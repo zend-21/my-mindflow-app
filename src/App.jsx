@@ -125,7 +125,11 @@ const DraggableWidget = ({ id, onSwitchTab, addActivity, recentActivities, displ
 
 function App() {
     const [user, setUser] = useState(null);
-    const [profile, setProfile] = useState(null);
+    
+    const [profile, setProfile] = useState({
+        name: '개발자 모드',
+        picture: '/placeholder-avatar.svg'
+    });
     const [activeTab, setActiveTab] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     
@@ -142,14 +146,17 @@ function App() {
     const secretKeyFromUrl = urlParams.get('secret');
     const adminSecretKey = import.meta.env.VITE_ADMIN_SECRET_KEY;
     const isAdminMode = secretKeyFromUrl === adminSecretKey;
-
+    
+    /*
     const login = useGoogleLogin({
         onSuccess: (codeResponse) => {
             setUser(codeResponse);
         },
         onError: (error) => console.log('Login Failed:', error)
     });
+    */
 
+    /*
     useEffect(() => {
         if (isAdminMode) {
             // 관리자 모드인 경우, 더미 프로필로 설정하여 바로 메인 화면으로 진입
@@ -173,6 +180,7 @@ function App() {
             });
         }
     }, [user, isAdminMode]);
+    */
 
     const logOut = () => {
         setProfile(null);
@@ -294,69 +302,63 @@ function App() {
             <Screen>
                 <Header
                     profile={profile}
-                    onLogin={login}
-                    onLogout={logOut}
+                    onLogin={null} // onLogin 함수를 null로 설정
+                    onLogout={null} // onLogout 함수를 null로 설정
                     onSearchClick={handleSearchClick}
                     onMenuClick={handleToggleMenu}
                 />
-                {!profile ? (
-                    <LoginScreen>
-                        <h2>나만의 생각 정리 앱</h2>
-                        <p>로그인하고 모든 기능을 사용해 보세요.</p>
-                        <LoginButton onClick={() => login()}>구글 계정으로 시작하기</LoginButton>
-                    </LoginScreen>
-                ) : (
-                    <ContentArea>
-                        {activeTab === 'home' && (
-                            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-                                <SortableContext items={widgets} strategy={verticalListSortingStrategy}>
-                                    {widgets.map((widgetName) => (
-                                        <DraggableWidget
-                                            key={widgetName}
-                                            id={widgetName}
-                                            onSwitchTab={handleSwitchTab}
-                                            addActivity={addActivity}
-                                            recentActivities={recentActivities}
-                                            displayCount={displayCount}
-                                            setDisplayCount={setDisplayCount}
-                                            deleteActivity={deleteActivity}
-                                        />
-                                    ))}
-                                </SortableContext>
-                            </DndContext>
-                        )}
-                        {activeTab === 'memo' && 
-                            <MemoPage 
-                                memos={memos}
-                                onSaveNewMemo={handleSaveNewMemo}
-                                onEditMemo={handleEditMemo}
-                                onDeleteMemo={handleDeleteMemo}
-                                addActivity={addActivity}
-                                profile={profile} // profile prop 추가
-                            />
-                        }
-                        {activeTab === 'calendar' && <div>캘린더 페이지</div>}
-                        {activeTab === 'secret' && <div>시크릿 페이지</div>}
-                        {activeTab === 'review' && <div>리뷰 페이지</div>}
-                        {activeTab === 'profile' && <div>프로필 페이지</div>}
-                        {activeTab === 'todo' && <div>할 일 페이지</div>}
-                        {activeTab === 'recent-detail' && <div>최근 활동 상세 페이지</div>}
-                    </ContentArea>
-                )}
 
-                {profile && <FloatingButton onClick={handleFloatingButtonClick} />}
-                {profile && <BottomNav activeTab={activeTab} onSwitchTab={handleSwitchTab} />}
-                {profile && <SideMenu 
-                    isOpen={isMenuOpen} 
+                <ContentArea>
+                    {activeTab === 'home' && (
+                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+                            <SortableContext items={widgets} strategy={verticalListSortingStrategy}>
+                                {widgets.map((widgetName) => (
+                                    <DraggableWidget
+                                        key={widgetName}
+                                        id={widgetName}
+                                        onSwitchTab={handleSwitchTab}
+                                        addActivity={addActivity}
+                                        recentActivities={recentActivities}
+                                        displayCount={displayCount}
+                                        setDisplayCount={setDisplayCount}
+                                        deleteActivity={deleteActivity}
+                                    />
+                                ))}
+                            </SortableContext>
+                        </DndContext>
+                    )}
+                    {activeTab === 'memo' &&
+                        <MemoPage
+                            memos={memos}
+                            onSaveNewMemo={handleSaveNewMemo}
+                            onEditMemo={handleEditMemo}
+                            onDeleteMemo={handleDeleteMemo}
+                            addActivity={addActivity}
+                            profile={profile}
+                        />
+                    }
+                    {activeTab === 'calendar' && <div>캘린더 페이지</div>}
+                    {activeTab === 'secret' && <div>시크릿 페이지</div>}
+                    {activeTab === 'review' && <div>리뷰 페이지</div>}
+                    {activeTab === 'profile' && <div>프로필 페이지</div>}
+                    {activeTab === 'todo' && <div>할 일 페이지</div>}
+                    {activeTab === 'recent-detail' && <div>최근 활동 상세 페이지</div>}
+                </ContentArea>
+
+                {/* profile이 필요 없는 컴포넌트들 */}
+                <FloatingButton onClick={handleFloatingButtonClick} />
+                <BottomNav activeTab={activeTab} onSwitchTab={handleSwitchTab} />
+                <SideMenu
+                    isOpen={isMenuOpen}
                     onClose={handleToggleMenu}
                     displayCount={displayCount}
                     setDisplayCount={setDisplayCount}
-                />}
+                />
             </Screen>
 
             {isSearchModalOpen && (
-                <SearchModal 
-                    onClose={() => setIsSearchModalOpen(false)} 
+                <SearchModal
+                    onClose={() => setIsSearchModalOpen(false)}
                     allData={allData}
                     onSelectResult={(id, type) => {
                         setIsSearchModalOpen(false);

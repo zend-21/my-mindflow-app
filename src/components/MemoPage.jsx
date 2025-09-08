@@ -36,14 +36,14 @@ const SectionHeader = styled.div`
 
 const SectionTitle = styled.h2`
     font-size: 24px;
-    font-weight: 500; /* 볼드 제거 */
+    font-weight: 500;
     color: #2d3748;
     margin: 0;
 `;
 
 const MemoCount = styled.span`
-    font-size: 18px; /* 글씨 크기 작게 */
-    font-weight: normal; /* 볼드 제거 */
+    font-size: 18px;
+    font-weight: normal;
 `;
 
 const AddMemoButton = styled.button`
@@ -58,20 +58,50 @@ const AddMemoButton = styled.button`
     }
 `;
 
-const MemoList = styled.div`
+const ViewToggle = styled.div`
     display: flex;
-    flex-direction: column;
+    gap: 8px;
+`;
+
+const ViewButton = styled.button`
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: ${({ $isActive }) => ($isActive ? 1 : 0.5)};
+    transition: opacity 0.2s ease-in-out;
+    padding: 0;
+    display: flex;
+    align-items: center;
+
+    &:hover {
+        opacity: 0.8;
+    }
+`;
+
+const MemoList = styled.div`
+    display: ${({ $isGridLayout }) => ($isGridLayout ? 'grid' : 'flex')};
+    flex-direction: ${({ $isGridLayout }) => ($isGridLayout ? 'row' : 'column')};
+    flex-wrap: wrap;
     gap: 16px;
+    width: 100%;
+
+    ${({ $isGridLayout }) => $isGridLayout && `
+        grid-template-columns: repeat(2, 1fr);
+    `}
 `;
 
 const MemoCard = styled.div`
-    background: ${props => props.isImportant ? 'rgba(255, 230, 230, 0.9)' : '#fff8e1'};
+    background: ${({ $isImportant }) => ($isImportant ? 'rgba(255, 230, 230, 0.9)' : '#fff8e1')};
     border-radius: 16px;
     padding: 16px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     position: relative;
+    
+    ${({ $isGridLayout }) => $isGridLayout && `
+        height: 150px; 
+    `}
     
     &:hover {
         transform: translateY(-4px);
@@ -89,10 +119,9 @@ const MemoText = styled.p`
     font-size: 16px;
     color: #4a5568;
     margin: 0;
-    white-space: nowrap; /* ★ 줄바꿈 방지 */
+    white-space: nowrap; 
     overflow: hidden;
     text-overflow: ellipsis;
-    /* -webkit-box 관련 속성은 이제 필요 없습니다 */
     flex-grow: 1;
 `;
 
@@ -116,6 +145,7 @@ const DeleteButton = styled.button`
     }
 `;
 
+// === 이 부분 수정: isImportant prop을 $isImportant로 변경 ===
 const ImportantIndicator = styled.span`
     position: absolute;
     top: -8px;
@@ -130,10 +160,11 @@ const ImportantIndicator = styled.span`
     color: white;
     font-size: 14px;
     font-weight: 900;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); /* 연한 그림자 효과 추가 */
-    opacity: ${props => props.isImportant ? 1 : 0};
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); 
+    opacity: ${props => props.$isImportant ? 1 : 0};
     transition: opacity 0.3s ease;
 `;
+// === 수정 끝 ===
 
 const MemoPage = ({ memos, onSaveNewMemo, onEditMemo, onDeleteMemo, addActivity }) => {
     const [isNewMemoModalOpen, setIsNewMemoModalOpen] = useState(false);
@@ -142,25 +173,22 @@ const MemoPage = ({ memos, onSaveNewMemo, onEditMemo, onDeleteMemo, addActivity 
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [memoToDelete, setMemoToDelete] = useState(null);
     const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
+    const [isGridLayout, setIsGridLayout] = useState(true);
 
-    // 새 메모 모달 열기
     const handleAddMemoClick = () => {
         setIsNewMemoModalOpen(true);
     };
 
-    // 메모 상세 모달 열기
     const handleMemoCardClick = (memo) => {
         setSelectedMemo(memo);
         setIsDetailModalOpen(true);
     };
 
-    // 메모 수정
     const handleDetailSave = (id, newContent, isImportant) => {
         onEditMemo(id, newContent, isImportant);
         setIsDetailModalOpen(false);
     };
     
-    // 메모 삭제
     const handleDeleteClick = (e, id) => {
         e.stopPropagation();
         setMemoToDelete(id);
@@ -178,7 +206,6 @@ const MemoPage = ({ memos, onSaveNewMemo, onEditMemo, onDeleteMemo, addActivity 
         setMemoToDelete(null);
     };
 
-    // 데이터 내보내기/가져오기
     const handleExport = () => {
         exportData(memos);
         addActivity('백업', '전체 메모 백업');
@@ -199,22 +226,43 @@ const MemoPage = ({ memos, onSaveNewMemo, onEditMemo, onDeleteMemo, addActivity 
         <MemoContainer>
             <SectionHeader>
                 <SectionTitle>📝  메모장 <MemoCount>({memos.length})</MemoCount></SectionTitle>
+                <ViewToggle>
+                    <ViewButton $isActive={!isGridLayout} onClick={() => setIsGridLayout(false)}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2d3748" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="3" y1="12" x2="21" y2="12" />
+                            <line x1="3" y1="6" x2="21" y2="6" />
+                            <line x1="3" y1="18" x2="21" y2="18" />
+                        </svg>
+                    </ViewButton>
+                    <ViewButton $isActive={isGridLayout} onClick={() => setIsGridLayout(true)}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2d3748" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="3" width="7" height="7" />
+                            <rect x="14" y="3" width="7" height="7" />
+                            <rect x="14" y="14" width="7" height="7" />
+                            <rect x="3" y="14" width="7" height="7" />
+                        </svg>
+                    </ViewButton>
+                </ViewToggle>
                 <AddMemoButton onClick={() => setIsNewMemoModalOpen(true)}>+</AddMemoButton>
             </SectionHeader>
 
-            <MemoList>
+            <MemoList $isGridLayout={isGridLayout}>
                 {memos.length > 0 ? (
                     sortedMemos.map(memo => {
-                        // 5시간(300분)을 밀리초로 계산하여 'new' 여부 판단
                         const isNew = (Date.now() - memo.date) < (5 * 60 * 60 * 1000);
                         return (
-                            <MemoCard key={memo.id} onClick={() => handleMemoCardClick(memo)} isImportant={memo.isImportant}>
-                                {isNew && <NewBadge>NEW</NewBadge>} {/* ★ 이 부분에 추가 */}
-                                <ImportantIndicator isImportant={memo.isImportant}>!</ImportantIndicator>
+                            <MemoCard 
+                                key={memo.id} 
+                                onClick={() => handleMemoCardClick(memo)} 
+                                $isImportant={memo.isImportant} 
+                                $isGridLayout={isGridLayout}
+                            >
+                                {isNew && <NewBadge>NEW</NewBadge>}
+                                {/* 이 부분 수정: isImportant prop을 $isImportant로 변경 */}
+                                <ImportantIndicator $isImportant={memo.isImportant}>!</ImportantIndicator>
                                 <MemoHeader>
                                     <MemoText>
                                         {
-                                            // 텍스트를 13자로 자르고, 넘치면 ...를 추가
                                             memo.content.split('\n')[0].length > 15
                                                 ? memo.content.split('\n')[0].substring(0, 15) + '...'
                                                 : memo.content.split('\n')[0]
