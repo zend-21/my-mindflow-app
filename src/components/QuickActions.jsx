@@ -19,6 +19,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { restrictToParentElement } from '@dnd-kit/modifiers';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const ActionsGrid = styled.div`
     display: grid;
@@ -97,11 +98,16 @@ const CardSubtitle = styled.div`
 
 const DragOverlayCard = ({ item }) => (
     <ActionCard $isDragging>
-        <CardIcon $isDragging>{item.icon}</CardIcon>
-        <CardContent>
-            <CardTitle>{item.title}</CardTitle>
-            <CardSubtitle>{item.subtitle}</CardSubtitle>
-        </CardContent>
+        <div style={{
+            transform: 'rotate(5deg) scale(1.05)',
+            transformOrigin: 'center'
+        }}>
+            <CardIcon $isDragging>{item.icon}</CardIcon>
+            <CardContent>
+                <CardTitle>{item.title}</CardTitle>
+                <CardSubtitle>{item.subtitle}</CardSubtitle>
+            </CardContent>
+        </div>
     </ActionCard>
 );
 
@@ -152,7 +158,7 @@ const SortableItem = ({ item, onSwitchTab, isDragOverlay = false }) => {
 };
 
 const QuickActions = ({ onSwitchTab }) => {
-    const [items, setItems] = useState([
+    const [items, setItems] = useLocalStorage('quick-actions-order', [
         { id: 'memo', icon: '📝', title: '메모', subtitle: '빠른 생각 정리' },
         { id: 'calendar', icon: '📅', title: '캘린더', subtitle: '일정 관리' },
         { id: 'secret', icon: '🔒', title: '시크릿', subtitle: '비밀 노트' },

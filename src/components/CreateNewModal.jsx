@@ -2,6 +2,7 @@
 
 import React from 'react';
 import styled, { keyframes } from 'styled-components';
+import Portal from './Portal';
 
 const fadeIn = keyframes`
   from {
@@ -78,6 +79,7 @@ const CreateNewModal = ({ onClose, onActionSelect }) => {
     ];
 
     return (
+      <Portal>
         <Overlay onClick={onClose}>
             <ModalContent onClick={e => e.stopPropagation()}>
                 <ModalTitle>새 항목 만들기</ModalTitle>
@@ -89,6 +91,7 @@ const CreateNewModal = ({ onClose, onActionSelect }) => {
                 ))}
             </ModalContent>
         </Overlay>
+      </Portal>
     );
 };
 

@@ -47,6 +47,13 @@ const NavIcon = styled.div`
     margin-bottom: 4px;
     color: ${props => props.$active ? '#4a90e2' : '#777'};
     transition: all 0.3s ease;
+
+    /* ★★★ 아래 두 줄 추가 ★★★ */
+    /* 활성화($active)되면 흑백 필터(grayscale)를 0%로, 비활성화되면 100%(흑백)로 설정 */
+    filter: grayscale(${props => props.$active ? '0%' : '100%'});
+    
+    /* 비활성화 시 연하게 보이도록 투명도(opacity) 조절 */
+    opacity: ${props => props.$active ? 1 : 0.3};
 `;
 
 const NavLabel = styled.span`

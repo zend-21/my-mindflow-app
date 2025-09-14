@@ -28,4 +28,4 @@ dist-ssr
 .env
 
 # 구글 클라이언트 ID 파일 업로드 방지
-구글 클라이언트 ID.txt
+클라이언트 ID.txt

@@ -1,20 +1,29 @@
 // src/components/MemoPage.jsx
 
-import React, { useState } from 'react';
-import styled from 'styled-components';
-import ConfirmationModal from './ConfirmationModal';
-import MemoDetailModal from './MemoDetailModal';
-import NewMemoModal from './NewMemoModal';
-import SideMenu from './SideMenu';
+import React, { useRef } from 'react';
+import styled, { keyframes, css } from 'styled-components'; 
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { exportData, importData } from '../utils/dataManager';
+import Header from './Header';
+import { BsCheckCircleFill, BsCircle } from 'react-icons/bs';
 
-// NEW 배지 스타일 추가
+// 애니메이션 keyframes
+const fadeIn = keyframes`
+    from { opacity: 0; }
+    to { opacity: 1; }
+`;
+
+const slideUp = keyframes`
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+`;
+
+// --- (스타일 정의) ---
 const NewBadge = styled.span`
     position: absolute;
     top: -8px;
     left: -8px;
-    background-color: #ff4d4f;
+    background-color: #5ebe26ff;
     color: white;
     font-size: 10px;
     font-weight: bold;
@@ -22,30 +31,104 @@ const NewBadge = styled.span`
     border-radius: 12px;
     z-index: 10;
 `;
-
 const MemoContainer = styled.div`
-    padding: 24px;
+    padding: 0px 0px;
 `;
-
 const SectionHeader = styled.div`
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
 `;
+const SelectionHeader = styled.div`
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background-color: #ececec; /* 단일 색상으로 변경 */
+    padding: 10px 20px;
+    animation: ${fadeIn} 0.3s ease-out;
+    transform: translateY(-5px);
+    border-radius: 12px;
+`;
+const HeaderButton = styled.button`
+    background-color: white;
+    border: none;
+    font-size: 16px;
+    color: #4a90e2;
+    cursor: pointer;
+    font-weight: 600;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 
+    &:disabled {
+        background-color: #e9ecef;
+        box-shadow: none;
+        color: #a0aec0;
+        cursor: not-allowed;
+    }
+    
+    &:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+`;
+const SelectionCount = styled.span`
+    font-size: 20px;
+    font-weight: bold;
+    color: #ff2b2b;
+    margin-top: 0px; /* 오타 수정 및 정렬을 위해 margin-top 사용 */
+`;
+const SectionTitleWrapper = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 10px;
+`;
 const SectionTitle = styled.h2`
     font-size: 24px;
     font-weight: 500;
-    color: #2d3748;
+    color: #482d2d;
     margin: 0;
 `;
-
 const MemoCount = styled.span`
     font-size: 18px;
     font-weight: normal;
 `;
-
+const HeaderButtonWrapper = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 15px;
+`;
+const LayoutButtonSet = styled.div`
+    display: flex;
+    gap: 5px; 
+`;
+const LayoutToggleButton = styled.button`
+    background-color: transparent;
+    border: 1px solid ${props => props.$isActive ? '#4a90e2' : '#e2e8f0'}; 
+    font-size: 18px;
+    cursor: pointer;
+    color: ${props => props.$isActive ? '#4a90e2' : '#a0aec0'}; 
+    border-radius: 8px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    
+    &:hover {
+        background-color: #f7fafc;
+        color: #000;
+        border-color: #a0aec0; 
+    }
+`;
 const AddMemoButton = styled.button`
     background-color: transparent;
     border: none;
@@ -56,82 +139,88 @@ const AddMemoButton = styled.button`
     &:hover {
         transform: rotate(90deg);
     }
-`;
-
-const ViewToggle = styled.div`
-    display: flex;
-    gap: 8px;
-`;
-
-const ViewButton = styled.button`
-    background: none;
-    border: none;
-    cursor: pointer;
-    opacity: ${({ $isActive }) => ($isActive ? 1 : 0.5)};
-    transition: opacity 0.2s ease-in-out;
+    width: 40px;
+    height: 40px;
     padding: 0;
     display: flex;
     align-items: center;
-
-    &:hover {
-        opacity: 0.8;
-    }
+    justify-content: center;
 `;
-
-const MemoList = styled.div`
-    display: ${({ $isGridLayout }) => ($isGridLayout ? 'grid' : 'flex')};
-    flex-direction: ${({ $isGridLayout }) => ($isGridLayout ? 'row' : 'column')};
-    flex-wrap: wrap;
-    gap: 16px;
+const GridIconContainer = styled.div`
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 3px;
+    width: 15px;
+    height: 15px;
+`;
+const GridSquare = styled.span`
+    background-color: currentColor;
+    border-radius: 2px;
+`;
+const GridIcon = () => (
+    <GridIconContainer>
+        <GridSquare /><GridSquare /><GridSquare /><GridSquare />
+    </GridIconContainer>
+);
+const ListIconContainer = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 15px;
+    height: 15px;
+    justify-content: center;
+`;
+const ListBar = styled.span`
+    background-color: currentColor;
+    height: 5px;
     width: 100%;
-
-    ${({ $isGridLayout }) => $isGridLayout && `
-        grid-template-columns: repeat(2, 1fr);
-    `}
+    border-radius: 2px;
 `;
-
+const ListIcon = () => (
+    <ListIconContainer>
+        <ListBar /><ListBar />
+    </ListIconContainer>
+);
 const MemoCard = styled.div`
-    background: ${({ $isImportant }) => ($isImportant ? 'rgba(255, 230, 230, 0.9)' : '#fff8e1')};
+    background: ${props => props.$isImportant ? 'rgba(255, 230, 230, 0.9)' : '#fff8e1'};
     border-radius: 16px;
     padding: 16px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
     cursor: pointer;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     position: relative;
-    
-    ${({ $isGridLayout }) => $isGridLayout && `
-        height: 150px; 
-    `}
+    border: 2px solid ${props => props.$isSelected ? '#4a90e2' : 'transparent'};
     
     &:hover {
         transform: translateY(-4px);
         box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
     }
-`;
 
+    ${props => props.$isSelectionMode && `
+        &:hover {
+            transform: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+    `}
+`;
 const MemoHeader = styled.div`
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
 `;
-
 const MemoText = styled.p`
     font-size: 16px;
     color: #4a5568;
     margin: 0;
-    white-space: nowrap; 
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex-grow: 1;
+    white-space: pre-wrap; 
+    word-break: break-word; 
 `;
-
 const DateText = styled.span`
     font-size: 12px;
     color: #a0aec0;
     margin-top: 8px;
     display: block;
 `;
-
 const DeleteButton = styled.button`
     background: none;
     border: none;
@@ -143,136 +232,320 @@ const DeleteButton = styled.button`
     &:hover {
         color: #e53e3e;
     }
+    ${props => props.$isSelectionMode && `
+        display: none;
+    `}
 `;
-
-// === 이 부분 수정: isImportant prop을 $isImportant로 변경 ===
+const ToastOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 6000; 
+  background: rgba(0, 0, 0, 0.2); 
+  animation: ${fadeIn} 0.2s ease-out;
+`;
+const ToastBox = styled.div`
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
+`;
 const ImportantIndicator = styled.span`
     position: absolute;
-    top: -8px;
-    right: -8px;
+    top: -8px; 
+    right: -8px; 
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: #e53e3e;
+    background: #ff4d4f;
     display: flex;
     justify-content: center;
     align-items: center;
     color: white;
     font-size: 14px;
     font-weight: 900;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); 
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     opacity: ${props => props.$isImportant ? 1 : 0};
     transition: opacity 0.3s ease;
-`;
-// === 수정 끝 ===
+    z-index: 10; 
 
-const MemoPage = ({ memos, onSaveNewMemo, onEditMemo, onDeleteMemo, addActivity }) => {
-    const [isNewMemoModalOpen, setIsNewMemoModalOpen] = useState(false);
-    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-    const [selectedMemo, setSelectedMemo] = useState(null);
-    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-    const [memoToDelete, setMemoToDelete] = useState(null);
-    const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
-    const [isGridLayout, setIsGridLayout] = useState(true);
+    ${props => props.$layoutView === 'grid' && `
+        top: -12px; 
+        right: 5px;
+        left: auto;
+        transform: none;
+    `}
+`;
+const MemoList = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 16px; 
+    width: 100%;
+    margin-top: 35px;
+
+    & ${MemoText} {
+        white-space: nowrap; 
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex-grow: 1; 
+    }
+
+    /* ★★★ 반응형 그리드 레이아웃 수정 ★★★ */
+    ${props => props.$layoutView === 'grid' && `
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+
+        & ${MemoCard} {
+            height: 160px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; 
+            padding-top: 20px;
+        }
+
+        & ${MemoHeader} {
+             flex-grow: 1; 
+             overflow: hidden; 
+        }
+
+        & ${MemoText} {
+            white-space: pre-wrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 6; 
+            -webkit-box-orient: vertical;
+            word-break: break-word;
+            flex-grow: 0;
+        }
+        
+         & ${DateText} {
+             flex-shrink: 0; 
+             margin-top: 8px; 
+         }
+    `}
+
+    /* ★★★ 태블릿 및 데스크탑용 미디어 쿼리 추가 ★★★ */
+    @media (min-width: 768px) {
+        ${props => props.$layoutView === 'grid' && `
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        `}
+    }
+
+    @media (min-width: 1024px) {
+        ${props => props.$layoutView === 'grid' && `
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        `}
+    }
+
+    @media (min-width: 1440px) {
+        ${props => props.$layoutView === 'grid' && `
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        `}
+    }
+`;
+
+const LeftHeaderGroup = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 5px;
+`;
+const CheckboxContainer = styled.div`
+    position: absolute;
+    top: 19px;
+    right: 10px;
+    font-size: 24px;
+    color: ${props => props.$isSelected ? '#4a90e2' : '#a0aec0'};
+    background: #fff;
+    border-radius: 50%;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    
+    ${props => !props.$isVisible && `
+        display: none;
+    `}
+`;
+const StyledCheckIcon = styled(BsCheckCircleFill)`
+    transform: translateY(0px);
+`;
+// --- (모든 스타일 끝) ---
+
+const MemoPage = ({ 
+    memos, 
+    onOpenNewMemo, 
+    onOpenDetailMemo, 
+    onDeleteMemoRequest,
+    isSelectionMode,
+    selectedMemoIds,
+    onStartSelectionMode,
+    onToggleMemoSelection,
+    onExitSelectionMode,
+    onRequestDeleteSelectedMemos
+}) => {
+    const [layoutView, setLayoutView] = useLocalStorage('memoLayoutView', 'list'); 
+    const longPressTimer = useRef(null);
+    const PRESS_DURATION = 500;
 
     const handleAddMemoClick = () => {
-        setIsNewMemoModalOpen(true);
+        onOpenNewMemo();
     };
 
-    const handleMemoCardClick = (memo) => {
-        setSelectedMemo(memo);
-        setIsDetailModalOpen(true);
+    const handleTouchStart = (e, memoId) => {
+        longPressTimer.current = setTimeout(() => {
+            onStartSelectionMode(memoId);
+        }, PRESS_DURATION);
     };
 
-    const handleDetailSave = (id, newContent, isImportant) => {
-        onEditMemo(id, newContent, isImportant);
-        setIsDetailModalOpen(false);
+    const handleTouchEnd = () => {
+        clearTimeout(longPressTimer.current);
+    };
+
+    const handleMemoCardInteraction = (e, memo) => {
+        e.stopPropagation();
+        
+        if (isSelectionMode) {
+            // 이미 선택 모드인 경우, 토글만 수행
+            onToggleMemoSelection(memo.id);
+        } else {
+            // 선택 모드가 아닌 경우, 상세 보기로 이동
+            onOpenDetailMemo(memo);
+        }
+        // 클릭 이벤트 후 longPressTimer를 항상 초기화
+        clearTimeout(longPressTimer.current);
+    };
+    
+    const handleMouseUp = (e, memo) => {
+        clearTimeout(longPressTimer.current);
+    };
+    
+    const handleMouseDown = (e, memoId) => {
+        longPressTimer.current = setTimeout(() => {
+            onStartSelectionMode(memoId);
+        }, PRESS_DURATION);
     };
     
     const handleDeleteClick = (e, id) => {
         e.stopPropagation();
-        setMemoToDelete(id);
-        setIsDeleteModalOpen(true);
+        onDeleteMemoRequest(id);
     };
 
-    const handleDeleteConfirm = () => {
-        onDeleteMemo(memoToDelete);
-        setIsDeleteModalOpen(false);
-        setMemoToDelete(null);
-    };
+    let sortedMemos = [];
+    if (memos && Array.isArray(memos)) {
+        sortedMemos = [...memos].sort((a, b) => {
+            const aImportant = a.isImportant ? 1 : 0;
+            const bImportant = b.isImportant ? 1 : 0;
+            return bImportant - aImportant || (b.date || 0) - (a.date || 0);
+        });
+    }
 
-    const handleDeleteCancel = () => {
-        setIsDeleteModalOpen(false);
-        setMemoToDelete(null);
-    };
-
-    const handleExport = () => {
-        exportData(memos);
-        addActivity('백업', '전체 메모 백업');
-    };
-
-    const handleImport = async () => {
-        const imported = await importData();
-        if (imported) {
-            alert('데이터가 성공적으로 복원되었습니다.');
-            addActivity('복원', '전체 메모 복원');
-            window.location.reload();
-        }
-    };
-    
-    const sortedMemos = [...memos].sort((a, b) => b.isImportant - a.isImportant || b.date - a.date);
+    const selectedCount = selectedMemoIds.size;
 
     return (
         <MemoContainer>
-            <SectionHeader>
-                <SectionTitle>📝  메모장 <MemoCount>({memos.length})</MemoCount></SectionTitle>
-                <ViewToggle>
-                    <ViewButton $isActive={!isGridLayout} onClick={() => setIsGridLayout(false)}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2d3748" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <line x1="3" y1="12" x2="21" y2="12" />
-                            <line x1="3" y1="6" x2="21" y2="6" />
-                            <line x1="3" y1="18" x2="21" y2="18" />
-                        </svg>
-                    </ViewButton>
-                    <ViewButton $isActive={isGridLayout} onClick={() => setIsGridLayout(true)}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2d3748" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="3" y="3" width="7" height="7" />
-                            <rect x="14" y="3" width="7" height="7" />
-                            <rect x="14" y="14" width="7" height="7" />
-                            <rect x="3" y="14" width="7" height="7" />
-                        </svg>
-                    </ViewButton>
-                </ViewToggle>
-                <AddMemoButton onClick={() => setIsNewMemoModalOpen(true)}>+</AddMemoButton>
-            </SectionHeader>
+            {isSelectionMode ? (
+                <SelectionHeader>
+                    <HeaderButton onClick={onExitSelectionMode}>취소</HeaderButton>
+                    <SelectionCount>{selectedCount}개 선택됨</SelectionCount>
+                    <HeaderButton onClick={onRequestDeleteSelectedMemos} disabled={selectedCount === 0}>
+                        삭제
+                    </HeaderButton>
+                </SelectionHeader>
+            ) : (
+                <SectionHeader>
+                    <LeftHeaderGroup>
+                        <SectionTitleWrapper>
+                            <SectionTitle>📝  메모장 <MemoCount>({memos?.length || 0})</MemoCount></SectionTitle>
+                        </SectionTitleWrapper>
+                        <AddMemoButton onClick={handleAddMemoClick}>+</AddMemoButton>
+                    </LeftHeaderGroup>
+                    
+                    <HeaderButtonWrapper>
+                        <LayoutButtonSet>
+                            <LayoutToggleButton $isActive={layoutView === 'list'} onClick={() => setLayoutView('list')}>
+                                <ListIcon />
+                            </LayoutToggleButton>
+                            <LayoutToggleButton $isActive={layoutView === 'grid'} onClick={() => setLayoutView('grid')}>
+                                <GridIcon />
+                            </LayoutToggleButton>
+                        </LayoutButtonSet>
+                    </HeaderButtonWrapper>
+                </SectionHeader>
+            )}
 
-            <MemoList $isGridLayout={isGridLayout}>
-                {memos.length > 0 ? (
+            <MemoList $layoutView={layoutView}>
+                {sortedMemos.length > 0 ? (
                     sortedMemos.map(memo => {
+                        if (!memo || !memo.id) {
+                            return null;
+                        }
                         const isNew = (Date.now() - memo.date) < (5 * 60 * 60 * 1000);
+                        const isSelected = selectedMemoIds.has(memo.id);
+                        
                         return (
                             <MemoCard 
                                 key={memo.id} 
-                                onClick={() => handleMemoCardClick(memo)} 
-                                $isImportant={memo.isImportant} 
-                                $isGridLayout={isGridLayout}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    if(isSelectionMode) {
+                                        onToggleMemoSelection(memo.id);
+                                    } else {
+                                        onOpenDetailMemo(memo);
+                                    }
+                                }} 
+                                onTouchStart={(e) => {
+                                    longPressTimer.current = setTimeout(() => {
+                                        onStartSelectionMode(memo.id);
+                                    }, PRESS_DURATION);
+                                }}
+                                onTouchEnd={() => {
+                                    clearTimeout(longPressTimer.current);
+                                }}
+                                onTouchMove={() => {
+                                    clearTimeout(longPressTimer.current);
+                                }}
+                                onMouseDown={(e) => {
+                                    longPressTimer.current = setTimeout(() => {
+                                        onStartSelectionMode(memo.id);
+                                    }, PRESS_DURATION);
+                                }}
+                                onMouseUp={() => {
+                                    clearTimeout(longPressTimer.current);
+                                }}
+                                onMouseLeave={() => clearTimeout(longPressTimer.current)}
+                                $isImportant={memo.isImportant}
+                                $isSelectionMode={isSelectionMode}
+                                $isSelected={isSelected}
                             >
-                                {isNew && <NewBadge>NEW</NewBadge>}
-                                {/* 이 부분 수정: isImportant prop을 $isImportant로 변경 */}
-                                <ImportantIndicator $isImportant={memo.isImportant}>!</ImportantIndicator>
+                                <CheckboxContainer $isVisible={isSelectionMode} $isSelected={isSelected}>
+                                    {isSelected ? <StyledCheckIcon /> : <BsCircle />}
+                                </CheckboxContainer>
+                                {isNew && <NewBadge>NEW</NewBadge>} 
+                                <ImportantIndicator $isImportant={memo.isImportant} $layoutView={layoutView}>!</ImportantIndicator>
                                 <MemoHeader>
                                     <MemoText>
-                                        {
-                                            memo.content.split('\n')[0].length > 15
-                                                ? memo.content.split('\n')[0].substring(0, 15) + '...'
-                                                : memo.content.split('\n')[0]
-                                        }
+                                        {memo.content || ''}
                                     </MemoText>
-                                    <DeleteButton onClick={(e) => handleDeleteClick(e, memo.id)}>
+                                    <DeleteButton onClick={(e) => handleDeleteClick(e, memo.id)} $isSelectionMode={isSelectionMode}>
                                         &times;
                                     </DeleteButton>
                                 </MemoHeader>
-                                <DateText>{memo.displayDate}</DateText>
+                                <DateText>{memo.displayDate || '날짜 없음'}</DateText>
                             </MemoCard>
                         );
                     })
@@ -280,32 +553,6 @@ const MemoPage = ({ memos, onSaveNewMemo, onEditMemo, onDeleteMemo, addActivity 
                     <p>작성된 메모가 없습니다.</p>
                 )}
             </MemoList>
-
-            <ConfirmationModal
-                isOpen={isDeleteModalOpen}
-                onConfirm={handleDeleteConfirm}
-                onCancel={handleDeleteCancel}
-            />
-
-            <MemoDetailModal
-                isOpen={isDetailModalOpen}
-                memo={selectedMemo}
-                onSave={handleDetailSave}
-                onCancel={() => setIsDetailModalOpen(false)}
-            />
-
-            <NewMemoModal
-                isOpen={isNewMemoModalOpen}
-                onSave={onSaveNewMemo}
-                onCancel={() => setIsNewMemoModalOpen(false)}
-            />
-
-            <SideMenu
-                isOpen={isSideMenuOpen}
-                onClose={() => setIsSideMenuOpen(false)}
-                onExport={handleExport}
-                onImport={handleImport}
-            />
         </MemoContainer>
     );
 };

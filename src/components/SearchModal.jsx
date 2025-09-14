@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';
+import Portal from './Portal';
 
 const slideIn = keyframes`
   from {
@@ -22,20 +23,37 @@ const Overlay = styled.div`
     bottom: 0;
     background-color: rgba(0, 0, 0, 0.6);
     display: flex;
+    /* ★★★ 수정: 상단에 붙도록 정렬 ★★★ */
     align-items: flex-start;
     justify-content: center;
-    z-index: 2000;
+    z-index: 10000;
 `;
 
 const ModalContent = styled.div`
     background: #f0f2f5;
     border-radius: 0 0 20px 20px;
     width: 100%;
-    max-width: 450px;
+    max-width: 760px;
     padding: 16px;
     padding-bottom: 24px;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-    animation: ${slideIn} 0.3s ease-out forwards;
+    animation: ${slideIn} 0.3s ease-out forwards;  
+    
+    /* 가로 모드일 때 padding-bottom을 줄여 공간 확보 */
+    @media (orientation: landscape) {
+        padding-bottom: 10px;
+    }
+
+    /* ✅ PC 화면일 때 (768px 이상) */
+    @media (min-width: 768px) {
+        max-width: 420px;   /* PC에서 폭 제한 */
+        border-radius: 20px; /* PC에선 더 부드럽게 */
+    }
+
+    /* ✅ 큰 데스크탑 화면일 때 */
+    @media (min-width: 1200px) {
+        max-width: 580px;
+    }
 `;
 
 const SearchInput = styled.input`
@@ -134,7 +152,6 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
     const filteredResults = allData.filter(item => {
         const matchesCategory = activeFilters.includes('all') || activeFilters.includes(item.type);
         
-        // 시크릿 모드 필터가 선택되지 않았거나 검색어가 없으면 시크릿 데이터를 숨김
         const isSecretFilterActive = activeFilters.includes('secret');
         if (item.isSecret && !isSecretFilterActive) {
             return false;
@@ -147,6 +164,7 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
     });
 
     return (
+      <Portal>
         <Overlay onClick={onClose}>
             <ModalContent onClick={e => e.stopPropagation()}>
                 <SearchInput
@@ -184,6 +202,7 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
                 </SearchResultList>
             </ModalContent>
         </Overlay>
+      </Portal>
     );
 };
 

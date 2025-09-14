@@ -2,6 +2,7 @@
 
 import React from 'react';
 import styled, { keyframes } from 'styled-components';
+import Portal from './Portal';
 
 const fadeIn = keyframes`
     from { opacity: 0; transform: translateY(20px); }
@@ -33,10 +34,12 @@ const Notification = ({ message, isVisible }) => {
         return null;
     }
 
-    return (
+    return ( 
+      <Portal>
         <NotificationContainer isVisible={isVisible}>
             {message}
         </NotificationContainer>
+        </Portal>
     );
 };
 

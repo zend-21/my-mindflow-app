@@ -1,14 +1,17 @@
 // src/App.jsx
 
-import React, { useState, useEffect } from 'react';
-import styled from 'styled-components';
+import React, { useState, useEffect, useRef } from 'react';
+import styled, { keyframes, css } from 'styled-components'; 
 import { GlobalStyle } from './styles.js';
-import { useGoogleLogin } from '@react-oauth/google';
+import { GoogleLogin } from '@react-oauth/google';
+import { jwtDecode } from 'jwt-decode';
 import { DndContext, closestCenter, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useLocalStorage } from './hooks/useLocalStorage';
-
+import { exportData, importData } from './utils/dataManager';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 // 하위 컴포넌트들
 import Header from './components/Header.jsx';
 import StatsGrid from './components/StatsGrid.jsx';
@@ -19,24 +22,159 @@ import FloatingButton from './components/FloatingButton.jsx';
 import SideMenu from './components/SideMenu.jsx';
 import SearchModal from './components/SearchModal.jsx';
 import MemoPage from './components/MemoPage.jsx';
+import MemoDetailModal from './components/MemoDetailModal.jsx';
+import NewMemoModal from './components/NewMemoModal.jsx';
+import ConfirmationModal from './components/ConfirmationModal.jsx'; 
+import Calendar from './modules/calendar/Calendar.jsx';
+import CalendarEditorModal from './modules/calendar/CalendarEditorModal.jsx';
+import AlarmModal from './modules/calendar/AlarmModal.jsx';
+import DateSelectorModal from './modules/calendar/DateSelectorModal.jsx';
+import LoginModal from './components/LoginModal.jsx';
+
+// ★★★ 토스트 메시지 스타일 ★★★
+const fadeIn = keyframes`
+    from { opacity: 0; }
+    to { opacity: 1; }
+`;
+
+const MainContent = styled.main`
+  padding-top: 80px; /* 헤더 높이만큼 패딩 추가 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+`;
+
+const slideUp = keyframes`
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+`;
+
+const PullToSyncIndicator = styled.div`
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #818181ff;
+  font-size: 14px;
+  animation: ${fadeIn} 0.3s ease-out;
+  z-index: 5000;
+  margin-top: 60px; 
+`;
+
+const SyncSpinner = styled.div`
+  width: 16px;
+  height: 16px;
+  border: 2px solid #a0aec0;
+  border-top: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+`;
+
+const ToastOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 12000;
+  background: rgba(0, 0, 0, 0.2); 
+  animation: ${fadeIn} 0.2s ease-out;
+`;
+
+const ToastBox = styled.div`
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 8px;
+  font-size: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
+  text-align: center;
+`;
 
 const Screen = styled.div`
     height: 100vh;
-    width: 100vw;
-    max-width: 450px;
+    width: 100%;
+    max-width: 450px; /* 모바일 기본 너비 */
+    margin: 0 auto;
+    
     background: linear-gradient(180deg, #fafafa 0%, #f0f2f5 100%);
     position: relative;
     display: flex;
     flex-direction: column;
     overflow-x: hidden;
+    
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+
+    /* ★★★ 태블릿 화면 ★★★ */
+    @media (min-width: 768px) {
+        max-width: 480px; /* ◀◀◀ 책장의 폭을 넓힙니다 */
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+
+        ${props => props.$layoutView === 'grid' && `
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        `}
+    }
+
+    /* ★★★ 데스크탑 화면 ★★★ */
+    @media (min-width: 1024px) {
+        max-width: 530px; /* ◀◀◀ 책장의 폭을 더 넓힙니다 */
+
+        ${props => props.$layoutView === 'grid' && `
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        `}
+    }
+    
+    /* ★★★ 더 큰 데스크탑 화면 ★★★ */
+    @media (min-width: 1440px) {
+        max-width: 580px; /* ◀◀◀ 책장의 폭을 최대로 넓힙니다 */
+        
+        ${props => props.$layoutView === 'grid' && `
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        `}
+    }
+    
+    /* ★★★ 더 큰 데스크탑 화면 ★★★ */
+    @media (min-width: 1900px) {
+        max-width: 680px; /* ◀◀◀ 책장의 폭을 최대로 넓힙니다 */
+        
+        ${props => props.$layoutView === 'grid' && `
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        `}
+    }
 `;
 
 const ContentArea = styled.div`
     flex: 1;
-    padding: 16px 24px 24px 24px;
+    padding-left: 24px;
+    padding-right: 24px;
     padding-bottom: 80px;
+    padding-top: ${props => props.$showHeader ? '90px' : '20px'};
     overflow-y: auto;
-    transition: all 0.2s ease;
+    position: relative;
+    transition: padding-top 0.3s ease;
+    transform: translateY(${props => props.$pullDistance}px);
+    will-change: transform;
 `;
 
 const LoginScreen = styled.div`
@@ -57,6 +195,16 @@ const LoginScreen = styled.div`
         color: #888;
         margin-bottom: 30px;
     }
+`;
+
+const LoadingScreen = styled.div`
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 20px;
+    color: #888;
 `;
 
 const LoginButton = styled.button`
@@ -82,6 +230,13 @@ const WidgetWrapper = styled.div`
         box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         z-index: 1000;
         opacity: 0.85;
+        
+        padding: 24px;
+        
+        display: flex;
+        flex-direction: column;
+        background-color: #fff4b7ff; 
+        border-radius: 16px;
     `}
 `;
 
@@ -124,63 +279,152 @@ const DraggableWidget = ({ id, onSwitchTab, addActivity, recentActivities, displ
 };
 
 function App() {
-    const [user, setUser] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [profile, setProfile] = useState(null); 
+    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+ 
+    useEffect(() => {
+        // 브라우저 저장소(localStorage)에서 이전에 저장된 사용자 정보를 가져옴
+        const savedProfile = localStorage.getItem('userProfile');
+
+        if (savedProfile) {
+            // 저장된 정보가 있으면, profile 상태를 업데이트
+            setProfile(JSON.parse(savedProfile));
+        }
+        
+        // 정보 확인이 끝났으므로 로딩 상태를 false로 변경
+        setIsLoading(false);
+    }, []); // 빈 배열[]: 컴포넌트가 처음 마운트될 때 한 번만 실행
+
+    // ★★★ 3. 로그인 성공 시, 'userProfile'이 아닌 'profile' 상태를 업데이트합니다. ★★★
+    const handleLoginSuccess = (credentialResponse) => {
+        const decodedToken = jwtDecode(credentialResponse.credential);
+        setProfile(decodedToken);
+        localStorage.setItem('userProfile', JSON.stringify(decodedToken));
+        setIsLoginModalOpen(false);
+    };
+
+    const handleLoginError = () => {
+        console.log('Login Failed');
+        setIsLoginModalOpen(false); // ★ 로그인 실패/취소 시 모달 닫기
+    };
+
+    const handleSync = () => {
+        // 1. 로그인 상태 확인 (기존 로직과 동일)
+        if (!profile) {
+            showToast('로그인이 필요한 기능입니다.');
+            setIsLoginModalOpen(true);
+            return; // 함수 종료
+        }
+
+        // 2. 동기화 애니메이션 및 로직 실행
+        setIsSyncing(true);
+        console.log("동기화 시작...");
+        setTimeout(() => {
+            console.log("동기화 완료!");
+            setIsSyncing(false);
+            addActivity('동기화', '데이터 동기화 완료');
+            showToast("데이터 동기화가 완료되었습니다.");
+        }, 1500);
+    };
+
+    const handleTouchEnd = () => {
+        if (pullDistance > PULL_THRESHOLD) {
+            handleSync(); // 동기화 로직이 담긴 새 함수를 호출
+        } else {
+            setPullDistance(0);
+        }
+    };
+
+    const handleLogout = () => {
+        setProfile(null);
+        localStorage.removeItem('userProfile');
+        showToast("로그아웃 되었습니다.");
+        setIsMenuOpen(false); // ★★★ 사이드 메뉴를 닫는 코드 추가 ★★★
+    };
     
-    const [profile, setProfile] = useState({
-        name: '개발자 모드',
-        picture: '/placeholder-avatar.svg'
-    });
     const [activeTab, setActiveTab] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    const storageKeySuffix = profile ? profile.email : 'guest';
+    const [widgets, setWidgets] = useLocalStorage(`widgets_${storageKeySuffix}`, ['StatsGrid', 'QuickActions', 'RecentActivity']);
+    const [memos, setMemos] = useLocalStorage(`memos_${storageKeySuffix}`, []);
+    const [recentActivities, setRecentActivities] = useLocalStorage(`recentActivities_${storageKeySuffix}`, []);
+    const [calendarSchedules, setCalendarSchedules] = useLocalStorage(`calendarSchedules_${storageKeySuffix}`, {});
+    const [displayCount, setDisplayCount] = useLocalStorage(`displayCount_${storageKeySuffix}`, 5);
     
-    const [widgets, setWidgets] = useLocalStorage('widgets', profile, ['StatsGrid', 'QuickActions', 'RecentActivity']);
     const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+    const contentAreaRef = useRef(null);
     
-    // MemoPage에서 사용할 상태와 함수를 App.jsx에서 관리
-    const [memos, setMemos] = useLocalStorage('memos', profile, []);
-    const [recentActivities, setRecentActivities] = useLocalStorage('recentActivities', profile, []);
-    const [displayCount, setDisplayCount] = useLocalStorage('displayCount', profile, 5);
+    const [isCalendarEditorOpen, setIsCalendarEditorOpen] = useState(false);
+    const [calendarModalData, setCalendarModalData] = useState({ date: new Date(), text: '' });
     
-    // **새롭게 추가된 관리자 모드 로직**
     const urlParams = new URLSearchParams(window.location.search);
     const secretKeyFromUrl = urlParams.get('secret');
     const adminSecretKey = import.meta.env.VITE_ADMIN_SECRET_KEY;
     const isAdminMode = secretKeyFromUrl === adminSecretKey;
     
-    /*
-    const login = useGoogleLogin({
-        onSuccess: (codeResponse) => {
-            setUser(codeResponse);
-        },
-        onError: (error) => console.log('Login Failed:', error)
-    });
-    */
+    const handleOpenCalendarEditor = (date, text) => {
+        const key = format(new Date(date), 'yyyy-MM-dd');
+        const scheduleData = calendarSchedules[key] || {}; // 날짜 키로 전체 스케줄 데이터 조회
 
-    /*
-    useEffect(() => {
-        if (isAdminMode) {
-            // 관리자 모드인 경우, 더미 프로필로 설정하여 바로 메인 화면으로 진입
-            setProfile({
-                name: '관리자',
-                picture: 'https://via.placeholder.com/48',
-            });
-            console.log("관리자 모드로 진입했습니다.");
-        } else if (user) {
-            // 관리자 모드가 아닌 경우, 기존 구글 로그인 로직 실행
-            fetch(`https://www.googleapis.com/oauth2/v1/userinfo?access_token=${user.access_token}`, {
-                headers: {
-                    Authorization: `Bearer ${user.access_token}`,
-                    Accept: 'application/json'
+        // 모달에 전달할 데이터에 타임스탬프 추가
+        setCalendarModalData({
+            date,
+            text: scheduleData.text ?? text, // 텍스트는 기존 방식을 유지
+            createdAt: scheduleData.createdAt, // 작성일 추가
+            updatedAt: scheduleData.updatedAt  // 수정일 추가
+        });
+        setIsCalendarEditorOpen(true);
+    };
+
+    // 스케줄 저장/수정/삭제 함수 (Calendar.jsx에서 로직 이동)
+    // App.jsx 안에서 기존 handleCalendarScheduleSave 대신 아래 코드 붙여넣기
+    const handleCalendarScheduleSave = (date, text) => {
+        if (!date) return;
+
+        const key = format(new Date(date), 'yyyy-MM-dd');
+        const now = Date.now();
+
+        // ▼▼▼ 1. 저장하기 전에, 해당 날짜에 이미 스케줄이 있었는지 확인합니다. ▼▼▼
+        const isEditingExisting = !!calendarSchedules[key];
+
+        setCalendarSchedules(prev => {
+            const copy = { ...prev };
+
+            if (!text || text.trim() === "") {
+                if (copy[key]) {
+                    delete copy[key];
                 }
-            })
-            .then((res) => res.json())
-            .then((data) => {
-                setProfile(data);
-                setActiveTab('home');
-            });
+            } else {
+                copy[key] = {
+                    text,
+                    createdAt: copy[key]?.createdAt ?? now,
+                    updatedAt: now,
+                };
+            }
+            return copy;
+        });
+
+        // ▼▼▼ 2. 위에서 확인한 '수정 여부'에 따라 다른 메시지와 활동 로그를 보여줍니다. ▼▼▼
+        if (!text || text.trim() === "") {
+            addActivity('스케줄 삭제', `${key}`);
+            showToast?.('스케줄이 삭제되었습니다.');
+        } else {
+            const activityType = isEditingExisting ? '스케줄 수정' : '스케줄 등록';
+            const toastMessage = isEditingExisting ? '스케줄이 수정되었습니다.' : '스케줄이 등록되었습니다 ✅';
+            
+            addActivity(activityType, `${key} - ${text}`);
+            showToast?.(toastMessage);
         }
-    }, [user, isAdminMode]);
-    */
+
+        setIsCalendarEditorOpen(false);
+    };
+
+    const handleProfileClick = () => {
+        setIsMenuOpen(false);
+        alert("프로필 설정 페이지로 이동합니다. (연결 예정)");
+    };   
 
     const logOut = () => {
         setProfile(null);
@@ -188,7 +432,7 @@ function App() {
     };
 
     const addActivity = (type, description, memoId = null) => {
-        const allowedTypes = ['메모 작성', '메모 수정', '메모 삭제', '백업', '복원', '스케줄 등록', '리뷰 작성'];
+        const allowedTypes = ['메모 작성', '메모 수정', '메모 삭제', '백업', '복원', '스케줄 등록', '스케줄 수정', '스케줄 삭제', '리뷰 작성', '동기화'];
         if (!allowedTypes.includes(type)) {
             return;
         }
@@ -217,6 +461,93 @@ function App() {
         });
     };
     
+    const [isNewMemoModalOpen, setIsNewMemoModalOpen] = useState(false);
+    const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+    const [selectedMemo, setSelectedMemo] = useState(null);
+    const [toastMessage, setToastMessage] = useState(null);
+    const [memoOpenSource, setMemoOpenSource] = useState(null);
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectedMemoIds, setSelectedMemoIds] = useState(new Set());
+    
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [memoToDelete, setMemoToDelete] = useState(null);
+    const [isCalendarConfirmOpen, setIsCalendarConfirmOpen] = useState(false);
+    const [dateToDelete, setDateToDelete] = useState(null);
+    
+    const [isAlarmModalOpen, setIsAlarmModalOpen] = useState(false);
+    const [scheduleForAlarm, setScheduleForAlarm] = useState(null);
+    const [isDateSelectorOpen, setIsDateSelectorOpen] = useState(false);
+
+    const handleOpenAlarmModal = (scheduleData) => {
+        console.log('handleOpenAlarmModal 호출됨:', scheduleData); // 디버깅용
+        console.log('현재 isAlarmModalOpen 상태:', isAlarmModalOpen);
+        console.log('현재 scheduleForAlarm 상태:', scheduleForAlarm);
+        
+        setScheduleForAlarm(scheduleData);
+        setIsAlarmModalOpen(true);
+
+        setTimeout(() => {
+            console.log('상태 변경 후 isAlarmModalOpen:', isAlarmModalOpen);
+            console.log('상태 변경 후 scheduleForAlarm:', scheduleForAlarm);
+        }, 100);
+    };
+
+    const handleSaveAlarm = (alarmSettings) => {
+        // 1. 알람을 설정할 대상 스케줄의 날짜 키(key)를 찾습니다.
+        if (!scheduleForAlarm?.date) {
+            console.error("알람을 저장할 스케줄 정보가 없습니다.");
+            return;
+        }
+        const key = format(new Date(scheduleForAlarm.date), 'yyyy-MM-dd');
+
+        // 2. calendarSchedules 상태를 업데이트합니다.
+        setCalendarSchedules(prevSchedules => {
+            const updatedSchedules = { ...prevSchedules };
+            const targetSchedule = updatedSchedules[key];
+
+            // 3. 해당 날짜의 스케줄에 'alarm' 객체를 추가하거나 업데이트합니다.
+            if (targetSchedule) {
+                updatedSchedules[key] = {
+                    ...targetSchedule,
+                    alarm: alarmSettings
+                };
+            }
+            return updatedSchedules;
+        });
+
+        // 4. 사용자에게 피드백을 주고 모달을 닫습니다.
+        showToast('알람이 설정되었습니다. 🔔');
+        setIsAlarmModalOpen(false);
+        setScheduleForAlarm(null);
+    };
+
+    const requestCalendarDelete = (date) => {
+        setDateToDelete(date);
+        setIsCalendarConfirmOpen(true);
+    };
+
+    const showToast = (message) => {
+        setToastMessage(message);
+        setTimeout(() => {
+            setToastMessage(null);
+        }, 1500);
+    };
+    
+    const handleDataExport = () => {
+        exportData(memos);
+        addActivity('백업', '전체 메모 백업');
+        showToast("백업완료 되었습니다.");
+    };
+
+    const handleDataImport = async () => {
+        const imported = await importData();
+        if (imported) {
+            alert('데이터가 성공적으로 복원되었습니다.');
+            addActivity('복원', '전체 메모 복원');
+            window.location.reload();
+        }
+    };
+    
     const handleSaveNewMemo = (newMemoContent, isImportant) => {
         const now = Date.now();
         const newId = `m${now}`;
@@ -229,6 +560,8 @@ function App() {
         };
         setMemos(prevMemos => [newMemo, ...prevMemos]);
         addActivity('메모 작성', newMemoContent, newId);
+        setIsNewMemoModalOpen(false);
+        showToast("새 메모가 성공적으로 저장되었습니다.");
     };
 
     const handleEditMemo = (id, newContent, isImportant) => {
@@ -242,6 +575,8 @@ function App() {
             )
         );
         addActivity('메모 수정', newContent, id);
+        setIsDetailModalOpen(false);
+        showToast("메모가 성공적으로 수정되었습니다.");
     };
 
     const handleDeleteMemo = (id) => {
@@ -250,6 +585,71 @@ function App() {
             setMemos(prevMemos => prevMemos.filter(memo => memo.id !== id));
             addActivity('메모 삭제', deletedMemo.content, id);
         }
+        return deletedMemo; 
+    };
+    
+    const handleStartSelectionMode = (memoId) => {
+        setIsSelectionMode(true);
+        setSelectedMemoIds(new Set([memoId]));
+    };
+
+    const handleToggleMemoSelection = (memoId) => {
+        setSelectedMemoIds(prevIds => {
+            const newIds = new Set(prevIds);
+            if (newIds.has(memoId)) {
+                newIds.delete(memoId);
+            } else {
+                newIds.add(memoId);
+            }
+            if (newIds.size === 0) {
+                setIsSelectionMode(false);
+            }
+            return newIds;
+        });
+    };
+
+    const handleExitSelectionMode = () => {
+        setIsSelectionMode(false);
+        setSelectedMemoIds(new Set());
+    };
+
+    const requestDeleteSelectedMemos = () => {
+        if (selectedMemoIds.size === 0) return;
+        const idsToDelete = Array.from(selectedMemoIds);
+        console.log("삭제 요청된 메모 ID들:", idsToDelete); // ★★★ 추가
+        setMemoToDelete(idsToDelete);
+        setIsDeleteModalOpen(true);
+    };
+
+    const handleDeleteConfirm = () => {
+        const isBulkDelete = Array.isArray(memoToDelete);
+        let message = '';
+
+        if (isBulkDelete) {
+            const idsToDelete = new Set(memoToDelete);
+            setMemos(prevMemos => prevMemos.filter(memo => !idsToDelete.has(memo.id)));
+            message = `${idsToDelete.size}개의 메모가 삭제되었습니다.`;
+            handleExitSelectionMode();
+        } else {
+            const memoBeingDeleted = handleDeleteMemo(memoToDelete);
+            message = (memoBeingDeleted && memoBeingDeleted.isImportant)
+                ? "중요 메모가 삭제되었습니다."
+                : "메모가 삭제되었습니다.";
+        }
+        
+        setIsDeleteModalOpen(false);
+        setMemoToDelete(null);
+        showToast(message);
+    };
+
+    const handleDeleteCancel = () => {
+        setIsDeleteModalOpen(false);
+        setMemoToDelete(null);
+    };
+
+    const requestDeleteConfirmation = (id) => {
+        setMemoToDelete(id);
+        setIsDeleteModalOpen(true);
     };
 
     const deleteActivity = (activityId) => {
@@ -281,6 +681,10 @@ function App() {
         setIsSearchModalOpen(true);
     };
 
+    const onDragStart = (event) => {
+        setActiveId(event.active.id);
+    };
+
     const onDragEnd = (event) => {
         const { active, over } = event;
         if (active.id !== over.id) {
@@ -290,71 +694,249 @@ function App() {
                 return arrayMove(items, oldIndex, newIndex);
             });
         }
+        
+        setActiveId(null);
     };
+
+    const onDragCancel = () => {
+        setActiveId(null); // ★★★ 이 부분도 혹시 필요하다면 추가해 주세요. (드래그 취소 시) ★★★
+    };
+    
+    const [showHeader, setShowHeader] = useState(true);
+    const lastScrollY = useRef(0);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [pullDistance, setPullDistance] = useState(0);
+    const pullStartY = useRef(0);
+    const PULL_THRESHOLD = 80;
+    const [activeId, setActiveId] = useState(null);
 
     const mouseSensor = useSensor(MouseSensor, { activationConstraint: { distance: 8 } });
     const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 500, tolerance: 5 } });
     const sensors = useSensors(mouseSensor, touchSensor);
     
+    useEffect(() => {
+        const handleScroll = () => {
+            const currentScrollY = contentAreaRef.current.scrollTop;
+            
+            if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
+                setShowHeader(false);
+            } 
+            
+            if (currentScrollY <= 0) {
+                setShowHeader(true);
+            }
+            
+            lastScrollY.current = currentScrollY;
+        };
+        
+        const contentArea = contentAreaRef.current;
+        if (contentArea) {
+            contentArea.addEventListener('scroll', handleScroll);
+        }
+        
+        return () => {
+            if (contentArea) {
+                contentArea.removeEventListener('scroll', handleScroll);
+            }
+        };
+    }, []);
+
+    const executeCalendarDelete = () => {
+        if (!dateToDelete) return;
+        const key = format(dateToDelete, 'yyyy-MM-dd');
+        const deletedEntry = calendarSchedules[key];
+    
+        if (deletedEntry) {
+            addActivity('스케줄 삭제', `${key} - ${deletedEntry.text}`); // ✅ 활동 내역 추가
+        }
+
+        setCalendarSchedules(prev => {
+            const updated = { ...prev };
+            delete updated[key];
+            return updated;
+        });
+        
+        // 활동 로그 추가
+        if (deletedEntry) {
+            addActivity('스케줄 삭제', `${key} - ${deletedEntry.text}`);
+        }
+
+        showToast?.('스케줄이 삭제되었습니다 🗑️');
+        setIsCalendarConfirmOpen(false);
+        setDateToDelete(null);
+    };
+    
+    const handleTouchStart = (e) => {
+      pullStartY.current = e.touches[0].clientY;
+    };
+
+    const handleTouchMove = (e) => {
+      const currentY = e.touches[0].clientY;
+      const distance = currentY - pullStartY.current;
+      
+      if (contentAreaRef.current.scrollTop === 0 && distance > 0) {
+        setPullDistance(distance * 0.5);
+      } else {
+        setPullDistance(0);
+      }
+    };
+    
+    useEffect(() => {
+        if (contentAreaRef.current) {
+            contentAreaRef.current.scrollTop = 0;
+        }
+    }, [activeTab]);
+    
+    const [loginService, setLoginService] = useState('none');
+    const [isLoggedIn, setIsLoggedIn] = useState(false);
+    
+    const handleOpenNewMemoFromPage = () => {
+        setMemoOpenSource('page'); 
+        setIsNewMemoModalOpen(true);
+    };
+
+    const handleOpenNewMemoFromFAB = () => {
+        setMemoOpenSource('fab'); 
+        setIsNewMemoModalOpen(true);
+    };
+
+    const handleOpenDetailMemo = (memo) => {
+        setSelectedMemo(memo);
+        setIsDetailModalOpen(true);
+    };
+    const [selectedDate, setSelectedDate] = useState(new Date()); // 새로운 상태 추가
+
+    const handleSelectDate = (date) => {
+        setSelectedDate(date);
+        // 나중에 스케줄 에디터를 렌더링하는 데 사용됩니다.
+    };
+
+if (isLoading) {
+        return (
+            <Screen>
+                <LoadingScreen>
+                    앱을 불러오는 중...
+                </LoadingScreen>
+            </Screen>
+        );
+    }
+
     return (
         <>
             <GlobalStyle />
             <Screen>
-                <Header
-                    profile={profile}
-                    onLogin={null} // onLogin 함수를 null로 설정
-                    onLogout={null} // onLogout 함수를 null로 설정
-                    onSearchClick={handleSearchClick}
-                    onMenuClick={handleToggleMenu}
-                />
+                {/* ★★★ 더 이상 로그인 여부로 화면을 막지 않고, 항상 메인 앱을 보여줍니다. ★★★ */}
+                <>
+                    <Header
+                        profile={profile}
+                        onLogout={handleLogout}
+                        onSearchClick={handleSearchClick}
+                        onMenuClick={handleToggleMenu}
+                        isHidden={!showHeader}
+                        onLoginClick={() => setIsLoginModalOpen(true)} // ★ 로그인 모달 여는 함수 전달
+                    />
+                    <ContentArea
+                        ref={contentAreaRef}
+                        $pullDistance={pullDistance}
+                        $showHeader={showHeader}
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                    >
+                        {isSyncing && (
+                            <PullToSyncIndicator>
+                                <SyncSpinner />
+                                동기화 중...
+                            </PullToSyncIndicator>
+                        )}
+                        {activeTab === 'home' && (
+                            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+                                <SortableContext items={widgets} strategy={verticalListSortingStrategy}>
+                                    {widgets.map((widgetName) => (
+                                        <DraggableWidget
+                                            key={widgetName}
+                                            id={widgetName}
+                                            onSwitchTab={handleSwitchTab}
+                                            addActivity={addActivity}
+                                            recentActivities={recentActivities}
+                                            displayCount={displayCount}
+                                            setDisplayCount={setDisplayCount}
+                                            deleteActivity={deleteActivity}
+                                        />
+                                    ))}
+                                </SortableContext>
+                            </DndContext>
+                        )}
+                        {activeTab === 'calendar' && 
+                            <Calendar 
+                                onSelectDate={handleSelectDate} 
+                                addActivity={addActivity} 
+                                schedules={calendarSchedules} 
+                                setSchedules={setCalendarSchedules} 
+                                showToast={showToast}
+                                onRequestDelete={requestCalendarDelete}
+                                onOpenAlarm={handleOpenAlarmModal}
+                                onOpenEditor={handleOpenCalendarEditor}
+                                onOpenDateSelector={() => setIsDateSelectorOpen(true)}
+                            />
+                        }
+                        {activeTab === 'memo' &&
+                            <MemoPage
+                                memos={memos}
+                                onDeleteMemoRequest={requestDeleteConfirmation}
+                                onOpenNewMemo={handleOpenNewMemoFromPage} 
+                                onOpenDetailMemo={handleOpenDetailMemo}
+                                showToast={showToast}
+                                isSelectionMode={isSelectionMode}
+                                selectedMemoIds={selectedMemoIds}
+                                onStartSelectionMode={handleStartSelectionMode}
+                                onToggleMemoSelection={handleToggleMemoSelection}
+                                onExitSelectionMode={handleExitSelectionMode}
+                                onRequestDeleteSelectedMemos={requestDeleteSelectedMemos}
+                            />
+                        }
+                        {activeTab === 'secret' && <div>시크릿 페이지</div>}
+                        {activeTab === 'review' && <div>리뷰 페이지</div>}
+                        {activeTab === 'profile' && <div>프로필 페이지</div>}
+                        {activeTab === 'todo' && <div>할 일 페이지</div>}
+                        {activeTab === 'recent-detail' && <div>최근 활동 상세 페이지</div>}
+                    </ContentArea>
 
-                <ContentArea>
-                    {activeTab === 'home' && (
-                        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-                            <SortableContext items={widgets} strategy={verticalListSortingStrategy}>
-                                {widgets.map((widgetName) => (
-                                    <DraggableWidget
-                                        key={widgetName}
-                                        id={widgetName}
-                                        onSwitchTab={handleSwitchTab}
-                                        addActivity={addActivity}
-                                        recentActivities={recentActivities}
-                                        displayCount={displayCount}
-                                        setDisplayCount={setDisplayCount}
-                                        deleteActivity={deleteActivity}
-                                    />
-                                ))}
-                            </SortableContext>
-                        </DndContext>
-                    )}
-                    {activeTab === 'memo' &&
-                        <MemoPage
-                            memos={memos}
-                            onSaveNewMemo={handleSaveNewMemo}
-                            onEditMemo={handleEditMemo}
-                            onDeleteMemo={handleDeleteMemo}
-                            addActivity={addActivity}
-                            profile={profile}
-                        />
-                    }
-                    {activeTab === 'calendar' && <div>캘린더 페이지</div>}
-                    {activeTab === 'secret' && <div>시크릿 페이지</div>}
-                    {activeTab === 'review' && <div>리뷰 페이지</div>}
-                    {activeTab === 'profile' && <div>프로필 페이지</div>}
-                    {activeTab === 'todo' && <div>할 일 페이지</div>}
-                    {activeTab === 'recent-detail' && <div>최근 활동 상세 페이지</div>}
-                </ContentArea>
-
-                {/* profile이 필요 없는 컴포넌트들 */}
-                <FloatingButton onClick={handleFloatingButtonClick} />
-                <BottomNav activeTab={activeTab} onSwitchTab={handleSwitchTab} />
-                <SideMenu
-                    isOpen={isMenuOpen}
-                    onClose={handleToggleMenu}
-                    displayCount={displayCount}
-                    setDisplayCount={setDisplayCount}
-                />
+                    <FloatingButton onClick={handleOpenNewMemoFromFAB} activeTab={activeTab} />
+                    <BottomNav activeTab={activeTab} onSwitchTab={handleSwitchTab} />
+                    <SideMenu
+                        isOpen={isMenuOpen}
+                        onClose={handleToggleMenu}
+                        displayCount={displayCount}
+                        setDisplayCount={setDisplayCount}
+                        showToast={showToast}
+                        onExport={handleDataExport} 
+                        onImport={handleDataImport}
+                        profile={profile} 
+                        onProfileClick={handleProfileClick}
+                        onLogout={handleLogout}
+                        onLoginClick={() => setIsLoginModalOpen(true)} // ★ 로그인 모달 여는 함수 전달
+                    />
+                </>
             </Screen>
+            
+            {/* ★★★ 로그인 모달 렌더링 로직 ★★★ */}
+            {isLoginModalOpen && (
+                <LoginModal
+                    onSuccess={handleLoginSuccess}
+                    onError={handleLoginError}
+                    onClose={() => setIsLoginModalOpen(false)}
+                />
+            )}
+
+            {/* 모달(Modal)들은 Screen 컴포넌트 바깥에 두어 전체 화면을 덮도록 합니다. */}
+            {toastMessage && (
+                <ToastOverlay>
+                    <ToastBox>
+                        {toastMessage}
+                    </ToastBox>
+                </ToastOverlay>
+            )}
 
             {isSearchModalOpen && (
                 <SearchModal
@@ -366,6 +948,72 @@ function App() {
                     }}
                 />
             )}
+            {isCalendarEditorOpen && (
+                <CalendarEditorModal
+                    isOpen={isCalendarEditorOpen}
+                    onClose={() => setIsCalendarEditorOpen(false)}
+                    data={calendarModalData}
+                    onSave={handleCalendarScheduleSave}
+                />
+            )}
+            {isDateSelectorOpen && (
+                <DateSelectorModal
+                    isOpen={isDateSelectorOpen}
+                    onClose={() => setIsDateSelectorOpen(false)}
+                    onSelectDate={handleSelectDate}
+                />
+            )}
+            
+            <NewMemoModal
+                isOpen={isNewMemoModalOpen}
+                openSource={memoOpenSource}
+                onSave={handleSaveNewMemo}
+                onCancel={() => {
+                    setIsNewMemoModalOpen(false);
+                    setMemoOpenSource(null);
+                }}
+            />
+
+            <MemoDetailModal
+                isOpen={isDetailModalOpen}
+                memo={selectedMemo}
+                onSave={handleEditMemo}
+                onCancel={() => setIsDetailModalOpen(false)}
+            />
+            
+            {isDeleteModalOpen && (
+                <ConfirmationModal
+                    isOpen={true}
+                    message={
+                        Array.isArray(memoToDelete) 
+                            ? `선택한 ${memoToDelete.length}개의 메모를 정말 삭제하시겠습니까?`
+                            : "메모를 정말 삭제하시겠습니까?"
+                    }
+                    onConfirm={handleDeleteConfirm}
+                    onCancel={handleDeleteCancel}
+                />
+            )}
+
+            {isCalendarConfirmOpen && dateToDelete && (
+                <ConfirmationModal
+                    isOpen={true}
+                    message={
+                        <>
+                            {`${format(dateToDelete, '<yyyy년 M월 d일>의', { locale: ko })}`} 스케줄을
+                            <br />
+                            정말 삭제하시겠습니까?
+                        </>
+                    }
+                    onConfirm={executeCalendarDelete}
+                    onCancel={() => setIsCalendarConfirmOpen(false)}
+                />
+            )}
+            <AlarmModal
+                isOpen={isAlarmModalOpen}
+                scheduleData={scheduleForAlarm}
+                onSave={handleSaveAlarm}
+                onClose={() => setIsAlarmModalOpen(false)}
+            />     
         </>
     );
 }
