@@ -39,6 +39,18 @@ const ProfileImage = styled.img`
     object-fit: cover;
 `;
 
+const PlaceholderIcon = styled.div`
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #e2e8f0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #a0aec0;
+    flex-shrink: 0;
+`;
+
 const ProfileName = styled.span`
     font-size: 18px;
     font-weight: 600;
@@ -50,17 +62,6 @@ const LoginText = styled.span`
     font-weight: 600;
     color: #4a5568;
     cursor: pointer;
-`;
-
-const PlaceholderIcon = styled.div`
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background-color: #e2e8f0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: #a0aec0;
 `;
 
 const RightContainer = styled.div`

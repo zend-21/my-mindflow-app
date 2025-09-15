@@ -81,10 +81,10 @@ const fetchSpecialDatesWithRetry = async (year, month, attempt = 0) => {
   }
   
   const urls = [
-    `http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getHoliDeInfo?solYear=${year}&solMonth=${month}&_type=json&serviceKey=${API_KEY}`,
-    `http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/get24DivisionsInfo?solYear=${year}&solMonth=${month}&_type=json&serviceKey=${API_KEY}`,
-    `http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getAnniversaryInfo?solYear=${year}&solMonth=${month}&_type=json&serviceKey=${API_KEY}`,
-    `http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getSundryDayInfo?solYear=${year}&solMonth=${month}&_type=json&serviceKey=${API_KEY}`
+    `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getHoliDeInfo?solYear=${year}&solMonth=${month}&_type=json&serviceKey=${API_KEY}`,
+    `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/get24DivisionsInfo?solYear=${year}&solMonth=${month}&_type=json&serviceKey=${API_KEY}`,
+    `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getAnniversaryInfo?solYear=${year}&solMonth=${month}&_type=json&serviceKey=${API_KEY}`,
+    `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getSundryDayInfo?solYear=${year}&solMonth=${month}&_type=json&serviceKey=${API_KEY}`
   ];
   
   try {
