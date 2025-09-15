@@ -75,9 +75,10 @@ const LoginModal = ({ onClose, setProfile }) => {
                     <h2>내 손안의 비서</h2>
                     <p>구글 계정으로 모든 정보를 안전하게 관리하세요.</p>
                     <GoogleLogin
-  onSuccess={handleSuccess}
-  onError={handleError}
-  onClose={() => setIsLoginOpen(false)}
+                        onSuccess={handleSuccess}   // ✅ 여기서 내부 핸들러 실행
+                        onError={handleError}
+                        ux_mode="popup"   // 👈 강제로 팝업 모드 지정
+                        useOneTap={false}
                     />
                 </ModalContent>
             </ModalOverlay>
