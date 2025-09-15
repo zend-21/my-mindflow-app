@@ -926,6 +926,7 @@ if (isLoading) {
                     onSuccess={handleLoginSuccess}
                     onError={handleLoginError}
                     onClose={() => setIsLoginModalOpen(false)}
+                    setProfile={setProfile}
                 />
             )}
 
