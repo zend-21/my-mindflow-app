@@ -224,8 +224,7 @@ const SideMenu = ({ isOpen, onClose, onExport, onImport, profile, onProfileClick
                                     </MenuItem>
                                 </>
                             )}
-                            {/* <MenuItem onClick={() => setIsRouletteModalOpen(true)}> */}
-                            <MenuItem>
+                            <MenuItem onClick={() => setIsRouletteModalOpen(true)}>
                                 <span className="icon">🔮</span> 오늘의 운세
                             </MenuItem>
                             <MenuItem>
