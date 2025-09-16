@@ -74,7 +74,7 @@ const checkNetworkStatus = () => {
 
 // API 호출 함수 (재시도 로직 포함)
 const fetchSpecialDatesWithRetry = async (year, month, attempt = 0) => {
-  const API_KEY = '33208e17eea0094dccc0fef14279e36fe54ddbde33bf30b2025ae197ee08e72f';
+  const API_KEY = import.meta.env.VITE_SPCDE_API_KEY;
   
   if (!checkNetworkStatus()) {
     throw new Error('네트워크 연결이 없습니다.');
