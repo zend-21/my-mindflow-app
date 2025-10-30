@@ -210,6 +210,10 @@ const SideMenu = ({ isOpen, onClose, onExport, onImport, profile, onProfileClick
                                     <MenuItem onClick={onSync}>
                                         <span className="icon">🔄</span> 동기화
                                     </MenuItem>
+                                    <MenuItem onClick={onRestoreFromDrive}>
+                                        <MenuIcon>☁️</MenuIcon>
+                                        <MenuText>Google Drive에서 복원</MenuText>
+                                    </MenuItem>                                    
                                     <MenuItem onClick={onExport}>
                                         <span className="icon">💾</span> 백업하기
                                     </MenuItem>

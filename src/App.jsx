@@ -5,6 +5,7 @@ import styled, { keyframes, css } from 'styled-components';
 import { GlobalStyle } from './styles.js';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
+import { initializeGapiClient, setAccessToken, syncToGoogleDrive, loadFromGoogleDrive } from './utils/googleDriveSync';
 import { DndContext, closestCenter, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -280,69 +281,16 @@ const DraggableWidget = ({ id, onSwitchTab, addActivity, recentActivities, displ
 };
 
 function App() {
+    // ✅ 기존 상태들은 그대로 유지
     const [isLoading, setIsLoading] = useState(true);
     const [profile, setProfile] = useState(null); 
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
- 
-    useEffect(() => {
-        // 브라우저 저장소(localStorage)에서 이전에 저장된 사용자 정보를 가져옴
-        const savedProfile = localStorage.getItem('userProfile');
-
-        if (savedProfile) {
-            // 저장된 정보가 있으면, profile 상태를 업데이트
-            setProfile(JSON.parse(savedProfile));
-        }
-        
-        // 정보 확인이 끝났으므로 로딩 상태를 false로 변경
-        setIsLoading(false);
-    }, []); // 빈 배열[]: 컴포넌트가 처음 마운트될 때 한 번만 실행
-
-    // ★★★ 3. 로그인 성공 시, 'userProfile'이 아닌 'profile' 상태를 업데이트합니다. ★★★
-    const handleLoginSuccess = (credentialResponse) => {
-        const decodedToken = jwtDecode(credentialResponse.credential);
-        setProfile(decodedToken);
-        localStorage.setItem('userProfile', JSON.stringify(decodedToken));
-        setIsLoginModalOpen(false);
-    };
-
-    const handleLoginError = () => {
-        console.log('Login Failed');
-        setIsLoginModalOpen(false); // ★ 로그인 실패/취소 시 모달 닫기
-    };
-
-    const handleSync = () => {
-        // 1. 로그인 상태 확인 (기존 로직과 동일)
-        if (!profile) {
-            showToast('로그인이 필요한 기능입니다.');
-            setIsLoginModalOpen(true);
-            return; // 함수 종료
-        }
-
-        // 2. 동기화 애니메이션 및 로직 실행
-        setIsSyncing(true);
-        console.log("동기화 시작...");
-        setTimeout(() => {
-            console.log("동기화 완료!");
-            setIsSyncing(false);
-            addActivity('동기화', '데이터 동기화 완료');
-            showToast("데이터 동기화가 완료되었습니다.");
-        }, 1500);
-    };
-
-    const handleTouchEnd = () => {
-        if (pullDistance > PULL_THRESHOLD) {
-            handleSync(); // 동기화 로직이 담긴 새 함수를 호출
-        } else {
-            setPullDistance(0);
-        }
-    };
-
-    const handleLogout = () => {
-        setProfile(null);
-        localStorage.removeItem('userProfile');
-        showToast("로그아웃 되었습니다.");
-        setIsMenuOpen(false); // ★★★ 사이드 메뉴를 닫는 코드 추가 ★★★
-    };
+    
+    // ✅ 새로 추가되는 상태들
+    const [accessToken, setAccessTokenState] = useState(null);
+    const [lastSyncTime, setLastSyncTime] = useState(null);
+    const syncIntervalRef = useRef(null);
+    const [isGapiReady, setIsGapiReady] = useState(false);
     
     const [activeTab, setActiveTab] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -715,6 +663,245 @@ function App() {
     const mouseSensor = useSensor(MouseSensor, { activationConstraint: { distance: 8 } });
     const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 500, tolerance: 5 } });
     const sensors = useSensors(mouseSensor, touchSensor);
+
+    // ✅ GAPI 초기화 (앱 시작 시 한 번만)
+    useEffect(() => {
+        initializeGapiClient()
+            .then(() => {
+                console.log('✅ GAPI 준비 완료');
+                setIsGapiReady(true);
+            })
+            .catch((error) => {
+                console.error('❌ GAPI 초기화 실패:', error);
+            });
+    }, []);
+
+    // ✅ 앱 시작 시 저장된 정보 복원 (기존 useEffect를 확장)
+    useEffect(() => {
+        const savedProfile = localStorage.getItem('userProfile');
+        const savedToken = localStorage.getItem('accessToken');
+
+        if (savedProfile && savedToken) {
+            setProfile(JSON.parse(savedProfile));
+            setAccessTokenState(savedToken);
+            
+            // GAPI가 준비되면 토큰 설정
+            if (isGapiReady) {
+                setAccessToken(savedToken);
+            }
+        }
+        
+        setIsLoading(false);
+    }, [isGapiReady]);
+
+    // ✅ 로그인 성공 시 처리 (기존 handleLoginSuccess를 확장)
+    const handleLoginSuccess = async (credentialResponse) => {
+        try {
+            const decodedToken = jwtDecode(credentialResponse.credential);
+            const token = credentialResponse.credential;
+            
+            setProfile(decodedToken);
+            setAccessTokenState(token);
+            
+            localStorage.setItem('userProfile', JSON.stringify(decodedToken));
+            localStorage.setItem('accessToken', token);
+            
+            // GAPI에 토큰 설정
+            if (isGapiReady) {
+                setAccessToken(token);
+                
+                // 로그인 직후 자동 동기화 시도
+                setTimeout(async () => {
+                    console.log('🔄 로그인 후 초기 동기화 시도...');
+                    await performSync();
+                }, 1000);
+            }
+            
+            setIsLoginModalOpen(false);
+        } catch (error) {
+            console.error('로그인 처리 중 오류:', error);
+        }
+    };
+
+    const handleLoginError = () => {
+        console.log('Login Failed');
+        setIsLoginModalOpen(false);
+    };
+
+    // ✅ 실제 동기화 수행 함수 (새로 추가)
+    const performSync = async () => {
+        if (!profile || !accessToken) {
+            showToast('동기화를 하려면 로그인 상태여야 합니다.');
+            return false;
+        }
+
+        if (!isGapiReady) {
+            showToast('Google Drive 연결 준비 중입니다...');
+            return false;
+        }
+
+        try {
+            setIsSyncing(true);
+            
+            // 동기화할 데이터 준비
+            const dataToSync = {
+                memos,
+                calendarSchedules,
+                recentActivities,
+                displayCount,
+                widgets,
+                userEmail: profile.email,
+            };
+
+            const result = await syncToGoogleDrive(dataToSync);
+            
+            if (result.success) {
+                const now = Date.now();
+                setLastSyncTime(now);
+                localStorage.setItem('lastSyncTime', now.toString());
+                
+                addActivity('동기화', 'Google Drive 동기화 완료');
+                showToast('데이터 동기화가 완료되었습니다 ☁️');
+                return true;
+            } else {
+                if (result.error === 'TOKEN_EXPIRED') {
+                    showToast('로그인이 만료되었습니다. 다시 로그인해주세요.');
+                    handleLogout();
+                } else {
+                    showToast('동기화에 실패했습니다. 다시 시도해주세요.');
+                }
+                return false;
+            }
+        } catch (error) {
+            console.error('동기화 중 오류:', error);
+            showToast('동기화 중 오류가 발생했습니다.');
+            return false;
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    // ✅ 수동 동기화 (기존 handleSync를 간단하게 수정)
+    const handleSync = async () => {
+        await performSync();
+    };
+
+    // ✅ handleTouchEnd는 그대로 유지 (변경 없음)
+    const handleTouchEnd = () => {
+        if (pullDistance > PULL_THRESHOLD) {
+            handleSync();
+        } else {
+            setPullDistance(0);
+        }
+    };
+
+    // ✅ 자동 동기화 (30초마다) - 새로 추가
+    useEffect(() => {
+        if (profile && accessToken && isGapiReady) {
+            console.log('🔄 자동 동기화 타이머 시작 (30초 간격)');
+            
+            syncIntervalRef.current = setInterval(async () => {
+                console.log('⏰ 자동 동기화 실행...');
+                await performSync();
+            }, 30000); // 30초
+
+            return () => {
+                if (syncIntervalRef.current) {
+                    console.log('⏹️ 자동 동기화 타이머 정지');
+                    clearInterval(syncIntervalRef.current);
+                }
+            };
+        }
+    }, [profile, accessToken, isGapiReady, memos, calendarSchedules, recentActivities]);
+
+    // ✅ 앱 종료 시 마지막 동기화 - 새로 추가
+    useEffect(() => {
+        const handleBeforeUnload = async () => {
+            if (profile && accessToken && isGapiReady) {
+                console.log('👋 앱 종료 전 마지막 동기화...');
+                
+                const dataToSync = {
+                    memos,
+                    calendarSchedules,
+                    recentActivities,
+                    displayCount,
+                    widgets,
+                    userEmail: profile.email,
+                };
+
+                try {
+                    await syncToGoogleDrive(dataToSync);
+                    console.log('✅ 종료 전 동기화 완료');
+                } catch (error) {
+                    console.error('❌ 종료 전 동기화 실패:', error);
+                }
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [profile, accessToken, isGapiReady, memos, calendarSchedules, recentActivities]);
+
+    // ✅ Google Drive에서 복원 - 새로 추가
+    const handleRestoreFromDrive = async () => {
+        if (!profile || !accessToken) {
+            showToast('복원하려면 로그인 상태여야 합니다.');
+            setIsLoginModalOpen(true);
+            return;
+        }
+
+        if (!isGapiReady) {
+            showToast('Google Drive 연결 준비 중입니다...');
+            return;
+        }
+
+        try {
+            const result = await loadFromGoogleDrive();
+            
+            if (result.success && result.data) {
+                if (result.data.memos) setMemos(result.data.memos);
+                if (result.data.calendarSchedules) setCalendarSchedules(result.data.calendarSchedules);
+                if (result.data.recentActivities) setRecentActivities(result.data.recentActivities);
+                if (result.data.displayCount) setDisplayCount(result.data.displayCount);
+                if (result.data.widgets) setWidgets(result.data.widgets);
+                
+                addActivity('복원', 'Google Drive에서 복원 완료');
+                showToast('데이터가 성공적으로 복원되었습니다 ✅');
+                
+                setIsMenuOpen(false);
+            } else if (result.message === 'NO_FILE') {
+                showToast('복원할 데이터가 없습니다.');
+            } else if (result.error === 'TOKEN_EXPIRED') {
+                showToast('로그인이 만료되었습니다. 다시 로그인해주세요.');
+                handleLogout();
+            } else {
+                showToast('복원에 실패했습니다.');
+            }
+        } catch (error) {
+            console.error('복원 중 오류:', error);
+            showToast('복원 중 오류가 발생했습니다.');
+        }
+    };
+
+    // ✅ 로그아웃 (확장됨)
+    const handleLogout = () => {
+        setProfile(null);
+        setAccessTokenState(null);
+        localStorage.removeItem('userProfile');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('lastSyncTime');
+        
+        showToast("로그아웃 되었습니다.");
+        setIsMenuOpen(false);
+        
+        // 자동 동기화 중지
+        if (syncIntervalRef.current) {
+            clearInterval(syncIntervalRef.current);
+        }
+    };
     
     useEffect(() => {
         console.log('🔍 showHeader 상태 변경:', showHeader);
@@ -935,6 +1122,7 @@ if (isLoading) {
                         showToast={showToast}
                         onExport={handleDataExport} 
                         onImport={handleDataImport}
+                        onRestoreFromDrive={handleRestoreFromDrive}
                         profile={profile} 
                         onProfileClick={handleProfileClick}
                         onLogout={handleLogout}
