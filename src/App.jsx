@@ -312,11 +312,11 @@ function App() {
 
     const [isDragging, setIsDragging] = useState(false);
     const pullStartTime = useRef(0);
-    const PULL_TIME_LIMIT = 400; // 0.4초 이내에만 Pull-to-Sync 작동
+    const PULL_TIME_LIMIT = 600; // 0.6초 이내에만 Pull-to-Sync 작동
 
     const handlePullStart = (clientY) => {
         // 스크롤이 최상단일 때만 시작
-        if (contentAreaRef.current && contentAreaRef.current.scrollTop !== 0) {
+        if (contentAreaRef.current && contentAreaRef.current.scrollTop > 5) {
             return;
         }
         
@@ -332,7 +332,7 @@ function App() {
         const currentY = clientY;
         const distance = currentY - pullStartY.current;
         
-        // 시간 체크: 0.4초 이내에만 당기기 허용
+        // 시간 체크
         const elapsedTime = Date.now() - pullStartTime.current;
         if (elapsedTime > PULL_TIME_LIMIT) {
             console.log('⏱️ 시간 초과 - Pull-to-Sync 취소');
@@ -340,7 +340,8 @@ function App() {
             return;
         }
         
-        if (contentAreaRef.current.scrollTop === 0 && distance > 0) {
+        const scrollTop = contentAreaRef.current?.scrollTop || 0;
+        if (scrollTop <= 5 && distance > 0) {
             setPullDistance(distance * 0.5);
         } else {
             setPullDistance(0);
@@ -794,7 +795,7 @@ function App() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [pullDistance, setPullDistance] = useState(0);
     const pullStartY = useRef(0);
-    const PULL_THRESHOLD = 80;
+    const PULL_THRESHOLD = 60;
     const [activeId, setActiveId] = useState(null);
 
     const mouseSensor = useSensor(MouseSensor, { activationConstraint: { distance: 8 } });
