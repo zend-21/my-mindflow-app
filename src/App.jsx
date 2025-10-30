@@ -1018,6 +1018,15 @@ function App() {
       }
     };
     
+    const handleTouchEnd = async () => {
+        // PULL_THRESHOLD (80)보다 당긴 거리가 길다면 수동 동기화 실행
+        if (pullDistance > PULL_THRESHOLD) {
+            await handleSync(); 
+        }
+        // 당겨진 거리를 0으로 리셋하여 화면이 원래 위치로 돌아가도록 합니다.
+        setPullDistance(0);
+    };
+    
     useEffect(() => {
         if (contentAreaRef.current) {
             contentAreaRef.current.scrollTop = 0;
