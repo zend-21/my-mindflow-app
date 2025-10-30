@@ -313,10 +313,13 @@ function App() {
     // ✅ 추가: 앱 활성 상태 (포커스 여부)
     const [isAppActive, setIsAppActive] = useState(true); 
 
-    // ✅ 앱 활성 상태 리스너 (새로 추가)
+    const [isUserIdle, setIsUserIdle] = useState(false);
+    const idleTimerRef = useRef(null);
+    const IDLE_TIMEOUT = 5 * 60 * 1000; // 5분
+
+    // 기존 useEffect (앱 활성 상태 리스너)
     useEffect(() => {
         const handleVisibilityChange = () => {
-            // document.visibilityState가 'visible'일 때만 true
             setIsAppActive(document.visibilityState === 'visible');
         };
 
@@ -325,6 +328,40 @@ function App() {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);
+
+    useEffect(() => {
+        const resetIdleTimer = () => {
+            setIsUserIdle(false);
+            
+            if (idleTimerRef.current) {
+                clearTimeout(idleTimerRef.current);
+            }
+            
+            idleTimerRef.current = setTimeout(() => {
+                setIsUserIdle(true);
+                console.log('⏸️ 사용자 비활성 상태 - 자동 동기화 중지');
+            }, IDLE_TIMEOUT);
+        };
+
+        // 사용자 활동 감지 이벤트들
+        const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+        
+        events.forEach(event => {
+            document.addEventListener(event, resetIdleTimer, true);
+        });
+
+        // 초기 타이머 시작
+        resetIdleTimer();
+
+        return () => {
+            events.forEach(event => {
+                document.removeEventListener(event, resetIdleTimer, true);
+            });
+            if (idleTimerRef.current) {
+                clearTimeout(idleTimerRef.current);
+            }
+        };
+    }, []);  
 
     const storageKeySuffix = profile ? profile.email : 'guest';
     const [widgets, setWidgets] = useLocalStorage(`widgets_${storageKeySuffix}`, ['StatsGrid', 'QuickActions', 'RecentActivity']);
@@ -777,7 +814,7 @@ function App() {
     };
 
     // ✅ 실제 동기화 수행 함수 (toast 제어 파라미터 추가)
-    const performSync = async (isManual = false) => { // ★★★ 파라미터 확인: isManual
+    const performSync = async (isManual = false) => {
         if (!profile || !accessToken) {
             if (isManual) showToast('동기화를 하려면 로그인 상태여야 합니다.');
             return false;
@@ -789,9 +826,13 @@ function App() {
         }
 
         try {
-            if (isManual) setIsSyncing(true); // 수동 동기화일 때만 스피너 표시
+            // ✅ 수동 동기화일 때 즉시 스피너 표시
+            if (isManual) {
+                setIsSyncing(true);
+                // 약간의 지연을 주어 UI가 업데이트되도록 함
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
             
-            // 동기화할 데이터 준비
             const dataToSync = {
                 memos,
                 calendarSchedules,
@@ -808,8 +849,10 @@ function App() {
                 setLastSyncTime(now);
                 localStorage.setItem('lastSyncTime', now.toString());
                 
-                if (isManual) { // ✅ 이 부분이 동기화 완료 메시지 출력 조건입니다!
+                if (isManual) {
                     addActivity('동기화', 'Google Drive 동기화 완료');
+                    // ✅ 최소 1초는 스피너를 보여줌
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                     showToast('데이터 동기화가 완료되었습니다 ☁️');
                 }
                 return true;
@@ -818,7 +861,7 @@ function App() {
                     showToast('로그인이 만료되었습니다. 다시 로그인해주세요.');
                     handleLogout();
                 } else {
-                    if (isManual) { // 수동일 때만 실패 메시지 표시
+                    if (isManual) {
                         showToast('동기화에 실패했습니다. 다시 시도해주세요.');
                     }
                 }
@@ -826,10 +869,12 @@ function App() {
             }
         } catch (error) {
             console.error('동기화 중 오류:', error);
-            if (isManual) showToast('동기화 중 오류가 발생했습니다.'); // 수동일 때만 오류 메시지 표시
+            if (isManual) showToast('동기화 중 오류가 발생했습니다.');
             return false;
         } finally {
-            if (isManual) setIsSyncing(false); // 수동 동기화일 때만 스피너 숨김
+            if (isManual) {
+                setIsSyncing(false);
+            }
         }
     };
 
@@ -841,22 +886,33 @@ function App() {
     // ✅ 자동 동기화 (30초마다) - 수정됨: isAppActive 조건 및 isManual=false 전달
     useEffect(() => {
         // ★★★ isAppActive 조건 추가: 앱이 활성화 상태일 때만 자동 동기화 타이머 시작
-        if (profile && accessToken && isGapiReady && isAppActive) { 
+        if (profile && accessToken && isGapiReady && isAppActive && !isUserIdle) { 
             console.log('🔄 자동 동기화 타이머 시작 (30초 간격)');
             
             syncIntervalRef.current = setInterval(async () => {
-                await performSync(false); // ★★★ false 전달: 토스트 메시지 표시 안 함
+                // 실행 시점에도 idle 상태 재확인
+                if (!isUserIdle && isAppActive) {
+                    console.log('🔄 자동 동기화 실행 중...');
+                    await performSync(false);
+                }
             }, 30000);
 
         } else {
-             // 앱이 비활성화되거나 로그아웃되면 타이머를 정지
-             if (syncIntervalRef.current) {
+            if (syncIntervalRef.current) {
+                clearInterval(syncIntervalRef.current);
+                syncIntervalRef.current = null;
+                console.log('⏸️ 자동 동기화 타이머 중지');
+            }
+        }
+
+        return () => {
+            if (syncIntervalRef.current) {
                 clearInterval(syncIntervalRef.current);
                 syncIntervalRef.current = null;
             }
-        }
-    // ★★★ isAppActive를 의존성 배열에 추가
-    }, [profile, accessToken, isGapiReady, isAppActive, memos, calendarSchedules, recentActivities]); 
+        };
+    // ✅ isUserIdle을 의존성 배열에 추가
+    }, [profile, accessToken, isGapiReady, isAppActive, isUserIdle, memos, calendarSchedules, recentActivities]);
 
     // ✅ 앱 종료 시 마지막 동기화 - 새로 추가
     useEffect(() => {
@@ -1034,12 +1090,15 @@ function App() {
     };
 
     const handleTouchEnd = async () => {
-        // PULL_THRESHOLD (80)보다 당긴 거리가 길다면 수동 동기화 실행
-        if (pullDistance > PULL_THRESHOLD) {
-            await handleSync(); 
-        }
-        // 당겨진 거리를 0으로 리셋하여 화면이 원래 위치로 돌아가도록 합니다.
+        const shouldSync = pullDistance > PULL_THRESHOLD;
+        
+        // 먼저 pullDistance를 0으로 리셋 (화면 복귀)
         setPullDistance(0);
+        
+        // 그 다음 동기화 실행
+        if (shouldSync) {
+            await handleSync();
+        }
     };
     
     useEffect(() => {
