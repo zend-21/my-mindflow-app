@@ -310,6 +310,75 @@ function App() {
     const [activeTab, setActiveTab] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+    const [isDragging, setIsDragging] = useState(false);
+    const pullStartTime = useRef(0);
+    const PULL_TIME_LIMIT = 400; // 0.4초 이내에만 Pull-to-Sync 작동
+
+    const handlePullStart = (clientY) => {
+        // 스크롤이 최상단일 때만 시작
+        if (contentAreaRef.current && contentAreaRef.current.scrollTop !== 0) {
+            return;
+        }
+        
+        pullStartY.current = clientY;
+        pullStartTime.current = Date.now();
+        setIsDragging(true);
+        console.log('⏱️ Pull 시작 시간 기록:', pullStartTime.current);
+    };
+
+    const handlePullMove = (clientY) => {
+        if (!isDragging) return;
+        
+        const currentY = clientY;
+        const distance = currentY - pullStartY.current;
+        
+        // 시간 체크: 0.4초 이내에만 당기기 허용
+        const elapsedTime = Date.now() - pullStartTime.current;
+        if (elapsedTime > PULL_TIME_LIMIT) {
+            console.log('⏱️ 시간 초과 - Pull-to-Sync 취소');
+            setPullDistance(0);
+            return;
+        }
+        
+        if (contentAreaRef.current.scrollTop === 0 && distance > 0) {
+            setPullDistance(distance * 0.5);
+        } else {
+            setPullDistance(0);
+        }
+    };
+
+    const handlePullEnd = async () => {
+        setIsDragging(false);
+        
+        // 시간 체크: 0.4초 이내에만 동기화 실행
+        const elapsedTime = Date.now() - pullStartTime.current;
+        console.log('⏱️ 경과 시간:', elapsedTime, 'ms');
+        
+        if (elapsedTime > PULL_TIME_LIMIT) {
+            console.log('⏱️ 시간 초과 - 위젯 드래그로 간주, 동기화 안 함');
+            setPullDistance(0);
+            return;
+        }
+        
+        console.log('🔵 handlePullEnd 호출됨');
+        console.log('📏 pullDistance:', pullDistance);
+        console.log('📏 PULL_THRESHOLD:', PULL_THRESHOLD);
+        
+        const shouldSync = pullDistance > PULL_THRESHOLD;
+        console.log('❓ shouldSync:', shouldSync);
+        
+        // 먼저 pullDistance를 0으로 리셋 (화면 복귀)
+        setPullDistance(0);
+        
+        // 그 다음 동기화 실행
+        if (shouldSync) {
+            console.log('✅ 수동 동기화 시작!');
+            await handleSync();
+        } else {
+            console.log('❌ 임계값 미달 - 동기화 안 함');
+        }
+    };
+
     // ✅ 추가: 앱 활성 상태 (포커스 여부)
     const [isAppActive, setIsAppActive] = useState(true); 
 
@@ -813,23 +882,37 @@ function App() {
         setIsLoginModalOpen(false);
     };
 
-    // ✅ 실제 동기화 수행 함수 (toast 제어 파라미터 추가)
+    // ✅ handleSync 함수 (performSync(true) 호출 확인)
+    const handleSync = async () => {
+        console.log('🔄 handleSync 호출됨');
+        console.log('👤 profile:', profile);
+        console.log('🔑 accessToken:', accessToken ? '있음' : '없음');
+        console.log('📡 isGapiReady:', isGapiReady);
+        
+        await performSync(true);
+    };
+
     const performSync = async (isManual = false) => {
+        console.log('🔧 performSync 시작 - isManual:', isManual);
+        
         if (!profile || !accessToken) {
+            console.log('❌ 로그인 안 됨');
             if (isManual) showToast('동기화를 하려면 로그인 상태여야 합니다.');
             return false;
         }
 
         if (!isGapiReady) {
+            console.log('❌ GAPI 준비 안 됨');
             if (isManual) showToast('Google Drive 연결 준비 중입니다...');
             return false;
         }
 
         try {
-            // ✅ 수동 동기화일 때 즉시 스피너 표시
+            console.log('✅ 동기화 조건 충족 - 시작');
+            
             if (isManual) {
+                console.log('🎯 수동 동기화 - 스피너 표시');
                 setIsSyncing(true);
-                // 약간의 지연을 주어 UI가 업데이트되도록 함
                 await new Promise(resolve => setTimeout(resolve, 100));
             }
             
@@ -842,7 +925,9 @@ function App() {
                 userEmail: profile.email,
             };
 
+            console.log('📤 Google Drive에 업로드 시작...');
             const result = await syncToGoogleDrive(dataToSync);
+            console.log('📥 업로드 결과:', result);
             
             if (result.success) {
                 const now = Date.now();
@@ -850,13 +935,15 @@ function App() {
                 localStorage.setItem('lastSyncTime', now.toString());
                 
                 if (isManual) {
+                    console.log('✅ 수동 동기화 - 활동 기록 추가');
                     addActivity('동기화', 'Google Drive 동기화 완료');
-                    // ✅ 최소 1초는 스피너를 보여줌
                     await new Promise(resolve => setTimeout(resolve, 1000));
+                    console.log('✅ 수동 동기화 - 토스트 표시');
                     showToast('데이터 동기화가 완료되었습니다 ☁️');
                 }
                 return true;
             } else {
+                console.error('❌ 동기화 실패:', result);
                 if (result.error === 'TOKEN_EXPIRED') {
                     showToast('로그인이 만료되었습니다. 다시 로그인해주세요.');
                     handleLogout();
@@ -868,19 +955,15 @@ function App() {
                 return false;
             }
         } catch (error) {
-            console.error('동기화 중 오류:', error);
+            console.error('❌ 동기화 중 오류:', error);
             if (isManual) showToast('동기화 중 오류가 발생했습니다.');
             return false;
         } finally {
             if (isManual) {
+                console.log('🎯 수동 동기화 - 스피너 숨김');
                 setIsSyncing(false);
             }
         }
-    };
-
-    // ✅ handleSync 함수 (performSync(true) 호출 확인)
-    const handleSync = async () => {
-        await performSync(true); 
     };
 
     // ✅ 자동 동기화 (30초마다) - 수정됨: isAppActive 조건 및 isManual=false 전달
@@ -1075,29 +1158,37 @@ function App() {
     };
     
     const handleTouchStart = (e) => {
-      pullStartY.current = e.touches[0].clientY;
+        handlePullStart(e.touches[0].clientY);
     };
 
     const handleTouchMove = (e) => {
-      const currentY = e.touches[0].clientY;
-      const distance = currentY - pullStartY.current;
-      
-      if (contentAreaRef.current.scrollTop === 0 && distance > 0) {
-        setPullDistance(distance * 0.5);
-      } else {
-        setPullDistance(0);
-      }
+        handlePullMove(e.touches[0].clientY);
     };
 
     const handleTouchEnd = async () => {
-        const shouldSync = pullDistance > PULL_THRESHOLD;
-        
-        // 먼저 pullDistance를 0으로 리셋 (화면 복귀)
-        setPullDistance(0);
-        
-        // 그 다음 동기화 실행
-        if (shouldSync) {
-            await handleSync();
+        await handlePullEnd();
+    };
+
+    // 마우스 이벤트 핸들러 (PC 지원)
+    const handleMouseDown = (e) => {
+        handlePullStart(e.clientY);
+    };
+
+    const handleMouseMove = (e) => {
+        if (isDragging) {
+            handlePullMove(e.clientY);
+        }
+    };
+
+    const handleMouseUp = async () => {
+        if (isDragging) {
+            await handlePullEnd();
+        }
+    };
+
+    const handleMouseLeave = async () => {
+        if (isDragging) {
+            await handlePullEnd();
         }
     };
     
@@ -1161,9 +1252,15 @@ if (isLoading) {
                         ref={contentAreaRef}
                         $pullDistance={pullDistance}
                         $showHeader={showHeader}
+                        // 터치 이벤트 (모바일)
                         onTouchStart={handleTouchStart}
                         onTouchMove={handleTouchMove}
                         onTouchEnd={handleTouchEnd}
+                        // 마우스 이벤트 (PC)
+                        onMouseDown={handleMouseDown}
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={handleMouseUp}
+                        onMouseLeave={handleMouseLeave}
                     >
                         {isSyncing && (
                             <PullToSyncIndicator>
