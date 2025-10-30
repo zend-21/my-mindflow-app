@@ -65,6 +65,21 @@ const PullToSyncIndicator = styled.div`
   z-index: 5000;
   margin-top: 60px; 
 `;
+const SyncingIndicator = styled.div`
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10000; /* 모든 UI 위에 표시 */
+    width: 60px;
+    height: 60px;
+    border: 6px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top-color: #5c67f2;
+    animation: ${keyframes`
+        to { transform: rotate(360deg); }
+    `} 1s linear infinite;
+`;
 
 const SyncSpinner = styled.div`
   width: 16px;
@@ -749,7 +764,7 @@ function App() {
             }
             
             setIsLoginModalOpen(false);
-            showToast('로그인 성공! 🎉');
+            showToast('로그인 및 초기 동기화 완료! ☁️');
         } catch (error) {
             console.error('로그인 처리 중 오류:', error);
             showToast('로그인 처리 중 오류가 발생했습니다.');
