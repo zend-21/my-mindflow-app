@@ -311,8 +311,8 @@ function App() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     const [isDragging, setIsDragging] = useState(false);
-    const WIDGET_ACTIVATION_DELAY = 500; // 위젯: 0.5초 제자리 누름
-    const MIN_PULL_DISTANCE = 60;        // 동기화: 60px 이상 드래그
+    const pullStartTime = useRef(0);
+    const PULL_TIME_LIMIT = 600; // 0.6초 이내에만 Pull-to-Sync 작동
 
     const handlePullStart = (clientY) => {
         // 스크롤이 최상단일 때만
@@ -332,10 +332,6 @@ function App() {
         const currentY = clientY;
         const distance = currentY - pullStartY.current;
         
-        // ✅ 핵심: 거리만 체크, 시간은 체크 안 함!
-        // 위젯은 제자리에서 누르므로 거리가 작음
-        // 동기화는 드래그하므로 거리가 큼
-        
         const scrollTop = contentAreaRef.current?.scrollTop || 0;
         if (scrollTop <= 5 && distance > 0) {
             setPullDistance(distance * 0.5);
@@ -349,14 +345,15 @@ function App() {
         
         console.log('🔵 handlePullEnd 호출됨');
         console.log('📏 pullDistance:', pullDistance);
-        console.log('📏 MIN_PULL_DISTANCE:', MIN_PULL_DISTANCE);
+        console.log('📏 PULL_THRESHOLD:', PULL_THRESHOLD);
         
-        // ✅ 거리만 체크! 시간 체크 제거!
-        const shouldSync = pullDistance > MIN_PULL_DISTANCE;
+        const shouldSync = pullDistance > PULL_THRESHOLD;
         console.log('❓ shouldSync:', shouldSync);
         
+        // 먼저 pullDistance를 0으로 리셋 (화면 복귀)
         setPullDistance(0);
         
+        // 그 다음 동기화 실행
         if (shouldSync) {
             console.log('✅ 수동 동기화 시작!');
             await handleSync();
