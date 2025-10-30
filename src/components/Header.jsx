@@ -1,6 +1,6 @@
 // src/components/Header.jsx
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 
 const HeaderWrapper = styled.header`
@@ -19,7 +19,6 @@ const HeaderWrapper = styled.header`
     opacity 0.6s ease-in-out;
   width: 100%;
   max-width: 450px;
-  transition: top 1.1s cubic-bezier(0.28, 0.9, 0.4, 1);
 
   @media (min-width: 768px) { max-width: 480px; }
   @media (min-width: 1024px) { max-width: 530px; }
@@ -34,23 +33,40 @@ const LeftContainer = styled.div`
     cursor: pointer;
 `;
 
+const RightContainer = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 25px; 
+`;
+
 const ProfileImage = styled.img`
-    width: 40px;
-    height: 40px;
+    width: 35px;
+    height: 35px;
     border-radius: 50%;
     object-fit: cover;
+    cursor: pointer;
+    transition: transform 0.2s;
+    &:hover {
+        transform: scale(1.1);
+    }
 `;
 
 const PlaceholderIcon = styled.div`
-    width: 40px;
-    height: 40px;
+    width: 35px;
+    height: 35px;
     border-radius: 50%;
-    background-color: #e2e8f0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     display: flex;
-    justify-content: center;
     align-items: center;
-    color: #a0aec0;
-    flex-shrink: 0;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 16px;
+    cursor: pointer;
+    transition: transform 0.2s;
+    &:hover {
+        transform: scale(1.1);
+    }
 `;
 
 const ProfileName = styled.span`
@@ -66,12 +82,6 @@ const LoginText = styled.span`
     cursor: pointer;
 `;
 
-const RightContainer = styled.div`
-    display: flex;
-    align-items: center;
-    gap: 25px; 
-`;
-
 const ActionButton = styled.button`
     background: none;
     border: none;
@@ -82,16 +92,40 @@ const ActionButton = styled.button`
     font-size: 24px;
 `;
 
-// ★ 1. props에 onProfileClick 추가 ★
-const Header = ({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, onProfileClick, onSync }) => {
+// Header 컴포넌트
+const Header = ({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, onProfileClick }) => {
+    const [imageError, setImageError] = useState(false);
+
+    // profile이 변경될 때마다 imageError 초기화
+    useEffect(() => {
+        setImageError(false);
+    }, [profile]);
+
+    const handleImageError = () => {
+        console.log('⚠️ 프로필 이미지 로드 실패 - Placeholder 표시');
+        setImageError(true);
+    };
+
     console.log('🎯 Header 렌더링 - isHidden:', isHidden);
+    
     return (
         <HeaderWrapper $isHidden={isHidden}>
             <LeftContainer onClick={profile ? onProfileClick : onLoginClick}>
                 {profile ? (
                     // 로그인 상태: 프로필 사진과 이름
                     <>
-                        <ProfileImage src={profile.picture} alt="User profile" />
+                        {!imageError ? (
+                            <ProfileImage 
+                                src={profile.picture} 
+                                alt={profile.name}
+                                onError={handleImageError}
+                                crossOrigin="anonymous"
+                            />
+                        ) : (
+                            <PlaceholderIcon>
+                                {profile.name ? profile.name.charAt(0).toUpperCase() : '?'}
+                            </PlaceholderIcon>
+                        )}
                         <ProfileName>{profile.name}</ProfileName>
                     </>
                 ) : (
