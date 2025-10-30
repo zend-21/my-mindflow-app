@@ -313,6 +313,8 @@ function App() {
     const [isDragging, setIsDragging] = useState(false);
     const pullStartTime = useRef(0);
     const PULL_TIME_LIMIT = 600; // 0.6초 이내에만 Pull-to-Sync 작동
+    const WIDGET_ACTIVATION_DELAY = 500; // 위젯: 0.5초 제자리 누름
+    const MIN_PULL_DISTANCE = 60;        // 동기화: 60px 이상 드래그
 
     const handlePullStart = (clientY) => {
         // 스크롤이 최상단일 때만
