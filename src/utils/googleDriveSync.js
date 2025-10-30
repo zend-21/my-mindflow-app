@@ -3,25 +3,38 @@
 const FOLDER_NAME = 'MemoApp_Backup';
 const FILE_NAME = 'app_data.json';
 
-// Google API 클라이언트 로드 및 초기화
+// ⚠️ 중요: Google OAuth로 받은 credential은 ID Token이므로
+// Drive API 사용을 위해서는 별도의 Access Token이 필요합니다.
+// 하지만 @react-oauth/google의 credential에서는 Access Token을 직접 얻을 수 없으므로
+// useGoogleLogin을 사용하여 Access Token을 받아야 합니다.
+
+let gapiInited = false;
+let tokenClient = null;
+
+// GAPI 초기화
 export const initializeGapiClient = () => {
   return new Promise((resolve, reject) => {
+    if (gapiInited) {
+      resolve();
+      return;
+    }
+
     const script = document.createElement('script');
     script.src = 'https://apis.google.com/js/api.js';
     script.onload = () => {
-      window.gapi.load('client', () => {
-        window.gapi.client
-          .init({
+      window.gapi.load('client', async () => {
+        try {
+          await window.gapi.client.init({
+            apiKey: '', // 선택사항
             discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-          })
-          .then(() => {
-            console.log('✅ GAPI 클라이언트 초기화 완료');
-            resolve();
-          })
-          .catch((error) => {
-            console.error('❌ GAPI 초기화 실패:', error);
-            reject(error);
           });
+          gapiInited = true;
+          console.log('✅ GAPI 클라이언트 초기화 완료');
+          resolve();
+        } catch (error) {
+          console.error('❌ GAPI 초기화 실패:', error);
+          reject(error);
+        }
       });
     };
     script.onerror = reject;
@@ -29,13 +42,17 @@ export const initializeGapiClient = () => {
     if (!document.querySelector('script[src="https://apis.google.com/js/api.js"]')) {
       document.body.appendChild(script);
     } else {
-      window.gapi.load('client', () => {
-        window.gapi.client
-          .init({
+      window.gapi.load('client', async () => {
+        try {
+          await window.gapi.client.init({
+            apiKey: '',
             discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-          })
-          .then(resolve)
-          .catch(reject);
+          });
+          gapiInited = true;
+          resolve();
+        } catch (error) {
+          reject(error);
+        }
       });
     }
   });
@@ -45,13 +62,13 @@ export const initializeGapiClient = () => {
 export const setAccessToken = (token) => {
   if (window.gapi && window.gapi.client) {
     window.gapi.client.setToken({ access_token: token });
+    console.log('✅ Access Token 설정 완료');
   }
 };
 
 // 폴더 찾기 또는 생성
 const getOrCreateFolder = async () => {
   try {
-    // 기존 폴더 검색
     const response = await window.gapi.client.drive.files.list({
       q: `name='${FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
       fields: 'files(id, name)',
@@ -63,7 +80,6 @@ const getOrCreateFolder = async () => {
       return response.result.files[0].id;
     }
 
-    // 폴더 생성
     const folderMetadata = {
       name: FOLDER_NAME,
       mimeType: 'application/vnd.google-apps.folder',
@@ -103,7 +119,7 @@ const findExistingFile = async (folderId) => {
   }
 };
 
-// Google Drive에 데이터 업로드 (동기화)
+// Google Drive에 데이터 업로드
 export const syncToGoogleDrive = async (data) => {
   try {
     if (!window.gapi || !window.gapi.client) {
@@ -161,8 +177,7 @@ export const syncToGoogleDrive = async (data) => {
   } catch (error) {
     console.error('❌ Google Drive 동기화 실패:', error);
     
-    // 토큰 만료 에러 체크
-    if (error.status === 401) {
+    if (error.status === 401 || error.status === 403) {
       return { success: false, error: 'TOKEN_EXPIRED' };
     }
     
@@ -170,7 +185,7 @@ export const syncToGoogleDrive = async (data) => {
   }
 };
 
-// Google Drive에서 데이터 다운로드 (복원)
+// Google Drive에서 데이터 다운로드
 export const loadFromGoogleDrive = async () => {
   try {
     if (!window.gapi || !window.gapi.client) {
@@ -200,10 +215,31 @@ export const loadFromGoogleDrive = async () => {
   } catch (error) {
     console.error('❌ Google Drive 데이터 로드 실패:', error);
     
-    if (error.status === 401) {
+    if (error.status === 401 || error.status === 403) {
       return { success: false, error: 'TOKEN_EXPIRED' };
     }
     
     return { success: false, error: error.message };
   }
+};
+
+// Google OAuth Access Token 요청
+export const requestAccessToken = (clientId) => {
+  return new Promise((resolve, reject) => {
+    const client = window.google.accounts.oauth2.initTokenClient({
+      client_id: clientId,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: (response) => {
+        if (response.access_token) {
+          console.log('✅ Access Token 발급 성공');
+          resolve(response.access_token);
+        } else {
+          console.error('❌ Access Token 발급 실패');
+          reject(new Error('Access Token을 받지 못했습니다.'));
+        }
+      },
+    });
+    
+    client.requestAccessToken();
+  });
 };

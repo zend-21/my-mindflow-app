@@ -695,20 +695,26 @@ function App() {
     }, [isGapiReady]);
 
     // ✅ 로그인 성공 시 처리 (기존 handleLoginSuccess를 확장)
-    const handleLoginSuccess = async (credentialResponse) => {
+    const handleLoginSuccess = async (response) => {
         try {
-            const decodedToken = jwtDecode(credentialResponse.credential);
-            const token = credentialResponse.credential;
+            const { accessToken, userInfo } = response;
             
-            setProfile(decodedToken);
-            setAccessTokenState(token);
+            // 사용자 프로필 설정
+            const profileData = {
+                email: userInfo.email,
+                name: userInfo.name,
+                picture: userInfo.picture,
+            };
             
-            localStorage.setItem('userProfile', JSON.stringify(decodedToken));
-            localStorage.setItem('accessToken', token);
+            setProfile(profileData);
+            setAccessTokenState(accessToken);
+            
+            localStorage.setItem('userProfile', JSON.stringify(profileData));
+            localStorage.setItem('accessToken', accessToken);
             
             // GAPI에 토큰 설정
             if (isGapiReady) {
-                setAccessToken(token);
+                setAccessToken(accessToken);
                 
                 // 로그인 직후 자동 동기화 시도
                 setTimeout(async () => {
@@ -718,8 +724,10 @@ function App() {
             }
             
             setIsLoginModalOpen(false);
+            showToast('로그인 성공! 🎉');
         } catch (error) {
             console.error('로그인 처리 중 오류:', error);
+            showToast('로그인 처리 중 오류가 발생했습니다.');
         }
     };
 
