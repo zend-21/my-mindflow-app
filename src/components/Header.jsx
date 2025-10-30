@@ -4,25 +4,27 @@ import React from 'react';
 import styled from 'styled-components';
 
 const HeaderWrapper = styled.header`
-    background-color: #ffe59fff;
-    padding: 16px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
-    z-index: 500;
-    position: absolute; 
-    top: 0;
-    left: 0;
-    right: 0;
-    margin: 0 auto;
-    width: 100%;
-    max-width: 450px;
-    transition: transform 0.3s ease-in-out;
-    transform: translateY(${props => props.$isHidden ? '-100%' : '0'});
+  background-color: #ffe59fff;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  z-index: 500;
+  position: fixed;
+  top: ${props => props.$isHidden ? '-100px' : '0'};
+  opacity: ${props => props.$isHidden ? 0 : 1};
+  transition:
+    top 1.1s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.6s ease-in-out;
+  width: 100%;
+  max-width: 450px;
+  transition: top 1.1s cubic-bezier(0.28, 0.9, 0.4, 1);
 
-    @media (min-width: 768px) { max-width: 700px; }
-    @media (min-width: 1024px) { max-width: 900px; }
+  @media (min-width: 768px) { max-width: 480px; }
+  @media (min-width: 1024px) { max-width: 530px; }
+  @media (min-width: 1440px) { max-width: 580px; }
+  @media (min-width: 1900px) { max-width: 680px; }
 `;
 
 const LeftContainer = styled.div`
@@ -82,6 +84,7 @@ const ActionButton = styled.button`
 
 // ★ 1. props에 onProfileClick 추가 ★
 const Header = ({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, onProfileClick, onSync }) => {
+    console.log('🎯 Header 렌더링 - isHidden:', isHidden);
     return (
         <HeaderWrapper $isHidden={isHidden}>
             <LeftContainer onClick={profile ? onProfileClick : onLoginClick}>

@@ -107,7 +107,7 @@ const ToastBox = styled.div`
 const Screen = styled.div`
     height: 100vh;
     width: 100%;
-    max-width: 450px; /* 모바일 기본 너비 */
+    max-width: 450px;
     margin: 0 auto;
     
     background: linear-gradient(180deg, #fafafa 0%, #f0f2f5 100%);
@@ -115,6 +115,7 @@ const Screen = styled.div`
     display: flex;
     flex-direction: column;
     overflow-x: hidden;
+    overflow-y: hidden;  /* ← visible에서 hidden으로 변경 */
     
     -webkit-tap-highlight-color: transparent;
     user-select: none;
@@ -704,6 +705,7 @@ function App() {
     
     const [showHeader, setShowHeader] = useState(true);
     const lastScrollY = useRef(0);
+    const scrollDirection = useRef('down');
     const [isSyncing, setIsSyncing] = useState(false);
     const [pullDistance, setPullDistance] = useState(0);
     const pullStartY = useRef(0);
@@ -715,30 +717,39 @@ function App() {
     const sensors = useSensors(mouseSensor, touchSensor);
     
     useEffect(() => {
-        const handleScroll = () => {
-            const currentScrollY = contentAreaRef.current.scrollTop;
-            
-            if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
-                setShowHeader(false);
-            } 
-            
-            if (currentScrollY <= 0) {
-                setShowHeader(true);
-            }
-            
-            lastScrollY.current = currentScrollY;
-        };
-        
+        console.log('🔍 showHeader 상태 변경:', showHeader);
+    }, [showHeader]);
+
+    const lastScrollYRef = useRef(0);
+
+    useEffect(() => {
+    const handleScroll = () => {
+        const currentY = contentAreaRef.current.scrollTop;
+
+        if (currentY > lastScrollYRef.current && currentY > 100) {
+        setShowHeader(false);
+        } else if (currentY < lastScrollYRef.current && currentY <= 30) {
+        setShowHeader(true);
+        }
+
+        lastScrollYRef.current = currentY; // ✅ useRef는 재할당 가능
+    };
+
+    const timer = setTimeout(() => {
         const contentArea = contentAreaRef.current;
         if (contentArea) {
-            contentArea.addEventListener('scroll', handleScroll);
+        contentArea.addEventListener('scroll', handleScroll);
+        console.log('✅ 스크롤 이벤트 리스너 등록됨');
         }
-        
-        return () => {
-            if (contentArea) {
-                contentArea.removeEventListener('scroll', handleScroll);
-            }
-        };
+    }, 100);
+
+    return () => {
+        clearTimeout(timer);
+        const contentArea = contentAreaRef.current;
+        if (contentArea) {
+        contentArea.removeEventListener('scroll', handleScroll);
+        }
+    };
     }, []);
 
     const executeCalendarDelete = () => {
@@ -828,12 +839,14 @@ if (isLoading) {
                 {/* ★★★ 더 이상 로그인 여부로 화면을 막지 않고, 항상 메인 앱을 보여줍니다. ★★★ */}
                 <>
                     <Header
+                        key={showHeader.toString()}
                         profile={profile}
                         onLogout={handleLogout}
                         onSearchClick={handleSearchClick}
                         onMenuClick={handleToggleMenu}
                         isHidden={!showHeader}
-                        onLoginClick={() => setIsLoginModalOpen(true)} // ★ 로그인 모달 여는 함수 전달
+                        onLoginClick={() => setIsLoginModalOpen(true)}
+                        onProfileClick={handleProfileClick}
                     />
                     <ContentArea
                         ref={contentAreaRef}
