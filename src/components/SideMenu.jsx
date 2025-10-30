@@ -165,7 +165,18 @@ const FileInput = styled.input`
     display: none;
 `;
 
-const SideMenu = ({ isOpen, onClose, onExport, onImport, profile, onProfileClick, onLogout, onLoginClick, onSync }) => {
+const SideMenu = ({ 
+    isOpen, 
+    onClose, 
+    onExport, 
+    onImport, 
+    onRestoreFromDrive,  // ⭐ 이 줄 추가
+    profile, 
+    onProfileClick, 
+    onLogout, 
+    onLoginClick, 
+    onSync 
+}) => {
     const fileInputRef = useRef(null);
     // const [isRouletteModalOpen, setIsRouletteModalOpen] = useState(false);
 
@@ -211,8 +222,7 @@ const SideMenu = ({ isOpen, onClose, onExport, onImport, profile, onProfileClick
                                         <span className="icon">🔄</span> 동기화
                                     </MenuItem>
                                     <MenuItem onClick={onRestoreFromDrive}>
-                                        <MenuIcon>☁️</MenuIcon>
-                                        <MenuText>Google Drive에서 복원</MenuText>
+                                        <span className="icon">☁️</span> Google Drive에서 복원
                                     </MenuItem>                                    
                                     <MenuItem onClick={onExport}>
                                         <span className="icon">💾</span> 백업하기
@@ -228,9 +238,9 @@ const SideMenu = ({ isOpen, onClose, onExport, onImport, profile, onProfileClick
                                     </MenuItem>
                                 </>
                             )}
-                            <MenuItem onClick={() => setIsRouletteModalOpen(true)}>
+                            {/* <MenuItem onClick={() => setIsRouletteModalOpen(true)}>
                                 <span className="icon">🔮</span> 오늘의 운세
-                            </MenuItem>
+                            </MenuItem> */}
                             <MenuItem>
                                 <span className="icon">📝</span> 메모
                             </MenuItem>
@@ -250,10 +260,6 @@ const SideMenu = ({ isOpen, onClose, onExport, onImport, profile, onProfileClick
                     </MenuContainer>
                 </>
             )}
-
-            {/* {isRouletteModalOpen && (
-                <Roulette onClose={() => setIsRouletteModalOpen(false)} />
-            )} */}
         </>
     );
 };

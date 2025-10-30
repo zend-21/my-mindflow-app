@@ -153,3 +153,16 @@ const GoogleButtonWrapper = styled.div`
     width: 100%;
     margin-top: 24px;
 `;
+
+const ModalTitle = styled.h2`
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #333;
+`;
+
+const ModalDescription = styled.p`
+    font-size: 16px;
+    color: #666;
+    line-height: 1.5;
+`;
