@@ -145,6 +145,7 @@ const FloatingButtonContainer = styled.div`
 const LONG_PRESS_DURATION = 500; // 0.5초
 const MAX_DRAG_UP = -100;
 const MIN_DRAG_DOWN = 0;
+const DRAG_THRESHOLD = 10; 
 
 const FloatingButton = ({ activeTab, onClick }) => {
     const [offsetY, setOffsetY] = useState(0);
@@ -186,37 +187,50 @@ const FloatingButton = ({ activeTab, onClick }) => {
     };
 
     const handlePointerMove = (e) => {
+        // 1. 새 좌표 계산
+        const deltaY = e.clientY - dragStartRef.current.y;
+        let newY = dragStartRef.current.initialOffset + deltaY; // 'let'으로 변경하여 값 수정이 가능하도록 함
+
+        // ★★★ 1-A. 드래그 모드 즉시 진입 로직 (클릭/드래그 구분) ★★★
+        if (!isLongPressSuccessful.current && Math.abs(deltaY) > DRAG_THRESHOLD) {
+            clearTimeout(timerRef.current);
+            isLongPressSuccessful.current = true;
+            setIsDragging(true); 
+            setHasBeenDragged(true); 
+        }
+
         if (!isLongPressSuccessful.current) {
             return;
         }
-        e.preventDefault();
-        e.stopPropagation();
 
-        // 1. 새 좌표는 항상 계산하고 Ref에 저장
-        const deltaY = e.clientY - dragStartRef.current.y;
-        const newY = dragStartRef.current.initialOffset + deltaY;
-        latestDragY.current = newY; // ★ state 대신 Ref에 최신 좌표 저장
+        // ★★★ 1-B. [핵심 수정]: 실시간으로 이동 범위를 제한(Clamping)합니다. ★★★
+        // 상한 제한: newY가 MAX_DRAG_UP(-100)보다 작아지면(-101, -102 등) MAX_DRAG_UP으로 고정
+        if (newY < MAX_DRAG_UP) {
+            newY = MAX_DRAG_UP;
+        } 
+        // 하한 제한: newY가 MIN_DRAG_DOWN(0)보다 커지면(1, 2 등) MIN_DRAG_DOWN으로 고정
+        else if (newY > MIN_DRAG_DOWN) { 
+            newY = MIN_DRAG_DOWN;
+        }
+
+        latestDragY.current = newY; // 실시간 제한된 newY 값을 Ref에 저장
 
         // 2. ★ 이미 rAF가 예약되어 있다면, 추가 예약(state 업데이트)을 하지 않고 반환
         if (rafRef.current) {
             return;
         }
-
+        
         // 3. ★ rAF를 예약하여 다음 프레임에 딱 한 번만 state를 업데이트
         rafRef.current = requestAnimationFrame(() => {
-            setOffsetY(latestDragY.current); // Ref에 저장된 *가장 최신* 값으로 state 업데이트
-            rafRef.current = null; // 예약 완료되었으므로 ID 초기화
+            setOffsetY(latestDragY.current);
+            rafRef.current = null;
         });
     };
 
     const handlePointerUp = (e) => {
         e.stopPropagation();
         
-        // ★ (추가) 예약된 rAF가 있다면 즉시 취소 (드롭했으므로)
-        if (rafRef.current) {
-            cancelAnimationFrame(rafRef.current);
-            rafRef.current = null;
-        }
+        // ... (생략: rAF 취소 및 타이머 정리)
         
         clearTimeout(timerRef.current);
 
@@ -224,8 +238,9 @@ const FloatingButton = ({ activeTab, onClick }) => {
             e.target.releasePointerCapture(e.pointerId);
         } catch (error) { /* 무시 */ }
 
-        if (isDragging) {
-            // 이 블록은 드래그가 끝났을 때만 실행됩니다. (기존과 동일)
+        // isLongPressSuccessful.current가 true였으면 (길게 눌렀거나, 10px 이상 움직였으면)
+        if (isLongPressSuccessful.current) { 
+            // 이 블록은 드래그가 끝났을 때만 실행됩니다.
             setIsDragging(false); 
 
             const finalY = latestDragY.current;
@@ -239,9 +254,8 @@ const FloatingButton = ({ activeTab, onClick }) => {
                 return finalY; 
             });
         } else {
-            // ★★★ 추가된 부분 ★★★
-            // 드래그가 아니었다면(isDragging이 false라면) '클릭'으로 간주합니다.
-            // 부모로부터 onClick 함수를 받았다면 실행합니다.
+            // isLongPressSuccessful.current가 false였으면 '클릭'으로 간주합니다.
+            // (짧게 터치했거나, 500ms 안에 10px 미만 움직임)
             if (onClick) {
                 onClick();
             }

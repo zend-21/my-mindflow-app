@@ -721,18 +721,28 @@ function App() {
     }, [showHeader]);
 
     const lastScrollYRef = useRef(0);
+    
+    // ★★★ 스크롤 임계값 변수를 정의합니다. ★★★
+    const HIDE_THRESHOLD = 80; // 이 값 이상 스크롤해야 헤더가 숨겨집니다.
+    const SHOW_THRESHOLD = 5; // 이 값 이하로 스크롤해야 헤더가 다시 나타납니다.
 
     useEffect(() => {
     const handleScroll = () => {
         const currentY = contentAreaRef.current.scrollTop;
 
-        if (currentY > lastScrollYRef.current && currentY > 100) {
-        setShowHeader(false);
-        } else if (currentY < lastScrollYRef.current && currentY <= 30) {
-        setShowHeader(true);
+        // 1. 스크롤 다운 (숨기기) 로직
+        // 현재 스크롤 위치가 이전에 저장된 값보다 크고, 숨김 임계값보다 크면 숨깁니다.
+        if (currentY > lastScrollYRef.current && currentY > HIDE_THRESHOLD) { 
+            setShowHeader(false);
+        } 
+        // 2. 스크롤 업 (보이기) 로직
+        // 현재 스크롤 위치가 이전에 저장된 값보다 작고, 보이기 임계값보다 작으면 보이게 합니다.
+        // 스크롤을 '위로' 올릴 때만 반응하도록 lastScrollYRef.current도 체크합니다.
+        else if (currentY < lastScrollYRef.current && currentY <= SHOW_THRESHOLD) { 
+            setShowHeader(true);
         }
 
-        lastScrollYRef.current = currentY; // ✅ useRef는 재할당 가능
+        lastScrollYRef.current = currentY; 
     };
 
     const timer = setTimeout(() => {
