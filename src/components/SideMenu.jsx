@@ -178,7 +178,17 @@ const SideMenu = ({
     onSync 
 }) => {
     const fileInputRef = useRef(null);
-    // const [isRouletteModalOpen, setIsRouletteModalOpen] = useState(false);
+    const [imageError, setImageError] = useState(false); // ✅ 추가: 이미지 로드 오류 상태
+
+    const handleError = () => { // 에러 발생 시 상태 변경
+        setImageError(true);
+    };
+
+    React.useEffect(() => { // 메뉴 열릴 때 상태 초기화
+        if (isOpen) {
+            setImageError(false);
+        }
+    }, [isOpen]);
 
     const handleImportClick = () => {
         if (fileInputRef.current) {
@@ -194,12 +204,13 @@ const SideMenu = ({
                     <MenuContainer $isOpen={isOpen}>
                         <MenuHeader>
                             <ProfileCluster onClick={profile ? onProfileClick : onLoginClick}>
-                                {profile ? (
+                                {profile && !imageError ? ( // ✅ 조건 수정: imageError가 아닐 때만 이미지 표시
                                     <ProfileImage 
                                         src={profile.picture} 
-                                        alt="Profile" 
+                                        alt={profile.name || "Profile"} 
+                                        onError={handleError} // ✅ 추가: 에러 발생 시 handleError 호출
                                     />
-                                ) : (
+                                ) : ( // ✅ 수정: profile이 없거나 이미지 로드 에러 시 PlaceholderIcon 표시
                                     <PlaceholderIcon>
                                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>

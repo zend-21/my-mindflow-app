@@ -295,6 +295,22 @@ function App() {
     const [activeTab, setActiveTab] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
+    // ✅ 추가: 앱 활성 상태 (포커스 여부)
+    const [isAppActive, setIsAppActive] = useState(true); 
+
+    // ✅ 앱 활성 상태 리스너 (새로 추가)
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            // document.visibilityState가 'visible'일 때만 true
+            setIsAppActive(document.visibilityState === 'visible');
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
+
     const storageKeySuffix = profile ? profile.email : 'guest';
     const [widgets, setWidgets] = useLocalStorage(`widgets_${storageKeySuffix}`, ['StatsGrid', 'QuickActions', 'RecentActivity']);
     const [memos, setMemos] = useLocalStorage(`memos_${storageKeySuffix}`, []);
@@ -699,17 +715,15 @@ function App() {
         try {
             const { accessToken, userInfo } = response;
             
-            // ★★★ 수정 시작: 강력한 URL HTTPS 강제 변환 로직 ★★★
+            // ★★★ 수정: 강력한 URL HTTPS 강제 변환 로직 ★★★
             let pictureUrl = userInfo.picture;
             if (pictureUrl) {
-                // 1. URL에서 기존의 http:// 또는 https:// 부분을 모두 제거 (정규식 사용)
-                // 이 방법이 어떤 형태의 URL이 오더라도 안전하게 HTTPS로 변환하는 가장 강력한 방법입니다.
+                // http:// 또는 https:// 부분을 제거하고 무조건 https://를 붙입니다.
                 const strippedUrl = pictureUrl.replace(/^https?:\/\//, ''); 
-                // 2. 무조건 https://를 붙여서 HTTPS 프로토콜을 강제합니다.
                 pictureUrl = `https://${strippedUrl}`;
             }
-            // ★★★ 수정 끝 ★★★
-
+            // ★★★
+            
             // 사용자 프로필 설정
             const profileData = {
                 email: userInfo.email,
@@ -747,20 +761,20 @@ function App() {
         setIsLoginModalOpen(false);
     };
 
-    // ✅ 실제 동기화 수행 함수 (새로 추가)
-    const performSync = async () => {
+    // ✅ 실제 동기화 수행 함수 (toast 제어 파라미터 추가)
+    const performSync = async (isManual = false) => { // ★★★ 파라미터 추가
         if (!profile || !accessToken) {
-            showToast('동기화를 하려면 로그인 상태여야 합니다.');
+            if (isManual) showToast('동기화를 하려면 로그인 상태여야 합니다.');
             return false;
         }
 
         if (!isGapiReady) {
-            showToast('Google Drive 연결 준비 중입니다...');
+            if (isManual) showToast('Google Drive 연결 준비 중입니다...');
             return false;
         }
 
         try {
-            setIsSyncing(true);
+            if (isManual) setIsSyncing(true); // 수동 동기화일 때만 스피너 표시
             
             // 동기화할 데이터 준비
             const dataToSync = {
@@ -779,59 +793,55 @@ function App() {
                 setLastSyncTime(now);
                 localStorage.setItem('lastSyncTime', now.toString());
                 
-                addActivity('동기화', 'Google Drive 동기화 완료');
-                showToast('데이터 동기화가 완료되었습니다 ☁️');
+                if (isManual) { // ★★★ 수동 동기화일 때만 메시지 표시
+                    addActivity('동기화', 'Google Drive 동기화 완료');
+                    showToast('데이터 동기화가 완료되었습니다 ☁️');
+                }
                 return true;
             } else {
                 if (result.error === 'TOKEN_EXPIRED') {
                     showToast('로그인이 만료되었습니다. 다시 로그인해주세요.');
                     handleLogout();
                 } else {
-                    showToast('동기화에 실패했습니다. 다시 시도해주세요.');
+                    if (isManual) { // 수동일 때만 실패 메시지 표시
+                        showToast('동기화에 실패했습니다. 다시 시도해주세요.');
+                    }
                 }
                 return false;
             }
         } catch (error) {
             console.error('동기화 중 오류:', error);
-            showToast('동기화 중 오류가 발생했습니다.');
+            if (isManual) showToast('동기화 중 오류가 발생했습니다.'); // 수동일 때만 오류 메시지 표시
             return false;
         } finally {
-            setIsSyncing(false);
+            if (isManual) setIsSyncing(false); // 수동 동기화일 때만 스피너 숨김
         }
     };
 
-    // ✅ 수동 동기화 (기존 handleSync를 간단하게 수정)
+    // ✅ 수동 동기화 (isManual=true 전달)
     const handleSync = async () => {
-        await performSync();
+        await performSync(true); 
     };
 
-    // ✅ handleTouchEnd는 그대로 유지 (변경 없음)
-    const handleTouchEnd = () => {
-        if (pullDistance > PULL_THRESHOLD) {
-            handleSync();
-        } else {
-            setPullDistance(0);
-        }
-    };
-
-    // ✅ 자동 동기화 (30초마다) - 새로 추가
+    // ✅ 자동 동기화 (30초마다) - 수정됨: isAppActive 조건 및 isManual=false 전달
     useEffect(() => {
-        if (profile && accessToken && isGapiReady) {
+        // ★★★ isAppActive 조건 추가: 앱이 활성화 상태일 때만 자동 동기화 타이머 시작
+        if (profile && accessToken && isGapiReady && isAppActive) { 
             console.log('🔄 자동 동기화 타이머 시작 (30초 간격)');
             
             syncIntervalRef.current = setInterval(async () => {
-                console.log('⏰ 자동 동기화 실행...');
-                await performSync();
-            }, 30000); // 30초
+                await performSync(false); // ★★★ false 전달: 토스트 메시지 표시 안 함
+            }, 30000);
 
-            return () => {
-                if (syncIntervalRef.current) {
-                    console.log('⏹️ 자동 동기화 타이머 정지');
-                    clearInterval(syncIntervalRef.current);
-                }
-            };
+        } else {
+             // 앱이 비활성화되거나 로그아웃되면 타이머를 정지
+             if (syncIntervalRef.current) {
+                clearInterval(syncIntervalRef.current);
+                syncIntervalRef.current = null;
+            }
         }
-    }, [profile, accessToken, isGapiReady, memos, calendarSchedules, recentActivities]);
+    // ★★★ isAppActive를 의존성 배열에 추가
+    }, [profile, accessToken, isGapiReady, isAppActive, memos, calendarSchedules, recentActivities]); 
 
     // ✅ 앱 종료 시 마지막 동기화 - 새로 추가
     useEffect(() => {
