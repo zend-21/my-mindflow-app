@@ -699,11 +699,14 @@ function App() {
         try {
             const { accessToken, userInfo } = response;
             
-            // ★★★ 수정 시작: HTTP -> HTTPS 변환 로직 추가 ★★★
+            // ★★★ 수정 시작: 강력한 URL HTTPS 강제 변환 로직 ★★★
             let pictureUrl = userInfo.picture;
-            if (pictureUrl && pictureUrl.startsWith('http://')) {
-                // HTTP를 HTTPS로 교체하여 혼합 콘텐츠 오류를 방지합니다.
-                pictureUrl = pictureUrl.replace('http://', 'https://'); 
+            if (pictureUrl) {
+                // 1. URL에서 기존의 http:// 또는 https:// 부분을 모두 제거 (정규식 사용)
+                // 이 방법이 어떤 형태의 URL이 오더라도 안전하게 HTTPS로 변환하는 가장 강력한 방법입니다.
+                const strippedUrl = pictureUrl.replace(/^https?:\/\//, ''); 
+                // 2. 무조건 https://를 붙여서 HTTPS 프로토콜을 강제합니다.
+                pictureUrl = `https://${strippedUrl}`;
             }
             // ★★★ 수정 끝 ★★★
 
@@ -711,7 +714,7 @@ function App() {
             const profileData = {
                 email: userInfo.email,
                 name: userInfo.name,
-                picture: pictureUrl, // 수정된 pictureUrl을 사용합니다.
+                picture: pictureUrl, // 수정된 pictureUrl 사용
             };
             
             setProfile(profileData);
