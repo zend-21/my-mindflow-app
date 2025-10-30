@@ -699,11 +699,19 @@ function App() {
         try {
             const { accessToken, userInfo } = response;
             
+            // ★★★ 수정 시작: HTTP -> HTTPS 변환 로직 추가 ★★★
+            let pictureUrl = userInfo.picture;
+            if (pictureUrl && pictureUrl.startsWith('http://')) {
+                // HTTP를 HTTPS로 교체하여 혼합 콘텐츠 오류를 방지합니다.
+                pictureUrl = pictureUrl.replace('http://', 'https://'); 
+            }
+            // ★★★ 수정 끝 ★★★
+
             // 사용자 프로필 설정
             const profileData = {
                 email: userInfo.email,
                 name: userInfo.name,
-                picture: userInfo.picture,
+                picture: pictureUrl, // 수정된 pictureUrl을 사용합니다.
             };
             
             setProfile(profileData);
