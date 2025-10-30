@@ -762,7 +762,7 @@ function App() {
     };
 
     // ✅ 실제 동기화 수행 함수 (toast 제어 파라미터 추가)
-    const performSync = async (isManual = false) => { // ★★★ 파라미터 추가
+    const performSync = async (isManual = false) => { // ★★★ 파라미터 확인: isManual
         if (!profile || !accessToken) {
             if (isManual) showToast('동기화를 하려면 로그인 상태여야 합니다.');
             return false;
@@ -793,7 +793,7 @@ function App() {
                 setLastSyncTime(now);
                 localStorage.setItem('lastSyncTime', now.toString());
                 
-                if (isManual) { // ★★★ 수동 동기화일 때만 메시지 표시
+                if (isManual) { // ✅ 이 부분이 동기화 완료 메시지 출력 조건입니다!
                     addActivity('동기화', 'Google Drive 동기화 완료');
                     showToast('데이터 동기화가 완료되었습니다 ☁️');
                 }
@@ -818,7 +818,7 @@ function App() {
         }
     };
 
-    // ✅ 수동 동기화 (isManual=true 전달)
+    // ✅ handleSync 함수 (performSync(true) 호출 확인)
     const handleSync = async () => {
         await performSync(true); 
     };
@@ -1017,7 +1017,7 @@ function App() {
         setPullDistance(0);
       }
     };
-    
+
     const handleTouchEnd = async () => {
         // PULL_THRESHOLD (80)보다 당긴 거리가 길다면 수동 동기화 실행
         if (pullDistance > PULL_THRESHOLD) {
