@@ -312,8 +312,11 @@ function App() {
 
     const [isDragging, setIsDragging] = useState(false);
     const pullStartTime = useRef(0);
+    const [pullDistance, setPullDistance] = useState(0);
+    const pullStartY = useRef(0);                        
     const WIDGET_ACTIVATION_DELAY = 500; // 위젯: 0.5초 제자리 누름
     const MIN_PULL_DISTANCE = 60;        // 동기화: 60px 이상 드래그
+    const PULL_THRESHOLD = 60;
 
     const handlePullStart = (clientY) => {
         // 스크롤이 최상단일 때만
@@ -776,9 +779,6 @@ function App() {
     const lastScrollY = useRef(0);
     const scrollDirection = useRef('down');
     const [isSyncing, setIsSyncing] = useState(false);
-    const [pullDistance, setPullDistance] = useState(0);
-    const pullStartY = useRef(0);
-    const PULL_THRESHOLD = 60;
     const [activeId, setActiveId] = useState(null);
 
     const mouseSensor = useSensor(MouseSensor, { activationConstraint: { distance: 8 } });
