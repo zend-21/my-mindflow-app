@@ -110,14 +110,17 @@ const ToastOverlay = styled.div`
 `;
 
 const ToastBox = styled.div`
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.9); /* 더 어둡게 */
   color: white;
-  padding: 16px 24px;
-  border-radius: 8px;
-  font-size: 16px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  padding: 24px 32px; /* 더 크게 */
+  border-radius: 12px;
+  font-size: 18px; /* 더 크게 */
+  font-weight: 600; /* 굵게 */
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); /* 더 진한 그림자 */
   animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
   text-align: center;
+  min-width: 200px; /* 최소 너비 */
+  z-index: 12001; /* z-index 더 높게 */
 `;
 
 const Screen = styled.div`
@@ -351,13 +354,14 @@ function App() {
         console.log('📏 pullDistance:', pullDistance);
         console.log('📏 PULL_THRESHOLD:', PULL_THRESHOLD);
         
+        // ✅ 테스트: 무조건 Toast 표시
+        showToast(`테스트: ${Math.round(pullDistance)}px 당김`);
+        
         const shouldSync = pullDistance > PULL_THRESHOLD;
         console.log('❓ shouldSync:', shouldSync);
         
-        // 먼저 pullDistance를 0으로 리셋 (화면 복귀)
         setPullDistance(0);
         
-        // 그 다음 동기화 실행
         if (shouldSync) {
             console.log('✅ 수동 동기화 시작!');
             await handleSync();
@@ -600,10 +604,12 @@ function App() {
     };
 
     const showToast = (message) => {
+        console.log('🔔 showToast 호출됨:', message); // ✅ 로그 추가
         setToastMessage(message);
         setTimeout(() => {
+            console.log('🔔 Toast 숨김'); // ✅ 로그 추가
             setToastMessage(null);
-        }, 1500);
+        }, 3000); // ✅ 1.5초 → 3초로 늘림
     };
     
     const handleDataExport = () => {
@@ -881,13 +887,19 @@ function App() {
         
         if (!profile || !accessToken) {
             console.log('❌ 로그인 안 됨');
-            if (isManual) showToast('동기화를 하려면 로그인 상태여야 합니다.');
+            if (isManual) {
+                showToast('⚠️ 로그인 필요');
+                console.log('Toast 표시: 로그인 필요');
+            }
             return false;
         }
 
         if (!isGapiReady) {
             console.log('❌ GAPI 준비 안 됨');
-            if (isManual) showToast('Google Drive 연결 준비 중입니다...');
+            if (isManual) {
+                showToast('⏳ Drive 연결 중...');
+                console.log('Toast 표시: Drive 연결 중');
+            }
             return false;
         }
 
@@ -897,7 +909,8 @@ function App() {
             if (isManual) {
                 console.log('🎯 수동 동기화 - 스피너 표시');
                 setIsSyncing(true);
-                await new Promise(resolve => setTimeout(resolve, 100));
+                showToast('🔄 동기화 시작...'); // ✅ 추가
+                await new Promise(resolve => setTimeout(resolve, 500)); // 더 길게
             }
             
             const dataToSync = {
@@ -921,26 +934,27 @@ function App() {
                 if (isManual) {
                     console.log('✅ 수동 동기화 - 활동 기록 추가');
                     addActivity('동기화', 'Google Drive 동기화 완료');
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await new Promise(resolve => setTimeout(resolve, 500));
                     console.log('✅ 수동 동기화 - 토스트 표시');
-                    showToast('데이터 동기화가 완료되었습니다 ☁️');
+                    showToast('✅ 동기화 완료!');
+                    console.log('Toast 표시: 동기화 완료');
                 }
                 return true;
             } else {
                 console.error('❌ 동기화 실패:', result);
                 if (result.error === 'TOKEN_EXPIRED') {
-                    showToast('로그인이 만료되었습니다. 다시 로그인해주세요.');
+                    showToast('❌ 로그인 만료');
                     handleLogout();
                 } else {
                     if (isManual) {
-                        showToast('동기화에 실패했습니다. 다시 시도해주세요.');
+                        showToast('❌ 동기화 실패');
                     }
                 }
                 return false;
             }
         } catch (error) {
             console.error('❌ 동기화 중 오류:', error);
-            if (isManual) showToast('동기화 중 오류가 발생했습니다.');
+            if (isManual) showToast('❌ 오류 발생');
             return false;
         } finally {
             if (isManual) {
