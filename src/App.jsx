@@ -393,68 +393,25 @@ function App() {
         const contentArea = contentAreaRef.current;
         if (!contentArea) return;
 
-        let startY = 0;
-        let currentDistance = 0;
-        let isDraggingLocal = false;
-
         const handleTouchStartNative = (e) => {
             if (contentArea.scrollTop > 5) return;
-            startY = e.touches[0].clientY;
-            isDraggingLocal = true;
-            setIsDragging(true);
-            setIsPulling(false);
-            console.log('⏱️ Pull 시작 (네이티브)');
+            handlePullStart(e.touches[0].clientY); // ✅ 기존 함수 호출
         };
 
         const handleTouchMoveNative = (e) => {
-            if (!isDraggingLocal) return;
+            if (!isDragging) return;
             
-            const currentY = e.touches[0].clientY;
-            const distance = currentY - startY;
-            
-            console.log('📊 Move (네이티브) - distance:', distance);
-            
-            if (contentArea.scrollTop <= 5 && distance > 0) {
-                // 브라우저 기본 Pull-to-Refresh 방지
-                e.preventDefault();
-                
-                const adjustedDistance = distance * 0.5;
-                setPullDistance(adjustedDistance);
-                currentDistance = adjustedDistance;
-                
-                console.log('📏 adjustedDistance:', adjustedDistance);
-                
-                if (adjustedDistance > 30) {
-                    console.log('✅ setIsPulling(true)');
-                    setIsPulling(true);
-                }
-            } else {
-                setPullDistance(0);
-                setIsPulling(false);
+            if (contentArea.scrollTop <= 5) {
+                e.preventDefault(); // 브라우저 기본 동작 방지
             }
+            
+            handlePullMove(e.touches[0].clientY); // ✅ 기존 함수 호출
         };
 
         const handleTouchEndNative = async () => {
-            isDraggingLocal = false;
-            setIsDragging(false);
-            setIsPulling(false);
-            
-            console.log('🔵 handlePullEnd (네이티브)');
-            console.log('📏 currentDistance:', currentDistance);
-            
-            const shouldSync = currentDistance > PULL_THRESHOLD;
-            
-            setPullDistance(0);
-            
-            if (shouldSync) {
-                console.log('✅ 수동 동기화 시작!');
-                await handleSync();
-            }
-            
-            currentDistance = 0;
+            await handlePullEnd(); // ✅ 기존 함수 호출
         };
 
-        // passive: false는 preventDefault()를 사용하기 위해 필수
         contentArea.addEventListener('touchstart', handleTouchStartNative, { passive: false });
         contentArea.addEventListener('touchmove', handleTouchMoveNative, { passive: false });
         contentArea.addEventListener('touchend', handleTouchEndNative, { passive: false });
@@ -464,7 +421,7 @@ function App() {
             contentArea.removeEventListener('touchmove', handleTouchMoveNative);
             contentArea.removeEventListener('touchend', handleTouchEndNative);
         };
-    }, []); // 빈 의존성 배열
+    }, [isDragging]); // ✅ isDragging 의존성 추가
 
     // ✅ 추가: 앱 활성 상태 (포커스 여부)
     const [isAppActive, setIsAppActive] = useState(true); 
