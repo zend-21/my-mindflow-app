@@ -312,6 +312,7 @@ function App() {
     const [accessToken, setAccessTokenState] = useState(null);
     const [lastSyncTime, setLastSyncTime] = useState(null);
     const syncIntervalRef = useRef(null);
+    const syncDebounceRef = useRef(null);
     const [isGapiReady, setIsGapiReady] = useState(false);
     
     const [activeTab, setActiveTab] = useState('home');
@@ -456,48 +457,45 @@ function App() {
         setIsCalendarEditorOpen(true);
     };
 
-    // 스케줄 저장/수정/삭제 함수 (Calendar.jsx에서 로직 이동)
-    // App.jsx 안에서 기존 handleCalendarScheduleSave 대신 아래 코드 붙여넣기
     const handleCalendarScheduleSave = (date, text) => {
-        if (!date) return;
+            if (!date) return;
 
-        const key = format(new Date(date), 'yyyy-MM-dd');
-        const now = Date.now();
+            const key = format(new Date(date), 'yyyy-MM-dd');
+            const now = Date.now();
 
-        // ▼▼▼ 1. 저장하기 전에, 해당 날짜에 이미 스케줄이 있었는지 확인합니다. ▼▼▼
-        const isEditingExisting = !!calendarSchedules[key];
+            const isEditingExisting = !!calendarSchedules[key];
 
-        setCalendarSchedules(prev => {
-            const copy = { ...prev };
+            setCalendarSchedules(prev => {
+                const copy = { ...prev };
+
+                if (!text || text.trim() === "") {
+                    if (copy[key]) {
+                        delete copy[key];
+                    }
+                } else {
+                    copy[key] = {
+                        text,
+                        createdAt: copy[key]?.createdAt ?? now,
+                        updatedAt: now,
+                    };
+                }
+                return copy;
+            });
 
             if (!text || text.trim() === "") {
-                if (copy[key]) {
-                    delete copy[key];
-                }
+                addActivity('스케줄 삭제', `${key}`);
+                showToast?.('스케줄이 삭제되었습니다.');
             } else {
-                copy[key] = {
-                    text,
-                    createdAt: copy[key]?.createdAt ?? now,
-                    updatedAt: now,
-                };
+                const activityType = isEditingExisting ? '스케줄 수정' : '스케줄 등록';
+                const toastMessage = isEditingExisting ? '스케줄이 수정되었습니다.' : '스케줄이 등록되었습니다 ✅';
+                
+                addActivity(activityType, `${key} - ${text}`);
+                showToast?.(toastMessage);
             }
-            return copy;
-        });
 
-        // ▼▼▼ 2. 위에서 확인한 '수정 여부'에 따라 다른 메시지와 활동 로그를 보여줍니다. ▼▼▼
-        if (!text || text.trim() === "") {
-            addActivity('스케줄 삭제', `${key}`);
-            showToast?.('스케줄이 삭제되었습니다.');
-        } else {
-            const activityType = isEditingExisting ? '스케줄 수정' : '스케줄 등록';
-            const toastMessage = isEditingExisting ? '스케줄이 수정되었습니다.' : '스케줄이 등록되었습니다 ✅';
-            
-            addActivity(activityType, `${key} - ${text}`);
-            showToast?.(toastMessage);
-        }
-
-        setIsCalendarEditorOpen(false);
-    };
+            setIsCalendarEditorOpen(false);
+            quietSync(); // ✅ 추가
+        };
 
     const handleProfileClick = () => {
         setIsMenuOpen(false);
@@ -629,44 +627,47 @@ function App() {
     };
     
     const handleSaveNewMemo = (newMemoContent, isImportant) => {
-        const now = Date.now();
-        const newId = `m${now}`;
-        const newMemo = {
-            id: newId,
-            content: newMemoContent,
-            date: now,
-            displayDate: new Date(now).toLocaleString(),
-            isImportant: isImportant
+            const now = Date.now();
+            const newId = `m${now}`;
+            const newMemo = {
+                id: newId,
+                content: newMemoContent,
+                date: now,
+                displayDate: new Date(now).toLocaleString(),
+                isImportant: isImportant
+            };
+            setMemos(prevMemos => [newMemo, ...prevMemos]);
+            addActivity('메모 작성', newMemoContent, newId);
+            setIsNewMemoModalOpen(false);
+            showToast("새 메모가 성공적으로 저장되었습니다.");
+            quietSync(); // ✅ 추가
         };
-        setMemos(prevMemos => [newMemo, ...prevMemos]);
-        addActivity('메모 작성', newMemoContent, newId);
-        setIsNewMemoModalOpen(false);
-        showToast("새 메모가 성공적으로 저장되었습니다.");
-    };
 
     const handleEditMemo = (id, newContent, isImportant) => {
-        const now = Date.now();
-        const editedMemo = { id, content: newContent, date: now, displayDate: new Date(now).toLocaleString(), isImportant };
-        setMemos(prevMemos => 
-            prevMemos.map(memo => 
-                memo.id === id 
-                    ? editedMemo
-                    : memo
-            )
-        );
-        addActivity('메모 수정', newContent, id);
-        setIsDetailModalOpen(false);
-        showToast("메모가 성공적으로 수정되었습니다.");
-    };
+            const now = Date.now();
+            const editedMemo = { id, content: newContent, date: now, displayDate: new Date(now).toLocaleString(), isImportant };
+            setMemos(prevMemos => 
+                prevMemos.map(memo => 
+                    memo.id === id 
+                        ? editedMemo
+                        : memo
+                )
+            );
+            addActivity('메모 수정', newContent, id);
+            setIsDetailModalOpen(false);
+            showToast("메모가 성공적으로 수정되었습니다.");
+            quietSync(); // ✅ 추가
+        };
 
     const handleDeleteMemo = (id) => {
-        const deletedMemo = memos.find(memo => memo.id === id);
-        if (deletedMemo) {
-            setMemos(prevMemos => prevMemos.filter(memo => memo.id !== id));
-            addActivity('메모 삭제', deletedMemo.content, id);
-        }
-        return deletedMemo; 
-    };
+            const deletedMemo = memos.find(memo => memo.id === id);
+            if (deletedMemo) {
+                setMemos(prevMemos => prevMemos.filter(memo => memo.id !== id));
+                addActivity('메모 삭제', deletedMemo.content, id);
+                quietSync(); // ✅ 추가
+            }
+            return deletedMemo; 
+        };
     
     const handleStartSelectionMode = (memoId) => {
         setIsSelectionMode(true);
@@ -877,6 +878,21 @@ function App() {
         await performSync(true);
     };
 
+    const quietSync = () => {
+        // 기존 타이머 클리어
+        if (syncDebounceRef.current) {
+            clearTimeout(syncDebounceRef.current);
+        }
+        
+        // 3초 후 조용히 동기화
+        syncDebounceRef.current = setTimeout(async () => {
+            if (profile && accessToken && isGapiReady) {
+                console.log('🔄 조용한 동기화 시작 (3초 디바운싱)');
+                await performSync(false); // isManual = false (메시지 없음)
+            }
+        }, 3000); // 3초
+    };
+
     const performSync = async (isManual = false) => {
         console.log('🔧 performSync 시작 - isManual:', isManual);
         
@@ -966,36 +982,40 @@ function App() {
         }
     };
 
-    // ✅ 자동 동기화 (30초마다) - 수정됨: isAppActive 조건 및 isManual=false 전달
     useEffect(() => {
-        // ★★★ isAppActive 조건 추가: 앱이 활성화 상태일 때만 자동 동기화 타이머 시작
-        if (profile && accessToken && isGapiReady && isAppActive && !isUserIdle) { 
-            console.log('🔄 자동 동기화 타이머 시작 (30초 간격)');
+        const handleVisibilityChange = async () => {
+            console.log('🔔 Visibility 상태 변경:', document.hidden ? '숨김(백그라운드)' : '보임(포그라운드)');
             
-            syncIntervalRef.current = setInterval(async () => {
-                // 실행 시점에도 idle 상태 재확인
-                if (!isUserIdle && isAppActive) {
-                    console.log('🔄 자동 동기화 실행 중...');
-                    await performSync(false);
+            if (document.hidden) {
+                // 앱이 백그라운드로 전환됨
+                console.log('📱 백그라운드 전환 감지 - 즉시 동기화 시작');
+                
+                // 대기 중인 디바운스 타이머 취소
+                if (syncDebounceRef.current) {
+                    clearTimeout(syncDebounceRef.current);
+                    console.log('⏸️ 디바운스 타이머 취소됨');
                 }
-            }, 30000);
-
-        } else {
-            if (syncIntervalRef.current) {
-                clearInterval(syncIntervalRef.current);
-                syncIntervalRef.current = null;
-                console.log('⏸️ 자동 동기화 타이머 중지');
-            }
-        }
-
-        return () => {
-            if (syncIntervalRef.current) {
-                clearInterval(syncIntervalRef.current);
-                syncIntervalRef.current = null;
+                
+                // 즉시 동기화 (조용히)
+                if (profile && accessToken && isGapiReady) {
+                    console.log('🔄 백그라운드 동기화 실행 중...');
+                    const success = await performSync(false); // isManual = false
+                    if (success) {
+                        console.log('✅ 백그라운드 동기화 완료');
+                    }
+                }
+            } else {
+                // 앱이 포그라운드로 복귀
+                console.log('👀 앱이 다시 활성화됨 (포그라운드)');
             }
         };
-    // ✅ isUserIdle을 의존성 배열에 추가
-    }, [profile, accessToken, isGapiReady, isAppActive, isUserIdle, memos, calendarSchedules, recentActivities]);
+        
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [profile, accessToken, isGapiReady, memos, calendarSchedules, recentActivities, displayCount, widgets]);
 
     // ✅ 앱 종료 시 마지막 동기화 - 새로 추가
     useEffect(() => {
@@ -1221,6 +1241,14 @@ function App() {
         setSelectedDate(date);
         // 나중에 스케줄 에디터를 렌더링하는 데 사용됩니다.
     };
+
+    useEffect(() => {
+        return () => {
+            if (syncDebounceRef.current) {
+                clearTimeout(syncDebounceRef.current);
+            }
+        };
+    }, []);
 
 if (isLoading) {
         return (
