@@ -358,9 +358,6 @@ function App() {
         console.log('📏 pullDistance:', pullDistance);
         console.log('📏 PULL_THRESHOLD:', PULL_THRESHOLD);
         
-        // ✅ 테스트: 무조건 Toast 표시
-        showToast(`테스트: ${Math.round(pullDistance)}px 당김`);
-        
         const shouldSync = pullDistance > PULL_THRESHOLD;
         console.log('❓ shouldSync:', shouldSync);
         
