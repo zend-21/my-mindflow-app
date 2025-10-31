@@ -309,6 +309,7 @@ function App() {
     const [lastSyncTime, setLastSyncTime] = useState(null);
     const syncIntervalRef = useRef(null);
     const [isGapiReady, setIsGapiReady] = useState(false);
+    const [isPulling, setIsPulling] = useState(false);
     
     const [activeTab, setActiveTab] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -322,7 +323,6 @@ function App() {
     const PULL_THRESHOLD = 60;
 
     const handlePullStart = (clientY) => {
-        // 스크롤이 최상단일 때만
         if (contentAreaRef.current && contentAreaRef.current.scrollTop > 5) {
             return;
         }
@@ -330,9 +330,11 @@ function App() {
         pullStartY.current = clientY;
         pullStartTime.current = Date.now();
         setIsDragging(true);
+        setIsPulling(false); // ✅ 추가
         console.log('⏱️ Pull 시작');
     };
 
+    // handlePullMove 수정
     const handlePullMove = (clientY) => {
         if (!isDragging) return;
         
@@ -341,32 +343,35 @@ function App() {
         
         const scrollTop = contentAreaRef.current?.scrollTop || 0;
         if (scrollTop <= 5 && distance > 0) {
-            setPullDistance(distance * 0.5);
+            const adjustedDistance = distance * 0.5;
+            setPullDistance(adjustedDistance);
+            
+            // ✅ 30px 이상 당기면 표시
+            if (adjustedDistance > 30) {
+                setIsPulling(true);
+            }
         } else {
             setPullDistance(0);
+            setIsPulling(false);
         }
     };
 
+    // handlePullEnd 수정
     const handlePullEnd = async () => {
+        const currentDistance = pullDistance; // ✅ 먼저 저장
+        
         setIsDragging(false);
+        setIsPulling(false); // ✅ 추가
+        setPullDistance(0);
         
         console.log('🔵 handlePullEnd 호출됨');
-        console.log('📏 pullDistance:', pullDistance);
-        console.log('📏 PULL_THRESHOLD:', PULL_THRESHOLD);
+        console.log('📏 pullDistance:', currentDistance);
         
-        // ✅ 테스트: 무조건 Toast 표시
-        showToast(`테스트: ${Math.round(pullDistance)}px 당김`);
-        
-        const shouldSync = pullDistance > PULL_THRESHOLD;
-        console.log('❓ shouldSync:', shouldSync);
-        
-        setPullDistance(0);
+        const shouldSync = currentDistance > PULL_THRESHOLD;
         
         if (shouldSync) {
             console.log('✅ 수동 동기화 시작!');
             await handleSync();
-        } else {
-            console.log('❌ 거리 부족 - 동기화 안 함');
         }
     };
 
@@ -909,8 +914,8 @@ function App() {
             if (isManual) {
                 console.log('🎯 수동 동기화 - 스피너 표시');
                 setIsSyncing(true);
-                showToast('🔄 동기화 시작...'); // ✅ 추가
-                await new Promise(resolve => setTimeout(resolve, 500)); // 더 길게
+                showToast('🔄 동기화 시작...'); 
+                await new Promise(resolve => setTimeout(resolve, 500));
             }
             
             const dataToSync = {
@@ -927,6 +932,7 @@ function App() {
             console.log('📥 업로드 결과:', result);
             
             if (result.success) {
+                // ✅ 성공 처리 - 이 부분이 반드시 있어야 함!
                 const now = Date.now();
                 setLastSyncTime(now);
                 localStorage.setItem('lastSyncTime', now.toString());
@@ -943,8 +949,14 @@ function App() {
             } else {
                 console.error('❌ 동기화 실패:', result);
                 if (result.error === 'TOKEN_EXPIRED') {
-                    showToast('❌ 로그인 만료');
-                    handleLogout();
+                    // ✅ 자동 로그아웃 대신 재로그인 유도
+                    if (isManual) {
+                        showToast('🔐 로그인이 만료되었습니다. 다시 로그인해주세요.');
+                        setTimeout(() => {
+                            setIsLoginModalOpen(true);
+                        }, 1500);
+                    }
+                    // handleLogout()을 호출하지 않음!
                 } else {
                     if (isManual) {
                         showToast('❌ 동기화 실패');
@@ -1260,10 +1272,10 @@ if (isLoading) {
                         onMouseUp={handleMouseUp}
                         onMouseLeave={handleMouseLeave}
                     >
-                        {isSyncing && (
+                        {(isPulling || isSyncing) && (
                             <PullToSyncIndicator>
                                 <SyncSpinner />
-                                동기화 중...
+                                {isSyncing ? '동기화 중...' : '놓으면 동기화'}
                             </PullToSyncIndicator>
                         )}
                         {activeTab === 'home' && (
