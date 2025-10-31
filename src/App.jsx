@@ -130,11 +130,6 @@ const Screen = styled.div`
     margin: 0 auto;
     
     background: linear-gradient(180deg, #fafafa 0%, #f0f2f5 100%);
-    
-    /* ✅ 브라우저 기본 Pull-to-Refresh 비활성화 */
-    overscroll-behavior: none;
-    overscroll-behavior-y: contain;
-
     position: relative;
     display: flex;
     flex-direction: column;
@@ -196,11 +191,6 @@ const ContentArea = styled.div`
     padding-bottom: 80px;
     padding-top: ${props => props.$showHeader ? '90px' : '20px'};
     overflow-y: auto;
-    
-    /* ✅ 터치 제스처 최적화 */
-    overscroll-behavior: none;
-    touch-action: pan-y;
-
     position: relative;
     transition: padding-top 0.3s ease;
     transform: translateY(${props => props.$pullDistance}px);
@@ -319,7 +309,6 @@ function App() {
     const [lastSyncTime, setLastSyncTime] = useState(null);
     const syncIntervalRef = useRef(null);
     const [isGapiReady, setIsGapiReady] = useState(false);
-    const [isPulling, setIsPulling] = useState(false);
     
     const [activeTab, setActiveTab] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -333,6 +322,7 @@ function App() {
     const PULL_THRESHOLD = 60;
 
     const handlePullStart = (clientY) => {
+        // 스크롤이 최상단일 때만
         if (contentAreaRef.current && contentAreaRef.current.scrollTop > 5) {
             return;
         }
@@ -340,11 +330,9 @@ function App() {
         pullStartY.current = clientY;
         pullStartTime.current = Date.now();
         setIsDragging(true);
-        setIsPulling(false); // ✅ 추가
         console.log('⏱️ Pull 시작');
     };
 
-    // handlePullMove 수정
     const handlePullMove = (clientY) => {
         if (!isDragging) return;
         
@@ -353,33 +341,26 @@ function App() {
         
         const scrollTop = contentAreaRef.current?.scrollTop || 0;
         if (scrollTop <= 5 && distance > 0) {
-            const adjustedDistance = distance * 0.5;
-            setPullDistance(adjustedDistance);
-            
-            // ✅ 30px 이상 당기면 표시
-            if (adjustedDistance > 30) {
-                setIsPulling(true);
-            }
+            setPullDistance(distance * 0.5);
         } else {
             setPullDistance(0);
-            setIsPulling(false);
         }
     };
 
-    // handlePullEnd 수정
     const handlePullEnd = async () => {
-        const currentDistance = pullDistance;
-        
         setIsDragging(false);
-        setIsPulling(false);
-        setPullDistance(0);
         
         console.log('🔵 handlePullEnd 호출됨');
-        console.log('📏 pullDistance:', currentDistance);
+        console.log('📏 pullDistance:', pullDistance);
         console.log('📏 PULL_THRESHOLD:', PULL_THRESHOLD);
         
-        const shouldSync = currentDistance > PULL_THRESHOLD;
+        // ✅ 테스트: 무조건 Toast 표시
+        showToast(`테스트: ${Math.round(pullDistance)}px 당김`);
+        
+        const shouldSync = pullDistance > PULL_THRESHOLD;
         console.log('❓ shouldSync:', shouldSync);
+        
+        setPullDistance(0);
         
         if (shouldSync) {
             console.log('✅ 수동 동기화 시작!');
@@ -388,40 +369,6 @@ function App() {
             console.log('❌ 거리 부족 - 동기화 안 함');
         }
     };
-
-    useEffect(() => {
-        const contentArea = contentAreaRef.current;
-        if (!contentArea) return;
-
-        const handleTouchStartNative = (e) => {
-            if (contentArea.scrollTop > 5) return;
-            handlePullStart(e.touches[0].clientY); // ✅ 기존 함수 호출
-        };
-
-        const handleTouchMoveNative = (e) => {
-            if (!isDragging) return;
-            
-            if (contentArea.scrollTop <= 5) {
-                e.preventDefault(); // 브라우저 기본 동작 방지
-            }
-            
-            handlePullMove(e.touches[0].clientY); // ✅ 기존 함수 호출
-        };
-
-        const handleTouchEndNative = async () => {
-            await handlePullEnd(); // ✅ 기존 함수 호출
-        };
-
-        contentArea.addEventListener('touchstart', handleTouchStartNative, { passive: false });
-        contentArea.addEventListener('touchmove', handleTouchMoveNative, { passive: false });
-        contentArea.addEventListener('touchend', handleTouchEndNative, { passive: false });
-
-        return () => {
-            contentArea.removeEventListener('touchstart', handleTouchStartNative);
-            contentArea.removeEventListener('touchmove', handleTouchMoveNative);
-            contentArea.removeEventListener('touchend', handleTouchEndNative);
-        };
-    }, [isDragging]); // ✅ isDragging 의존성 추가
 
     // ✅ 추가: 앱 활성 상태 (포커스 여부)
     const [isAppActive, setIsAppActive] = useState(true); 
@@ -1214,6 +1161,18 @@ function App() {
         setIsCalendarConfirmOpen(false);
         setDateToDelete(null);
     };
+    
+    const handleTouchStart = (e) => {
+        handlePullStart(e.touches[0].clientY);
+    };
+
+    const handleTouchMove = (e) => {
+        handlePullMove(e.touches[0].clientY);
+    };
+
+    const handleTouchEnd = async () => {
+        await handlePullEnd();
+    };
 
     // 마우스 이벤트 핸들러 (PC 지원)
     const handleMouseDown = (e) => {
@@ -1298,20 +1257,20 @@ if (isLoading) {
                         ref={contentAreaRef}
                         $pullDistance={pullDistance}
                         $showHeader={showHeader}
-                        // ❌ 터치 이벤트 제거 (네이티브 리스너가 처리)
-                        // onTouchStart={handleTouchStart}
-                        // onTouchMove={handleTouchMove}
-                        // onTouchEnd={handleTouchEnd}
-                        // ✅ 마우스 이벤트는 유지 (PC용)
+                        // 터치 이벤트 (모바일)
+                        onTouchStart={handleTouchStart}
+                        onTouchMove={handleTouchMove}
+                        onTouchEnd={handleTouchEnd}
+                        // 마우스 이벤트 (PC)
                         onMouseDown={handleMouseDown}
                         onMouseMove={handleMouseMove}
                         onMouseUp={handleMouseUp}
                         onMouseLeave={handleMouseLeave}
                     >
-                        {(isPulling || isSyncing) && (
+                        {isSyncing && (
                             <PullToSyncIndicator>
                                 <SyncSpinner />
-                                {isSyncing ? '동기화 중...' : '놓으면 동기화'}
+                                동기화 중...
                             </PullToSyncIndicator>
                         )}
                         {activeTab === 'home' && (
