@@ -135,6 +135,8 @@ const Screen = styled.div`
     flex-direction: column;
     overflow-x: hidden;
     overflow-y: hidden;  /* ← visible에서 hidden으로 변경 */
+    overscroll-behavior: none;
+    overscroll-behavior-y: contain;
     
     -webkit-tap-highlight-color: transparent;
     user-select: none;
@@ -195,6 +197,8 @@ const ContentArea = styled.div`
     transition: padding-top 0.3s ease;
     transform: translateY(${props => props.$pullDistance}px);
     will-change: transform;
+    overscroll-behavior: none;
+    touch-action: pan-y;
 `;
 
 const LoginScreen = styled.div`
