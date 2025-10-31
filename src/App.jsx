@@ -852,16 +852,10 @@ function App() {
             // GAPI에 토큰 설정
             if (isGapiReady) {
                 setAccessToken(accessToken);
-                
-                // 로그인 직후 자동 동기화 시도
-                setTimeout(async () => {
-                    console.log('🔄 로그인 후 초기 동기화 시도...');
-                    await performSync();
-                }, 1000);
             }
             
             setIsLoginModalOpen(false);
-            showToast('로그인 및 초기 동기화 완료! ☁️');
+            showToast('✅ 로그인 완료!');
         } catch (error) {
             console.error('로그인 처리 중 오류:', error);
             showToast('로그인 처리 중 오류가 발생했습니다.');
