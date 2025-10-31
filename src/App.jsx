@@ -130,6 +130,11 @@ const Screen = styled.div`
     margin: 0 auto;
     
     background: linear-gradient(180deg, #fafafa 0%, #f0f2f5 100%);
+    
+    /* ✅ 브라우저 기본 Pull-to-Refresh 비활성화 */
+    overscroll-behavior: none;
+    overscroll-behavior-y: contain;
+
     position: relative;
     display: flex;
     flex-direction: column;
@@ -191,6 +196,11 @@ const ContentArea = styled.div`
     padding-bottom: 80px;
     padding-top: ${props => props.$showHeader ? '90px' : '20px'};
     overflow-y: auto;
+    
+    /* ✅ 터치 제스처 최적화 */
+    overscroll-behavior: none;
+    touch-action: pan-y;
+
     position: relative;
     transition: padding-top 0.3s ease;
     transform: translateY(${props => props.$pullDistance}px);
@@ -358,22 +368,103 @@ function App() {
 
     // handlePullEnd 수정
     const handlePullEnd = async () => {
-        const currentDistance = pullDistance; // ✅ 먼저 저장
+        const currentDistance = pullDistance;
         
         setIsDragging(false);
-        setIsPulling(false); // ✅ 추가
+        setIsPulling(false);
         setPullDistance(0);
         
         console.log('🔵 handlePullEnd 호출됨');
         console.log('📏 pullDistance:', currentDistance);
+        console.log('📏 PULL_THRESHOLD:', PULL_THRESHOLD);
         
         const shouldSync = currentDistance > PULL_THRESHOLD;
+        console.log('❓ shouldSync:', shouldSync);
         
         if (shouldSync) {
             console.log('✅ 수동 동기화 시작!');
             await handleSync();
+        } else {
+            console.log('❌ 거리 부족 - 동기화 안 함');
         }
     };
+
+    useEffect(() => {
+        const contentArea = contentAreaRef.current;
+        if (!contentArea) return;
+
+        let startY = 0;
+        let currentDistance = 0;
+        let isDraggingLocal = false;
+
+        const handleTouchStartNative = (e) => {
+            if (contentArea.scrollTop > 5) return;
+            startY = e.touches[0].clientY;
+            isDraggingLocal = true;
+            setIsDragging(true);
+            setIsPulling(false);
+            console.log('⏱️ Pull 시작 (네이티브)');
+        };
+
+        const handleTouchMoveNative = (e) => {
+            if (!isDraggingLocal) return;
+            
+            const currentY = e.touches[0].clientY;
+            const distance = currentY - startY;
+            
+            console.log('📊 Move (네이티브) - distance:', distance);
+            
+            if (contentArea.scrollTop <= 5 && distance > 0) {
+                // 브라우저 기본 Pull-to-Refresh 방지
+                e.preventDefault();
+                
+                const adjustedDistance = distance * 0.5;
+                setPullDistance(adjustedDistance);
+                currentDistance = adjustedDistance;
+                
+                console.log('📏 adjustedDistance:', adjustedDistance);
+                
+                if (adjustedDistance > 30) {
+                    console.log('✅ setIsPulling(true)');
+                    setIsPulling(true);
+                }
+            } else {
+                setPullDistance(0);
+                setIsPulling(false);
+            }
+        };
+
+        const handleTouchEndNative = async () => {
+            isDraggingLocal = false;
+            setIsDragging(false);
+            setIsPulling(false);
+            
+            console.log('🔵 handlePullEnd (네이티브)');
+            console.log('📏 currentDistance:', currentDistance);
+            
+            const shouldSync = currentDistance > PULL_THRESHOLD;
+            
+            setPullDistance(0);
+            
+            if (shouldSync) {
+                console.log('✅ 수동 동기화 시작!');
+                await handleSync();
+            }
+            
+            currentDistance = 0;
+        };
+
+        // passive: false는 preventDefault()를 사용하기 위해 필수
+        contentArea.addEventListener('touchstart', handleTouchStartNative, { passive: false });
+        contentArea.addEventListener('touchmove', handleTouchMoveNative, { passive: false });
+        contentArea.addEventListener('touchend', handleTouchEndNative, { passive: false });
+
+        return () => {
+            contentArea.removeEventListener('touchstart', handleTouchStartNative);
+            contentArea.removeEventListener('touchmove', handleTouchMoveNative);
+            contentArea.removeEventListener('touchend', handleTouchEndNative);
+        };
+    }, []); // 빈 의존성 배열
 
     // ✅ 추가: 앱 활성 상태 (포커스 여부)
     const [isAppActive, setIsAppActive] = useState(true); 
@@ -1166,18 +1257,6 @@ function App() {
         setIsCalendarConfirmOpen(false);
         setDateToDelete(null);
     };
-    
-    const handleTouchStart = (e) => {
-        handlePullStart(e.touches[0].clientY);
-    };
-
-    const handleTouchMove = (e) => {
-        handlePullMove(e.touches[0].clientY);
-    };
-
-    const handleTouchEnd = async () => {
-        await handlePullEnd();
-    };
 
     // 마우스 이벤트 핸들러 (PC 지원)
     const handleMouseDown = (e) => {
@@ -1262,11 +1341,11 @@ if (isLoading) {
                         ref={contentAreaRef}
                         $pullDistance={pullDistance}
                         $showHeader={showHeader}
-                        // 터치 이벤트 (모바일)
-                        onTouchStart={handleTouchStart}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
-                        // 마우스 이벤트 (PC)
+                        // ❌ 터치 이벤트 제거 (네이티브 리스너가 처리)
+                        // onTouchStart={handleTouchStart}
+                        // onTouchMove={handleTouchMove}
+                        // onTouchEnd={handleTouchEnd}
+                        // ✅ 마우스 이벤트는 유지 (PC용)
                         onMouseDown={handleMouseDown}
                         onMouseMove={handleMouseMove}
                         onMouseUp={handleMouseUp}
