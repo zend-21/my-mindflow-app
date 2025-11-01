@@ -75,7 +75,12 @@ const checkNetworkStatus = () => {
 // API 호출 함수 (재시도 로직 포함)
 const fetchSpecialDatesWithRetry = async (year, month, attempt = 0) => {
   const API_KEY = import.meta.env.VITE_SPCDE_API_KEY;
-  
+
+  if (!API_KEY) {
+    console.error('❌ VITE_SPCDE_API_KEY 환경 변수가 설정되지 않았습니다!');
+    throw new Error('API 키가 설정되지 않았습니다.');
+  }
+
   if (!checkNetworkStatus()) {
     throw new Error('네트워크 연결이 없습니다.');
   }
