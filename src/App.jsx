@@ -1373,19 +1373,19 @@ if (isLoading) {
                                 </SortableContext>
                             </DndContext>
                         )}
-                        {activeTab === 'calendar' && 
-                            <Calendar 
-                                onSelectDate={handleSelectDate} 
-                                addActivity={addActivity} 
-                                schedules={calendarSchedules} 
-                                setSchedules={setCalendarSchedules} 
+                        <div style={{ display: activeTab === 'calendar' ? 'block' : 'none' }}>
+                            <Calendar
+                                onSelectDate={handleSelectDate}
+                                addActivity={addActivity}
+                                schedules={calendarSchedules}
+                                setSchedules={setCalendarSchedules}
                                 showToast={showToast}
                                 onRequestDelete={requestCalendarDelete}
                                 onOpenAlarm={handleOpenAlarmModal}
                                 onOpenEditor={handleOpenCalendarEditor}
                                 onOpenDateSelector={() => setIsDateSelectorOpen(true)}
                             />
-                        }
+                        </div>
                         {activeTab === 'memo' &&
                             <MemoPage
                                 memos={memos}
