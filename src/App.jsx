@@ -363,19 +363,19 @@ function App() {
 
         const scrollTop = contentAreaRef.current?.scrollTop || 0;
 
-        // 스크롤이 최상단일 때만
-        if (scrollTop === 0) {
+        // 스크롤이 최상단이거나 거의 최상단일 때 (1px 여유)
+        if (scrollTop <= 1) {
             // 아래로 당길 때 (distance > 30)
             if (distance > 30) {
                 setPullDistance((distance - 30) * 0.4);
             }
-            // 위로 올릴 때 (0 < distance < 30) 또는 (distance < 0)
-            else if (distance > 0) {
-                setPullDistance(0); // 데드존 안에 있음
-            } else {
-                setPullDistance(0); // 위로 올림
+            // 위로 올릴 때나 데드존에 있을 때
+            else {
+                setPullDistance(0);
             }
         } else {
+            // 스크롤이 조금이라도 내려갔으면 드래그 취소
+            setIsDragging(false);
             setPullDistance(0);
         }
     };
@@ -1309,6 +1309,22 @@ if (isLoading) {
                         onLoginClick={() => setIsLoginModalOpen(true)}
                         onProfileClick={handleProfileClick}
                     />
+
+                    {/* 풀 가이드 메시지: 임계값에 도달했을 때 (ContentArea 밖으로 이동) */}
+                    {!isSyncing && pullDistance >= PULL_THRESHOLD && (
+                        <PullGuideMessage>
+                            ↓ 손을 떼면 동기화가 시작됩니다
+                        </PullGuideMessage>
+                    )}
+
+                    {/* 동기화 중 표시 (ContentArea 밖으로 이동) */}
+                    {isSyncing && (
+                        <PullToSyncIndicator>
+                            <SyncSpinner />
+                            동기화 중...
+                        </PullToSyncIndicator>
+                    )}
+
                     <ContentArea
                         ref={contentAreaRef}
                         $pullDistance={pullDistance}
@@ -1323,20 +1339,6 @@ if (isLoading) {
                         onMouseUp={handleMouseUp}
                         onMouseLeave={handleMouseLeave}
                     >
-                        {/* 풀 가이드 메시지: 임계값에 도달했을 때 */}
-                        {!isSyncing && pullDistance >= PULL_THRESHOLD && (
-                            <PullGuideMessage>
-                                ↓ 손을 떼면 동기화가 시작됩니다
-                            </PullGuideMessage>
-                        )}
-
-                        {/* 동기화 중 표시 */}
-                        {isSyncing && (
-                            <PullToSyncIndicator>
-                                <SyncSpinner />
-                                동기화 중...
-                            </PullToSyncIndicator>
-                        )}
                         {activeTab === 'home' && (
                             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
                                 <SortableContext items={widgets} strategy={verticalListSortingStrategy}>
