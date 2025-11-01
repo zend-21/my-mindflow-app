@@ -54,7 +54,7 @@ const slideUp = keyframes`
 
 const PullToSyncIndicator = styled.div`
   position: fixed;
-  top: 0;
+  top: 80px; /* 헤더(60px) + 여유(20px) */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -64,7 +64,22 @@ const PullToSyncIndicator = styled.div`
   font-size: 14px;
   animation: ${fadeIn} 0.3s ease-out;
   z-index: 5000;
-  margin-top: 60px; 
+`;
+
+const PullGuideMessage = styled.div`
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(102, 126, 234, 0.9);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 5000;
+  animation: ${fadeIn} 0.2s ease-out;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 `;
 const SyncingIndicator = styled.div`
     position: fixed;
@@ -928,8 +943,8 @@ function App() {
             if (isManual) {
                 console.log('🎯 수동 동기화 - 스피너 표시');
                 setIsSyncing(true);
-                showToast('🔄 동기화 시작...'); 
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // 동기화 시작 토스트 제거 - 스피너만 표시
+                await new Promise(resolve => setTimeout(resolve, 300));
             }
             
             const dataToSync = {
@@ -1298,6 +1313,14 @@ if (isLoading) {
                         onMouseUp={handleMouseUp}
                         onMouseLeave={handleMouseLeave}
                     >
+                        {/* 풀 가이드 메시지: 임계값에 도달했을 때 */}
+                        {!isSyncing && pullDistance >= PULL_THRESHOLD && (
+                            <PullGuideMessage>
+                                ↓ 손을 떼면 동기화가 시작됩니다
+                            </PullGuideMessage>
+                        )}
+
+                        {/* 동기화 중 표시 */}
                         {isSyncing && (
                             <PullToSyncIndicator>
                                 <SyncSpinner />
