@@ -1316,8 +1316,8 @@ if (isLoading) {
                         onProfileClick={handleProfileClick}
                     />
 
-                    {/* 풀 가이드 메시지: 임계값에 도달했을 때 (ContentArea 밖으로 이동) */}
-                    {!isSyncing && pullDistance >= PULL_THRESHOLD && (
+                    {/* 풀 가이드 메시지: 80px 이상 당겼을 때 미리 표시 */}
+                    {!isSyncing && pullDistance >= 80 && (
                         <PullGuideMessage>
                             ↓ 손을 떼면 동기화가 시작됩니다
                         </PullGuideMessage>
