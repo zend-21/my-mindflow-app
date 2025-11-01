@@ -68,7 +68,7 @@ const PullToSyncIndicator = styled.div`
 
 const PullGuideMessage = styled.div`
   position: fixed;
-  top: 120px; /* 훨씬 위로 이동 (80px → 120px) */
+  top: 70px; /* 50px 위로 이동 (120px → 70px) */
   left: 50%;
   transform: translateX(-50%);
   background: rgba(102, 126, 234, 0.9);
@@ -210,7 +210,7 @@ const ContentArea = styled.div`
     padding-top: ${props => props.$showHeader ? '90px' : '20px'};
     overflow-y: auto;
     position: relative;
-    transition: padding-top 0.3s ease;
+    transition: padding-top 0.3s ease, ${props => props.$pullDistance === 0 ? 'transform 0.3s ease' : 'none'};
     transform: translateY(${props => props.$pullDistance}px);
     will-change: transform;
     overscroll-behavior: none;
@@ -363,19 +363,23 @@ function App() {
 
         const scrollTop = contentAreaRef.current?.scrollTop || 0;
 
-        // 스크롤이 최상단이거나 거의 최상단일 때 (1px 여유)
-        if (scrollTop <= 1) {
-            // 아래로 당길 때 (distance > 30)
-            if (distance > 30) {
-                setPullDistance((distance - 30) * 0.4);
-            }
-            // 위로 올릴 때나 데드존에 있을 때
-            else {
-                setPullDistance(0);
-            }
-        } else {
-            // 스크롤이 조금이라도 내려갔으면 드래그 취소
+        // 스크롤이 조금이라도 내려갔으면 드래그 취소
+        if (scrollTop > 1) {
             setIsDragging(false);
+            setPullDistance(0);
+            return;
+        }
+
+        // 스크롤이 최상단일 때: 손가락 위치를 실시간 추적
+        // 30px 데드존 적용하되, 음수(위로 올림)가 되면 0으로
+        if (distance > 30) {
+            // 아래로 충분히 당김: 데드존 제외하고 계산
+            setPullDistance((distance - 30) * 0.4);
+        } else if (distance > 0) {
+            // 데드존 안 (0~30px): 아직 당기지 않은 것으로 간주
+            setPullDistance(0);
+        } else {
+            // 음수 (위로 올림): 0으로 고정하되 드래그는 유지
             setPullDistance(0);
         }
     };
