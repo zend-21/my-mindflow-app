@@ -340,8 +340,8 @@ function App() {
     const [pullDistance, setPullDistance] = useState(0);
     const pullStartY = useRef(0);
     const WIDGET_ACTIVATION_DELAY = 500; // 위젯: 0.5초 제자리 누름
-    const MIN_PULL_DISTANCE = 100;       // 동기화: 100px 이상 드래그
-    const PULL_THRESHOLD = 100;          // 임계값: 100px (가이드 메시지도 동일)
+    const MIN_PULL_DISTANCE = 110;       // 동기화: 100px 이상 드래그
+    const PULL_THRESHOLD = 110;          // 임계값: 100px (가이드 메시지도 동일)
 
     const handlePullStart = (clientY) => {
         // 스크롤이 정확히 최상단일 때만 (더 엄격하게)
@@ -1317,7 +1317,7 @@ if (isLoading) {
                     />
 
                     {/* 풀 가이드 메시지: 100px 이상 당겼을 때 표시 */}
-                    {!isSyncing && pullDistance >= 100 && (
+                    {!isSyncing && pullDistance >= 110 && (
                         <PullGuideMessage>
                             ↓ 손을 떼면 동기화가 시작됩니다
                         </PullGuideMessage>
