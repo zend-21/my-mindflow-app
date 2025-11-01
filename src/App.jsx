@@ -342,6 +342,7 @@ function App() {
     const WIDGET_ACTIVATION_DELAY = 500; // 위젯: 0.5초 제자리 누름
     const MIN_PULL_DISTANCE = 110;       // 동기화: 100px 이상 드래그
     const PULL_THRESHOLD = 110;          // 임계값: 100px (가이드 메시지도 동일)
+    const MIN_TOUCH_DURATION = 300;      // 최소 터치 시간: 0.3초 (빠른 스와이프 방지)
 
     const handlePullStart = (clientY) => {
         // 스크롤이 정확히 최상단일 때만 (더 엄격하게)
@@ -379,21 +380,28 @@ function App() {
 
     const handlePullEnd = async () => {
         setIsDragging(false);
-        
+
+        const touchDuration = Date.now() - pullStartTime.current;
+
         console.log('🔵 handlePullEnd 호출됨');
         console.log('📏 pullDistance:', pullDistance);
         console.log('📏 PULL_THRESHOLD:', PULL_THRESHOLD);
-        
-        const shouldSync = pullDistance > PULL_THRESHOLD;
+        console.log('⏱️ touchDuration:', touchDuration);
+
+        const shouldSync = pullDistance > PULL_THRESHOLD && touchDuration >= MIN_TOUCH_DURATION;
         console.log('❓ shouldSync:', shouldSync);
-        
+
         setPullDistance(0);
-        
+
         if (shouldSync) {
             console.log('✅ 수동 동기화 시작!');
             await handleSync();
         } else {
-            console.log('❌ 거리 부족 - 동기화 안 함');
+            if (touchDuration < MIN_TOUCH_DURATION) {
+                console.log('❌ 터치 시간 부족 - 동기화 안 함 (빠른 스와이프)');
+            } else {
+                console.log('❌ 거리 부족 - 동기화 안 함');
+            }
         }
     };
 

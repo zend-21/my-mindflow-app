@@ -764,10 +764,11 @@ const Calendar = ({
     // 개선된 특일 데이터 로드 함수
     const loadSpecialDatesData = async (forceUpdate = false) => {
         const cachedData = getCachedData();
-        
+
         // 캐시가 유효하고 강제 업데이트가 아닌 경우 캐시 사용
         if (!forceUpdate && cachedData && !shouldUpdateCache(cachedData)) {
             setSpecialDates(cachedData.data);
+            setCacheStatus({ loading: false, error: null }); // 로딩 상태 명시적으로 false
             console.log('캐시된 특일 데이터 사용:', new Date(cachedData.timestamp));
             return;
         }
@@ -776,6 +777,7 @@ const Calendar = ({
         if (!checkNetworkStatus()) {
             if (cachedData && cachedData.data) {
                 setSpecialDates(cachedData.data);
+                setCacheStatus({ loading: false, error: '네트워크 연결 없음' }); // 로딩 상태 명시적으로 false
                 console.log('네트워크 연결 없음 - 기존 캐시 데이터 사용');
             }
             return;
