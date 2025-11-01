@@ -340,8 +340,8 @@ function App() {
     const [pullDistance, setPullDistance] = useState(0);
     const pullStartY = useRef(0);
     const WIDGET_ACTIVATION_DELAY = 500; // 위젯: 0.5초 제자리 누름
-    const MIN_PULL_DISTANCE = 120;       // 동기화: 120px 이상 드래그
-    const PULL_THRESHOLD = 120;          // 임계값: 120px
+    const MIN_PULL_DISTANCE = 80;        // 동기화: 80px 이상 드래그
+    const PULL_THRESHOLD = 80;           // 임계값: 80px
 
     const handlePullStart = (clientY) => {
         // 스크롤이 정확히 최상단일 때만 (더 엄격하게)
