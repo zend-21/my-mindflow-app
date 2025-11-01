@@ -12,7 +12,7 @@ const PERSONAL_EVENTS = {};
 
 // API 캐시 관리 유틸리티
 const API_CACHE_KEY = 'special_dates_cache';
-const CACHE_VERSION = '1.0'; // 캐시 구조 변경 시 버전업
+const CACHE_VERSION = '1.1'; // 캐시 구조 변경 시 버전업 (손상된 캐시 강제 삭제)
 const CACHE_DURATION_DAYS = 90; // 90일 주기
 const MAX_RETRY_ATTEMPTS = 5; // 최대 재시도 횟수
 const RETRY_INTERVALS = [1000, 5000, 15000, 60000, 300000]; // 재시도 간격 (밀리초)
@@ -32,15 +32,23 @@ const getCachedData = () => {
   try {
     const cached = localStorage.getItem(API_CACHE_KEY);
     if (!cached) return null;
-    
+
     const parsedCache = JSON.parse(cached);
-    
+
     // 버전 체크
     if (parsedCache.version !== CACHE_VERSION) {
+      console.log('캐시 버전 불일치 - 삭제:', parsedCache.version, '→', CACHE_VERSION);
       localStorage.removeItem(API_CACHE_KEY);
       return null;
     }
-    
+
+    // 무결성 검사: 데이터가 비어있거나 잘못된 형식인지 확인
+    if (!parsedCache.data || typeof parsedCache.data !== 'object' || Object.keys(parsedCache.data).length === 0) {
+      console.warn('캐시 데이터 손상 감지 - 삭제 후 재다운로드');
+      localStorage.removeItem(API_CACHE_KEY);
+      return null;
+    }
+
     return parsedCache;
   } catch (error) {
     console.error('캐시 데이터 읽기 오류:', error);
