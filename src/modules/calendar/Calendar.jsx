@@ -865,6 +865,18 @@ const Calendar = ({
         loadSpecialDatesData();
     }, []); // 한 번만 실행
 
+    // 로딩 상태 타임아웃 (10초 후 강제 종료)
+    useEffect(() => {
+        if (cacheStatus.loading) {
+            const timeout = setTimeout(() => {
+                console.log('로딩 타임아웃 - 강제 종료');
+                setCacheStatus({ loading: false, error: '타임아웃' });
+            }, 10000); // 10초
+
+            return () => clearTimeout(timeout);
+        }
+    }, [cacheStatus.loading]);
+
     // 앱 포커스 시 재시도 로직
     useEffect(() => {
         const handleFocus = () => {
@@ -1151,15 +1163,10 @@ const Calendar = ({
 
     return (
         <CalendarWrapper {...swipeHandlers}>
-            {/* 캐시 상태 표시 */}
+            {/* 캐시 상태 표시 - 로딩 중일 때만 표시 */}
             {cacheStatus.loading && (
                 <LoadingIndicator>
                     특일 정보 업데이트 중...
-                </LoadingIndicator>
-            )}
-            {cacheStatus.error && !cacheStatus.loading && (
-                <LoadingIndicator style={{ color: '#ff6b6b' }}>
-                    업데이트 실패 - 기존 데이터 사용
                 </LoadingIndicator>
             )}
 

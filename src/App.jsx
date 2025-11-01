@@ -344,11 +344,6 @@ function App() {
     const PULL_THRESHOLD = 120;          // 임계값: 120px
 
     const handlePullStart = (clientY) => {
-        // 캘린더 탭에서는 pull-to-refresh 비활성화
-        if (activeTab === 'calendar') {
-            return;
-        }
-
         // 스크롤이 정확히 최상단일 때만 (더 엄격하게)
         if (contentAreaRef.current && contentAreaRef.current.scrollTop > 0) {
             return;
