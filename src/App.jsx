@@ -31,6 +31,7 @@ import CalendarEditorModal from './modules/calendar/CalendarEditorModal.jsx';
 import AlarmModal from './modules/calendar/AlarmModal.jsx';
 import DateSelectorModal from './modules/calendar/DateSelectorModal.jsx';
 import LoginModal from './components/LoginModal.jsx';
+import FortuneFlow from './components/FortuneFlow.jsx';
 
 // ★★★ 토스트 메시지 스타일 ★★★
 const fadeIn = keyframes`
@@ -317,6 +318,7 @@ function App() {
     
     const [activeTab, setActiveTab] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isFortuneFlowOpen, setIsFortuneFlowOpen] = useState(false);
 
     const [isDragging, setIsDragging] = useState(false);
     const pullStartTime = useRef(0);
@@ -505,6 +507,11 @@ function App() {
     const logOut = () => {
         setProfile(null);
         setUser(null);
+    };
+
+    const handleOpenFortune = () => {
+        setIsFortuneFlowOpen(true);
+        // 사이드 메뉴는 이미 SideMenu.jsx 내부에서 닫혔다고 가정
     };
 
     const addActivity = (type, description, memoId = null) => {
@@ -1357,6 +1364,7 @@ if (isLoading) {
                         displayCount={displayCount}
                         setDisplayCount={setDisplayCount}
                         showToast={showToast}
+                        onOpenFortune={handleOpenFortune}
                         onExport={handleDataExport} 
                         onImport={handleDataImport}
                         onRestoreFromDrive={handleRestoreFromDrive}
@@ -1462,7 +1470,15 @@ if (isLoading) {
                 scheduleData={scheduleForAlarm}
                 onSave={handleSaveAlarm}
                 onClose={() => setIsAlarmModalOpen(false)}
-            />     
+            /> 
+            {/* ✨ 🔮 오늘의 운세 전체 플로우 컴포넌트 */}
+            {isFortuneFlowOpen && (
+                <FortuneFlow
+                    onClose={() => setIsFortuneFlowOpen(false)}
+                    profile={profile}
+                    // 운세 결과 및 기타 상태를 FortuneFlow 내부에서 관리
+                />
+            )}                
         </>
     );
 }

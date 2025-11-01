@@ -165,17 +165,18 @@ const FileInput = styled.input`
     display: none;
 `;
 
-const SideMenu = ({ 
-    isOpen, 
-    onClose, 
-    onExport, 
-    onImport, 
+const SideMenu = ({
+    isOpen,
+    onClose,
+    onExport,
+    onImport,
     onRestoreFromDrive,  // ⭐ 이 줄 추가
-    profile, 
-    onProfileClick, 
-    onLogout, 
-    onLoginClick, 
-    onSync 
+    profile,
+    onProfileClick,
+    onLogout,
+    onLoginClick,
+    onSync,
+    onOpenFortune  // 🔮 운세 기능 추가
 }) => {
     const fileInputRef = useRef(null);
     const [imageError, setImageError] = useState(false); // ✅ 추가: 이미지 로드 오류 상태
@@ -249,9 +250,13 @@ const SideMenu = ({
                                     </MenuItem>
                                 </>
                             )}
-                            {/* <MenuItem onClick={() => setIsRouletteModalOpen(true)}>
+                            {/* 🔮 오늘의 운세 탭 활성화 */}
+                            <MenuItem onClick={() => {
+                                onClose(); // 메뉴 닫기
+                                onOpenFortune(); // 운세 시작 함수 호출
+                            }}>
                                 <span className="icon">🔮</span> 오늘의 운세
-                            </MenuItem> */}
+                            </MenuItem>            
                             <MenuItem>
                                 <span className="icon">📝</span> 메모
                             </MenuItem>
