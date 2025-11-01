@@ -68,7 +68,7 @@ const PullToSyncIndicator = styled.div`
 
 const PullGuideMessage = styled.div`
   position: fixed;
-  top: 70px; /* 50px 위로 이동 (120px → 70px) */
+  top: 75px; /* 5px 아래로 이동 (70px → 75px) */
   left: 50%;
   transform: translateX(-50%);
   background: rgba(102, 126, 234, 0.9);
@@ -210,7 +210,7 @@ const ContentArea = styled.div`
     padding-top: ${props => props.$showHeader ? '90px' : '20px'};
     overflow-y: auto;
     position: relative;
-    transition: padding-top 0.3s ease, ${props => props.$pullDistance === 0 ? 'transform 0.3s ease' : 'none'};
+    transition: padding-top 0.3s ease${props => props.$isDragging ? '' : ', transform 0.3s ease'};
     transform: translateY(${props => props.$pullDistance}px);
     will-change: transform;
     overscroll-behavior: none;
@@ -1333,6 +1333,7 @@ if (isLoading) {
                         ref={contentAreaRef}
                         $pullDistance={pullDistance}
                         $showHeader={showHeader}
+                        $isDragging={isDragging}
                         // 터치 이벤트 (모바일)
                         onTouchStart={handleTouchStart}
                         onTouchMove={handleTouchMove}
