@@ -12,20 +12,24 @@ const PERSONAL_EVENTS = {};
 
 // API 캐시 관리 유틸리티
 const API_CACHE_KEY = 'special_dates_cache';
-const CACHE_VERSION = '1.1'; // 캐시 구조 변경 시 버전업 (손상된 캐시 강제 삭제)
-const CACHE_DURATION_DAYS = 90; // 90일 주기
+const CACHE_VERSION = '1.2'; // 캐시 구조 변경 - 월별 체크 시스템 적용
 const MAX_RETRY_ATTEMPTS = 5; // 최대 재시도 횟수
 const RETRY_INTERVALS = [1000, 5000, 15000, 60000, 300000]; // 재시도 간격 (밀리초)
 
 // 캐시 데이터 구조
-const createCacheData = (data, timestamp = Date.now()) => ({
-  version: CACHE_VERSION,
-  timestamp,
-  nextUpdateDate: timestamp + (CACHE_DURATION_DAYS * 24 * 60 * 60 * 1000),
-  data,
-  lastFailedAttempt: null,
-  failedAttempts: 0
-});
+const createCacheData = (data, timestamp = Date.now()) => {
+  const now = new Date();
+  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+  return {
+    version: CACHE_VERSION,
+    timestamp,
+    data,
+    lastCheckedMonth: currentMonth, // 마지막으로 체크한 월 (YYYY-MM)
+    lastFailedAttempt: null,
+    failedAttempts: 0
+  };
+};
 
 // 캐시 관리 함수들
 const getCachedData = () => {
@@ -65,19 +69,125 @@ const setCachedData = (data) => {
   }
 };
 
-const shouldUpdateCache = (cachedData) => {
+// 월별 업데이트 체크 함수
+const shouldRunMonthlyCheck = (cachedData) => {
   if (!cachedData) return true;
-  
-  const now = Date.now();
-  const shouldUpdate = now >= cachedData.nextUpdateDate;
-  const hasFailedRecently = cachedData.failedAttempts > 0;
-  
-  return shouldUpdate || hasFailedRecently;
+
+  // 실패한 시도가 있으면 재시도
+  if (cachedData.failedAttempts > 0) return true;
+
+  // lastCheckedMonth가 없으면 체크 필요
+  if (!cachedData.lastCheckedMonth) return true;
+
+  const today = new Date();
+  const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+  // 마지막 체크한 달과 현재 달이 다르면 체크 실행
+  return cachedData.lastCheckedMonth !== currentMonth;
 };
 
 // 네트워크 상태 감지
 const checkNetworkStatus = () => {
   return navigator.onLine !== false;
+};
+
+// 캐시 데이터에서 현재 월부터 끝까지의 월 목록 추출
+const getMonthsToCheck = (cachedData) => {
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1; // 1-12
+
+  const months = [];
+
+  // 캐시에 있는 모든 날짜 키에서 년-월 추출
+  if (cachedData && cachedData.data) {
+    const dateKeys = Object.keys(cachedData.data);
+    const uniqueMonths = new Set();
+
+    dateKeys.forEach(dateKey => {
+      // dateKey 형식: "YYYY-MM-DD"
+      const yearMonth = dateKey.substring(0, 7); // "YYYY-MM"
+      const [year, month] = yearMonth.split('-').map(Number);
+
+      // 현재 월 이후의 데이터만 추출
+      if (year > currentYear || (year === currentYear && month >= currentMonth)) {
+        uniqueMonths.add(yearMonth);
+      }
+    });
+
+    return Array.from(uniqueMonths).sort();
+  }
+
+  return months;
+};
+
+// 특정 월의 샘플 데이터 다운로드 (비교용)
+const fetchMonthSample = async (yearMonth) => {
+  const [year, month] = yearMonth.split('-');
+  const monthStr = month.padStart(2, '0');
+
+  try {
+    const apiData = await fetchSpecialDatesWithRetry(year, monthStr);
+
+    const mergedData = {};
+
+    const processData = (items, color, isNationalDay = false) => {
+      const processedItems = Array.isArray(items) ? items : (items ? [items] : []);
+
+      processedItems.forEach(item => {
+        const date = String(item.locdate);
+        const formattedDate = `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}`;
+        if (!mergedData[formattedDate]) {
+          mergedData[formattedDate] = [];
+        }
+        mergedData[formattedDate].push({ name: item.dateName, color, isNationalDay });
+      });
+    };
+
+    processData(apiData.holiday?.response?.body?.items?.item, 'red', true);
+    processData(apiData.solarTerm?.response?.body?.items?.item, '#808080');
+    processData(apiData.anniversary?.response?.body?.items?.item, '#808080');
+    processData(apiData.sundryDay?.response?.body?.items?.item, '#808080');
+
+    return mergedData;
+  } catch (error) {
+    console.error(`${yearMonth} 샘플 다운로드 실패:`, error);
+    throw error;
+  }
+};
+
+// 두 개의 월 데이터 비교
+const compareMonthData = (cachedMonthData, sampleMonthData) => {
+  // 캐시된 데이터의 키
+  const cachedKeys = Object.keys(cachedMonthData || {});
+  const sampleKeys = Object.keys(sampleMonthData || {});
+
+  // 키 개수가 다르면 변경됨
+  if (cachedKeys.length !== sampleKeys.length) {
+    return false; // 다름
+  }
+
+  // 모든 키를 순회하며 비교
+  for (const key of sampleKeys) {
+    const cachedEvents = cachedMonthData[key];
+    const sampleEvents = sampleMonthData[key];
+
+    // 캐시에 해당 날짜가 없으면 변경됨
+    if (!cachedEvents) return false;
+
+    // 이벤트 개수가 다르면 변경됨
+    if (cachedEvents.length !== sampleEvents.length) return false;
+
+    // 각 이벤트 비교 (이름만 비교)
+    const cachedNames = cachedEvents.map(e => e.name).sort();
+    const sampleNames = sampleEvents.map(e => e.name).sort();
+
+    if (JSON.stringify(cachedNames) !== JSON.stringify(sampleNames)) {
+      return false;
+    }
+  }
+
+  return true; // 동일
 };
 
 // API 호출 함수 (재시도 로직 포함)
@@ -796,7 +906,7 @@ const Calendar = ({
         trackMouse: true,
     });
 
-    // 개선된 특일 데이터 로드 함수
+    // 월별 체크 시스템을 적용한 특일 데이터 로드 함수
     const loadSpecialDatesData = async (forceUpdate = false) => {
         const cachedData = getCachedData();
 
@@ -805,47 +915,149 @@ const Calendar = ({
         console.log('  - cachedData 존재:', !!cachedData);
         if (cachedData) {
             console.log('  - cachedData.timestamp:', new Date(cachedData.timestamp));
-            console.log('  - shouldUpdateCache:', shouldUpdateCache(cachedData));
+            console.log('  - lastCheckedMonth:', cachedData.lastCheckedMonth);
+            console.log('  - shouldRunMonthlyCheck:', shouldRunMonthlyCheck(cachedData));
         }
 
-        // 캐시가 유효하고 강제 업데이트가 아닌 경우 캐시 사용
-        if (!forceUpdate && cachedData && !shouldUpdateCache(cachedData)) {
-            setSpecialDates(cachedData.data);
-            setCacheStatus({ loading: false, error: null }); // 로딩 상태 명시적으로 false
-            console.log('✅ 캐시된 특일 데이터 사용:', new Date(cachedData.timestamp));
+        // 캐시가 없으면 전체 다운로드
+        if (!cachedData) {
+            console.log('⚠️ 캐시 없음 - 전체 데이터 다운로드 시작');
+            await downloadAllData();
             return;
         }
 
-        console.log('⚠️ API 호출 시작 - 캐시 사용 불가');
+        // 캐시가 유효하고 강제 업데이트가 아니며 월별 체크 불필요한 경우
+        if (!forceUpdate && !shouldRunMonthlyCheck(cachedData)) {
+            setSpecialDates(cachedData.data);
+            setCacheStatus({ loading: false, error: null });
+            console.log('✅ 캐시된 특일 데이터 사용 (이번 달 이미 체크함)');
+            return;
+        }
 
         // 네트워크 연결 확인
         if (!checkNetworkStatus()) {
             if (cachedData && cachedData.data) {
                 setSpecialDates(cachedData.data);
-                setCacheStatus({ loading: false, error: '네트워크 연결 없음' }); // 로딩 상태 명시적으로 false
+                setCacheStatus({ loading: false, error: '네트워크 연결 없음' });
                 console.log('네트워크 연결 없음 - 기존 캐시 데이터 사용');
             }
             return;
         }
 
+        console.log('📅 월별 체크 시작 - 현재 월부터 캐시 끝까지 샘플 비교');
         setCacheStatus({ loading: true, error: null });
-        
+
+        try {
+            // 현재 월부터 캐시 끝까지의 월 목록 추출
+            const monthsToCheck = getMonthsToCheck(cachedData);
+
+            if (monthsToCheck.length === 0) {
+                console.log('⚠️ 체크할 월이 없음 - 전체 재다운로드');
+                await downloadAllData();
+                return;
+            }
+
+            console.log(`📋 체크할 월 목록 (${monthsToCheck.length}개월):`, monthsToCheck);
+
+            let hasChanges = false;
+            let firstChangedMonth = null;
+
+            // 각 월의 샘플 다운로드 및 비교
+            for (const yearMonth of monthsToCheck) {
+                console.log(`🔍 ${yearMonth} 샘플 체크 중...`);
+
+                try {
+                    const sampleData = await fetchMonthSample(yearMonth);
+
+                    // 캐시에서 해당 월의 데이터만 추출
+                    const cachedMonthData = {};
+                    Object.keys(cachedData.data).forEach(dateKey => {
+                        if (dateKey.startsWith(yearMonth)) {
+                            cachedMonthData[dateKey] = cachedData.data[dateKey];
+                        }
+                    });
+
+                    // 비교
+                    const isIdentical = compareMonthData(cachedMonthData, sampleData);
+
+                    if (!isIdentical) {
+                        console.log(`⚠️ ${yearMonth} 변경 감지!`);
+                        hasChanges = true;
+                        firstChangedMonth = yearMonth;
+                        break; // 변경 감지 시 즉시 중단
+                    } else {
+                        console.log(`✅ ${yearMonth} 변경 없음`);
+                    }
+                } catch (error) {
+                    console.error(`${yearMonth} 샘플 체크 실패:`, error);
+                    // 샘플 체크 실패 시 안전하게 전체 재다운로드
+                    throw error;
+                }
+            }
+
+            if (hasChanges) {
+                console.log(`🔄 변경 감지 - ${firstChangedMonth}부터 전체 재다운로드`);
+                await downloadFromMonth(firstChangedMonth);
+            } else {
+                console.log('✅ 모든 월 변경 없음 - 캐시 유지, lastCheckedMonth 갱신');
+
+                // lastCheckedMonth만 업데이트
+                const today = new Date();
+                const currentMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+
+                const updatedCache = {
+                    ...cachedData,
+                    lastCheckedMonth: currentMonth,
+                    failedAttempts: 0,
+                    lastFailedAttempt: null
+                };
+
+                setCachedData(updatedCache);
+                setSpecialDates(cachedData.data);
+                setCacheStatus({ loading: false, error: null });
+                showToast?.('특일 정보 확인 완료 (변경사항 없음)');
+            }
+
+        } catch (error) {
+            console.error('월별 체크 실패:', error);
+
+            // 실패 정보를 캐시에 기록
+            const updatedCache = {
+                ...cachedData,
+                lastFailedAttempt: Date.now(),
+                failedAttempts: (cachedData.failedAttempts || 0) + 1
+            };
+            setCachedData(updatedCache);
+
+            setCacheStatus({ loading: false, error: error.message });
+
+            // 기존 캐시 데이터 사용
+            if (cachedData && cachedData.data) {
+                setSpecialDates(cachedData.data);
+                showToast?.(`특일 정보 체크 실패: ${error.message}`);
+            }
+        }
+    };
+
+    // 전체 데이터 다운로드 (초기 또는 캐시 없을 때)
+    const downloadAllData = async () => {
+        console.log('📥 전체 데이터 다운로드 시작 (24개월)');
+        setCacheStatus({ loading: true, error: null });
+
         try {
             const currentYear = new Date().getFullYear();
             const nextYear = currentYear + 1;
             const mergedData = {};
 
-            // 현재년도와 다음년도 데이터 로드
             for (const year of [currentYear, nextYear]) {
                 for (let month = 1; month <= 12; month++) {
                     try {
                         const monthStr = month.toString().padStart(2, '0');
                         const apiData = await fetchSpecialDatesWithRetry(year, monthStr);
-                        
-                        // 데이터 처리 함수
+
                         const processData = (items, color, isNationalDay = false) => {
                             const processedItems = Array.isArray(items) ? items : (items ? [items] : []);
-                            
+
                             processedItems.forEach(item => {
                                 const date = String(item.locdate);
                                 const formattedDate = `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}`;
@@ -856,54 +1068,107 @@ const Calendar = ({
                             });
                         };
 
-                        // 각 API 데이터 병합
                         processData(apiData.holiday?.response?.body?.items?.item, 'red', true);
                         processData(apiData.solarTerm?.response?.body?.items?.item, '#808080');
                         processData(apiData.anniversary?.response?.body?.items?.item, '#808080');
                         processData(apiData.sundryDay?.response?.body?.items?.item, '#808080');
 
-                        // 진행 상황 표시 (선택적)
                         const progress = ((year - currentYear) * 12 + month) / 24 * 100;
                         console.log(`특일 데이터 로딩 진행률: ${Math.round(progress)}%`);
-                        
+
                     } catch (monthError) {
                         console.error(`${year}-${month} 데이터 로딩 실패:`, monthError);
-                        // 개별 월 실패는 전체 작업을 중단시키지 않음
                     }
                 }
             }
 
-            // 성공적으로 로드된 데이터를 캐시에 저장
             const newCacheData = createCacheData(mergedData);
             setCachedData(newCacheData);
             setSpecialDates(mergedData);
             setCacheStatus({ loading: false, error: null });
-            
-            console.log('특일 데이터 업데이트 완료:', new Date());
+
+            console.log('특일 데이터 다운로드 완료:', new Date());
             showToast?.('특일 정보가 업데이트되었습니다.');
 
         } catch (error) {
-            console.error('특일 데이터 로딩 실패:', error);
-
-            // 실패 정보를 캐시에 기록
-            if (cachedData) {
-                const updatedCache = {
-                    ...cachedData,
-                    lastFailedAttempt: Date.now(),
-                    failedAttempts: (cachedData.failedAttempts || 0) + 1
-                };
-                setCachedData(updatedCache);
-            }
-
+            console.error('전체 데이터 다운로드 실패:', error);
             setCacheStatus({ loading: false, error: error.message });
+            showToast?.(`특일 정보 다운로드 실패: ${error.message}`);
+        }
+    };
 
-            // 기존 캐시 데이터가 있다면 그것을 사용
-            if (cachedData && cachedData.data) {
-                setSpecialDates(cachedData.data);
-                showToast?.(`특일 정보 업데이트 실패: ${error.message}`);
-            } else {
-                showToast?.(`특일 정보 로딩 실패: ${error.message}`);
+    // 특정 월부터 끝까지 다운로드 (변경 감지 시)
+    const downloadFromMonth = async (startYearMonth) => {
+        console.log(`📥 ${startYearMonth}부터 끝까지 재다운로드 시작`);
+        setCacheStatus({ loading: true, error: null });
+
+        try {
+            const [startYear, startMonth] = startYearMonth.split('-').map(Number);
+            const currentYear = new Date().getFullYear();
+            const nextYear = currentYear + 1;
+
+            const cachedData = getCachedData();
+            const mergedData = { ...(cachedData?.data || {}) };
+
+            // 기존 데이터에서 startYearMonth 이후 데이터 삭제
+            Object.keys(mergedData).forEach(dateKey => {
+                if (dateKey >= startYearMonth) {
+                    delete mergedData[dateKey];
+                }
+            });
+
+            // startYearMonth부터 내년 12월까지 다운로드
+            let downloading = false;
+
+            for (const year of [currentYear, nextYear]) {
+                for (let month = 1; month <= 12; month++) {
+                    // startYearMonth부터 시작
+                    if (year === startYear && month < startMonth) continue;
+                    if (year === startYear && month === startMonth) downloading = true;
+                    if (!downloading) continue;
+
+                    try {
+                        const monthStr = month.toString().padStart(2, '0');
+                        const apiData = await fetchSpecialDatesWithRetry(year, monthStr);
+
+                        const processData = (items, color, isNationalDay = false) => {
+                            const processedItems = Array.isArray(items) ? items : (items ? [items] : []);
+
+                            processedItems.forEach(item => {
+                                const date = String(item.locdate);
+                                const formattedDate = `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}`;
+                                if (!mergedData[formattedDate]) {
+                                    mergedData[formattedDate] = [];
+                                }
+                                mergedData[formattedDate].push({ name: item.dateName, color, isNationalDay });
+                            });
+                        };
+
+                        processData(apiData.holiday?.response?.body?.items?.item, 'red', true);
+                        processData(apiData.solarTerm?.response?.body?.items?.item, '#808080');
+                        processData(apiData.anniversary?.response?.body?.items?.item, '#808080');
+                        processData(apiData.sundryDay?.response?.body?.items?.item, '#808080');
+
+                        console.log(`${year}-${monthStr} 다운로드 완료`);
+
+                    } catch (monthError) {
+                        console.error(`${year}-${month} 데이터 로딩 실패:`, monthError);
+                    }
+                }
             }
+
+            const newCacheData = createCacheData(mergedData);
+            setCachedData(newCacheData);
+            setSpecialDates(mergedData);
+            setCacheStatus({ loading: false, error: null });
+
+            console.log('부분 재다운로드 완료:', new Date());
+            showToast?.('특일 정보가 업데이트되었습니다.');
+
+        } catch (error) {
+            console.error('부분 재다운로드 실패:', error);
+            setCacheStatus({ loading: false, error: error.message });
+            showToast?.(`특일 정보 업데이트 실패: ${error.message}`);
         }
     };
 
