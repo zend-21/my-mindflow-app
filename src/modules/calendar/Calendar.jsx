@@ -1108,14 +1108,18 @@ const Calendar = ({
             const nextYear = currentYear + 1;
 
             const cachedData = getCachedData();
-            const mergedData = { ...(cachedData?.data || {}) };
 
-            // 기존 데이터에서 startYearMonth 이후 데이터 삭제
-            Object.keys(mergedData).forEach(dateKey => {
-                if (dateKey >= startYearMonth) {
-                    delete mergedData[dateKey];
+            // ✅ 새로운 임시 데이터 객체 (기존 캐시는 건드리지 않음)
+            const newMergedData = {};
+
+            // 과거 데이터 (startYearMonth 이전)는 기존 캐시에서 복사
+            Object.keys(cachedData.data).forEach(dateKey => {
+                if (dateKey < startYearMonth) {
+                    newMergedData[dateKey] = cachedData.data[dateKey];
                 }
             });
+
+            console.log(`📦 과거 데이터 ${Object.keys(newMergedData).length}개 복사 완료`);
 
             // startYearMonth부터 내년 12월까지 다운로드
             let downloading = false;
@@ -1137,10 +1141,10 @@ const Calendar = ({
                             processedItems.forEach(item => {
                                 const date = String(item.locdate);
                                 const formattedDate = `${date.substring(0, 4)}-${date.substring(4, 6)}-${date.substring(6, 8)}`;
-                                if (!mergedData[formattedDate]) {
-                                    mergedData[formattedDate] = [];
+                                if (!newMergedData[formattedDate]) {
+                                    newMergedData[formattedDate] = [];
                                 }
-                                mergedData[formattedDate].push({ name: item.dateName, color, isNationalDay });
+                                newMergedData[formattedDate].push({ name: item.dateName, color, isNationalDay });
                             });
                         };
 
@@ -1153,21 +1157,36 @@ const Calendar = ({
 
                     } catch (monthError) {
                         console.error(`${year}-${month} 데이터 로딩 실패:`, monthError);
+                        // 개별 월 실패는 계속 진행 (부분 실패 허용)
                     }
                 }
             }
 
-            const newCacheData = createCacheData(mergedData);
+            // ✅ 모든 다운로드 완료 후 한 번에 저장 (원자적 업데이트)
+            const newCacheData = createCacheData(newMergedData);
             setCachedData(newCacheData);
-            setSpecialDates(mergedData);
+            setSpecialDates(newMergedData);
             setCacheStatus({ loading: false, error: null });
 
             console.log('부분 재다운로드 완료:', new Date());
+            console.log(`✅ lastCheckedMonth 갱신됨 → ${newCacheData.lastCheckedMonth}`);
             // showToast?.('특일 정보가 업데이트되었습니다.'); // 사용자에게 불필요한 메시지
 
         } catch (error) {
             console.error('부분 재다운로드 실패:', error);
             setCacheStatus({ loading: false, error: error.message });
+
+            // ⚠️ 실패 시 lastCheckedMonth는 갱신되지 않음 → 다음 실행 시 재시도
+            const cachedData = getCachedData();
+            if (cachedData) {
+                const updatedCache = {
+                    ...cachedData,
+                    lastFailedAttempt: Date.now(),
+                    failedAttempts: (cachedData.failedAttempts || 0) + 1
+                };
+                setCachedData(updatedCache);
+            }
+
             showToast?.(`특일 정보 업데이트 실패: ${error.message}`);
         }
     };
