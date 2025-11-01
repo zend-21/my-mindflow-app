@@ -854,7 +854,7 @@ const Calendar = ({
 
         } catch (error) {
             console.error('특일 데이터 로딩 실패:', error);
-            
+
             // 실패 정보를 캐시에 기록
             if (cachedData) {
                 const updatedCache = {
@@ -866,13 +866,13 @@ const Calendar = ({
             }
 
             setCacheStatus({ loading: false, error: error.message });
-            
+
             // 기존 캐시 데이터가 있다면 그것을 사용
             if (cachedData && cachedData.data) {
                 setSpecialDates(cachedData.data);
-                showToast?.('특일 정보 업데이트에 실패했습니다. 기존 데이터를 사용합니다.');
+                showToast?.(`특일 정보 업데이트 실패: ${error.message}`);
             } else {
-                showToast?.('특일 정보를 불러올 수 없습니다.');
+                showToast?.(`특일 정보 로딩 실패: ${error.message}`);
             }
         }
     };
