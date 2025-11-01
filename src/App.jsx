@@ -340,8 +340,8 @@ function App() {
     const [pullDistance, setPullDistance] = useState(0);
     const pullStartY = useRef(0);
     const WIDGET_ACTIVATION_DELAY = 500; // 위젯: 0.5초 제자리 누름
-    const MIN_PULL_DISTANCE = 100;       // 동기화: 100px 이상 드래그 (증가)
-    const PULL_THRESHOLD = 100;          // 임계값 증가 (60 → 100)
+    const MIN_PULL_DISTANCE = 150;       // 동기화: 150px 이상 드래그 (증가)
+    const PULL_THRESHOLD = 150;          // 임계값 증가 (100 → 150)
 
     const handlePullStart = (clientY) => {
         // 스크롤이 정확히 최상단일 때만 (더 엄격하게)
@@ -1212,10 +1212,19 @@ function App() {
     };
 
     const handleTouchMove = (e) => {
+        if (isDragging && contentAreaRef.current?.scrollTop === 0) {
+            // 스크롤 최상단에서 드래그 중일 때만 기본 동작 방지
+            e.preventDefault();
+        }
         handlePullMove(e.touches[0].clientY);
     };
 
     const handleTouchEnd = async () => {
+        await handlePullEnd();
+    };
+
+    const handleTouchCancel = async () => {
+        // 터치가 취소되어도 handlePullEnd 호출 (드래그 종료)
         await handlePullEnd();
     };
 
@@ -1331,6 +1340,7 @@ if (isLoading) {
                         onTouchStart={handleTouchStart}
                         onTouchMove={handleTouchMove}
                         onTouchEnd={handleTouchEnd}
+                        onTouchCancel={handleTouchCancel}
                         // 마우스 이벤트 (PC)
                         onMouseDown={handleMouseDown}
                         onMouseMove={handleMouseMove}
