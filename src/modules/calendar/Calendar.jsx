@@ -1015,7 +1015,7 @@ const Calendar = ({
                 setCachedData(updatedCache);
                 setSpecialDates(cachedData.data);
                 setCacheStatus({ loading: false, error: null });
-                showToast?.('특일 정보 확인 완료 (변경사항 없음)');
+                // showToast?.('특일 정보 확인 완료 (변경사항 없음)'); // 사용자에게 불필요한 메시지
             }
 
         } catch (error) {
@@ -1088,7 +1088,7 @@ const Calendar = ({
             setCacheStatus({ loading: false, error: null });
 
             console.log('특일 데이터 다운로드 완료:', new Date());
-            showToast?.('특일 정보가 업데이트되었습니다.');
+            // showToast?.('특일 정보가 업데이트되었습니다.'); // 사용자에게 불필요한 메시지
 
         } catch (error) {
             console.error('전체 데이터 다운로드 실패:', error);
@@ -1163,7 +1163,7 @@ const Calendar = ({
             setCacheStatus({ loading: false, error: null });
 
             console.log('부분 재다운로드 완료:', new Date());
-            showToast?.('특일 정보가 업데이트되었습니다.');
+            // showToast?.('특일 정보가 업데이트되었습니다.'); // 사용자에게 불필요한 메시지
 
         } catch (error) {
             console.error('부분 재다운로드 실패:', error);
