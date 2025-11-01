@@ -323,17 +323,17 @@ function App() {
     const [isDragging, setIsDragging] = useState(false);
     const pullStartTime = useRef(0);
     const [pullDistance, setPullDistance] = useState(0);
-    const pullStartY = useRef(0);                        
+    const pullStartY = useRef(0);
     const WIDGET_ACTIVATION_DELAY = 500; // 위젯: 0.5초 제자리 누름
-    const MIN_PULL_DISTANCE = 60;        // 동기화: 60px 이상 드래그
-    const PULL_THRESHOLD = 60;
+    const MIN_PULL_DISTANCE = 100;       // 동기화: 100px 이상 드래그 (증가)
+    const PULL_THRESHOLD = 100;          // 임계값 증가 (60 → 100)
 
     const handlePullStart = (clientY) => {
-        // 스크롤이 최상단일 때만
-        if (contentAreaRef.current && contentAreaRef.current.scrollTop > 5) {
+        // 스크롤이 정확히 최상단일 때만 (더 엄격하게)
+        if (contentAreaRef.current && contentAreaRef.current.scrollTop > 0) {
             return;
         }
-        
+
         pullStartY.current = clientY;
         pullStartTime.current = Date.now();
         setIsDragging(true);
@@ -342,13 +342,14 @@ function App() {
 
     const handlePullMove = (clientY) => {
         if (!isDragging) return;
-        
+
         const currentY = clientY;
         const distance = currentY - pullStartY.current;
-        
+
         const scrollTop = contentAreaRef.current?.scrollTop || 0;
-        if (scrollTop <= 5 && distance > 0) {
-            setPullDistance(distance * 0.5);
+        // 스크롤이 정확히 최상단이고, 충분히 당겼을 때만 (30px 이상)
+        if (scrollTop === 0 && distance > 30) {
+            setPullDistance((distance - 30) * 0.4); // 30px 무시하고, 더 천천히 증가 (0.5 → 0.4)
         } else {
             setPullDistance(0);
         }
