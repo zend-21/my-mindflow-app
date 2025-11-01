@@ -705,17 +705,39 @@ const ScheduleInput = styled.div`
     }
 `;
 
-// 로딩 상태 표시 컴포넌트
+// 로딩 상태 표시 컴포넌트 - 작은 아이콘
 const LoadingIndicator = styled.div`
     position: absolute;
-    top: 10px;
-    right: 10px;
-    font-size: 12px;
-    color: #666;
-    background: rgba(255, 255, 255, 0.9);
+    top: 15px;
+    right: 15px;
+    font-size: 20px;
+    z-index: 10;
+    animation: spin 1s linear infinite;
+
+    @keyframes spin {
+        from {
+            transform: rotate(0deg);
+        }
+        to {
+            transform: rotate(360deg);
+        }
+    }
+`;
+
+// 에러 표시 (디버깅용)
+const ErrorIndicator = styled.div`
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    color: #ff4444;
+    background: rgba(255, 255, 255, 0.95);
     padding: 4px 8px;
     border-radius: 4px;
-    border: 1px solid #ddd;
+    border: 1px solid #ff4444;
+    max-width: 80%;
+    text-align: center;
 `;
 
 const today = new Date();
@@ -1181,18 +1203,18 @@ const Calendar = ({
 
     return (
         <CalendarWrapper {...swipeHandlers}>
-            {/* 캐시 상태 표시 - 로딩 중일 때만 표시 */}
+            {/* 로딩 중일 때 작은 스피너 아이콘 표시 */}
             {cacheStatus.loading && (
-                <LoadingIndicator>
-                    특일 정보 업데이트 중...
+                <LoadingIndicator title="특일 정보 로딩 중...">
+                    ⏳
                 </LoadingIndicator>
             )}
 
             {/* 에러 상태 표시 (디버깅용) */}
             {cacheStatus.error && (
-                <LoadingIndicator style={{ background: 'rgba(255, 0, 0, 0.8)' }}>
-                    에러: {cacheStatus.error}
-                </LoadingIndicator>
+                <ErrorIndicator>
+                    ⚠️ {cacheStatus.error}
+                </ErrorIndicator>
             )}
 
             <Header>
