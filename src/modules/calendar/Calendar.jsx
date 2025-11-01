@@ -765,13 +765,23 @@ const Calendar = ({
     const loadSpecialDatesData = async (forceUpdate = false) => {
         const cachedData = getCachedData();
 
+        console.log('🔍 loadSpecialDatesData 호출');
+        console.log('  - forceUpdate:', forceUpdate);
+        console.log('  - cachedData 존재:', !!cachedData);
+        if (cachedData) {
+            console.log('  - cachedData.timestamp:', new Date(cachedData.timestamp));
+            console.log('  - shouldUpdateCache:', shouldUpdateCache(cachedData));
+        }
+
         // 캐시가 유효하고 강제 업데이트가 아닌 경우 캐시 사용
         if (!forceUpdate && cachedData && !shouldUpdateCache(cachedData)) {
             setSpecialDates(cachedData.data);
             setCacheStatus({ loading: false, error: null }); // 로딩 상태 명시적으로 false
-            console.log('캐시된 특일 데이터 사용:', new Date(cachedData.timestamp));
+            console.log('✅ 캐시된 특일 데이터 사용:', new Date(cachedData.timestamp));
             return;
         }
+
+        console.log('⚠️ API 호출 시작 - 캐시 사용 불가');
 
         // 네트워크 연결 확인
         if (!checkNetworkStatus()) {
