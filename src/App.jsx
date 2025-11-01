@@ -361,14 +361,7 @@ function App() {
         const currentY = clientY;
         const distance = currentY - pullStartY.current;
 
-        const scrollTop = contentAreaRef.current?.scrollTop || 0;
-
-        // 스크롤이 조금이라도 내려갔으면 드래그 취소
-        if (scrollTop > 1) {
-            setIsDragging(false);
-            setPullDistance(0);
-            return;
-        }
+        // 스크롤 체크 제거 - 손을 떼기 전까지는 절대 취소하지 않음
 
         // 아래로 당김 (30px 데드존 초과)
         if (distance > 30) {
