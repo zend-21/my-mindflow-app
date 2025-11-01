@@ -370,17 +370,17 @@ function App() {
             return;
         }
 
-        // 스크롤이 최상단일 때: 손가락 위치를 실시간 추적
-        // 30px 데드존 적용하되, 음수(위로 올림)가 되면 0으로
+        // 아래로 당김 (30px 데드존 초과)
         if (distance > 30) {
-            // 아래로 충분히 당김: 데드존 제외하고 계산
             setPullDistance((distance - 30) * 0.4);
-        } else if (distance > 0) {
-            // 데드존 안 (0~30px): 아직 당기지 않은 것으로 간주
+        }
+        // 데드존 안쪽 (0~30px)
+        else if (distance > 0) {
             setPullDistance(0);
-        } else {
-            // 음수 (위로 올림): 0으로 고정하되 드래그는 유지
-            setPullDistance(0);
+        }
+        // 위로 올릴 때: 손가락을 따라 음수로 이동 (부드럽게 복귀)
+        else {
+            setPullDistance(distance * 0.3); // 음수 값 허용, 저항감 추가
         }
     };
 
