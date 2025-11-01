@@ -888,6 +888,7 @@ const Calendar = ({
             const timeout = setTimeout(() => {
                 console.log('로딩 타임아웃 - 강제 종료');
                 setCacheStatus({ loading: false, error: '타임아웃' });
+                showToast?.('특일 정보 로딩 시간 초과 - API 호출 실패');
             }, 10000); // 10초
 
             return () => clearTimeout(timeout);
@@ -1184,6 +1185,13 @@ const Calendar = ({
             {cacheStatus.loading && (
                 <LoadingIndicator>
                     특일 정보 업데이트 중...
+                </LoadingIndicator>
+            )}
+
+            {/* 에러 상태 표시 (디버깅용) */}
+            {cacheStatus.error && (
+                <LoadingIndicator style={{ background: 'rgba(255, 0, 0, 0.8)' }}>
+                    에러: {cacheStatus.error}
                 </LoadingIndicator>
             )}
 
