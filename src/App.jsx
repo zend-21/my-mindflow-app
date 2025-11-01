@@ -633,12 +633,12 @@ function App() {
     };
 
     const showToast = (message) => {
-        console.log('🔔 showToast 호출됨:', message); // ✅ 로그 추가
+        console.log('🔔 showToast 호출됨:', message);
         setToastMessage(message);
         setTimeout(() => {
-            console.log('🔔 Toast 숨김'); // ✅ 로그 추가
+            console.log('🔔 Toast 숨김');
             setToastMessage(null);
-        }, 3000); // ✅ 1.5초 → 3초로 늘림
+        }, 1000); // 1초로 단축
     };
     
     const handleDataExport = () => {
