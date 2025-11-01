@@ -54,7 +54,7 @@ const slideUp = keyframes`
 
 const PullToSyncIndicator = styled.div`
   position: fixed;
-  top: 80px; /* 헤더(60px) + 여유(20px) */
+  top: 75px; /* 5px 위로 이동 */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -68,7 +68,7 @@ const PullToSyncIndicator = styled.div`
 
 const PullGuideMessage = styled.div`
   position: fixed;
-  top: 80px;
+  top: 120px; /* 훨씬 위로 이동 (80px → 120px) */
   left: 50%;
   transform: translateX(-50%);
   background: rgba(102, 126, 234, 0.9);
@@ -362,9 +362,19 @@ function App() {
         const distance = currentY - pullStartY.current;
 
         const scrollTop = contentAreaRef.current?.scrollTop || 0;
-        // 스크롤이 정확히 최상단이고, 충분히 당겼을 때만 (30px 이상)
-        if (scrollTop === 0 && distance > 30) {
-            setPullDistance((distance - 30) * 0.4); // 30px 무시하고, 더 천천히 증가 (0.5 → 0.4)
+
+        // 스크롤이 최상단일 때만
+        if (scrollTop === 0) {
+            // 아래로 당길 때 (distance > 30)
+            if (distance > 30) {
+                setPullDistance((distance - 30) * 0.4);
+            }
+            // 위로 올릴 때 (0 < distance < 30) 또는 (distance < 0)
+            else if (distance > 0) {
+                setPullDistance(0); // 데드존 안에 있음
+            } else {
+                setPullDistance(0); // 위로 올림
+            }
         } else {
             setPullDistance(0);
         }
