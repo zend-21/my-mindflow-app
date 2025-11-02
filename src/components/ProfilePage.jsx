@@ -830,12 +830,12 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                                         onKeyPress={(e) => e.key === 'Enter' && handleSaveNickname()}
                                         autoFocus
                                     />
-                                    <EditButton onClick={handleSaveNickname}>저장</EditButton>
+                                    <EditButton onClick={handleSaveNickname}>닉 저장</EditButton>
                                 </>
                             ) : (
                                 <>
                                     <Nickname>{userName}</Nickname>
-                                    <EditButton onClick={() => setIsEditingNickname(true)}>변경</EditButton>
+                                    <EditButton onClick={() => setIsEditingNickname(true)}>닉 변경</EditButton>
                                 </>
                             )}
                         </NicknameContainer>
