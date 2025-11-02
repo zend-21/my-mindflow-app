@@ -209,9 +209,11 @@ const EditButton = styled.button`
     cursor: pointer;
     font-size: 14px;
     padding: 4px 8px;
+    text-decoration: none;
 
     &:hover {
-        text-decoration: underline;
+        background: #edf2f7;
+        border-radius: 6px;
     }
 `;
 
