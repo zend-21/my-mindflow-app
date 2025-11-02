@@ -834,10 +834,10 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                         {/* 프로필 사진 동기화/복원 버튼 */}
                         <ProfilePictureSyncSection>
                             <SyncButton onClick={handleSyncProfilePicture}>
-                                ☁️ Drive에 프사 동기화
+                                ☁️ 프로필 사진 저장
                             </SyncButton>
                             <SyncButton onClick={handleRestoreProfilePicture}>
-                                📥 Drive에서 프사 복원
+                                📥 프로필 사진 복원
                             </SyncButton>
                         </ProfilePictureSyncSection>
                     </ProfileHeader>
