@@ -6,7 +6,7 @@ import { getUserProfile } from '../utils/fortuneLogic';
 import { getTodayFortune } from '../utils/fortuneLogic';
 import FortuneInputModal from './FortuneInputModal';
 import FortuneFlow from './FortuneFlow';
-import { syncProfilePictureToGoogleDrive } from '../utils/googleDriveSync';
+import { syncProfilePictureToGoogleDrive, loadProfilePictureFromGoogleDrive } from '../utils/googleDriveSync';
 
 // 🎨 Styled Components
 
@@ -359,6 +359,34 @@ const ActionButton = styled.button`
     `}
 `;
 
+const ProfilePictureSyncSection = styled.div`
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+`;
+
+const SyncButton = styled.button`
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #edf2f7;
+    color: #4a5568;
+
+    &:hover {
+        background: #e2e8f0;
+        transform: translateY(-1px);
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
+`;
+
 const BirthdayReminderSection = styled.div`
     padding: 16px;
     background: #f7fafc;
@@ -638,23 +666,6 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
 
             // 이미지 에러 상태 초기화
             setImageError(false);
-
-            // Google Drive에 업로드 (백그라운드 실행)
-            if (profile) {
-                syncProfilePictureToGoogleDrive(compressedBase64, hash)
-                    .then((result) => {
-                        if (result.success) {
-                            console.log('✅ 프로필 사진 Drive 동기화 완료');
-                        } else if (result.error === 'TOKEN_EXPIRED') {
-                            console.log('⚠️ Drive 토큰 만료 - 다음 동기화 시 재시도');
-                        } else {
-                            console.error('❌ Drive 업로드 실패:', result.error);
-                        }
-                    })
-                    .catch((err) => {
-                        console.error('❌ Drive 업로드 오류:', err);
-                    });
-            }
         } catch (error) {
             console.error('이미지 처리 오류:', error);
 
@@ -687,6 +698,76 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
             showToast?.('생일 알림이 활성화되었습니다 🎂');
         } else {
             showToast?.('생일 알림이 비활성화되었습니다');
+        }
+    };
+
+    // 프로필 사진 Google Drive에 동기화
+    const handleSyncProfilePicture = async () => {
+        const customPicture = localStorage.getItem('customProfilePicture');
+        const customPictureHash = localStorage.getItem('customProfilePictureHash');
+
+        if (!customPicture || !customPictureHash) {
+            showToast?.('⚠️ 동기화할 프로필 사진이 없습니다');
+            return;
+        }
+
+        showToast?.('📸 프로필 사진 업로드 중...');
+
+        try {
+            const result = await syncProfilePictureToGoogleDrive(customPicture, customPictureHash);
+
+            if (result.success) {
+                showToast?.('✅ 프로필 사진이 Drive에 동기화되었습니다');
+            } else if (result.error === 'TOKEN_EXPIRED') {
+                showToast?.('🔐 로그인이 만료되었습니다. 다시 로그인해주세요');
+            } else {
+                showToast?.('❌ 동기화 실패');
+            }
+        } catch (error) {
+            console.error('프로필 사진 동기화 오류:', error);
+            showToast?.('❌ 동기화 중 오류가 발생했습니다');
+        }
+    };
+
+    // 프로필 사진 Google Drive에서 복원
+    const handleRestoreProfilePicture = async () => {
+        showToast?.('📸 프로필 사진 다운로드 중...');
+
+        try {
+            const result = await loadProfilePictureFromGoogleDrive();
+
+            if (result.success && result.data) {
+                const { base64, hash } = result.data;
+
+                // 로컬 해시와 비교
+                const localHash = localStorage.getItem('customProfilePictureHash');
+
+                if (localHash === hash) {
+                    showToast?.('✅ 이미 최신 프로필 사진입니다');
+                    return;
+                }
+
+                // Drive의 사진으로 로컬 업데이트
+                localStorage.setItem('customProfilePicture', base64);
+                localStorage.setItem('customProfilePictureHash', hash);
+
+                // 프로필 업데이트 이벤트 발생
+                window.dispatchEvent(new CustomEvent('profilePictureChanged', {
+                    detail: { picture: base64, hash }
+                }));
+
+                showToast?.('✅ 프로필 사진이 복원되었습니다');
+                setImageError(false);
+            } else if (result.message === 'NO_FILE') {
+                showToast?.('📭 Drive에 저장된 프로필 사진이 없습니다');
+            } else if (result.error === 'TOKEN_EXPIRED') {
+                showToast?.('🔐 로그인이 만료되었습니다. 다시 로그인해주세요');
+            } else {
+                showToast?.('❌ 복원 실패');
+            }
+        } catch (error) {
+            console.error('프로필 사진 복원 오류:', error);
+            showToast?.('❌ 복원 중 오류가 발생했습니다');
         }
     };
 
@@ -749,6 +830,16 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                         </NicknameContainer>
 
                         <Email>{profile?.email || '게스트 모드'}</Email>
+
+                        {/* 프로필 사진 동기화/복원 버튼 */}
+                        <ProfilePictureSyncSection>
+                            <SyncButton onClick={handleSyncProfilePicture}>
+                                ☁️ Drive에 동기화
+                            </SyncButton>
+                            <SyncButton onClick={handleRestoreProfilePicture}>
+                                📥 Drive에서 복원
+                            </SyncButton>
+                        </ProfilePictureSyncSection>
                     </ProfileHeader>
                 </Section>
 

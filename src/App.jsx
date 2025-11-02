@@ -947,37 +947,6 @@ function App() {
             // GAPI에 토큰 설정
             if (isGapiReady) {
                 setAccessToken(accessToken);
-
-                // Google Drive에서 프로필 사진 다운로드 시도
-                try {
-                    const result = await loadProfilePictureFromGoogleDrive();
-                    if (result.success && result.data) {
-                        const { base64, hash } = result.data;
-
-                        // 로컬 해시와 비교
-                        const localHash = localStorage.getItem('customProfilePictureHash');
-
-                        if (localHash !== hash) {
-                            // Drive의 사진이 더 최신이면 로컬에 저장
-                            localStorage.setItem('customProfilePicture', base64);
-                            localStorage.setItem('customProfilePictureHash', hash);
-
-                            // 프로필 업데이트
-                            setProfile(prev => ({
-                                ...prev,
-                                customPicture: base64
-                            }));
-
-                            console.log('✅ Drive에서 프로필 사진 복원 완료');
-                        } else {
-                            console.log('✅ 프로필 사진이 이미 최신 상태입니다');
-                        }
-                    } else if (result.message === 'NO_FILE') {
-                        console.log('📭 Drive에 저장된 프로필 사진이 없습니다');
-                    }
-                } catch (error) {
-                    console.error('⚠️ 프로필 사진 다운로드 중 오류:', error);
-                }
             }
 
             setIsLoginModalOpen(false);
@@ -1063,25 +1032,6 @@ function App() {
             console.log('📥 업로드 결과:', result);
 
             if (result.success) {
-                // 프로필 사진 동기화 (백그라운드)
-                const customPicture = localStorage.getItem('customProfilePicture');
-                const customPictureHash = localStorage.getItem('customProfilePictureHash');
-
-                if (customPicture && customPictureHash) {
-                    console.log('📸 프로필 사진 동기화 시작...');
-                    syncProfilePictureToGoogleDrive(customPicture, customPictureHash)
-                        .then((picResult) => {
-                            if (picResult.success) {
-                                console.log('✅ 프로필 사진 동기화 완료');
-                            } else {
-                                console.log('⚠️ 프로필 사진 동기화 실패:', picResult.error);
-                            }
-                        })
-                        .catch((err) => {
-                            console.error('❌ 프로필 사진 동기화 오류:', err);
-                        });
-                }
-
                 // ✅ 성공 처리 - 이 부분이 반드시 있어야 함!
                 const now = Date.now();
                 setLastSyncTime(now);
