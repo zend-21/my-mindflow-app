@@ -849,12 +849,17 @@ function App() {
         const savedProfile = localStorage.getItem('userProfile');
         const savedToken = localStorage.getItem('accessToken');
         const savedNickname = localStorage.getItem('userNickname');
+        const savedCustomPicture = localStorage.getItem('customProfilePicture');
 
         if (savedProfile && savedToken) {
             const profileData = JSON.parse(savedProfile);
             // 저장된 닉네임이 있으면 profile에 추가
             if (savedNickname) {
                 profileData.nickname = savedNickname;
+            }
+            // 저장된 커스텀 프로필 사진이 있으면 추가
+            if (savedCustomPicture) {
+                profileData.customPicture = savedCustomPicture;
             }
             setProfile(profileData);
             setAccessTokenState(savedToken);
@@ -887,6 +892,28 @@ function App() {
 
         return () => {
             window.removeEventListener('nicknameChanged', handleNicknameChanged);
+        };
+    }, []);
+
+    // ✅ 프로필 사진 변경 이벤트 리스너
+    useEffect(() => {
+        const handleProfilePictureChanged = (event) => {
+            const { picture } = event.detail;
+            console.log('📸 프로필 사진 변경 이벤트 수신');
+
+            setProfile(prevProfile => {
+                if (!prevProfile) return prevProfile;
+                return {
+                    ...prevProfile,
+                    customPicture: picture
+                };
+            });
+        };
+
+        window.addEventListener('profilePictureChanged', handleProfilePictureChanged);
+
+        return () => {
+            window.removeEventListener('profilePictureChanged', handleProfilePictureChanged);
         };
     }, []);
 

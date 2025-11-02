@@ -1,6 +1,6 @@
 // src/components/ProfilePage.jsx
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 import { getUserProfile } from '../utils/fortuneLogic';
 import { getTodayFortune } from '../utils/fortuneLogic';
@@ -514,9 +514,142 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
         setImageError(true);
     };
 
+    // 프로필 사진 업로드 input ref
+    const fileInputRef = React.useRef(null);
+
+    // 이미지를 압축하고 Base64로 변환
+    const compressAndConvertImage = (file) => {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (e) => {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 400;
+                    const MAX_HEIGHT = 400;
+                    let width = img.width;
+                    let height = img.height;
+
+                    // 비율 유지하면서 리사이즈
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // JPEG 품질 0.7로 압축
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    resolve(compressedBase64);
+                };
+                img.onerror = reject;
+            };
+            reader.onerror = reject;
+        });
+    };
+
+    // 해시 계산 함수
+    const calculateHash = async (base64String) => {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(base64String);
+        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        return hashHex;
+    };
+
     // 프로필 사진 변경
     const handleProfileImageClick = () => {
-        showToast?.('프로필 사진 변경 기능은 준비 중입니다');
+        fileInputRef.current?.click();
+    };
+
+    // 파일 선택 시 처리
+    const handleFileChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // 이미지 파일인지 확인
+        if (!file.type.startsWith('image/')) {
+            showToast?.('이미지 파일만 업로드할 수 있습니다');
+            return;
+        }
+
+        // 파일 크기 체크 (10MB 제한)
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        if (file.size > MAX_FILE_SIZE) {
+            showToast?.('이미지 크기는 10MB 이하여야 합니다');
+            e.target.value = '';
+            return;
+        }
+
+        try {
+            showToast?.('이미지 처리 중...');
+
+            // 이미지 압축 및 Base64 변환
+            const compressedBase64 = await compressAndConvertImage(file);
+
+            // Base64 크기 체크 (2MB 제한 - localStorage 여유 공간 확보)
+            const sizeInBytes = compressedBase64.length * 0.75; // Base64는 원본의 약 1.33배
+            const sizeInMB = sizeInBytes / (1024 * 1024);
+
+            if (sizeInMB > 2) {
+                showToast?.('압축 후에도 이미지가 너무 큽니다. 더 작은 이미지를 선택해주세요');
+                e.target.value = '';
+                return;
+            }
+
+            // 해시 계산
+            const hash = await calculateHash(compressedBase64);
+
+            try {
+                // localStorage에 저장 시도
+                localStorage.setItem('customProfilePicture', compressedBase64);
+                localStorage.setItem('customProfilePictureHash', hash);
+            } catch (storageError) {
+                if (storageError.name === 'QuotaExceededError') {
+                    showToast?.('저장 공간이 부족합니다. 더 작은 이미지를 선택해주세요');
+                } else {
+                    showToast?.('이미지 저장에 실패했습니다');
+                }
+                console.error('localStorage 저장 오류:', storageError);
+                e.target.value = '';
+                return;
+            }
+
+            // 프로필 상태 업데이트 이벤트 발생
+            window.dispatchEvent(new CustomEvent('profilePictureChanged', {
+                detail: { picture: compressedBase64, hash }
+            }));
+
+            showToast?.('프로필 사진이 변경되었습니다 📸');
+
+            // 이미지 에러 상태 초기화
+            setImageError(false);
+        } catch (error) {
+            console.error('이미지 처리 오류:', error);
+
+            // 메모리 부족 에러 감지
+            if (error.message && error.message.includes('memory')) {
+                showToast?.('이미지가 너무 커서 처리할 수 없습니다');
+            } else {
+                showToast?.('이미지 처리 중 오류가 발생했습니다');
+            }
+        }
+
+        // input 초기화 (같은 파일을 다시 선택할 수 있도록)
+        e.target.value = '';
     };
 
     // 운세 정보 수정
@@ -554,18 +687,28 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                 <Section>
                     <ProfileHeader>
                         <ProfileImageWrapper onClick={handleProfileImageClick}>
-                            {profile?.picture && !imageError ? (
+                            {(profile?.customPicture || profile?.picture) && !imageError ? (
                                 <ProfileImage
-                                    src={profile.picture}
+                                    src={profile.customPicture || profile.picture}
                                     alt="Profile"
                                     onError={handleImageError}
-                                    crossOrigin="anonymous"
+                                    crossOrigin={profile.customPicture ? undefined : "anonymous"}
                                 />
                             ) : (
                                 <DefaultProfileIcon>{profileInitial}</DefaultProfileIcon>
                             )}
                             <EditOverlay className="edit-overlay">변경</EditOverlay>
                         </ProfileImageWrapper>
+
+                        {/* 숨겨진 파일 input (카메라/앨범 선택) */}
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={handleFileChange}
+                            style={{ display: 'none' }}
+                        />
 
                         <NicknameContainer>
                             {isEditingNickname ? (

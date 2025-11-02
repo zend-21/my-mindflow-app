@@ -152,11 +152,11 @@ const Header = ({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, o
                     // 로그인 상태: 프로필 사진과 이름
                     <>
                         {!imageError ? (
-                            <ProfileImage 
-                                src={profile.picture} 
+                            <ProfileImage
+                                src={profile.customPicture || profile.picture}
                                 alt={profile.name}
                                 onError={handleImageError}
-                                crossOrigin="anonymous"
+                                crossOrigin={profile.customPicture ? undefined : "anonymous"}
                             />
                         ) : (
                             <PlaceholderIcon>
