@@ -362,7 +362,7 @@ const ActionButton = styled.button`
 const ProfilePictureSyncSection = styled.div`
     display: flex;
     gap: 12px;
-    margin-top: 16px;
+    margin-top: 2px;
 `;
 
 const SyncButton = styled.button`
