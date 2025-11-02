@@ -480,7 +480,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                         placeholder="예: 1995"
                                         value={birthYear}
                                         onChange={(e) => setBirthYear(e.target.value)}
-                                        style={{ width: '250px', textAlign: 'right' }}
+                                        style={{ width: '120px', textAlign: 'right' }}
                                     />
                                     <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '30px', textAlign: 'right' }}>년</span>
                                 </div>
