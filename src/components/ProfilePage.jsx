@@ -361,7 +361,7 @@ const ActionButton = styled.button`
 
 const ProfilePictureSyncSection = styled.div`
     display: flex;
-    gap: 8px;
+    gap: 12px;
     margin-top: 16px;
 `;
 
@@ -376,6 +376,7 @@ const SyncButton = styled.button`
     transition: all 0.2s;
     background: #edf2f7;
     color: #4a5568;
+    white-space: nowrap;
 
     &:hover {
         background: #e2e8f0;
@@ -808,6 +809,16 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                             style={{ display: 'none' }}
                         />
 
+                        {/* 프로필 사진 동기화/복원 버튼 */}
+                        <ProfilePictureSyncSection>
+                            <SyncButton onClick={handleSyncProfilePicture}>
+                                ☁️ 프사 저장
+                            </SyncButton>
+                            <SyncButton onClick={handleRestoreProfilePicture}>
+                                📥 프사 복원
+                            </SyncButton>
+                        </ProfilePictureSyncSection>
+
                         <NicknameContainer>
                             {isEditingNickname ? (
                                 <>
@@ -830,16 +841,6 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                         </NicknameContainer>
 
                         <Email>{profile?.email || '게스트 모드'}</Email>
-
-                        {/* 프로필 사진 동기화/복원 버튼 */}
-                        <ProfilePictureSyncSection>
-                            <SyncButton onClick={handleSyncProfilePicture}>
-                                ☁️ 프사 저장
-                            </SyncButton>
-                            <SyncButton onClick={handleRestoreProfilePicture}>
-                                📥 프사 복원
-                            </SyncButton>
-                        </ProfilePictureSyncSection>
                     </ProfileHeader>
                 </Section>
 
