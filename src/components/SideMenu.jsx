@@ -206,10 +206,11 @@ const SideMenu = ({
                         <MenuHeader>
                             <ProfileCluster onClick={profile ? onProfileClick : onLoginClick}>
                                 {profile && !imageError ? ( // ✅ 조건 수정: imageError가 아닐 때만 이미지 표시
-                                    <ProfileImage 
-                                        src={profile.picture} 
-                                        alt={profile.name || "Profile"} 
+                                    <ProfileImage
+                                        src={profile.picture}
+                                        alt={profile.name || "Profile"}
                                         onError={handleError} // ✅ 추가: 에러 발생 시 handleError 호출
+                                        crossOrigin="anonymous"
                                     />
                                 ) : ( // ✅ 수정: profile이 없거나 이미지 로드 에러 시 PlaceholderIcon 표시
                                     <PlaceholderIcon>
