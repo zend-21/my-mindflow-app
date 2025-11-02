@@ -5,65 +5,61 @@ import styled, { keyframes, css } from 'styled-components';
 
 // 🎨 Animations
 
-const starFall = keyframes`
-    0% {
-        top: -100px;
-        opacity: 0;
-        transform: translateX(-50%) scale(0) rotate(0deg);
-    }
-    20% {
-        opacity: 1;
-    }
-    100% {
-        top: 50%;
-        opacity: 1;
-        transform: translateX(-50%) scale(1) rotate(720deg);
-    }
-`;
-
-const starShine = keyframes`
-    0%, 100% {
-        filter: brightness(1) drop-shadow(0 0 20px rgba(255, 215, 0, 0.8));
-    }
-    50% {
-        filter: brightness(1.5) drop-shadow(0 0 40px rgba(255, 215, 0, 1));
-    }
-`;
-
-const starBurst = keyframes`
-    0% {
-        opacity: 1;
-        transform: translateX(-50%) scale(1);
-    }
-    100% {
-        opacity: 0;
-        transform: translateX(-50%) scale(3);
-    }
-`;
-
-const sparkleAnimation = keyframes`
-    0% {
-        opacity: 0;
-        transform: scale(0);
-    }
-    50% {
-        opacity: 1;
-        transform: scale(1);
-    }
-    100% {
-        opacity: 0;
-        transform: scale(0);
-    }
-`;
-
-const fadeIn = keyframes`
+const fadeInScale = keyframes`
     from {
         opacity: 0;
-        transform: translate(-50%, -40%);
+        transform: translate(-50%, -50%) scale(0.8);
     }
     to {
         opacity: 1;
-        transform: translate(-50%, -50%);
+        transform: translate(-50%, -50%) scale(1);
+    }
+`;
+
+const pulseRing = keyframes`
+    0% {
+        transform: scale(0.95);
+        opacity: 0.7;
+    }
+    50% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(0.95);
+        opacity: 0.7;
+    }
+`;
+
+const rotate = keyframes`
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+`;
+
+const shimmer = keyframes`
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+`;
+
+const floatUp = keyframes`
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-50px);
     }
 `;
 
@@ -75,150 +71,206 @@ const Overlay = styled.div`
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 10000;
 `;
 
-const Star = styled.div`
-    position: absolute;
-    left: 50%;
-    width: 100px;
-    height: 100px;
-    color: #ffd700;
-    font-size: 100px;
-    text-align: center;
-    line-height: 1;
-
-    ${props => props.$phase === 'falling' && css`
-        animation: ${starFall} 1.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-    `}
-
-    ${props => props.$phase === 'shining' && css`
-        top: 50%;
-        transform: translateX(-50%);
-        animation: ${starShine} 1s ease-in-out infinite;
-    `}
-
-    ${props => props.$phase === 'bursting' && css`
-        top: 50%;
-        animation: ${starBurst} 0.8s ease-out forwards;
-    `}
-
-    display: ${props => props.$phase === 'complete' ? 'none' : 'block'};
-`;
-
-const SparkleContainer = styled.div`
+const CenterContainer = styled.div`
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 400px;
-    height: 400px;
     transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 40px;
+    animation: ${fadeInScale} 0.6s ease-out;
+`;
+
+const LoadingRings = styled.div`
+    position: relative;
+    width: 120px;
+    height: 120px;
+`;
+
+const Ring = styled.div`
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 3px solid rgba(255, 255, 255, 0.2);
+
+    ${props => props.$index === 0 && css`
+        width: 120px;
+        height: 120px;
+        animation: ${pulseRing} 2s ease-in-out infinite;
+    `}
+
+    ${props => props.$index === 1 && css`
+        width: 90px;
+        height: 90px;
+        border-color: rgba(255, 255, 255, 0.3);
+        animation: ${pulseRing} 2s ease-in-out infinite 0.3s;
+    `}
+
+    ${props => props.$index === 2 && css`
+        width: 60px;
+        height: 60px;
+        border-color: rgba(255, 255, 255, 0.4);
+        animation: ${pulseRing} 2s ease-in-out infinite 0.6s;
+    `}
+`;
+
+const CenterOrb = styled.div`
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+    box-shadow: 0 0 30px rgba(255, 255, 255, 0.5);
+    animation: ${rotate} 3s linear infinite;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.3);
+    }
+`;
+
+const FloatingParticles = styled.div`
+    position: absolute;
+    width: 100%;
+    height: 100%;
     pointer-events: none;
 `;
 
-const Sparkle = styled.div`
+const Particle = styled.div`
     position: absolute;
-    width: 8px;
-    height: 8px;
-    background: radial-gradient(circle, #fff, #ffd700);
+    width: 6px;
+    height: 6px;
+    background: white;
     border-radius: 50%;
+    opacity: 0;
 
-    ${Array.from({ length: 30 }, (_, i) => {
-        const angle = (i / 30) * 360;
-        const distance = 80 + Math.random() * 100;
-        const x = Math.cos(angle * Math.PI / 180) * distance;
-        const y = Math.sin(angle * Math.PI / 180) * distance;
-        const delay = i * 0.03;
+    ${Array.from({ length: 20 }, (_, i) => {
+        const x = Math.random() * 100;
+        const delay = i * 0.2;
         return css`
             &:nth-child(${i + 1}) {
-                left: calc(50% + ${x}px);
-                top: calc(50% + ${y}px);
-                animation: ${sparkleAnimation} 1.2s ease-out ${delay}s forwards;
+                left: ${x}%;
+                bottom: 0;
+                animation: ${floatUp} 3s ease-out ${delay}s infinite;
             }
         `;
     })}
 `;
 
 const MessageContainer = styled.div`
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
     text-align: center;
     color: white;
-    z-index: 10;
     opacity: 0;
-    width: 80%;
-    max-width: 500px;
-
-    ${props => props.$show && css`
-        animation: ${fadeIn} 0.8s ease-out forwards;
-    `}
+    animation: ${fadeInScale} 0.8s ease-out 0.5s forwards;
 `;
 
 const Message = styled.h1`
-    font-size: 48px;
-    font-weight: 700;
+    font-size: 28px;
+    font-weight: 600;
     margin: 0;
-    text-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    letter-spacing: -0.5px;
+
+    @media (min-width: 768px) {
+        font-size: 36px;
+    }
 `;
 
 const SubMessage = styled.p`
-    font-size: 20px;
-    margin: 16px 0 0 0;
+    font-size: 16px;
+    margin: 12px 0 0 0;
     opacity: 0.9;
-    color: #e0e0e0;
+    font-weight: 300;
+
+    @media (min-width: 768px) {
+        font-size: 18px;
+    }
+`;
+
+const ProgressBar = styled.div`
+    width: 200px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 24px;
+
+    &::after {
+        content: '';
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.8) 50%,
+            rgba(255, 255, 255, 0) 100%
+        );
+        animation: ${shimmer} 2s infinite;
+    }
 `;
 
 // 🎯 Main Component
 
 const GachaAnimation = ({ onComplete }) => {
-    const [phase, setPhase] = useState('falling'); // falling → shining → bursting → complete
     const [showMessage, setShowMessage] = useState(false);
 
     useEffect(() => {
-        const timer1 = setTimeout(() => setPhase('shining'), 1500);
-        const timer2 = setTimeout(() => setPhase('bursting'), 3000);
-        const timer3 = setTimeout(() => {
-            setPhase('complete');
-            setShowMessage(true);
-        }, 3800);
-        const timer4 = setTimeout(() => {
+        const timer1 = setTimeout(() => setShowMessage(true), 800);
+        const timer2 = setTimeout(() => {
             onComplete();
-        }, 5500);
+        }, 3500);
 
         return () => {
             clearTimeout(timer1);
             clearTimeout(timer2);
-            clearTimeout(timer3);
-            clearTimeout(timer4);
         };
     }, [onComplete]);
 
     return (
         <Overlay>
-            <Star $phase={phase}>⭐</Star>
+            <FloatingParticles>
+                {Array.from({ length: 20 }, (_, i) => (
+                    <Particle key={i} />
+                ))}
+            </FloatingParticles>
 
-            {phase === 'bursting' && (
-                <SparkleContainer>
-                    {Array.from({ length: 30 }, (_, i) => (
-                        <Sparkle key={i} />
-                    ))}
-                </SparkleContainer>
-            )}
+            <CenterContainer>
+                <LoadingRings>
+                    <Ring $index={0} />
+                    <Ring $index={1} />
+                    <Ring $index={2} />
+                    <CenterOrb />
+                </LoadingRings>
 
-            <MessageContainer $show={showMessage}>
-                <Message>✨ 운세를 확인하는 중...</Message>
-                <SubMessage>당신만을 위한 특별한 메시지</SubMessage>
-            </MessageContainer>
+                {showMessage && (
+                    <MessageContainer>
+                        <Message>운세를 확인하는 중</Message>
+                        <SubMessage>잠시만 기다려주세요</SubMessage>
+                        <ProgressBar />
+                    </MessageContainer>
+                )}
+            </CenterContainer>
         </Overlay>
     );
 };

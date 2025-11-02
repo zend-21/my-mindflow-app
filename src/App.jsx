@@ -32,6 +32,7 @@ import AlarmModal from './modules/calendar/AlarmModal.jsx';
 import DateSelectorModal from './modules/calendar/DateSelectorModal.jsx';
 import LoginModal from './components/LoginModal.jsx';
 import FortuneFlow from './components/FortuneFlow.jsx';
+import ProfilePage from './components/ProfilePage.jsx';
 
 // ★★★ 토스트 메시지 스타일 ★★★
 const fadeIn = keyframes`
@@ -532,7 +533,7 @@ function App() {
 
     const handleProfileClick = () => {
         setIsMenuOpen(false);
-        alert("프로필 설정 페이지로 이동합니다. (연결 예정)");
+        setActiveTab('profile');
     };   
 
     const logOut = () => {
@@ -1403,7 +1404,6 @@ if (isLoading) {
                         }
                         {activeTab === 'secret' && <div>시크릿 페이지</div>}
                         {activeTab === 'review' && <div>리뷰 페이지</div>}
-                        {activeTab === 'profile' && <div>프로필 페이지</div>}
                         {activeTab === 'todo' && <div>할 일 페이지</div>}
                         {activeTab === 'recent-detail' && <div>최근 활동 상세 페이지</div>}
                     </ContentArea>
@@ -1530,7 +1530,18 @@ if (isLoading) {
                     profile={profile}
                     // 운세 결과 및 기타 상태를 FortuneFlow 내부에서 관리
                 />
-            )}                
+            )}
+
+            {/* 👤 프로필 페이지 모달 */}
+            {activeTab === 'profile' && (
+                <ProfilePage
+                    profile={profile}
+                    memos={memos}
+                    calendarSchedules={calendarSchedules}
+                    showToast={showToast}
+                    onClose={() => setActiveTab('home')}
+                />
+            )}
         </>
     );
 }

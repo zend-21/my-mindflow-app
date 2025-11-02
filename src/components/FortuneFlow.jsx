@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import FortuneInputModal from './FortuneInputModal';
+import ProfileConfirmModal from './ProfileConfirmModal';
 import GachaAnimation from './GachaAnimation';
 import FortuneResultPage from './FortuneResultPage';
 import { getFortuneData } from '../utils/fortuneData';
@@ -20,15 +21,18 @@ import {
  * Flow:
  * 1. 사용자 프로필 확인
  *    - 없으면 FortuneInputModal 표시 → 입력 후 저장
- * 2. 오늘의 운세 확인
+ * 2. 프로필 확인 모달 (저장된 프로필이 있는 경우)
+ *    - 저장된 정보 표시 및 확인/수정 선택
+ * 3. 오늘의 운세 확인
  *    - 있으면 바로 FortuneResultPage 표시
  *    - 없으면 GachaAnimation → 운세 계산 → FortuneResultPage
- * 3. 결과 확인 후 종료 또는 다시 보기
+ * 4. 결과 확인 후 종료 또는 다시 보기
  */
 
 const FortuneFlow = ({ onClose, profile }) => {
-    // Flow states: 'checkProfile' | 'inputProfile' | 'checkFortune' | 'gacha' | 'result'
+    // Flow states: 'checkProfile' | 'inputProfile' | 'confirmProfile' | 'checkFortune' | 'gacha' | 'result'
     const [flowState, setFlowState] = useState('checkProfile');
+    const [isEditMode, setIsEditMode] = useState(false); // 편집 모드 플래그
 
     // Data
     const [userProfile, setUserProfile] = useState(null);
@@ -48,8 +52,8 @@ const FortuneFlow = ({ onClose, profile }) => {
         const savedProfile = getUserProfile();
         if (savedProfile) {
             setUserProfile(savedProfile);
-            // Profile exists, check today's fortune
-            setFlowState('checkFortune');
+            // Profile exists, show confirmation modal
+            setFlowState('confirmProfile');
         } else {
             // No profile, need to input
             setFlowState('inputProfile');
@@ -79,6 +83,19 @@ const FortuneFlow = ({ onClose, profile }) => {
         setUserProfile(userData);
         // Move to fortune check
         setFlowState('checkFortune');
+    };
+
+    // 🎯 Handler: 프로필 확인 모달에서 확인 버튼 클릭
+    const handleProfileConfirm = () => {
+        // Proceed to check fortune
+        setFlowState('checkFortune');
+    };
+
+    // 🎯 Handler: 프로필 확인 모달에서 수정 버튼 클릭
+    const handleProfileEdit = () => {
+        // Go back to input modal for editing (편집 모드 활성화)
+        setIsEditMode(true);
+        setFlowState('inputProfile');
     };
 
     // 🎯 Handler: 가차 애니메이션 완료
@@ -114,6 +131,17 @@ const FortuneFlow = ({ onClose, profile }) => {
                     onSubmit={handleProfileSubmit}
                     initialData={userProfile}
                     userName={userName}
+                    isEditMode={isEditMode}
+                />
+            )}
+
+            {flowState === 'confirmProfile' && userProfile && (
+                <ProfileConfirmModal
+                    profile={userProfile}
+                    userName={userName}
+                    onConfirm={handleProfileConfirm}
+                    onEdit={handleProfileEdit}
+                    onClose={onClose}
                 />
             )}
 

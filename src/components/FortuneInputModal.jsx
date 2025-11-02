@@ -280,8 +280,9 @@ const ConfirmValue = styled.span`
 
 // 🎯 Main Component
 
-const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '게스트' }) => {
-    const [step, setStep] = useState(initialData ? 'confirm' : 'input'); // 'input' | 'confirm'
+const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '게스트', isEditMode = false }) => {
+    // 편집 모드이거나 initialData가 없으면 'input', 아니면 'confirm'
+    const [step, setStep] = useState(isEditMode ? 'input' : (initialData ? 'confirm' : 'input')); // 'input' | 'confirm'
 
     // 사용자 입력 데이터
     const [birthYear, setBirthYear] = useState(initialData?.birthYear?.toString() || '');
