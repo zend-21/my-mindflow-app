@@ -705,7 +705,6 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                             ref={fileInputRef}
                             type="file"
                             accept="image/*"
-                            capture="environment"
                             onChange={handleFileChange}
                             style={{ display: 'none' }}
                         />
