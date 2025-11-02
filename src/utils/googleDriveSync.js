@@ -2,6 +2,7 @@
 
 const FOLDER_NAME = 'MemoApp_Backup';
 const FILE_NAME = 'app_data.json';
+const PROFILE_PICTURE_FILE_NAME = 'profile_picture.json';
 
 // ⚠️ 중요: Google OAuth로 받은 credential은 ID Token이므로
 // Drive API 사용을 위해서는 별도의 Access Token이 필요합니다.
@@ -239,7 +240,141 @@ export const requestAccessToken = (clientId) => {
         }
       },
     });
-    
+
     client.requestAccessToken();
   });
+};
+
+// ========================================
+// 프로필 사진 동기화 함수들
+// ========================================
+
+// 프로필 사진 파일 찾기
+const findProfilePictureFile = async (folderId) => {
+  try {
+    const response = await window.gapi.client.drive.files.list({
+      q: `name='${PROFILE_PICTURE_FILE_NAME}' and '${folderId}' in parents and trashed=false`,
+      fields: 'files(id, name, modifiedTime)',
+      spaces: 'drive',
+    });
+
+    if (response.result.files && response.result.files.length > 0) {
+      console.log('📸 기존 프로필 사진 파일 발견:', response.result.files[0].id);
+      return response.result.files[0];
+    }
+    console.log('📸 기존 프로필 사진 파일 없음');
+    return null;
+  } catch (error) {
+    console.error('❌ 프로필 사진 파일 검색 실패:', error);
+    return null;
+  }
+};
+
+// Google Drive에 프로필 사진 업로드
+export const syncProfilePictureToGoogleDrive = async (base64Image, hash) => {
+  try {
+    if (!window.gapi || !window.gapi.client) {
+      throw new Error('GAPI 클라이언트가 초기화되지 않았습니다.');
+    }
+
+    console.log('📸 프로필 사진 업로드 시작...');
+
+    const folderId = await getOrCreateFolder();
+    const existingFile = await findProfilePictureFile(folderId);
+
+    const boundary = '-------314159265358979323846';
+    const delimiter = "\r\n--" + boundary + "\r\n";
+    const close_delim = "\r\n--" + boundary + "--";
+
+    const metadata = {
+      name: PROFILE_PICTURE_FILE_NAME,
+      mimeType: 'application/json',
+      parents: existingFile ? undefined : [folderId],
+    };
+
+    const profileData = {
+      base64: base64Image,
+      hash: hash,
+      uploadedAt: new Date().toISOString(),
+      version: '1.0',
+    };
+
+    const multipartRequestBody =
+      delimiter +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(metadata) +
+      delimiter +
+      'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+      JSON.stringify(profileData) +
+      close_delim;
+
+    const request = window.gapi.client.request({
+      path: existingFile
+        ? `/upload/drive/v3/files/${existingFile.id}`
+        : '/upload/drive/v3/files',
+      method: existingFile ? 'PATCH' : 'POST',
+      params: { uploadType: 'multipart' },
+      headers: {
+        'Content-Type': `multipart/related; boundary="${boundary}"`,
+      },
+      body: multipartRequestBody,
+    });
+
+    const response = await request;
+    console.log('✅ 프로필 사진 Google Drive 업로드 성공:', response.result.id);
+
+    return {
+      success: true,
+      fileId: response.result.id,
+      hash: hash
+    };
+  } catch (error) {
+    console.error('❌ 프로필 사진 Google Drive 업로드 실패:', error);
+
+    if (error.status === 401 || error.status === 403) {
+      return { success: false, error: 'TOKEN_EXPIRED' };
+    }
+
+    return { success: false, error: error.message };
+  }
+};
+
+// Google Drive에서 프로필 사진 다운로드
+export const loadProfilePictureFromGoogleDrive = async () => {
+  try {
+    if (!window.gapi || !window.gapi.client) {
+      throw new Error('GAPI 클라이언트가 초기화되지 않았습니다.');
+    }
+
+    console.log('📸 프로필 사진 다운로드 시작...');
+
+    const folderId = await getOrCreateFolder();
+    const existingFile = await findProfilePictureFile(folderId);
+
+    if (!existingFile) {
+      console.log('📭 복원할 프로필 사진이 없습니다.');
+      return { success: false, data: null, message: 'NO_FILE' };
+    }
+
+    const response = await window.gapi.client.drive.files.get({
+      fileId: existingFile.id,
+      alt: 'media',
+    });
+
+    console.log('✅ 프로필 사진 Google Drive 다운로드 성공');
+
+    return {
+      success: true,
+      data: response.result, // { base64, hash, uploadedAt, version }
+      modifiedTime: existingFile.modifiedTime
+    };
+  } catch (error) {
+    console.error('❌ 프로필 사진 Google Drive 다운로드 실패:', error);
+
+    if (error.status === 401 || error.status === 403) {
+      return { success: false, error: 'TOKEN_EXPIRED' };
+    }
+
+    return { success: false, error: error.message };
+  }
 };

@@ -6,6 +6,7 @@ import { getUserProfile } from '../utils/fortuneLogic';
 import { getTodayFortune } from '../utils/fortuneLogic';
 import FortuneInputModal from './FortuneInputModal';
 import FortuneFlow from './FortuneFlow';
+import { syncProfilePictureToGoogleDrive } from '../utils/googleDriveSync';
 
 // 🎨 Styled Components
 
@@ -637,6 +638,23 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
 
             // 이미지 에러 상태 초기화
             setImageError(false);
+
+            // Google Drive에 업로드 (백그라운드 실행)
+            if (profile) {
+                syncProfilePictureToGoogleDrive(compressedBase64, hash)
+                    .then((result) => {
+                        if (result.success) {
+                            console.log('✅ 프로필 사진 Drive 동기화 완료');
+                        } else if (result.error === 'TOKEN_EXPIRED') {
+                            console.log('⚠️ Drive 토큰 만료 - 다음 동기화 시 재시도');
+                        } else {
+                            console.error('❌ Drive 업로드 실패:', result.error);
+                        }
+                    })
+                    .catch((err) => {
+                        console.error('❌ Drive 업로드 오류:', err);
+                    });
+            }
         } catch (error) {
             console.error('이미지 처리 오류:', error);
 
