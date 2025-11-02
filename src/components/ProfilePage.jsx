@@ -470,6 +470,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     const [birthdayCalendarType, setBirthdayCalendarType] = useState('solar'); // 'solar' | 'lunar'
     const [isFortuneInputModalOpen, setIsFortuneInputModalOpen] = useState(false);
     const [isFortuneFlowOpen, setIsFortuneFlowOpen] = useState(false);
+    const [imageError, setImageError] = useState(false);
 
     // 운세 프로필 정보
     const fortuneProfile = getUserProfile();
@@ -492,10 +493,25 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     // 닉네임 저장
     const handleSaveNickname = () => {
         if (nickname.trim()) {
-            localStorage.setItem('userNickname', nickname.trim());
-            showToast?.('닉네임이 저장되었습니다');
+            const savedNickname = localStorage.getItem('userNickname');
+            const newNickname = nickname.trim();
+
+            localStorage.setItem('userNickname', newNickname);
+
+            // 닉네임이 실제로 변경된 경우에만 토스트 메시지 표시
+            if (savedNickname !== newNickname) {
+                showToast?.('닉네임이 변경되었습니다');
+                // profile 상태 업데이트를 위해 이벤트 발생
+                window.dispatchEvent(new CustomEvent('nicknameChanged', { detail: newNickname }));
+            }
         }
         setIsEditingNickname(false);
+    };
+
+    // 프로필 이미지 에러 처리
+    const handleImageError = () => {
+        console.log('⚠️ 프로필 이미지 로드 실패 - Placeholder 표시');
+        setImageError(true);
     };
 
     // 프로필 사진 변경
@@ -538,8 +554,13 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                 <Section>
                     <ProfileHeader>
                         <ProfileImageWrapper onClick={handleProfileImageClick}>
-                            {profile?.picture ? (
-                                <ProfileImage src={profile.picture} alt="Profile" />
+                            {profile?.picture && !imageError ? (
+                                <ProfileImage
+                                    src={profile.picture}
+                                    alt="Profile"
+                                    onError={handleImageError}
+                                    crossOrigin="anonymous"
+                                />
                             ) : (
                                 <DefaultProfileIcon>{profileInitial}</DefaultProfileIcon>
                             )}
@@ -562,7 +583,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                             ) : (
                                 <>
                                     <Nickname>{userName}</Nickname>
-                                    <EditButton onClick={() => setIsEditingNickname(true)}>수정</EditButton>
+                                    <EditButton onClick={() => setIsEditingNickname(true)}>변경</EditButton>
                                 </>
                             )}
                         </NicknameContainer>

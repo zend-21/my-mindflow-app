@@ -848,19 +848,47 @@ function App() {
     useEffect(() => {
         const savedProfile = localStorage.getItem('userProfile');
         const savedToken = localStorage.getItem('accessToken');
+        const savedNickname = localStorage.getItem('userNickname');
 
         if (savedProfile && savedToken) {
-            setProfile(JSON.parse(savedProfile));
+            const profileData = JSON.parse(savedProfile);
+            // 저장된 닉네임이 있으면 profile에 추가
+            if (savedNickname) {
+                profileData.nickname = savedNickname;
+            }
+            setProfile(profileData);
             setAccessTokenState(savedToken);
-            
+
             // GAPI가 준비되면 토큰 설정
             if (isGapiReady) {
                 setAccessToken(savedToken);
             }
         }
-        
+
         setIsLoading(false);
     }, [isGapiReady]);
+
+    // ✅ 닉네임 변경 이벤트 리스너
+    useEffect(() => {
+        const handleNicknameChanged = (event) => {
+            const newNickname = event.detail;
+            console.log('🔔 닉네임 변경 이벤트 수신:', newNickname);
+
+            setProfile(prevProfile => {
+                if (!prevProfile) return prevProfile;
+                return {
+                    ...prevProfile,
+                    nickname: newNickname
+                };
+            });
+        };
+
+        window.addEventListener('nicknameChanged', handleNicknameChanged);
+
+        return () => {
+            window.removeEventListener('nicknameChanged', handleNicknameChanged);
+        };
+    }, []);
 
     // ✅ 로그인 성공 시 처리 (기존 handleLoginSuccess를 확장)
     const handleLoginSuccess = async (response) => {

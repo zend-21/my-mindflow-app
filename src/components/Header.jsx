@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import { getDailyGreeting } from '../utils/greetingMessages';
 
 const HeaderWrapper = styled.header`
   background-color: #ffe59fff;
@@ -69,10 +70,23 @@ const PlaceholderIcon = styled.div`
     }
 `;
 
+const ProfileNameContainer = styled.div`
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+`;
+
 const ProfileName = styled.span`
     font-size: 18px;
     font-weight: 600;
     color: #4a5568;
+`;
+
+const GreetingMessage = styled.span`
+    font-size: 14px;
+    font-weight: 400;
+    color: #718096;
+    white-space: nowrap;
 `;
 
 const LoginText = styled.span`
@@ -95,11 +109,34 @@ const ActionButton = styled.button`
 // Header 컴포넌트
 const Header = ({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, onProfileClick }) => {
     const [imageError, setImageError] = useState(false);
+    const [greeting, setGreeting] = useState('');
 
     // profile이 변경될 때마다 imageError 초기화
     useEffect(() => {
         setImageError(false);
     }, [profile]);
+
+    // 하루에 한 번 인사말 업데이트
+    useEffect(() => {
+        setGreeting(getDailyGreeting());
+    }, []);
+
+    // 앱이 포그라운드로 돌아올 때 인사말 업데이트
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            // 앱이 다시 보이게 되면 (백그라운드 → 포그라운드)
+            if (!document.hidden) {
+                console.log('📱 앱이 포그라운드로 복귀 - 인사말 갱신');
+                setGreeting(getDailyGreeting());
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
 
     const handleImageError = () => {
         console.log('⚠️ 프로필 이미지 로드 실패 - Placeholder 표시');
@@ -123,10 +160,13 @@ const Header = ({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, o
                             />
                         ) : (
                             <PlaceholderIcon>
-                                {profile.name ? profile.name.charAt(0).toUpperCase() : '?'}
+                                {(profile.nickname || profile.name) ? (profile.nickname || profile.name).charAt(0).toUpperCase() : '?'}
                             </PlaceholderIcon>
                         )}
-                        <ProfileName>{profile.name}</ProfileName>
+                        <ProfileNameContainer>
+                            <ProfileName>{profile.nickname || profile.name}님</ProfileName>
+                            <GreetingMessage>{greeting}</GreetingMessage>
+                        </ProfileNameContainer>
                     </>
                 ) : (
                     // 로그아웃 상태: 아이콘과 '로그인' 텍스트

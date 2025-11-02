@@ -220,7 +220,7 @@ const SideMenu = ({
                                     </PlaceholderIcon>
                                 )}
                                 <ProfileInfo>
-                                    <ProfileName>{profile ? profile.name : '로그인'}</ProfileName>
+                                    <ProfileName>{profile ? (profile.nickname || profile.name) : '로그인'}</ProfileName>
                                     <ProfileEmail>{profile ? profile.email : '로그인이 필요합니다'}</ProfileEmail>
                                 </ProfileInfo>
                             </ProfileCluster>
