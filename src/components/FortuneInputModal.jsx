@@ -232,6 +232,9 @@ const LunarDateDisplay = styled.div`
     padding: 4px 8px;
     background: transparent;
     border-radius: 4px;
+    min-height: 21px; /* 공간 미리 확보 */
+    display: flex;
+    align-items: center;
 `;
 
 const UserNameDisplay = styled.div`
@@ -280,7 +283,7 @@ const ConfirmValue = styled.span`
 
 // 🎯 Main Component
 
-const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '게스트', isEditMode = false }) => {
+const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '게스트', isEditMode = false, profile = null }) => {
     // 편집 모드이거나 initialData가 없으면 'input', 아니면 'confirm'
     const [step, setStep] = useState(isEditMode ? 'input' : (initialData ? 'confirm' : 'input')); // 'input' | 'confirm'
 
@@ -460,59 +463,65 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                             <div>
                                 <Label>이름</Label>
                                 <UserNameDisplay>{userName}</UserNameDisplay>
-                                <InfoText>로그인 계정 또는 닉네임이 자동으로 표시됩니다</InfoText>
+                                <InfoText>
+                                    {profile
+                                        ? '로그인 계정 또는 닉네임이 자동으로 표시됩니다'
+                                        : '게스트는 로그인하지 않으면 매번 정보를 입력해야 합니다'}
+                                </InfoText>
                             </div>
 
-                            {/* 음력 자동 계산 안내 */}
-                            <InfoText style={{ margin: '0', color: '#667eea' }}>
-                                💡 양력 생일을 입력하면 자동으로 음력 날짜를 계산합니다
-                            </InfoText>
-
-                            {/* 생년 */}
+                            {/* 생년월일 입력 그룹 */}
                             <div>
-                                <Label>생년 *</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="예: 1995"
-                                    value={birthYear}
-                                    onChange={(e) => setBirthYear(e.target.value)}
-                                />
-                            </div>
-
-                            {/* 월 / 일 */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                                <div>
-                                    <Label>월 *</Label>
+                                {/* 출생 년 */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
+                                    <Label style={{ minWidth: '50px' }}>출생</Label>
                                     <Input
                                         type="number"
-                                        placeholder="01-12"
-                                        value={birthMonth}
-                                        onChange={handleMonthChange}
-                                        onBlur={handleMonthBlur}
-                                        onFocus={(e) => e.target.select()}
-                                        min="1"
-                                        max="12"
+                                        placeholder="예: 1995"
+                                        value={birthYear}
+                                        onChange={(e) => setBirthYear(e.target.value)}
+                                        style={{ width: '250px', textAlign: 'right' }}
                                     />
+                                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '30px', textAlign: 'right' }}>년</span>
                                 </div>
-                                <div>
-                                    <Label>일 *</Label>
-                                    <Input
-                                        type="number"
-                                        placeholder="01-31"
-                                        value={birthDay}
-                                        onChange={handleDayChange}
-                                        onBlur={handleDayBlur}
-                                        onFocus={(e) => e.target.select()}
-                                        min="1"
-                                        max="31"
-                                    />
-                                </div>
-                            </div>
 
-                            {/* 음력 날짜 표시 */}
-                            {lunarDate && (
-                                <LunarDateDisplay>({lunarDate})</LunarDateDisplay>
-                            )}
+                                {/* 월 / 일 */}
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Input
+                                            type="number"
+                                            placeholder="01-12"
+                                            value={birthMonth}
+                                            onChange={handleMonthChange}
+                                            onBlur={handleMonthBlur}
+                                            onFocus={(e) => e.target.select()}
+                                            min="1"
+                                            max="12"
+                                            style={{ width: '92px', textAlign: 'right' }}
+                                        />
+                                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '30px', textAlign: 'right' }}>월</span>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Input
+                                            type="number"
+                                            placeholder="01-31"
+                                            value={birthDay}
+                                            onChange={handleDayChange}
+                                            onBlur={handleDayBlur}
+                                            onFocus={(e) => e.target.select()}
+                                            min="1"
+                                            max="31"
+                                            style={{ width: '92px', textAlign: 'right' }}
+                                        />
+                                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '30px', textAlign: 'right' }}>일</span>
+                                    </div>
+                                </div>
+
+                                {/* 음력 날짜 표시 (바로 아래에 붙임) */}
+                                <LunarDateDisplay style={{ marginTop: '8px' }}>
+                                    {lunarDate ? `(${lunarDate})` : '💡 양력 생일을 입력하면 자동으로 음력 날짜를 계산합니다'}
+                                </LunarDateDisplay>
+                            </div>
 
                             {/* 성별 */}
                             <div>

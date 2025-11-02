@@ -305,6 +305,26 @@ const TarotCard = styled.div`
     }
 `;
 
+const TarotImageWrapper = styled.div`
+    display: flex;
+    justify-content: center;
+    margin-bottom: 16px;
+`;
+
+const TarotImage = styled.img`
+    max-width: 200px;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: ${props => props.$isReversed ? 'rotate(180deg)' : 'rotate(0deg)'};
+    transition: transform 0.3s ease;
+
+    @media (min-width: 768px) {
+        max-width: 250px;
+    }
+`;
+
 const TarotDirection = styled.span`
     display: inline-block;
     color: white;
@@ -314,6 +334,20 @@ const TarotDirection = styled.span`
     padding: 4px 12px;
     border-radius: 12px;
     margin-top: 8px;
+`;
+
+const TarotText = styled.p`
+    margin: 16px 0 0 0;
+    color: white;
+    font-size: 15px;
+    line-height: 1.7;
+    text-align: center;
+    opacity: 0.95;
+
+    @media (min-width: 768px) {
+        font-size: 16px;
+        line-height: 1.8;
+    }
 `;
 
 const ButtonGroup = styled.div`
@@ -433,6 +467,7 @@ ${fortuneResult.advice.content}
 
 🃏 타로점
 ${fortuneResult.tarot.message}
+${fortuneResult.tarot.content || ''}
 
 ♈ 별자리 운세 (${fortuneResult.starSign.sign})
 ${fortuneResult.starSign.keyword ? `[${fortuneResult.starSign.keyword}]` : ''}
@@ -553,9 +588,21 @@ ${fortuneResult.starSign.content}
                         <Section $delay="0.45s">
                             <SectionTitle>🃏 타로점</SectionTitle>
                             <TarotContainer>
+                                {fortuneResult.tarot.imageFile && (
+                                    <TarotImageWrapper>
+                                        <TarotImage
+                                            src={`/images/tarot/${fortuneResult.tarot.imageFile}`}
+                                            alt={fortuneResult.tarot.card}
+                                            $isReversed={fortuneResult.tarot.isReversed}
+                                        />
+                                    </TarotImageWrapper>
+                                )}
                                 <TarotCard>{fortuneResult.tarot.card}</TarotCard>
                                 {fortuneResult.tarot.isReversed && (
                                     <TarotDirection>역방향</TarotDirection>
+                                )}
+                                {fortuneResult.tarot.content && (
+                                    <TarotText>{fortuneResult.tarot.content}</TarotText>
                                 )}
                             </TarotContainer>
                         </Section>

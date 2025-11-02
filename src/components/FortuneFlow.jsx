@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import FortuneInputModal from './FortuneInputModal';
 import ProfileConfirmModal from './ProfileConfirmModal';
+import FortuneNoticeModal from './FortuneNoticeModal';
 import GachaAnimation from './GachaAnimation';
 import FortuneResultPage from './FortuneResultPage';
 import { getFortuneData } from '../utils/fortuneData';
@@ -19,6 +20,7 @@ import {
  * 🔮 FortuneFlow - 운세 전체 플로우 통합 컴포넌트
  *
  * Flow:
+ * 0. 안내 모달 표시 (처음 사용 시, "다시 보지 않기" 선택 안 한 경우)
  * 1. 사용자 프로필 확인
  *    - 없으면 FortuneInputModal 표시 → 입력 후 저장
  * 2. 프로필 확인 모달 (저장된 프로필이 있는 경우)
@@ -30,8 +32,8 @@ import {
  */
 
 const FortuneFlow = ({ onClose, profile }) => {
-    // Flow states: 'checkProfile' | 'inputProfile' | 'confirmProfile' | 'checkFortune' | 'gacha' | 'result'
-    const [flowState, setFlowState] = useState('checkProfile');
+    // Flow states: 'notice' | 'checkProfile' | 'inputProfile' | 'confirmProfile' | 'checkFortune' | 'gacha' | 'result'
+    const [flowState, setFlowState] = useState('notice');
     const [isEditMode, setIsEditMode] = useState(false); // 편집 모드 플래그
 
     // Data
@@ -42,12 +44,26 @@ const FortuneFlow = ({ onClose, profile }) => {
     // 사용자 이름 결정 (로그인 여부에 따라)
     const userName = profile?.name || profile?.email?.split('@')[0] || '게스트';
 
-    // 🎬 Step 1: 초기화 - 프로필 및 운세 데이터 확인
+    // 🎬 Step 0: 초기화 - 안내 모달 표시 여부 확인
     useEffect(() => {
         // Load fortune CSV data
         const data = getFortuneData();
         setFortuneData(data);
 
+        // Check if user has chosen "Don't show again"
+        const noticeHidden = localStorage.getItem('fortuneNoticeHidden');
+
+        if (noticeHidden === 'true') {
+            // Skip notice, go to profile check
+            checkProfileAndProceed();
+        } else {
+            // Show notice modal first
+            setFlowState('notice');
+        }
+    }, []);
+
+    // 프로필 확인 및 진행
+    const checkProfileAndProceed = () => {
         // Check user profile
         const savedProfile = getUserProfile();
         if (savedProfile) {
@@ -58,7 +74,7 @@ const FortuneFlow = ({ onClose, profile }) => {
             // No profile, need to input
             setFlowState('inputProfile');
         }
-    }, []);
+    };
 
     // 🎬 Step 2: 오늘의 운세 확인 (프로필이 있는 경우)
     useEffect(() => {
@@ -76,6 +92,12 @@ const FortuneFlow = ({ onClose, profile }) => {
             }
         }
     }, [flowState]);
+
+    // 🎯 Handler: 안내 모달 확인
+    const handleNoticeConfirm = () => {
+        // Proceed to profile check
+        checkProfileAndProceed();
+    };
 
     // 🎯 Handler: 프로필 입력 완료
     const handleProfileSubmit = (userData) => {
@@ -125,6 +147,10 @@ const FortuneFlow = ({ onClose, profile }) => {
     // 🎬 Render based on flow state
     return (
         <>
+            {flowState === 'notice' && (
+                <FortuneNoticeModal onConfirm={handleNoticeConfirm} />
+            )}
+
             {flowState === 'inputProfile' && (
                 <FortuneInputModal
                     onClose={onClose}
@@ -132,6 +158,7 @@ const FortuneFlow = ({ onClose, profile }) => {
                     initialData={userProfile}
                     userName={userName}
                     isEditMode={isEditMode}
+                    profile={profile}
                 />
             )}
 

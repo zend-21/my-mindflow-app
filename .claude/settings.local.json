@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python download_tarot.py:*)",
+      "Bash(pip install:*)",
+      "Bash(python download_sacred_texts.py:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
