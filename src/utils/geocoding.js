@@ -72,6 +72,14 @@ export const searchCity = async (query) => {
                 let bestMatch = null;
                 let primaryName = '';
 
+                console.log('🔍 검색어:', searchTerm);
+                console.log('📍 처리 중인 아이템:', item.display_name);
+                console.log('   📋 사용 가능한 필드:', {
+                    suburb, neighbourhood, quarter, village, town,
+                    city, municipality, borough,
+                    city_district, district, county, state, province, country
+                });
+
                 for (const field of allFields) {
                     if (field.value) {
                         const fieldLower = field.value.toLowerCase();
@@ -79,9 +87,13 @@ export const searchCity = async (query) => {
                         if (fieldLower === searchTerm ||
                             fieldLower.includes(searchTerm) ||
                             searchTerm.includes(fieldLower)) {
+
+                            console.log(`   ✅ 매칭됨: ${field.type} = "${field.value}" (level: ${field.level})`);
+
                             // 더 큰 level(상위 행정구역)이 매칭되면 우선 선택
                             if (!bestMatch || field.level >= bestMatch.level) {
                                 bestMatch = field;
+                                console.log(`      → bestMatch 갱신: ${field.type} (level: ${field.level})`);
                             }
                         }
                     }
@@ -90,6 +102,7 @@ export const searchCity = async (query) => {
                 // 매칭된 필드가 있으면 사용, 없으면 기존 방식(작은 단위부터)
                 if (bestMatch) {
                     primaryName = bestMatch.value;
+                    console.log(`   ✨ 최종 primaryName: "${primaryName}" (from ${bestMatch.type})`);
                 } else {
                     primaryName = suburb ||
                                  neighbourhood ||
@@ -100,6 +113,7 @@ export const searchCity = async (query) => {
                                  municipality ||
                                  borough ||
                                  item.name;
+                    console.log(`   ⚠️ bestMatch 없음, fallback primaryName: "${primaryName}"`);
                 }
 
                 // 구/군 (중간 행정구역)
