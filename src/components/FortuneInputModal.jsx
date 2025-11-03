@@ -690,6 +690,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                             !birthMonth ||
                                             !birthDay
                                         }
+                                        style={{ marginLeft: '-10px' }}
                                     >
                                         음력변환
                                     </LunarConvertButton>
