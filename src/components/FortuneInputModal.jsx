@@ -320,7 +320,9 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                 const month = parseInt(birthMonth);
                 const day = parseInt(birthDay);
 
+                // 유효성 검사: 년도는 4자리, 월/일은 1-2자리 완성된 숫자여야 함
                 if (!isNaN(year) && !isNaN(month) && !isNaN(day) &&
+                    birthYear.length === 4 &&  // 년도 4자리 입력 완료
                     year >= 1900 && year <= 2050 &&
                     month >= 1 && month <= 12 &&
                     day >= 1 && day <= 31) {
@@ -332,13 +334,20 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                     } else {
                         setLunarDate('');
                     }
+                } else {
+                    setLunarDate('');
                 }
             } else {
                 setLunarDate('');
             }
         };
 
-        fetchLunarDate();
+        // 디바운스: 500ms 후에 API 호출 (타이핑 중에는 호출 안 함)
+        const timer = setTimeout(() => {
+            fetchLunarDate();
+        }, 500);
+
+        return () => clearTimeout(timer);
     }, [birthYear, birthMonth, birthDay]);
 
     // 국가 변경 시 첫 번째 도시로 자동 설정
