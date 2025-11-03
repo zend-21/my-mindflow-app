@@ -304,7 +304,8 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
     const [city, setCity] = useState(initialData?.city || '서울');
 
     // 음력 날짜 표시용
-    const [lunarDate, setLunarDate] = useState('');
+    const [lunarDate, setLunarDate] = useState(initialData?.lunarDate || '');
+    const [isLoadingLunar, setIsLoadingLunar] = useState(false);
 
     // 국가 목록
     const countries = getCountries();
@@ -314,6 +315,11 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
 
     // 양력 → 음력 변환 (공공데이터포털 API 사용)
     useEffect(() => {
+        // 저장된 음력 데이터가 있으면 API 호출하지 않음
+        if (initialData?.lunarDate) {
+            return;
+        }
+
         const fetchLunarDate = async () => {
             if (birthYear && birthMonth && birthDay) {
                 const year = parseInt(birthYear);
@@ -327,7 +333,9 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                     month >= 1 && month <= 12 &&
                     day >= 1 && day <= 31) {
 
+                    setIsLoadingLunar(true);
                     const lunarData = await convertSolarToLunar(year, month, day);
+                    setIsLoadingLunar(false);
 
                     if (lunarData) {
                         setLunarDate(formatLunarDate(lunarData));
@@ -342,13 +350,13 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
             }
         };
 
-        // 디바운스: 500ms 후에 API 호출 (타이핑 중에는 호출 안 함)
+        // 디바운스: 300ms 후에 API 호출 (타이핑 중에는 호출 안 함)
         const timer = setTimeout(() => {
             fetchLunarDate();
-        }, 500);
+        }, 300);
 
         return () => clearTimeout(timer);
-    }, [birthYear, birthMonth, birthDay]);
+    }, [birthYear, birthMonth, birthDay, initialData?.lunarDate]);
 
     // 국가 변경 시 첫 번째 도시로 자동 설정
     const handleCountryChange = (e) => {
@@ -438,7 +446,8 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
             birthYear: parseInt(birthYear),
             birthMonth: parseInt(birthMonth),
             birthDay: parseInt(birthDay),
-            gender
+            gender,
+            lunarDate: lunarDate // 음력 날짜 저장
         };
 
         // 출생 시간 추가 (선택)
@@ -530,7 +539,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
 
                                 {/* 음력 날짜 표시 (오른쪽 정렬) */}
                                 <LunarDateDisplay style={{ marginTop: '8px', justifyContent: 'flex-end', paddingRight: '32px' }}>
-                                    {lunarDate ? `(${lunarDate})` : '💡 음력 날짜 자동 계산됩니다.'}
+                                    {isLoadingLunar ? '⏳ 음력 계산 중...' : (lunarDate ? `(${lunarDate})` : '💡 양력 생일을 입력하면 자동으로 음력 날짜를 계산합니다')}
                                 </LunarDateDisplay>
                             </div>
 
