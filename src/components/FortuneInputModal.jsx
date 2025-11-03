@@ -466,7 +466,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 <InfoText>
                                     {profile
                                         ? '👤 로그인 계정 또는 닉네임이 자동으로 표시됩니다'
-                                        : '👤 게스트는 로그인하지 않으면 매번 정보를 입력해야 합니다'}
+                                        : '👤 로그인하지 않으면 매번 정보를 입력해야 합니다'}
                                 </InfoText>
                             </div>
 
@@ -474,14 +474,14 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                             <div>
                                 {/* 출생 년 */}
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <Label>출생 *</Label>
+                                    <Label>출생 </Label>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                         <Input
                                             type="number"
                                             placeholder="예: 1995"
                                             value={birthYear}
                                             onChange={(e) => setBirthYear(e.target.value)}
-                                            style={{ width: '200px' }}
+                                            style={{ width: '220px' }}
                                         />
                                         <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '24px' }}>년</span>
                                     </div>
@@ -527,7 +527,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
 
                             {/* 성별 */}
                             <div>
-                                <Label>성별 *</Label>
+                                <Label>성별 </Label>
                                 <RadioGroup style={{ justifyContent: 'center', gap: '40px' }}>
                                     <RadioLabel>
                                         <input
