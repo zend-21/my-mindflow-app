@@ -434,6 +434,7 @@ export const calculateFortune = (userData, fortuneData) => {
         userDayStem,
         todayPillar: `${todayPillar.stem}${todayPillar.branch}`,
         zodiacSign,
+        lunarDate: userData.lunarDate, // 음력 날짜 추가
 
         // 운세 결과
         today: {
