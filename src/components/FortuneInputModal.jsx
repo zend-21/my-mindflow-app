@@ -694,7 +694,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                     >
                                         음력변환
                                     </LunarConvertButton>
-                                    <LunarDateDisplay style={{ margin: 0, padding: '4px 0', flex: 1, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                    <LunarDateDisplay style={{ margin: 0, padding: '4px 0 4px 20px', flex: 1, textAlign: 'right', whiteSpace: 'nowrap' }}>
                                         {isLoadingLunar ? '⏳ 계산 중...' : (lunarDate ? `(${lunarDate})` : '')}
                                     </LunarDateDisplay>
                                 </div>
