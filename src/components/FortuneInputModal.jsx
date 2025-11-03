@@ -402,8 +402,6 @@ const CitySearchHelperText = styled.div`
 const CitySearchItem = styled.div`
     padding: 14px 16px;
     cursor: pointer;
-    font-size: 15px;
-    color: #333;
     transition: background 0.2s;
     border-radius: 8px;
     margin-bottom: 4px;
@@ -420,6 +418,19 @@ const CitySearchItem = styled.div`
     &:active {
         background: #e2e8f0;
     }
+`;
+
+const CitySearchItemPrimary = styled.div`
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 4px;
+`;
+
+const CitySearchItemSecondary = styled.div`
+    font-size: 13px;
+    color: #718096;
+    line-height: 1.4;
 `;
 
 const CitySearchLoading = styled.div`
@@ -1124,14 +1135,29 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 ) : isSearchingCity ? (
                                     <CitySearchLoading>🔍 검색 중...</CitySearchLoading>
                                 ) : citySuggestions.length > 0 ? (
-                                    citySuggestions.map((suggestion, index) => (
-                                        <CitySearchItem
-                                            key={index}
-                                            onClick={() => handleCitySelect(suggestion)}
-                                        >
-                                            🌏 {suggestion.displayName}
-                                        </CitySearchItem>
-                                    ))
+                                    citySuggestions.map((suggestion, index) => {
+                                        // 주요 지명 (첫 줄)
+                                        const primary = `🌏 ${suggestion.primaryName || suggestion.city}`;
+
+                                        // 상세 정보 (둘째 줄)
+                                        const secondaryParts = [];
+                                        if (suggestion.district) secondaryParts.push(suggestion.district);
+                                        if (suggestion.state) secondaryParts.push(suggestion.state);
+                                        if (suggestion.country) secondaryParts.push(suggestion.country);
+                                        const secondary = secondaryParts.join(', ');
+
+                                        return (
+                                            <CitySearchItem
+                                                key={index}
+                                                onClick={() => handleCitySelect(suggestion)}
+                                            >
+                                                <CitySearchItemPrimary>{primary}</CitySearchItemPrimary>
+                                                {secondary && (
+                                                    <CitySearchItemSecondary>{secondary}</CitySearchItemSecondary>
+                                                )}
+                                            </CitySearchItem>
+                                        );
+                                    })
                                 ) : (
                                     <CitySearchEmpty>검색 결과가 없습니다</CitySearchEmpty>
                                 )}

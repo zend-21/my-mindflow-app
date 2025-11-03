@@ -37,32 +37,43 @@ export const searchCity = async (query) => {
             .map(item => {
                 const address = item.address || {};
 
-                // 도시명 추출 (우선순위 순서)
-                const city = address.city ||
-                            address.town ||
-                            address.village ||
-                            address.municipality ||
-                            address.borough ||
-                            address.suburb ||
-                            item.name;
+                // 주요 지명 추출 (우선순위 순서: 작은 단위부터)
+                const primaryName = address.suburb ||  // 동/리 (가장 작은 단위)
+                                   address.village ||
+                                   address.town ||
+                                   address.city ||
+                                   address.municipality ||
+                                   address.borough ||
+                                   item.name;
+
+                // 중간 행정구역 (구/군/카운티)
+                const district = address.county ||
+                                address.city_district ||
+                                address.district ||
+                                '';
+
+                // 상위 행정구역 (시/도/주)
+                const state = address.state ||
+                             address.province ||
+                             '';
 
                 // 국가명
                 const country = address.country || '';
 
-                // 주/도 정보
-                const state = address.state || address.province || '';
-
                 return {
-                    city,
-                    state,
-                    country,
-                    displayName: formatDisplayName(city, state, country),
+                    primaryName,      // 주요 지명 (신사동, Springfield 등)
+                    district,         // 구/군 (강남구, Sangamon County 등)
+                    state,           // 시/도/주 (서울특별시, 일리노이주 등)
+                    country,         // 국가 (대한민국, 미국 등)
+                    // 하위 호환성을 위해 기존 필드도 유지
+                    city: primaryName,
+                    displayName: formatDisplayName(primaryName, district, state, country),
                     lat: parseFloat(item.lat),
                     lon: parseFloat(item.lon),
                     rawData: item
                 };
             })
-            .filter(item => item.city && item.country); // 도시명과 국가명이 있는 것만
+            .filter(item => item.primaryName && item.country); // 지명과 국가명이 있는 것만
 
     } catch (error) {
         console.error('도시 검색 실패:', error);
@@ -71,14 +82,16 @@ export const searchCity = async (query) => {
 };
 
 /**
- * 표시용 주소 포맷팅
- * @param {string} city - 도시명
+ * 표시용 주소 포맷팅 (계층적 표시용)
+ * @param {string} primaryName - 주요 지명 (동/리/시)
+ * @param {string} district - 구/군/카운티
  * @param {string} state - 주/도
  * @param {string} country - 국가명
- * @returns {string} - "도시, 주/도, 국가" 형식
+ * @returns {string} - "주요지명, 구, 주/도, 국가" 형식
  */
-const formatDisplayName = (city, state, country) => {
-    const parts = [city];
+const formatDisplayName = (primaryName, district, state, country) => {
+    const parts = [primaryName];
+    if (district) parts.push(district);
     if (state) parts.push(state);
     if (country) parts.push(country);
     return parts.join(', ');
