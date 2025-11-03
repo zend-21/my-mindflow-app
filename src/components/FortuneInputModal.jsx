@@ -564,12 +564,10 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
     const [gender, setGender] = useState(initialData?.gender || '여성');
 
     // 출생 시간 (선택 사항)
-    const [hasBirthTime, setHasBirthTime] = useState(initialData?.birthHour !== undefined);
     const [birthHour, setBirthHour] = useState(initialData?.birthHour?.toString().padStart(2, '0') || '');
     const [birthMinute, setBirthMinute] = useState(initialData?.birthMinute?.toString().padStart(2, '0') || '');
 
     // 출생 장소 (선택 사항)
-    const [hasBirthPlace, setHasBirthPlace] = useState(initialData?.country !== undefined);
     const [country, setCountry] = useState(initialData?.country || '');
     const [city, setCity] = useState(initialData?.city || '');
 
@@ -804,14 +802,14 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
             lunarDate: lunarDate // 음력 날짜 저장
         };
 
-        // 출생 시간 추가 (선택)
-        if (hasBirthTime && birthHour && birthMinute) {
+        // 출생 시간 추가 (선택 - 값이 있으면)
+        if (birthHour && birthMinute) {
             userData.birthHour = parseInt(birthHour);
             userData.birthMinute = parseInt(birthMinute);
         }
 
-        // 출생 장소 추가 (선택)
-        if (hasBirthPlace) {
+        // 출생 장소 추가 (선택 - 값이 있으면)
+        if (country && city) {
             userData.country = country;
             userData.city = city;
         }
@@ -939,85 +937,57 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 </RadioGroup>
                             </div>
 
-                            {/* 출생 시간 (선택) */}
+                            {/* 출생 시간 (선택사항) */}
                             <div>
-                                <CheckboxLabel>
-                                    <input
-                                        type="checkbox"
-                                        checked={hasBirthTime}
-                                        onChange={(e) => setHasBirthTime(e.target.checked)}
-                                    />
-                                    출생 시간 입력 (선택사항)
-                                </CheckboxLabel>
-                            </div>
-
-                            {hasBirthTime && (
-                                <>
-                                    <InfoText style={{ marginTop: '-8px' }}>더 정확한 사주 분석을 위해 입력하세요</InfoText>
-                                    <TimeInputGroup>
-                                        <div>
-                                            <Label>시</Label>
-                                            <Input
-                                                type="number"
-                                                placeholder="00-23"
-                                                value={birthHour}
-                                                onChange={handleHourChange}
-                                                onBlur={handleHourBlur}
-                                                onFocus={(e) => e.target.select()}
-                                                min="0"
-                                                max="23"
-                                            />
-                                        </div>
-                                        <div>
-                                            <Label>분</Label>
-                                            <Input
-                                                type="number"
-                                                placeholder="00-59"
-                                                value={birthMinute}
-                                                onChange={handleMinuteChange}
-                                                onBlur={handleMinuteBlur}
-                                                onFocus={(e) => e.target.select()}
-                                                min="0"
-                                                max="59"
-                                            />
-                                        </div>
-                                    </TimeInputGroup>
-                                </>
-                            )}
-
-                            {/* 출생 장소 (선택) */}
-                            <div>
-                                <CheckboxLabel>
-                                    <input
-                                        type="checkbox"
-                                        checked={hasBirthPlace}
-                                        onChange={(e) => setHasBirthPlace(e.target.checked)}
-                                    />
-                                    출생 장소 입력 (선택사항)
-                                </CheckboxLabel>
-                            </div>
-
-                            {hasBirthPlace && (
-                                <>
-                                    <InfoText style={{ marginTop: '-8px' }}>태양시 보정을 위해 입력하세요</InfoText>
+                                <Label>출생 시간 (선택사항)</Label>
+                                <InfoText style={{ marginTop: '4px', marginBottom: '8px' }}>더 정확한 사주 분석을 위해 입력하세요</InfoText>
+                                <TimeInputGroup>
                                     <div>
-                                        <Label>출생 도시</Label>
                                         <Input
-                                            type="text"
-                                            placeholder="탭하여 도시 검색"
-                                            value={cityQuery}
-                                            onClick={handleOpenCitySearchModal}
-                                            readOnly
-                                            style={{ cursor: 'pointer', background: '#f9fafb' }}
+                                            type="number"
+                                            placeholder="00-23"
+                                            value={birthHour}
+                                            onChange={handleHourChange}
+                                            onBlur={handleHourBlur}
+                                            onFocus={(e) => e.target.select()}
+                                            min="0"
+                                            max="23"
                                         />
+                                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#666', marginLeft: '8px' }}>시</span>
                                     </div>
-                                    {city && country && (
-                                        <InfoText style={{ marginTop: '-8px', color: '#667eea' }}>
-                                            ✓ 선택됨: {city}, {country}
-                                        </InfoText>
-                                    )}
-                                </>
-                            )}
+                                    <div>
+                                        <Input
+                                            type="number"
+                                            placeholder="00-59"
+                                            value={birthMinute}
+                                            onChange={handleMinuteChange}
+                                            onBlur={handleMinuteBlur}
+                                            onFocus={(e) => e.target.select()}
+                                            min="0"
+                                            max="59"
+                                        />
+                                        <span style={{ fontSize: '14px', fontWeight: '600', color: '#666', marginLeft: '8px' }}>분</span>
+                                    </div>
+                                </TimeInputGroup>
+                            </div>
+
+                            {/* 출생 도시 (선택사항) */}
+                            <div>
+                                <Label>출생 도시 (선택사항)</Label>
+                                <Input
+                                    type="text"
+                                    placeholder="태양시 보정을 위해 입력하세요 (탭하여 검색)"
+                                    value={cityQuery}
+                                    onClick={handleOpenCitySearchModal}
+                                    readOnly
+                                    style={{ cursor: 'pointer', background: '#f9fafb', marginTop: '8px' }}
+                                />
+                                {city && country && (
+                                    <InfoText style={{ marginTop: '4px', color: '#667eea' }}>
+                                        ✓ 선택됨: {city}, {country}
+                                    </InfoText>
+                                )}
+                            </div>
 
                             <ButtonGroup>
                                 <Button onClick={onClose}>취소</Button>
@@ -1060,7 +1030,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 <ConfirmItem>
                                     <ConfirmLabel>출생 시간</ConfirmLabel>
                                     <ConfirmValue>
-                                        {hasBirthTime && birthHour && birthMinute
+                                        {birthHour && birthMinute
                                             ? `${birthHour}시 ${birthMinute}분`
                                             : '선택하지 않음'}
                                     </ConfirmValue>
@@ -1069,7 +1039,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 <ConfirmItem>
                                     <ConfirmLabel>출생 장소</ConfirmLabel>
                                     <ConfirmValue>
-                                        {hasBirthPlace
+                                        {country && city
                                             ? `${country}, ${city}`
                                             : '선택하지 않음'}
                                     </ConfirmValue>
