@@ -32,6 +32,9 @@ export const searchCity = async (query) => {
 
         const data = await response.json();
 
+        // 검색어를 소문자로 변환 (비교용)
+        const searchTerm = query.trim().toLowerCase();
+
         // 결과를 도시 위주로 필터링 및 포맷팅
         return data
             .map(item => {
@@ -91,14 +94,31 @@ export const searchCity = async (query) => {
                     lat: parseFloat(item.lat),
                     lon: parseFloat(item.lon),
                     rawData: item,
-                    // 🔍 디버깅용 - 모든 필드 포함
-                    _debug: {
-                        suburb, neighbourhood, quarter, city_district, district, borough,
-                        county, city, town, village, municipality, state, province
-                    }
                 };
             })
-            .filter(item => item.primaryName && item.country); // 지명과 국가명이 있는 것만
+            .filter(item => {
+                // 1. 기본 필터: 지명과 국가명이 있어야 함
+                if (!item.primaryName || !item.country) return false;
+
+                // 2. 검색어와 매칭되는지 확인
+                const primaryLower = item.primaryName.toLowerCase();
+
+                // 검색어가 primaryName에 포함되어 있으면 OK
+                if (primaryLower.includes(searchTerm) || searchTerm.includes(primaryLower)) {
+                    return true;
+                }
+
+                // 3. display_name 전체에서도 검색어 확인 (fallback)
+                const displayNameLower = item.rawData.display_name?.toLowerCase() || '';
+                return displayNameLower.includes(searchTerm);
+            })
+            .filter((item, index, self) => {
+                // 4. 중복 제거: 같은 좌표의 결과는 하나만
+                return index === self.findIndex(t => (
+                    Math.abs(t.lat - item.lat) < 0.001 &&
+                    Math.abs(t.lon - item.lon) < 0.001
+                ));
+            }); // 지명과 국가명이 있는 것만
 
     } catch (error) {
         console.error('도시 검색 실패:', error);
