@@ -1,6 +1,6 @@
 // src/components/FortuneInputModal.jsx
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { getCountries, getCities } from '../utils/timeZoneData';
 import { convertSolarToLunar, formatLunarDate } from '../utils/lunarConverter';
@@ -407,6 +407,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
     // 음력 날짜 표시용
     const [lunarDate, setLunarDate] = useState(initialData?.lunarDate || '');
     const [isLoadingLunar, setIsLoadingLunar] = useState(false);
+    const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
     // 국가 목록
     const countries = getCountries();
@@ -414,10 +415,43 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
     // 선택된 국가의 도시 목록
     const cities = getCities(country);
 
+    // 날짜 변경 감지하여 음력 초기화
+    useEffect(() => {
+        if (lunarDate && !initialData?.lunarDate) {
+            setLunarDate('');
+        }
+    }, [birthYear, birthMonth, birthDay]);
+
+    // 쿨다운 타이머
+    useEffect(() => {
+        if (cooldownSeconds > 0) {
+            const timer = setTimeout(() => {
+                setCooldownSeconds(cooldownSeconds - 1);
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [cooldownSeconds]);
+
     // 양력 → 음력 변환 (수동 버튼 클릭)
     const handleConvertToLunar = async () => {
         if (!birthYear || !birthMonth || !birthDay) {
             alert('생년월일을 모두 입력해주세요.');
+            return;
+        }
+
+        // 한 자리 숫자 자동 포맷팅 (첫 클릭 시)
+        let needsFormatting = false;
+        if (birthMonth.length === 1) {
+            setBirthMonth('0' + birthMonth);
+            needsFormatting = true;
+        }
+        if (birthDay.length === 1) {
+            setBirthDay('0' + birthDay);
+            needsFormatting = true;
+        }
+
+        // 포맷팅이 필요했다면 여기서 리턴 (다음 클릭 대기)
+        if (needsFormatting) {
             return;
         }
 
@@ -438,6 +472,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
 
             if (lunarData) {
                 setLunarDate(formatLunarDate(lunarData));
+                setCooldownSeconds(5); // 5초 쿨다운
             } else {
                 setLunarDate('');
                 alert('음력 변환에 실패했습니다. 날짜를 확인해주세요.');
@@ -647,11 +682,18 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', paddingRight: '32px' }}>
                                     <LunarConvertButton
                                         onClick={handleConvertToLunar}
-                                        disabled={isLoadingLunar || !birthYear || !birthMonth || !birthDay}
+                                        disabled={
+                                            isLoadingLunar ||
+                                            cooldownSeconds > 0 ||
+                                            !birthYear ||
+                                            birthYear.length !== 4 ||
+                                            !birthMonth ||
+                                            !birthDay
+                                        }
                                     >
-                                        음력변환
+                                        {cooldownSeconds > 0 ? `${cooldownSeconds}초 후 재시도` : '음력변환'}
                                     </LunarConvertButton>
-                                    <LunarDateDisplay style={{ margin: 0, padding: '4px 0' }}>
+                                    <LunarDateDisplay style={{ margin: 0, padding: '4px 0', minWidth: '200px' }}>
                                         {isLoadingLunar ? '⏳ 계산 중...' : (lunarDate ? `(${lunarDate})` : '')}
                                     </LunarDateDisplay>
                                 </div>
