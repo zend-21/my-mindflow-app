@@ -818,8 +818,8 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
     };
 
     return (
-        <Overlay onClick={onClose}>
-            <Container onClick={(e) => e.stopPropagation()}>
+        <Overlay>
+            <Container>
                 <Header>
                     <Title>🔮 운세 프로필 입력</Title>
                     <Subtitle>정확한 운세를 위해 정보를 입력해주세요</Subtitle>
