@@ -59,6 +59,16 @@ export const convertSolarToLunar = async (year, month, day) => {
         const lunDay = xmlDoc.getElementsByTagName('lunDay')[0]?.textContent;
         const lunLeapmonth = xmlDoc.getElementsByTagName('lunLeapmonth')[0]?.textContent;
 
+        // 디버깅 로그
+        console.log('🔍 API 응답:', {
+            입력: `${year}년 ${month}월 ${day}일`,
+            응답_lunYear: lunYear,
+            응답_lunMonth: lunMonth,
+            응답_lunDay: lunDay,
+            응답_lunLeapmonth: lunLeapmonth,
+            전체XML: text
+        });
+
         if (!lunYear || !lunMonth || !lunDay) {
             console.error('음력 데이터를 찾을 수 없습니다.');
             return null;
