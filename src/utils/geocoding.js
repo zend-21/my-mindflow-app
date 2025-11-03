@@ -1,10 +1,31 @@
 // src/utils/geocoding.js
+import { find } from 'geo-tz';
 
 /**
  * Nominatim API를 사용한 도시 검색
  * @param {string} query - 검색어 (예: "서울", "Paris", "つくば")
  * @returns {Promise<Array>} - 검색 결과 배열
  */
+/**
+ * 검색어의 언어를 감지
+ */
+const detectLanguage = (text) => {
+    // 한글 포함 여부 확인
+    if (/[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/.test(text)) {
+        return 'ko';
+    }
+    // 일본어 히라가나/가타카나 확인
+    if (/[\u3040-\u309F\u30A0-\u30FF]/.test(text)) {
+        return 'ja';
+    }
+    // 중국어 간체/번체 확인
+    if (/[\u4E00-\u9FFF]/.test(text)) {
+        return 'zh';
+    }
+    // 기본값: 영어
+    return 'en';
+};
+
 export const searchCity = async (query) => {
     if (!query || query.trim().length < 2) {
         return [];
@@ -17,6 +38,9 @@ export const searchCity = async (query) => {
             ? '/api/geocoding/search'
             : '/api/geocoding';
 
+        // 검색어 언어 감지
+        const lang = detectLanguage(query.trim());
+
         const params = new URLSearchParams({
             q: query.trim(),
             format: 'json',
@@ -26,7 +50,7 @@ export const searchCity = async (query) => {
 
         const response = await fetch(`${baseUrl}?${params.toString()}`, {
             headers: {
-                'Accept-Language': 'en' // 영어로 통일 (한글 번역 문제 방지)
+                'Accept-Language': `${lang},en;q=0.9` // 감지된 언어 우선, 영어 대체
             }
         });
 
@@ -36,101 +60,114 @@ export const searchCity = async (query) => {
 
         const data = await response.json();
 
-        // 🔍 API 응답 구조 확인 (디버깅용)
-        console.group(`🌍 Nominatim API 응답 분석: "${query}"`);
-        if (data.length > 0) {
-            console.log('첫 번째 결과:', data[0]);
-            console.log('display_name:', data[0].display_name);
-            console.log('address:', data[0].address);
-            console.log('importance:', data[0].importance);
-        }
+        // 🔍 디버깅: 첫 3개 결과의 address 구조 확인
+        console.group(`🌍 "${query}" 검색 결과 (언어: ${lang})`);
+        data.slice(0, 3).forEach((item, idx) => {
+            console.log(`\n[${idx + 1}] ${item.display_name}`);
+            console.log('address:', item.address);
+            console.log('importance:', item.importance);
+        });
         console.groupEnd();
+
+        // importance 기준으로 정렬 (중요도가 높은 것이 먼저 - Paris, France > Paris, Texas)
+        const sortedData = data.sort((a, b) => (b.importance || 0) - (a.importance || 0));
 
         // 검색어를 소문자로 변환 (비교용)
         const searchTerm = query.trim().toLowerCase();
-
-        // importance 기준으로 정렬 (중요도가 높은 것이 먼저)
-        const sortedData = data.sort((a, b) => (b.importance || 0) - (a.importance || 0));
 
         // 결과를 도시 위주로 필터링 및 포맷팅
         return sortedData
             .map(item => {
                 const address = item.address || {};
 
-                // 모든 가능한 필드를 추출
-                const suburb = address.suburb || '';
-                const neighbourhood = address.neighbourhood || '';
-                const quarter = address.quarter || '';
-                const city_district = address.city_district || '';
-                const district = address.district || '';
-                const borough = address.borough || '';
-                const county = address.county || '';
+                // 행정구역 필드만 추출 (도로명, 지번 등 제외)
                 const city = address.city || '';
                 const town = address.town || '';
                 const village = address.village || '';
+                const suburb = address.suburb || '';
                 const municipality = address.municipality || '';
-                const state = address.state || '';
-                const province = address.province || '';
+                const city_district = address.city_district || '';
+                const district = address.district || '';
+                const county = address.county || '';
+                const state = address.state || address.province || ''; // province도 포함!
                 const country = address.country || '';
 
-                // 📌 1단계: 검색어와 정확히 일치하는 필드 찾기 (대소문자 무시)
+                // 📌 primaryName: 검색어와 매칭되는 행정구역 찾기
                 let primaryName = '';
 
-                // 우선순위: city > town > village > suburb > neighbourhood
-                const priorityFields = [
+                // 우선순위: city > town > village > suburb > municipality
+                const candidates = [
                     { value: city, type: 'city' },
-                    { value: municipality, type: 'municipality' },
                     { value: town, type: 'town' },
+                    { value: municipality, type: 'municipality' },
                     { value: village, type: 'village' },
-                    { value: borough, type: 'borough' },
                     { value: suburb, type: 'suburb' },
-                    { value: neighbourhood, type: 'neighbourhood' },
-                    { value: quarter, type: 'quarter' },
                 ];
 
-                // 정확히 일치하는 필드 찾기
-                const exactMatch = priorityFields.find(field =>
-                    field.value && field.value.toLowerCase() === searchTerm
-                );
-
-                if (exactMatch) {
-                    primaryName = exactMatch.value;
-                } else {
-                    // 정확한 일치가 없으면 검색어를 포함하는 필드 찾기
-                    const partialMatch = priorityFields.find(field =>
-                        field.value && (
-                            field.value.toLowerCase().includes(searchTerm) ||
-                            searchTerm.includes(field.value.toLowerCase())
-                        )
-                    );
-
-                    if (partialMatch) {
-                        primaryName = partialMatch.value;
-                    } else {
-                        // 아무것도 매칭 안되면 가장 구체적인 지명 사용
-                        primaryName = city || town || village || suburb ||
-                                    neighbourhood || municipality || item.name || '';
+                // 1순위: 검색어와 정확히 일치하는 것
+                for (const candidate of candidates) {
+                    if (candidate.value && candidate.value.toLowerCase() === searchTerm) {
+                        primaryName = candidate.value;
+                        break;
                     }
                 }
 
-                // 📌 2단계: district (구/군) 설정
-                let districtName = city_district || district || borough || county || '';
-                if (primaryName === districtName) {
-                    districtName = ''; // 중복 제거
+                // 2순위: 검색어를 포함하는 것
+                if (!primaryName) {
+                    for (const candidate of candidates) {
+                        const valueLower = candidate.value.toLowerCase();
+                        if (candidate.value && (valueLower.includes(searchTerm) || searchTerm.includes(valueLower))) {
+                            primaryName = candidate.value;
+                            break;
+                        }
+                    }
                 }
 
-                // 📌 3단계: state (시/도/주) 설정
-                let stateName = '';
-                if (primaryName !== city && city) {
+                // 3순위: 가장 구체적인 행정구역
+                if (!primaryName) {
+                    primaryName = city || town || municipality || village || suburb || '';
+                }
+
+                // ⚠️ 도시급 이상의 행정구역만 허용 (동/리 제외)
+                const cityLevelFields = [
+                    city, town, village, municipality,
+                    county, state, country
+                ];
+
+                const hasCityLevelMatch = cityLevelFields.some(field => {
+                    if (!field) return false;
+                    const fieldLower = field.toLowerCase();
+                    return fieldLower.includes(searchTerm) || searchTerm.includes(fieldLower);
+                });
+
+                // 도시급 이상에 검색어가 없으면 제외 (suburb/동 검색 방지)
+                if (!hasCityLevelMatch) {
+                    return null;
+                }
+
+                // 📌 district: 구/군 레벨 (primaryName과 다른 것만)
+                let districtName = city_district || district || county || '';
+                if (primaryName === districtName || districtName === state) {
+                    districtName = '';
+                }
+
+                // 📌 state: 시/도/주 레벨
+                let stateName = state || '';
+
+                // primaryName이 city가 아니고 state가 있는 경우, city를 district로 승격
+                if (stateName && primaryName !== city && city && !districtName) {
+                    districtName = city;
+                }
+                // primaryName이 city가 아니고 state가 없는 경우, city를 state로 승격
+                else if (!stateName && primaryName !== city && city) {
                     stateName = city;
-                } else {
-                    stateName = state || province || '';
                 }
 
                 // 중복 제거
-                if (stateName === primaryName || stateName === districtName) {
-                    stateName = '';
-                }
+                if (primaryName === stateName) stateName = '';
+                if (districtName === stateName) stateName = '';
+                if (districtName === country) districtName = '';
+                if (stateName === country) stateName = '';
 
                 return {
                     primaryName,
@@ -145,26 +182,16 @@ export const searchCity = async (query) => {
                     rawData: item,
                 };
             })
-            // 필터링: 유효한 결과만
+            // 필터링: null 제거 및 기본 필터
             .filter(item => {
-                if (!item.primaryName || !item.country) return false;
-
-                const primaryLower = item.primaryName.toLowerCase();
-                const allText = [
-                    item.primaryName,
-                    item.district,
-                    item.state,
-                    item.country
-                ].filter(Boolean).join(' ').toLowerCase();
-
-                // 검색어가 주소 어딘가에 포함되어야 함
-                return allText.includes(searchTerm);
+                return item !== null && item.primaryName && item.country;
             })
-            // 중복 제거 (같은 좌표)
+            // 중복 제거: primaryName + state + country 조합이 같으면 하나만
             .filter((item, index, self) => {
                 return index === self.findIndex(t => (
-                    Math.abs(t.lat - item.lat) < 0.001 &&
-                    Math.abs(t.lon - item.lon) < 0.001
+                    t.primaryName === item.primaryName &&
+                    t.state === item.state &&
+                    t.country === item.country
                 ));
             })
             // 상위 10개만
@@ -193,12 +220,28 @@ const formatDisplayName = (primaryName, district, state, country) => {
 };
 
 /**
- * 좌표로부터 타임존 정보 가져오기 (추후 사주 계산용)
- * 참고: Nominatim은 타임존 정보를 직접 제공하지 않으므로,
- * 필요시 별도 API(예: TimeZoneDB) 사용 필요
+ * 좌표로부터 타임존 정보 가져오기 (사주 계산용)
+ * geo-tz 라이브러리를 사용하여 오프라인으로 정확한 타임존 계산
+ * 역사적 타임존 변경사항도 지원 (예: 한국 1961년 이전 UTC+8:30)
+ *
+ * @param {number} lat - 위도
+ * @param {number} lon - 경도
+ * @returns {string} - IANA 타임존 문자열 (예: "Asia/Seoul", "America/New_York")
  */
-export const getTimezoneFromCoords = async (lat, lon) => {
-    // TODO: 타임존 API 연동 필요 시 구현
-    // 현재는 브라우저 타임존 사용
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+export const getTimezoneFromCoords = (lat, lon) => {
+    try {
+        // geo-tz는 [lat, lon] 형식의 배열을 받고, 타임존 문자열 배열을 반환
+        const timezones = find(lat, lon);
+
+        if (timezones && timezones.length > 0) {
+            return timezones[0]; // 첫 번째 매칭 타임존 반환
+        }
+
+        // 타임존을 찾지 못한 경우 (드문 경우 - 대양 한가운데 등)
+        console.warn(`타임존을 찾을 수 없습니다: lat=${lat}, lon=${lon}`);
+        return Intl.DateTimeFormat().resolvedOptions().timeZone; // 브라우저 타임존 대체
+    } catch (error) {
+        console.error('타임존 계산 실패:', error);
+        return Intl.DateTimeFormat().resolvedOptions().timeZone; // 에러 시 브라우저 타임존 대체
+    }
 };
