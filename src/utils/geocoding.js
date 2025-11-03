@@ -36,6 +36,16 @@ export const searchCity = async (query) => {
 
         const data = await response.json();
 
+        // 🔍 API 응답 구조 확인 (디버깅용)
+        console.group(`🌍 Nominatim API 응답 분석: "${query}"`);
+        if (data.length > 0) {
+            console.log('첫 번째 결과:', data[0]);
+            console.log('display_name:', data[0].display_name);
+            console.log('address:', data[0].address);
+            console.log('importance:', data[0].importance);
+        }
+        console.groupEnd();
+
         // 검색어를 소문자로 변환 (비교용)
         const searchTerm = query.trim().toLowerCase();
 
