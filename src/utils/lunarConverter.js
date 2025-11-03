@@ -11,22 +11,34 @@ const API_KEY = import.meta.env.VITE_SPCDE_API_KEY;
  * @returns {Promise<Object>} { lunarYear, lunarMonth, lunarDay, isLeapMonth }
  */
 export const convertSolarToLunar = async (year, month, day) => {
-    if (!API_KEY) {
-        console.error('API 키가 설정되지 않았습니다.');
-        return null;
-    }
-
     try {
-        // Vite 프록시를 통해 API 호출 (CORS 우회)
-        const url = `/api/lunar/getLunCalInfo`; // 한국천문연구원 API
-        const params = new URLSearchParams({
-            serviceKey: API_KEY, // 인코딩된 키 그대로 사용
-            solYear: year.toString(),
-            solMonth: String(month).padStart(2, '0'),
-            solDay: String(day).padStart(2, '0')
-        });
+        // Vercel Serverless Function 또는 Vite 프록시 사용
+        const isDevelopment = import.meta.env.DEV;
+        const baseUrl = isDevelopment ? '/api/lunar/getLunCalInfo' : '/api/lunar';
 
-        const response = await fetch(`${url}?${params.toString()}`);
+        let url, params;
+
+        if (isDevelopment) {
+            // 개발 환경: Vite 프록시 사용
+            params = new URLSearchParams({
+                serviceKey: API_KEY,
+                solYear: year.toString(),
+                solMonth: String(month).padStart(2, '0'),
+                solDay: String(day).padStart(2, '0')
+            });
+            url = `${baseUrl}?${params.toString()}`;
+        } else {
+            // 프로덕션 환경: Vercel Serverless Function 사용
+            params = new URLSearchParams({
+                type: 'solar-to-lunar',
+                solYear: year.toString(),
+                solMonth: String(month).padStart(2, '0'),
+                solDay: String(day).padStart(2, '0')
+            });
+            url = `${baseUrl}?${params.toString()}`;
+        }
+
+        const response = await fetch(url);
         const text = await response.text();
 
         // XML 파싱
@@ -73,23 +85,36 @@ export const convertSolarToLunar = async (year, month, day) => {
  * @returns {Promise<Object>} { solarYear, solarMonth, solarDay }
  */
 export const convertLunarToSolar = async (year, month, day, isLeapMonth = false) => {
-    if (!API_KEY) {
-        console.error('API 키가 설정되지 않았습니다.');
-        return null;
-    }
-
     try {
-        // Vite 프록시를 통해 API 호출 (CORS 우회)
-        const url = `/api/lunar/getLunToSolInfo`; // 한국천문연구원 API
-        const params = new URLSearchParams({
-            serviceKey: API_KEY, // 인코딩된 키 그대로 사용
-            lunYear: year.toString(),
-            lunMonth: String(month).padStart(2, '0'),
-            lunDay: String(day).padStart(2, '0'),
-            lunLeapmonth: isLeapMonth ? '윤달' : '평달'
-        });
+        // Vercel Serverless Function 또는 Vite 프록시 사용
+        const isDevelopment = import.meta.env.DEV;
+        const baseUrl = isDevelopment ? '/api/lunar/getLunToSolInfo' : '/api/lunar';
 
-        const response = await fetch(`${url}?${params.toString()}`);
+        let url, params;
+
+        if (isDevelopment) {
+            // 개발 환경: Vite 프록시 사용
+            params = new URLSearchParams({
+                serviceKey: API_KEY,
+                lunYear: year.toString(),
+                lunMonth: String(month).padStart(2, '0'),
+                lunDay: String(day).padStart(2, '0'),
+                lunLeapmonth: isLeapMonth ? '윤달' : '평달'
+            });
+            url = `${baseUrl}?${params.toString()}`;
+        } else {
+            // 프로덕션 환경: Vercel Serverless Function 사용
+            params = new URLSearchParams({
+                type: 'lunar-to-solar',
+                lunYear: year.toString(),
+                lunMonth: String(month).padStart(2, '0'),
+                lunDay: String(day).padStart(2, '0'),
+                lunLeapmonth: isLeapMonth ? '윤달' : '평달'
+            });
+            url = `${baseUrl}?${params.toString()}`;
+        }
+
+        const response = await fetch(url);
         const text = await response.text();
 
         // XML 파싱
