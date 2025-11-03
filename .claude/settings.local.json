@@ -3,7 +3,8 @@
     "allow": [
       "Bash(python download_tarot.py:*)",
       "Bash(pip install:*)",
-      "Bash(python download_sacred_texts.py:*)"
+      "Bash(python download_sacred_texts.py:*)",
+      "Bash(git push)"
     ],
     "deny": [],
     "ask": []
