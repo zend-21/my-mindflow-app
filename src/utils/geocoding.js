@@ -56,29 +56,73 @@ export const searchCity = async (query) => {
                 const province = address.province || '';       // 도
                 const country = address.country || '';         // 국가
 
-                // 주요 지명 결정 (작은 단위부터)
-                const primaryName = suburb ||
-                                   neighbourhood ||
-                                   quarter ||
-                                   village ||
-                                   town ||
-                                   city ||
-                                   municipality ||
-                                   borough ||
-                                   item.name;
+                // 🔍 검색어와 가장 매칭되는 필드를 primaryName으로 선택
+                const allFields = [
+                    { value: suburb, level: 1, type: 'suburb' },
+                    { value: neighbourhood, level: 1, type: 'neighbourhood' },
+                    { value: quarter, level: 2, type: 'quarter' },
+                    { value: village, level: 3, type: 'village' },
+                    { value: town, level: 4, type: 'town' },
+                    { value: city, level: 5, type: 'city' },
+                    { value: municipality, level: 5, type: 'municipality' },
+                    { value: borough, level: 3, type: 'borough' },
+                ];
+
+                // 검색어와 매칭되는 필드 찾기
+                let bestMatch = null;
+                let primaryName = '';
+
+                for (const field of allFields) {
+                    if (field.value) {
+                        const fieldLower = field.value.toLowerCase();
+                        // 검색어와 정확히 일치하거나 포함되는 경우
+                        if (fieldLower === searchTerm ||
+                            fieldLower.includes(searchTerm) ||
+                            searchTerm.includes(fieldLower)) {
+                            // 더 큰 level(상위 행정구역)이 매칭되면 우선 선택
+                            if (!bestMatch || field.level >= bestMatch.level) {
+                                bestMatch = field;
+                            }
+                        }
+                    }
+                }
+
+                // 매칭된 필드가 있으면 사용, 없으면 기존 방식(작은 단위부터)
+                if (bestMatch) {
+                    primaryName = bestMatch.value;
+                } else {
+                    primaryName = suburb ||
+                                 neighbourhood ||
+                                 quarter ||
+                                 village ||
+                                 town ||
+                                 city ||
+                                 municipality ||
+                                 borough ||
+                                 item.name;
+                }
 
                 // 구/군 (중간 행정구역)
-                const districtName = city_district ||
-                                    district ||
-                                    borough ||
-                                    county ||
-                                    '';
+                let districtName = city_district ||
+                                  district ||
+                                  borough ||
+                                  county ||
+                                  '';
+
+                // primaryName이 이미 district 레벨이면 중복 방지
+                if (primaryName === districtName) {
+                    districtName = '';
+                }
 
                 // 시/도 (상위 행정구역)
-                const stateName = city ||  // city가 동보다 상위일 경우
-                                 state ||
-                                 province ||
-                                 '';
+                let stateName = '';
+
+                // primaryName이 city가 아닐 때만 city를 state로 사용
+                if (primaryName !== city && city) {
+                    stateName = city;
+                } else {
+                    stateName = state || province || '';
+                }
 
                 // ⚠️ 중복 제거: primaryName과 stateName이 같으면 stateName 비우기
                 const finalState = (stateName === primaryName) ? '' : stateName;
