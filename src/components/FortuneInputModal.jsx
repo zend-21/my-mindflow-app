@@ -260,6 +260,46 @@ const LunarConvertButton = styled.button`
     }
 `;
 
+const LunarContainer = styled.div`
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-left: 60px;
+    padding-right: 40px;
+    max-width: 100%;
+
+    /* 모바일 세로 모드 (기본) */
+    @media (max-width: 767px) {
+        padding-left: 50px;
+        padding-right: 30px;
+    }
+
+    /* 모바일 가로 모드 및 태블릿 */
+    @media (min-width: 768px) {
+        padding-left: 70px;
+        padding-right: 52px;
+    }
+
+    /* 데스크탑 */
+    @media (min-width: 1024px) {
+        padding-left: 80px;
+        padding-right: 60px;
+    }
+
+    /* 대형 데스크탑 */
+    @media (min-width: 1440px) {
+        padding-left: 90px;
+        padding-right: 70px;
+    }
+
+    /* 초대형 화면 */
+    @media (min-width: 1900px) {
+        padding-left: 100px;
+        padding-right: 80px;
+    }
+`;
+
 const UserNameDisplay = styled.div`
     padding: 12px 16px;
     border: 2px solid #e2e8f0;
@@ -679,7 +719,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 </div>
 
                                 {/* 음력 날짜 표시 및 변환 버튼 */}
-                                <div style={{ marginTop: '8px', display: 'flex', alignItems: 'center', paddingLeft: '70px', paddingRight: '52px' }}>
+                                <LunarContainer>
                                     <LunarConvertButton
                                         onClick={handleConvertToLunar}
                                         disabled={
@@ -690,14 +730,13 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                             !birthMonth ||
                                             !birthDay
                                         }
-                                        style={{ marginLeft: '-10px' }}
                                     >
                                         음력변환
                                     </LunarConvertButton>
                                     <LunarDateDisplay style={{ margin: 0, padding: '4px 0 4px 5px', flex: 1, textAlign: 'right', whiteSpace: 'nowrap' }}>
                                         {isLoadingLunar ? '⏳ 계산 중...' : (lunarDate ? `(${lunarDate})` : '')}
                                     </LunarDateDisplay>
-                                </div>
+                                </LunarContainer>
                             </div>
 
                             {/* 성별 */}
