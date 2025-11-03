@@ -21,10 +21,14 @@ export const searchCity = async (query) => {
             q: query.trim(),
             format: 'json',
             addressdetails: '1',
-            limit: '10'
+            limit: '20' // 더 많은 결과를 가져와서 필터링
         });
 
-        const response = await fetch(`${baseUrl}?${params.toString()}`);
+        const response = await fetch(`${baseUrl}?${params.toString()}`, {
+            headers: {
+                'Accept-Language': 'en' // 영어로 통일 (한글 번역 문제 방지)
+            }
+        });
 
         if (!response.ok) {
             throw new Error('API 호출 실패');
@@ -35,148 +39,126 @@ export const searchCity = async (query) => {
         // 검색어를 소문자로 변환 (비교용)
         const searchTerm = query.trim().toLowerCase();
 
+        // importance 기준으로 정렬 (중요도가 높은 것이 먼저)
+        const sortedData = data.sort((a, b) => (b.importance || 0) - (a.importance || 0));
+
         // 결과를 도시 위주로 필터링 및 포맷팅
-        return data
+        return sortedData
             .map(item => {
                 const address = item.address || {};
 
-                // 모든 가능한 필드를 추출해서 확인
-                const suburb = address.suburb || '';           // 동/리
-                const neighbourhood = address.neighbourhood || ''; // 이웃
-                const quarter = address.quarter || '';         // 구역
-                const city_district = address.city_district || ''; // 구
-                const district = address.district || '';       // 구역
-                const borough = address.borough || '';         // 자치구
-                const county = address.county || '';           // 군/카운티
-                const city = address.city || '';               // 시
-                const town = address.town || '';               // 읍
-                const village = address.village || '';         // 마을
-                const municipality = address.municipality || ''; // 자치시
-                const state = address.state || '';             // 주/도
-                const province = address.province || '';       // 도
-                const country = address.country || '';         // 국가
+                // 모든 가능한 필드를 추출
+                const suburb = address.suburb || '';
+                const neighbourhood = address.neighbourhood || '';
+                const quarter = address.quarter || '';
+                const city_district = address.city_district || '';
+                const district = address.district || '';
+                const borough = address.borough || '';
+                const county = address.county || '';
+                const city = address.city || '';
+                const town = address.town || '';
+                const village = address.village || '';
+                const municipality = address.municipality || '';
+                const state = address.state || '';
+                const province = address.province || '';
+                const country = address.country || '';
 
-                // 🔍 검색어와 가장 매칭되는 필드를 primaryName으로 선택
-                const allFields = [
-                    { value: suburb, level: 1, type: 'suburb' },
-                    { value: neighbourhood, level: 1, type: 'neighbourhood' },
-                    { value: quarter, level: 2, type: 'quarter' },
-                    { value: village, level: 3, type: 'village' },
-                    { value: town, level: 4, type: 'town' },
-                    { value: city, level: 5, type: 'city' },
-                    { value: municipality, level: 5, type: 'municipality' },
-                    { value: borough, level: 3, type: 'borough' },
-                ];
-
-                // 검색어와 매칭되는 필드 찾기
-                let bestMatch = null;
+                // 📌 1단계: 검색어와 정확히 일치하는 필드 찾기 (대소문자 무시)
                 let primaryName = '';
 
-                console.log('🔍 검색어:', searchTerm);
-                console.log('📍 처리 중인 아이템:', item.display_name);
-                console.log('   📋 사용 가능한 필드:', {
-                    suburb, neighbourhood, quarter, village, town,
-                    city, municipality, borough,
-                    city_district, district, county, state, province, country
-                });
+                // 우선순위: city > town > village > suburb > neighbourhood
+                const priorityFields = [
+                    { value: city, type: 'city' },
+                    { value: municipality, type: 'municipality' },
+                    { value: town, type: 'town' },
+                    { value: village, type: 'village' },
+                    { value: borough, type: 'borough' },
+                    { value: suburb, type: 'suburb' },
+                    { value: neighbourhood, type: 'neighbourhood' },
+                    { value: quarter, type: 'quarter' },
+                ];
 
-                for (const field of allFields) {
-                    if (field.value) {
-                        const fieldLower = field.value.toLowerCase();
-                        // 검색어와 정확히 일치하거나 포함되는 경우
-                        if (fieldLower === searchTerm ||
-                            fieldLower.includes(searchTerm) ||
-                            searchTerm.includes(fieldLower)) {
+                // 정확히 일치하는 필드 찾기
+                const exactMatch = priorityFields.find(field =>
+                    field.value && field.value.toLowerCase() === searchTerm
+                );
 
-                            console.log(`   ✅ 매칭됨: ${field.type} = "${field.value}" (level: ${field.level})`);
+                if (exactMatch) {
+                    primaryName = exactMatch.value;
+                } else {
+                    // 정확한 일치가 없으면 검색어를 포함하는 필드 찾기
+                    const partialMatch = priorityFields.find(field =>
+                        field.value && (
+                            field.value.toLowerCase().includes(searchTerm) ||
+                            searchTerm.includes(field.value.toLowerCase())
+                        )
+                    );
 
-                            // 더 큰 level(상위 행정구역)이 매칭되면 우선 선택
-                            if (!bestMatch || field.level >= bestMatch.level) {
-                                bestMatch = field;
-                                console.log(`      → bestMatch 갱신: ${field.type} (level: ${field.level})`);
-                            }
-                        }
+                    if (partialMatch) {
+                        primaryName = partialMatch.value;
+                    } else {
+                        // 아무것도 매칭 안되면 가장 구체적인 지명 사용
+                        primaryName = city || town || village || suburb ||
+                                    neighbourhood || municipality || item.name || '';
                     }
                 }
 
-                // 매칭된 필드가 있으면 사용, 없으면 기존 방식(작은 단위부터)
-                if (bestMatch) {
-                    primaryName = bestMatch.value;
-                    console.log(`   ✨ 최종 primaryName: "${primaryName}" (from ${bestMatch.type})`);
-                } else {
-                    primaryName = suburb ||
-                                 neighbourhood ||
-                                 quarter ||
-                                 village ||
-                                 town ||
-                                 city ||
-                                 municipality ||
-                                 borough ||
-                                 item.name;
-                    console.log(`   ⚠️ bestMatch 없음, fallback primaryName: "${primaryName}"`);
-                }
-
-                // 구/군 (중간 행정구역)
-                let districtName = city_district ||
-                                  district ||
-                                  borough ||
-                                  county ||
-                                  '';
-
-                // primaryName이 이미 district 레벨이면 중복 방지
+                // 📌 2단계: district (구/군) 설정
+                let districtName = city_district || district || borough || county || '';
                 if (primaryName === districtName) {
-                    districtName = '';
+                    districtName = ''; // 중복 제거
                 }
 
-                // 시/도 (상위 행정구역)
+                // 📌 3단계: state (시/도/주) 설정
                 let stateName = '';
-
-                // primaryName이 city가 아닐 때만 city를 state로 사용
                 if (primaryName !== city && city) {
                     stateName = city;
                 } else {
                     stateName = state || province || '';
                 }
 
-                // ⚠️ 중복 제거: primaryName과 stateName이 같으면 stateName 비우기
-                const finalState = (stateName === primaryName) ? '' : stateName;
+                // 중복 제거
+                if (stateName === primaryName || stateName === districtName) {
+                    stateName = '';
+                }
 
                 return {
-                    primaryName,      // 주요 지명 (신사동, Springfield 등)
-                    district: districtName,  // 구/군 (강남구, Sangamon County 등)
-                    state: finalState,       // 시/도/주 (서울특별시, 일리노이주 등)
-                    country,                 // 국가 (대한민국, 미국 등)
-                    // 하위 호환성을 위해 기존 필드도 유지
+                    primaryName,
+                    district: districtName,
+                    state: stateName,
+                    country,
                     city: primaryName,
-                    displayName: formatDisplayName(primaryName, districtName, finalState, country),
+                    displayName: formatDisplayName(primaryName, districtName, stateName, country),
                     lat: parseFloat(item.lat),
                     lon: parseFloat(item.lon),
+                    importance: item.importance || 0,
                     rawData: item,
                 };
             })
+            // 필터링: 유효한 결과만
             .filter(item => {
-                // 1. 기본 필터: 지명과 국가명이 있어야 함
                 if (!item.primaryName || !item.country) return false;
 
-                // 2. 검색어와 매칭되는지 확인
                 const primaryLower = item.primaryName.toLowerCase();
+                const allText = [
+                    item.primaryName,
+                    item.district,
+                    item.state,
+                    item.country
+                ].filter(Boolean).join(' ').toLowerCase();
 
-                // 검색어가 primaryName에 포함되어 있으면 OK
-                if (primaryLower.includes(searchTerm) || searchTerm.includes(primaryLower)) {
-                    return true;
-                }
-
-                // 3. display_name 전체에서도 검색어 확인 (fallback)
-                const displayNameLower = item.rawData.display_name?.toLowerCase() || '';
-                return displayNameLower.includes(searchTerm);
+                // 검색어가 주소 어딘가에 포함되어야 함
+                return allText.includes(searchTerm);
             })
+            // 중복 제거 (같은 좌표)
             .filter((item, index, self) => {
-                // 4. 중복 제거: 같은 좌표의 결과는 하나만
                 return index === self.findIndex(t => (
                     Math.abs(t.lat - item.lat) < 0.001 &&
                     Math.abs(t.lon - item.lon) < 0.001
                 ));
-            }); // 지명과 국가명이 있는 것만
+            })
+            // 상위 10개만
+            .slice(0, 10);
 
     } catch (error) {
         console.error('도시 검색 실패:', error);
