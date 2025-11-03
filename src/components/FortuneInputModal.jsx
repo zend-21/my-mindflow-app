@@ -465,8 +465,8 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 <UserNameDisplay>{userName}</UserNameDisplay>
                                 <InfoText>
                                     {profile
-                                        ? '로그인 계정 또는 닉네임이 자동으로 표시됩니다'
-                                        : '게스트는 로그인하지 않으면 매번 정보를 입력해야 합니다'}
+                                        ? 'ℹ️ 로그인 계정 또는 닉네임이 자동으로 표시됩니다'
+                                        : 'ℹ️ 게스트는 로그인하지 않으면 매번 정보를 입력해야 합니다'}
                                 </InfoText>
                             </div>
 
@@ -492,28 +492,28 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         <Input
                                             type="number"
-                                            placeholder="01-12"
+                                            placeholder="1-12"
                                             value={birthMonth}
                                             onChange={handleMonthChange}
                                             onBlur={handleMonthBlur}
                                             onFocus={(e) => e.target.select()}
                                             min="1"
                                             max="12"
-                                            style={{ width: '70px' }}
+                                            style={{ width: '80px' }}
                                         />
                                         <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '24px' }}>월</span>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         <Input
                                             type="number"
-                                            placeholder="01-31"
+                                            placeholder="1-31"
                                             value={birthDay}
                                             onChange={handleDayChange}
                                             onBlur={handleDayBlur}
                                             onFocus={(e) => e.target.select()}
                                             min="1"
                                             max="31"
-                                            style={{ width: '70px' }}
+                                            style={{ width: '80px' }}
                                         />
                                         <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '24px' }}>일</span>
                                     </div>
@@ -521,7 +521,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
 
                                 {/* 음력 날짜 표시 (오른쪽 정렬) */}
                                 <LunarDateDisplay style={{ marginTop: '8px', justifyContent: 'flex-end', paddingRight: '32px' }}>
-                                    {lunarDate ? `(${lunarDate})` : '💡 양력 생일을 입력하면 자동으로 음력 날짜를 계산합니다'}
+                                    {lunarDate ? `(${lunarDate})` : '💡 음력 날짜 자동 계산됩니다.'}
                                 </LunarDateDisplay>
                             </div>
 
