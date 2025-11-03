@@ -34,11 +34,6 @@ export const searchCity = async (query) => {
 
         // 결과를 도시 위주로 필터링 및 포맷팅
         return data
-            .filter(item => {
-                // 도시, 마을, 구 등만 포함
-                const validTypes = ['city', 'town', 'village', 'municipality', 'borough', 'suburb', 'quarter', 'neighbourhood'];
-                return item.type && validTypes.includes(item.type);
-            })
             .map(item => {
                 const address = item.address || {};
 
