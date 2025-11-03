@@ -411,14 +411,30 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                     month >= 1 && month <= 12 &&
                     day >= 1 && day <= 31) {
 
+                    // API 호출 시점의 날짜 값 저장 (race condition 방지)
+                    const requestDate = { year, month, day };
+
                     setIsLoadingLunar(true);
                     const lunarData = await convertSolarToLunar(year, month, day);
-                    setIsLoadingLunar(false);
 
-                    if (lunarData) {
-                        setLunarDate(formatLunarDate(lunarData));
+                    // 응답이 왔을 때 현재 입력값과 비교
+                    const currentYear = parseInt(birthYear);
+                    const currentMonth = parseInt(birthMonth);
+                    const currentDay = parseInt(birthDay);
+
+                    // 요청했던 날짜와 현재 날짜가 같을 때만 업데이트
+                    if (requestDate.year === currentYear &&
+                        requestDate.month === currentMonth &&
+                        requestDate.day === currentDay) {
+                        setIsLoadingLunar(false);
+                        if (lunarData) {
+                            setLunarDate(formatLunarDate(lunarData));
+                        } else {
+                            setLunarDate('');
+                        }
                     } else {
-                        setLunarDate('');
+                        // 날짜가 변경되었으면 로딩만 해제 (결과는 무시)
+                        setIsLoadingLunar(false);
                     }
                 } else {
                     setLunarDate('');
