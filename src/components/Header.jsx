@@ -164,8 +164,11 @@ const Header = ({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, o
                             </PlaceholderIcon>
                         )}
                         <ProfileNameContainer>
-                            <ProfileName>{profile.nickname || profile.name}님</ProfileName>
-                            <GreetingMessage>{greeting}</GreetingMessage>
+                        <ProfileName>
+                            {profile.nickname || profile.name}
+                            <span style={{ fontSize: '14px', fontWeight: '400', marginLeft: '2px' }}>님</span>
+                        </ProfileName>
+                        <GreetingMessage>{greeting}</GreetingMessage>
                         </ProfileNameContainer>
                     </>
                 ) : (
