@@ -473,21 +473,23 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                             {/* 생년월일 입력 그룹 */}
                             <div>
                                 {/* 출생 년 */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'flex-end' }}>
-                                    <Label style={{ minWidth: '50px' }}>출생</Label>
-                                    <Input
-                                        type="number"
-                                        placeholder="예: 1995"
-                                        value={birthYear}
-                                        onChange={(e) => setBirthYear(e.target.value)}
-                                        style={{ width: '120px', textAlign: 'right' }}
-                                    />
-                                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '30px', textAlign: 'right' }}>년</span>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Label>출생 *</Label>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <Input
+                                            type="number"
+                                            placeholder="예: 1995"
+                                            value={birthYear}
+                                            onChange={(e) => setBirthYear(e.target.value)}
+                                            style={{ width: '200px' }}
+                                        />
+                                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '24px' }}>년</span>
+                                    </div>
                                 </div>
 
                                 {/* 월 / 일 */}
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '24px', marginTop: '12px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         <Input
                                             type="number"
                                             placeholder="01-12"
@@ -497,11 +499,11 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                             onFocus={(e) => e.target.select()}
                                             min="1"
                                             max="12"
-                                            style={{ width: '92px', textAlign: 'right' }}
+                                            style={{ width: '70px' }}
                                         />
-                                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '30px', textAlign: 'right' }}>월</span>
+                                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '24px' }}>월</span>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         <Input
                                             type="number"
                                             placeholder="01-31"
@@ -511,14 +513,14 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                             onFocus={(e) => e.target.select()}
                                             min="1"
                                             max="31"
-                                            style={{ width: '92px', textAlign: 'right' }}
+                                            style={{ width: '70px' }}
                                         />
-                                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '30px', textAlign: 'right' }}>일</span>
+                                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '24px' }}>일</span>
                                     </div>
                                 </div>
 
-                                {/* 음력 날짜 표시 (바로 아래에 붙임) */}
-                                <LunarDateDisplay style={{ marginTop: '8px' }}>
+                                {/* 음력 날짜 표시 (오른쪽 정렬) */}
+                                <LunarDateDisplay style={{ marginTop: '8px', justifyContent: 'flex-end', paddingRight: '32px' }}>
                                     {lunarDate ? `(${lunarDate})` : '💡 양력 생일을 입력하면 자동으로 음력 날짜를 계산합니다'}
                                 </LunarDateDisplay>
                             </div>
@@ -526,7 +528,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                             {/* 성별 */}
                             <div>
                                 <Label>성별 *</Label>
-                                <RadioGroup>
+                                <RadioGroup style={{ justifyContent: 'center', gap: '40px' }}>
                                     <RadioLabel>
                                         <input
                                             type="radio"
@@ -668,19 +670,23 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                     <ConfirmValue>{gender}</ConfirmValue>
                                 </ConfirmItem>
 
-                                {hasBirthTime && birthHour && birthMinute && (
-                                    <ConfirmItem>
-                                        <ConfirmLabel>출생 시간</ConfirmLabel>
-                                        <ConfirmValue>{birthHour}시 {birthMinute}분</ConfirmValue>
-                                    </ConfirmItem>
-                                )}
+                                <ConfirmItem>
+                                    <ConfirmLabel>출생 시간</ConfirmLabel>
+                                    <ConfirmValue>
+                                        {hasBirthTime && birthHour && birthMinute
+                                            ? `${birthHour}시 ${birthMinute}분`
+                                            : '선택하지 않음'}
+                                    </ConfirmValue>
+                                </ConfirmItem>
 
-                                {hasBirthPlace && (
-                                    <ConfirmItem>
-                                        <ConfirmLabel>출생 장소</ConfirmLabel>
-                                        <ConfirmValue>{country}, {city}</ConfirmValue>
-                                    </ConfirmItem>
-                                )}
+                                <ConfirmItem>
+                                    <ConfirmLabel>출생 장소</ConfirmLabel>
+                                    <ConfirmValue>
+                                        {hasBirthPlace
+                                            ? `${country}, ${city}`
+                                            : '선택하지 않음'}
+                                    </ConfirmValue>
+                                </ConfirmItem>
                             </ConfirmSection>
 
                             <ButtonGroup>
