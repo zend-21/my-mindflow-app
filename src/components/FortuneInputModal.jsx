@@ -281,11 +281,89 @@ const ConfirmValue = styled.span`
     font-weight: 600;
 `;
 
+// 음력 경고 모달
+const WarningOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 20000;
+`;
+
+const WarningBox = styled.div`
+    background: white;
+    border-radius: 16px;
+    padding: 32px 24px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    text-align: center;
+`;
+
+const WarningIcon = styled.div`
+    font-size: 48px;
+    margin-bottom: 16px;
+`;
+
+const WarningTitle = styled.h3`
+    font-size: 20px;
+    font-weight: 700;
+    color: #333;
+    margin: 0 0 12px 0;
+`;
+
+const WarningMessage = styled.p`
+    font-size: 15px;
+    color: #666;
+    line-height: 1.6;
+    margin: 0 0 24px 0;
+    white-space: pre-line;
+`;
+
+const WarningButtonGroup = styled.div`
+    display: flex;
+    gap: 12px;
+`;
+
+const WarningButton = styled.button`
+    flex: 1;
+    padding: 14px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    ${props => props.$primary ? `
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+
+        &:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+    ` : `
+        background: #f0f2f5;
+        color: #666;
+
+        &:hover {
+            background: #e1e4e8;
+        }
+    `}
+`;
+
 // 🎯 Main Component
 
 const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '게스트', isEditMode = false, profile = null }) => {
     // 편집 모드이거나 initialData가 없으면 'input', 아니면 'confirm'
     const [step, setStep] = useState(isEditMode ? 'input' : (initialData ? 'confirm' : 'input')); // 'input' | 'confirm'
+    const [showLunarWarning, setShowLunarWarning] = useState(false);
 
     // 사용자 입력 데이터
     const [birthYear, setBirthYear] = useState(initialData?.birthYear?.toString() || '');
@@ -430,7 +508,24 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
             return;
         }
 
+        // 음력 변환 중이거나 실패한 경우 경고 표시
+        if (isLoadingLunar || !lunarDate) {
+            setShowLunarWarning(true);
+            return;
+        }
+
         setStep('confirm');
+    };
+
+    // 음력 없이 진행
+    const handleProceedWithoutLunar = () => {
+        setShowLunarWarning(false);
+        setStep('confirm');
+    };
+
+    // 음력 대기 취소
+    const handleCancelLunarWarning = () => {
+        setShowLunarWarning(false);
     };
 
     // 수정하기
@@ -717,6 +812,29 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                     )}
                 </Content>
             </Container>
+
+            {/* 음력 경고 모달 */}
+            {showLunarWarning && (
+                <WarningOverlay onClick={(e) => e.stopPropagation()}>
+                    <WarningBox onClick={(e) => e.stopPropagation()}>
+                        <WarningIcon>⚠️</WarningIcon>
+                        <WarningTitle>음력 변환이 완료되지 않았습니다</WarningTitle>
+                        <WarningMessage>
+                            음력 정보가 없으면 사주 내용은 표시되지 않습니다.{'\n'}
+                            이대로 진행하시겠습니까?{'\n\n'}
+                            (별자리, 타로 등은 정상 출력됩니다)
+                        </WarningMessage>
+                        <WarningButtonGroup>
+                            <WarningButton onClick={handleCancelLunarWarning}>
+                                취소
+                            </WarningButton>
+                            <WarningButton $primary onClick={handleProceedWithoutLunar}>
+                                진행
+                            </WarningButton>
+                        </WarningButtonGroup>
+                    </WarningBox>
+                </WarningOverlay>
+            )}
         </Overlay>
     );
 };

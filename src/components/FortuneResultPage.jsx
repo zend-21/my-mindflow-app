@@ -505,20 +505,26 @@ ${fortuneResult.starSign.content}
                         {/* 사주 정보 */}
                         <Section $delay="0.05s">
                             <SectionTitle>🌟 사주 정보</SectionTitle>
-                            <InfoGrid>
-                                <InfoItem>
-                                    <InfoLabel>일간</InfoLabel>
-                                    <InfoValue>{fortuneResult.userDayStem}</InfoValue>
-                                </InfoItem>
-                                <InfoItem>
-                                    <InfoLabel>오늘 일진</InfoLabel>
-                                    <InfoValue>{fortuneResult.todayPillar}</InfoValue>
-                                </InfoItem>
-                                <InfoItem>
-                                    <InfoLabel>별자리</InfoLabel>
-                                    <InfoValue>{fortuneResult.zodiacSign}</InfoValue>
-                                </InfoItem>
-                            </InfoGrid>
+                            {fortuneResult.lunarDate ? (
+                                <InfoGrid>
+                                    <InfoItem>
+                                        <InfoLabel>일간</InfoLabel>
+                                        <InfoValue>{fortuneResult.userDayStem}</InfoValue>
+                                    </InfoItem>
+                                    <InfoItem>
+                                        <InfoLabel>오늘 일진</InfoLabel>
+                                        <InfoValue>{fortuneResult.todayPillar}</InfoValue>
+                                    </InfoItem>
+                                    <InfoItem>
+                                        <InfoLabel>별자리</InfoLabel>
+                                        <InfoValue>{fortuneResult.zodiacSign}</InfoValue>
+                                    </InfoItem>
+                                </InfoGrid>
+                            ) : (
+                                <SectionContent $borderColor="#e2e8f0" style={{ textAlign: 'center', padding: '24px', color: '#999' }}>
+                                    ⚠️ 음력 정보가 없어 사주 결과를 표시할 수 없습니다.
+                                </SectionContent>
+                            )}
                         </Section>
 
                         {/* 오늘의 운세 */}
