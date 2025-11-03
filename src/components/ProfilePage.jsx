@@ -776,8 +776,8 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
 
     return (
         <>
-            <Overlay onClick={onClose}>
-                <ModalContainer onClick={(e) => e.stopPropagation()}>
+            <Overlay>
+                <ModalContainer>
                     <Header>
                         <HeaderTitle>프로필</HeaderTitle>
                         <CloseButton onClick={onClose}>&times;</CloseButton>

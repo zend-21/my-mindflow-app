@@ -451,8 +451,8 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
   return (
     <Portal>
     <Fragment>
-      <Overlay onClick={onClose}>
-        <ModalContent onClick={(e) => e.stopPropagation()}>
+      <Overlay>
+        <ModalContent>
           <Header>
             {/* 날짜 */}
             <TitleRow>

@@ -167,8 +167,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
     return (
       <Portal>
-        <Overlay onClick={onClose}>
-            <ModalContent onClick={e => e.stopPropagation()}>
+        <Overlay>
+            <ModalContent>
                 <Header>{scheduleDateStr} 알람 설정</Header>
                 <FormArea>
                     <Section>

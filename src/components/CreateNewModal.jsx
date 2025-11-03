@@ -80,8 +80,8 @@ const CreateNewModal = ({ onClose, onActionSelect }) => {
 
     return (
       <Portal>
-        <Overlay onClick={onClose}>
-            <ModalContent onClick={e => e.stopPropagation()}>
+        <Overlay>
+            <ModalContent>
                 <ModalTitle>새 항목 만들기</ModalTitle>
                 {actions.map(action => (
                     <ActionButton key={action.name} onClick={() => onActionSelect(action.name)}>

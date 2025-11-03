@@ -976,7 +976,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 <Label>출생 도시 (선택사항)</Label>
                                 <Input
                                     type="text"
-                                    placeholder="태양시 보정을 위해 입력하세요 (탭하여 검색)"
+                                    placeholder="태양시 보정을 위해 입력하세요"
                                     value={cityQuery}
                                     onClick={handleOpenCitySearchModal}
                                     readOnly

@@ -86,8 +86,8 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
     });
 
     return (
-        <ModalOverlay onClick={onClose}>
-            <ModalContent onClick={(e) => e.stopPropagation()}>
+        <ModalOverlay>
+            <ModalContent>
                 <CloseButton onClick={onClose}>×</CloseButton>
                 <ModalTitle>로그인</ModalTitle>
                 <ModalDescription>

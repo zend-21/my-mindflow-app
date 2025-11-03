@@ -416,8 +416,8 @@ const NewMemoModal = ({ isOpen, onSave, onCancel, openSource }) => {
     return (
       <Portal>
         <Fragment>
-            <Overlay onClick={handleCancelClick}>
-                <ModalContent onClick={e => e.stopPropagation()} $isImportant={isImportant}>
+            <Overlay>
+                <ModalContent $isImportant={isImportant}>
                     
                     {/* ★★★ 변경된 부분: 버튼 그룹화 ★★★ */}
                     <ButtonContainer>

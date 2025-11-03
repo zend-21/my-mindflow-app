@@ -196,8 +196,8 @@ const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) 
     };
 
     return (
-        <Overlay onClick={onClose}>
-            <Modal onClick={(e) => e.stopPropagation()}>
+        <Overlay>
+            <Modal>
                 <Title>정보 확인</Title>
                 <Subtitle>저장된 정보로 운세를 확인하시겠습니까?</Subtitle>
 

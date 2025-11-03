@@ -492,8 +492,8 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
     return (
       <Portal>
         <Fragment>
-            <Overlay onClick={handleCancelClick}>
-                <ModalContent onClick={e => e.stopPropagation()} $isImportant={isImportant}>
+            <Overlay>
+                <ModalContent $isImportant={isImportant}>
                     
                     {/* 1. 새로운 상단 그리드 */}
                     <TopGridContainer>
