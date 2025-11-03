@@ -11,25 +11,20 @@ export const searchCity = async (query) => {
     }
 
     try {
-        // 개발 환경에서는 Vite proxy 사용
+        // 개발 환경에서는 Vite proxy, 프로덕션에서는 Vercel serverless function 사용
         const isDevelopment = import.meta.env.DEV;
         const baseUrl = isDevelopment
             ? '/api/geocoding/search'
-            : 'https://nominatim.openstreetmap.org/search';
+            : '/api/geocoding';
 
-        const response = await fetch(
-            `${baseUrl}?` +
-            `q=${encodeURIComponent(query.trim())}` +
-            `&format=json` +
-            `&addressdetails=1` +
-            `&limit=10` +
-            `&accept-language=ko,en,ja`,
-            {
-                headers: {
-                    'User-Agent': 'MindFlowApp/1.0 (Fortune Telling App)'
-                }
-            }
-        );
+        const params = new URLSearchParams({
+            q: query.trim(),
+            format: 'json',
+            addressdetails: '1',
+            limit: '10'
+        });
+
+        const response = await fetch(`${baseUrl}?${params.toString()}`);
 
         if (!response.ok) {
             throw new Error('API 호출 실패');
