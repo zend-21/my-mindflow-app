@@ -37,40 +37,65 @@ export const searchCity = async (query) => {
             .map(item => {
                 const address = item.address || {};
 
-                // 주요 지명 추출 (우선순위 순서: 작은 단위부터)
-                const primaryName = address.suburb ||  // 동/리 (가장 작은 단위)
-                                   address.village ||
-                                   address.town ||
-                                   address.city ||
-                                   address.municipality ||
-                                   address.borough ||
+                // 모든 가능한 필드를 추출해서 확인
+                const suburb = address.suburb || '';           // 동/리
+                const neighbourhood = address.neighbourhood || ''; // 이웃
+                const quarter = address.quarter || '';         // 구역
+                const city_district = address.city_district || ''; // 구
+                const district = address.district || '';       // 구역
+                const borough = address.borough || '';         // 자치구
+                const county = address.county || '';           // 군/카운티
+                const city = address.city || '';               // 시
+                const town = address.town || '';               // 읍
+                const village = address.village || '';         // 마을
+                const municipality = address.municipality || ''; // 자치시
+                const state = address.state || '';             // 주/도
+                const province = address.province || '';       // 도
+                const country = address.country || '';         // 국가
+
+                // 주요 지명 결정 (작은 단위부터)
+                const primaryName = suburb ||
+                                   neighbourhood ||
+                                   quarter ||
+                                   village ||
+                                   town ||
+                                   city ||
+                                   municipality ||
+                                   borough ||
                                    item.name;
 
-                // 중간 행정구역 (구/군/카운티)
-                const district = address.county ||
-                                address.city_district ||
-                                address.district ||
-                                '';
+                // 구/군 (중간 행정구역)
+                const districtName = city_district ||
+                                    district ||
+                                    borough ||
+                                    county ||
+                                    '';
 
-                // 상위 행정구역 (시/도/주)
-                const state = address.state ||
-                             address.province ||
-                             '';
+                // 시/도 (상위 행정구역)
+                const stateName = city ||  // city가 동보다 상위일 경우
+                                 state ||
+                                 province ||
+                                 '';
 
-                // 국가명
-                const country = address.country || '';
+                // ⚠️ 중복 제거: primaryName과 stateName이 같으면 stateName 비우기
+                const finalState = (stateName === primaryName) ? '' : stateName;
 
                 return {
                     primaryName,      // 주요 지명 (신사동, Springfield 등)
-                    district,         // 구/군 (강남구, Sangamon County 등)
-                    state,           // 시/도/주 (서울특별시, 일리노이주 등)
-                    country,         // 국가 (대한민국, 미국 등)
+                    district: districtName,  // 구/군 (강남구, Sangamon County 등)
+                    state: finalState,       // 시/도/주 (서울특별시, 일리노이주 등)
+                    country,                 // 국가 (대한민국, 미국 등)
                     // 하위 호환성을 위해 기존 필드도 유지
                     city: primaryName,
-                    displayName: formatDisplayName(primaryName, district, state, country),
+                    displayName: formatDisplayName(primaryName, districtName, finalState, country),
                     lat: parseFloat(item.lat),
                     lon: parseFloat(item.lon),
-                    rawData: item
+                    rawData: item,
+                    // 🔍 디버깅용 - 모든 필드 포함
+                    _debug: {
+                        suburb, neighbourhood, quarter, city_district, district, borough,
+                        county, city, town, village, municipality, state, province
+                    }
                 };
             })
             .filter(item => item.primaryName && item.country); // 지명과 국가명이 있는 것만
