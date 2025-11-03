@@ -28,9 +28,9 @@ export const importData = (file, setFunction) => {
         try {
             const decryptedData = decrypt(e.target.result);
             setFunction(decryptedData);
-            alert('데이터가 성공적으로 복원되었습니다.'); // 복원 성공 알림 추가
+            // 성공 메시지는 호출하는 곳에서 처리
         } catch (error) {
-            alert('파일을 불러오는 데 실패했습니다. 올바른 형식의 파일인지 확인해주세요.');
+            console.error('파일을 불러오는 데 실패했습니다. 올바른 형식의 파일인지 확인해주세요.');
             console.error('Import failed:', error);
         }
     };

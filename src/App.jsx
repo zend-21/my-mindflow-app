@@ -659,9 +659,9 @@ function App() {
     const handleDataImport = async () => {
         const imported = await importData();
         if (imported) {
-            alert('데이터가 성공적으로 복원되었습니다.');
+            showToast('데이터가 성공적으로 복원되었습니다.');
             addActivity('복원', '전체 메모 복원');
-            window.location.reload();
+            setTimeout(() => window.location.reload(), 1500);
         }
     };
     
@@ -1508,7 +1508,7 @@ if (isLoading) {
                     allData={allData}
                     onSelectResult={(id, type) => {
                         setIsSearchModalOpen(false);
-                        alert(`선택된 항목의 상세 페이지로 이동합니다. ID: ${id}, 유형: ${type}`);
+                        console.log(`선택된 항목: ID: ${id}, 유형: ${type}`);
                     }}
                 />
             )}

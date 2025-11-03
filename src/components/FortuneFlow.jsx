@@ -123,7 +123,7 @@ const FortuneFlow = ({ onClose, profile }) => {
     // 🎯 Handler: 가차 애니메이션 완료
     const handleGachaComplete = () => {
         if (!userProfile || !fortuneData) {
-            alert('데이터를 불러오는 중 오류가 발생했습니다.');
+            console.error('데이터를 불러오는 중 오류가 발생했습니다.');
             onClose();
             return;
         }

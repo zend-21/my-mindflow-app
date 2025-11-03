@@ -420,10 +420,30 @@ const CopyNotification = styled.div`
     pointer-events: none;
 `;
 
+const ErrorNotification = styled.div`
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #f56565;
+    color: white;
+    padding: 14px 28px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 600;
+    box-shadow: 0 8px 24px rgba(245, 101, 101, 0.4);
+    z-index: 10001;
+    opacity: ${props => props.$show ? '1' : '0'};
+    transform: translateX(-50%) ${props => props.$show ? 'translateY(0)' : 'translateY(-20px)'};
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+`;
+
 // 🎯 Main Component
 
 const FortuneResultPage = ({ fortuneResult, onClose, onReset }) => {
     const [showCopyNotification, setShowCopyNotification] = useState(false);
+    const [showErrorNotification, setShowErrorNotification] = useState(false);
 
     if (!fortuneResult) return null;
 
@@ -485,7 +505,8 @@ ${fortuneResult.starSign.content}
             setShowCopyNotification(true);
             setTimeout(() => setShowCopyNotification(false), 2500);
         } catch (err) {
-            alert('복사에 실패했습니다. 다시 시도해주세요.');
+            setShowErrorNotification(true);
+            setTimeout(() => setShowErrorNotification(false), 2500);
         }
     };
 
@@ -636,6 +657,11 @@ ${fortuneResult.starSign.content}
             <CopyNotification $show={showCopyNotification}>
                 ✓ 복사되었습니다
             </CopyNotification>
+
+            {/* 에러 알림 */}
+            <ErrorNotification $show={showErrorNotification}>
+                ⚠️ 복사에 실패했습니다
+            </ErrorNotification>
         </>
     );
 };

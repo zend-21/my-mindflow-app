@@ -10,6 +10,14 @@ export default defineConfig({
         target: 'https://apis.data.go.kr',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/lunar/, '/B090041/openapi/service/LrsrCldInfoService')
+      },
+      '/api/geocoding': {
+        target: 'https://nominatim.openstreetmap.org',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/geocoding/, ''),
+        headers: {
+          'User-Agent': 'MindFlowApp/1.0'
+        }
       }
     }
   }

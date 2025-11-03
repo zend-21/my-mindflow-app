@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { getCountries, getCities } from '../utils/timeZoneData';
 import { convertSolarToLunar, formatLunarDate } from '../utils/lunarConverter';
+import { searchCity } from '../utils/geocoding';
 
 // 🎨 Styled Components
 
@@ -309,6 +310,132 @@ const UserNameDisplay = styled.div`
     color: #555;
 `;
 
+// 도시 검색 모달 오버레이
+const CitySearchModalOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10001;
+`;
+
+// 도시 검색 모달 컨테이너
+const CitySearchModalContainer = styled.div`
+    background: white;
+    width: 90%;
+    max-width: 500px;
+    max-height: 70vh;
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+`;
+
+// 도시 검색 모달 헤더
+const CitySearchModalHeader = styled.div`
+    padding: 20px 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+`;
+
+const CitySearchModalTitle = styled.h3`
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+`;
+
+// 도시 검색 모달 바디
+const CitySearchModalBody = styled.div`
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    flex: 1;
+    overflow: hidden;
+`;
+
+// 도시 검색 인풋
+const CitySearchInput = styled.input`
+    padding: 14px 16px;
+    border: 2px solid #e2e8f0;
+    border-radius: 10px;
+    font-size: 16px;
+    transition: border-color 0.2s;
+
+    &:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    &::placeholder {
+        color: #cbd5e0;
+    }
+`;
+
+// 도시 검색 결과 리스트
+const CitySearchResultsList = styled.div`
+    flex: 1;
+    overflow-y: auto;
+    background: #f7f9fc;
+    border-radius: 10px;
+    padding: 8px;
+`;
+
+// 도시 검색 헬퍼 텍스트
+const CitySearchHelperText = styled.div`
+    padding: 16px;
+    text-align: center;
+    color: #888;
+    font-size: 14px;
+    line-height: 1.6;
+`;
+
+const CitySearchItem = styled.div`
+    padding: 14px 16px;
+    cursor: pointer;
+    font-size: 15px;
+    color: #333;
+    transition: background 0.2s;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    background: white;
+
+    &:last-child {
+        margin-bottom: 0;
+    }
+
+    &:hover {
+        background: #eef1f8;
+    }
+
+    &:active {
+        background: #e2e8f0;
+    }
+`;
+
+const CitySearchLoading = styled.div`
+    padding: 32px 16px;
+    text-align: center;
+    color: #888;
+    font-size: 14px;
+`;
+
+const CitySearchEmpty = styled.div`
+    padding: 32px 16px;
+    text-align: center;
+    color: #888;
+    font-size: 14px;
+`;
+
 const ConfirmSection = styled.div`
     background: white;
     border-radius: 12px;
@@ -427,6 +554,8 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
     // 편집 모드이거나 initialData가 없으면 'input', 아니면 'confirm'
     const [step, setStep] = useState(isEditMode ? 'input' : (initialData ? 'confirm' : 'input')); // 'input' | 'confirm'
     const [showLunarWarning, setShowLunarWarning] = useState(false);
+    const [showErrorModal, setShowErrorModal] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     // 사용자 입력 데이터
     const [birthYear, setBirthYear] = useState(initialData?.birthYear?.toString() || '');
@@ -441,19 +570,24 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
 
     // 출생 장소 (선택 사항)
     const [hasBirthPlace, setHasBirthPlace] = useState(initialData?.country !== undefined);
-    const [country, setCountry] = useState(initialData?.country || '대한민국');
-    const [city, setCity] = useState(initialData?.city || '서울');
+    const [country, setCountry] = useState(initialData?.country || '');
+    const [city, setCity] = useState(initialData?.city || '');
+
+    // 도시 검색
+    const [cityQuery, setCityQuery] = useState(
+        initialData?.city && initialData?.country
+            ? `${initialData.city}, ${initialData.country}`
+            : ''
+    );
+    const [citySuggestions, setCitySuggestions] = useState([]);
+    const [isSearchingCity, setIsSearchingCity] = useState(false);
+    const [showCitySearchModal, setShowCitySearchModal] = useState(false);
+    const [modalCityQuery, setModalCityQuery] = useState('');
 
     // 음력 날짜 표시용
     const [lunarDate, setLunarDate] = useState(initialData?.lunarDate || '');
     const [isLoadingLunar, setIsLoadingLunar] = useState(false);
     const [cooldownSeconds, setCooldownSeconds] = useState(0);
-
-    // 국가 목록
-    const countries = getCountries();
-
-    // 선택된 국가의 도시 목록
-    const cities = getCities(country);
 
     // 날짜 변경 감지하여 음력 초기화
     useEffect(() => {
@@ -472,10 +606,46 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
         }
     }, [cooldownSeconds]);
 
+    // 도시 검색 (debounce 500ms) - 모달 내부 검색
+    useEffect(() => {
+        if (!showCitySearchModal || !modalCityQuery || modalCityQuery.trim().length < 2) {
+            setCitySuggestions([]);
+            return;
+        }
+
+        setIsSearchingCity(true);
+
+        const timer = setTimeout(async () => {
+            const results = await searchCity(modalCityQuery);
+            setCitySuggestions(results);
+            setIsSearchingCity(false);
+        }, 500);
+
+        return () => clearTimeout(timer);
+    }, [modalCityQuery, showCitySearchModal]);
+
+    // 도시 검색 모달 열기
+    const handleOpenCitySearchModal = () => {
+        setModalCityQuery('');
+        setCitySuggestions([]);
+        setShowCitySearchModal(true);
+    };
+
+    // 도시 선택 핸들러
+    const handleCitySelect = (suggestion) => {
+        setCity(suggestion.city);
+        setCountry(suggestion.country);
+        setCityQuery(suggestion.displayName);
+        setShowCitySearchModal(false);
+        setModalCityQuery('');
+        setCitySuggestions([]);
+    };
+
     // 양력 → 음력 변환 (수동 버튼 클릭)
     const handleConvertToLunar = async () => {
         if (!birthYear || !birthMonth || !birthDay) {
-            alert('생년월일을 모두 입력해주세요.');
+            setErrorMessage('생년월일을 모두 입력해주세요.');
+            setShowErrorModal(true);
             return;
         }
 
@@ -515,10 +685,12 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                 setCooldownSeconds(5); // 5초 쿨다운
             } else {
                 setLunarDate('');
-                alert('음력 변환에 실패했습니다. 날짜를 확인해주세요.');
+                setErrorMessage('음력 변환에 실패했습니다. 날짜를 확인해주세요.');
+                setShowErrorModal(true);
             }
         } else {
-            alert('올바른 날짜를 입력해주세요.');
+            setErrorMessage('올바른 날짜를 입력해주세요.');
+            setShowErrorModal(true);
         }
     };
 
@@ -590,7 +762,8 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
     const handleNext = () => {
         // 필수 입력 검증
         if (!birthYear || !birthMonth || !birthDay) {
-            alert('생년월일은 필수 입력 사항입니다.');
+            setErrorMessage('생년월일은 필수 입력 사항입니다.');
+            setShowErrorModal(true);
             return;
         }
 
@@ -828,21 +1001,21 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 <>
                                     <InfoText style={{ marginTop: '-8px' }}>태양시 보정을 위해 입력하세요</InfoText>
                                     <div>
-                                        <Label>국가</Label>
-                                        <Select value={country} onChange={handleCountryChange}>
-                                            {countries.map(c => (
-                                                <option key={c} value={c}>{c}</option>
-                                            ))}
-                                        </Select>
+                                        <Label>출생 도시</Label>
+                                        <Input
+                                            type="text"
+                                            placeholder="탭하여 도시 검색"
+                                            value={cityQuery}
+                                            onClick={handleOpenCitySearchModal}
+                                            readOnly
+                                            style={{ cursor: 'pointer', background: '#f9fafb' }}
+                                        />
                                     </div>
-                                    <div>
-                                        <Label>도시</Label>
-                                        <Select value={city} onChange={(e) => setCity(e.target.value)}>
-                                            {cities.map(c => (
-                                                <option key={c} value={c}>{c}</option>
-                                            ))}
-                                        </Select>
-                                    </div>
+                                    {city && country && (
+                                        <InfoText style={{ marginTop: '-8px', color: '#667eea' }}>
+                                            ✓ 선택됨: {city}, {country}
+                                        </InfoText>
+                                    )}
                                 </>
                             )}
 
@@ -935,6 +1108,67 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                         </WarningButtonGroup>
                     </WarningBox>
                 </WarningOverlay>
+            )}
+
+            {/* 에러 모달 */}
+            {showErrorModal && (
+                <WarningOverlay onClick={(e) => e.stopPropagation()}>
+                    <WarningBox onClick={(e) => e.stopPropagation()}>
+                        <WarningIcon>⚠️</WarningIcon>
+                        <WarningTitle>입력 오류</WarningTitle>
+                        <WarningMessage>
+                            {errorMessage}
+                        </WarningMessage>
+                        <WarningButtonGroup>
+                            <WarningButton $primary onClick={() => setShowErrorModal(false)}>
+                                확인
+                            </WarningButton>
+                        </WarningButtonGroup>
+                    </WarningBox>
+                </WarningOverlay>
+            )}
+
+            {/* 도시 검색 모달 */}
+            {showCitySearchModal && (
+                <CitySearchModalOverlay onClick={() => setShowCitySearchModal(false)}>
+                    <CitySearchModalContainer onClick={(e) => e.stopPropagation()}>
+                        <CitySearchModalHeader>
+                            <CitySearchModalTitle>출생 도시 검색</CitySearchModalTitle>
+                            <CloseButton onClick={() => setShowCitySearchModal(false)}>&times;</CloseButton>
+                        </CitySearchModalHeader>
+                        <CitySearchModalBody>
+                            <CitySearchInput
+                                type="text"
+                                placeholder="예: 서울, Paris, つくば"
+                                value={modalCityQuery}
+                                onChange={(e) => setModalCityQuery(e.target.value)}
+                                autoFocus
+                                autoComplete="off"
+                            />
+                            <CitySearchResultsList>
+                                {!modalCityQuery || modalCityQuery.trim().length < 2 ? (
+                                    <CitySearchHelperText>
+                                        태어난 도시를 모르시는 경우<br />
+                                        태어난 국가의 수도를 입력하세요.
+                                    </CitySearchHelperText>
+                                ) : isSearchingCity ? (
+                                    <CitySearchLoading>🔍 검색 중...</CitySearchLoading>
+                                ) : citySuggestions.length > 0 ? (
+                                    citySuggestions.map((suggestion, index) => (
+                                        <CitySearchItem
+                                            key={index}
+                                            onClick={() => handleCitySelect(suggestion)}
+                                        >
+                                            🌏 {suggestion.displayName}
+                                        </CitySearchItem>
+                                    ))
+                                ) : (
+                                    <CitySearchEmpty>검색 결과가 없습니다</CitySearchEmpty>
+                                )}
+                            </CitySearchResultsList>
+                        </CitySearchModalBody>
+                    </CitySearchModalContainer>
+                </CitySearchModalOverlay>
             )}
         </Overlay>
     );
