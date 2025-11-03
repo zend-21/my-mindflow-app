@@ -1,6 +1,6 @@
 // src/components/FortuneInputModal.jsx
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import styled from 'styled-components';
 import { getCountries, getCities } from '../utils/timeZoneData';
 import { convertSolarToLunar, formatLunarDate } from '../utils/lunarConverter';
@@ -237,6 +237,29 @@ const LunarDateDisplay = styled.div`
     align-items: center;
 `;
 
+const LunarConvertButton = styled.button`
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #667eea;
+    background: white;
+    border: 1.5px solid #667eea;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+
+    &:hover {
+        background: #667eea;
+        color: white;
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+`;
+
 const UserNameDisplay = styled.div`
     padding: 12px 16px;
     border: 2px solid #e2e8f0;
@@ -391,66 +414,38 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
     // 선택된 국가의 도시 목록
     const cities = getCities(country);
 
-    // 양력 → 음력 변환 (공공데이터포털 API 사용)
-    useEffect(() => {
-        // 저장된 음력 데이터가 있으면 API 호출하지 않음
-        if (initialData?.lunarDate) {
+    // 양력 → 음력 변환 (수동 버튼 클릭)
+    const handleConvertToLunar = async () => {
+        if (!birthYear || !birthMonth || !birthDay) {
+            alert('생년월일을 모두 입력해주세요.');
             return;
         }
 
-        const fetchLunarDate = async () => {
-            if (birthYear && birthMonth && birthDay) {
-                const year = parseInt(birthYear);
-                const month = parseInt(birthMonth);
-                const day = parseInt(birthDay);
+        const year = parseInt(birthYear);
+        const month = parseInt(birthMonth);
+        const day = parseInt(birthDay);
 
-                // 유효성 검사: 년도는 4자리, 월/일은 1-2자리 완성된 숫자여야 함
-                if (!isNaN(year) && !isNaN(month) && !isNaN(day) &&
-                    birthYear.length === 4 &&  // 년도 4자리 입력 완료
-                    year >= 1900 && year <= 2050 &&
-                    month >= 1 && month <= 12 &&
-                    day >= 1 && day <= 31) {
+        // 유효성 검사
+        if (!isNaN(year) && !isNaN(month) && !isNaN(day) &&
+            birthYear.length === 4 &&
+            year >= 1900 && year <= 2050 &&
+            month >= 1 && month <= 12 &&
+            day >= 1 && day <= 31) {
 
-                    // API 호출 시점의 날짜 값 저장 (race condition 방지)
-                    const requestDate = { year, month, day };
+            setIsLoadingLunar(true);
+            const lunarData = await convertSolarToLunar(year, month, day);
+            setIsLoadingLunar(false);
 
-                    setIsLoadingLunar(true);
-                    const lunarData = await convertSolarToLunar(year, month, day);
-
-                    // 응답이 왔을 때 현재 입력값과 비교
-                    const currentYear = parseInt(birthYear);
-                    const currentMonth = parseInt(birthMonth);
-                    const currentDay = parseInt(birthDay);
-
-                    // 요청했던 날짜와 현재 날짜가 같을 때만 업데이트
-                    if (requestDate.year === currentYear &&
-                        requestDate.month === currentMonth &&
-                        requestDate.day === currentDay) {
-                        setIsLoadingLunar(false);
-                        if (lunarData) {
-                            setLunarDate(formatLunarDate(lunarData));
-                        } else {
-                            setLunarDate('');
-                        }
-                    } else {
-                        // 날짜가 변경되었으면 로딩만 해제 (결과는 무시)
-                        setIsLoadingLunar(false);
-                    }
-                } else {
-                    setLunarDate('');
-                }
+            if (lunarData) {
+                setLunarDate(formatLunarDate(lunarData));
             } else {
                 setLunarDate('');
+                alert('음력 변환에 실패했습니다. 날짜를 확인해주세요.');
             }
-        };
-
-        // 디바운스: 300ms 후에 API 호출 (타이핑 중에는 호출 안 함)
-        const timer = setTimeout(() => {
-            fetchLunarDate();
-        }, 300);
-
-        return () => clearTimeout(timer);
-    }, [birthYear, birthMonth, birthDay, initialData?.lunarDate]);
+        } else {
+            alert('올바른 날짜를 입력해주세요.');
+        }
+    };
 
     // 국가 변경 시 첫 번째 도시로 자동 설정
     const handleCountryChange = (e) => {
@@ -648,10 +643,18 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                     </div>
                                 </div>
 
-                                {/* 음력 날짜 표시 (오른쪽 정렬) */}
-                                <LunarDateDisplay style={{ marginTop: '8px', justifyContent: 'flex-end', paddingRight: '32px' }}>
-                                    {isLoadingLunar ? '⏳ 음력 계산 중...' : (lunarDate ? `(${lunarDate})` : '💡 양력 생일을 입력하면 자동으로 음력 날짜를 계산합니다')}
-                                </LunarDateDisplay>
+                                {/* 음력 날짜 표시 및 변환 버튼 */}
+                                <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', paddingRight: '32px' }}>
+                                    <LunarConvertButton
+                                        onClick={handleConvertToLunar}
+                                        disabled={isLoadingLunar || !birthYear || !birthMonth || !birthDay}
+                                    >
+                                        음력변환
+                                    </LunarConvertButton>
+                                    <LunarDateDisplay style={{ margin: 0, padding: '4px 0' }}>
+                                        {isLoadingLunar ? '⏳ 계산 중...' : (lunarDate ? `(${lunarDate})` : '')}
+                                    </LunarDateDisplay>
+                                </div>
                             </div>
 
                             {/* 성별 */}
