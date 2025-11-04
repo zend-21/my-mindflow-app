@@ -172,11 +172,15 @@ const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) 
 
                 if (lunarData) {
                     setLunarDate(formatLunarDate(lunarData));
-                }
 
-                // 띠 계산
-                const animal = calculateZodiacAnimal(profile.birthYear);
-                setZodiacAnimal(animal);
+                    // 띠 계산 - 음력 연도 기준으로 계산
+                    const animal = calculateZodiacAnimal(lunarData.lunarYear);
+                    setZodiacAnimal(animal);
+                } else {
+                    // 음력 변환 실패 시 양력 연도로 계산
+                    const animal = calculateZodiacAnimal(profile.birthYear);
+                    setZodiacAnimal(animal);
+                }
             }
         };
 
@@ -217,7 +221,7 @@ const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) 
                         <div style={{ textAlign: 'right' }}>
                             <InfoValue>{formatBirthday()}</InfoValue>
                             {lunarDate && (
-                                <LunarNote>{zodiacAnimal}띠 음력: {lunarDate}</LunarNote>
+                                <LunarNote>({zodiacAnimal}띠) 음력: {lunarDate}</LunarNote>
                             )}
                         </div>
                     </InfoRow>

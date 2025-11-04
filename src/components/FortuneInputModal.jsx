@@ -596,6 +596,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
 
     // 음력 날짜 표시용
     const [lunarDate, setLunarDate] = useState(initialData?.lunarDate || '');
+    const [lunarData, setLunarData] = useState(null); // 음력 데이터 객체 저장
     const [isLoadingLunar, setIsLoadingLunar] = useState(false);
     const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
@@ -603,6 +604,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
     useEffect(() => {
         if (lunarDate && !initialData?.lunarDate) {
             setLunarDate('');
+            setLunarData(null);
         }
     }, [birthYear, birthMonth, birthDay]);
 
@@ -687,14 +689,16 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
             day >= 1 && day <= 31) {
 
             setIsLoadingLunar(true);
-            const lunarData = await convertSolarToLunar(year, month, day);
+            const convertedLunarData = await convertSolarToLunar(year, month, day);
             setIsLoadingLunar(false);
 
-            if (lunarData) {
-                setLunarDate(formatLunarDate(lunarData));
+            if (convertedLunarData) {
+                setLunarDate(formatLunarDate(convertedLunarData));
+                setLunarData(convertedLunarData); // 음력 데이터 객체 저장
                 setCooldownSeconds(5); // 5초 쿨다운
             } else {
                 setLunarDate('');
+                setLunarData(null);
                 setErrorMessage('음력 변환에 실패했습니다. 날짜를 확인해주세요.');
                 setShowErrorModal(true);
             }
@@ -833,8 +837,14 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
         <Overlay>
             <Container>
                 <Header>
-                    <Title>🔮 운세 프로필 입력</Title>
-                    <Subtitle>정확한 운세를 위해 정보를 입력해주세요</Subtitle>
+                    <Title>
+                        {step === 'input' ? '🔮 운세 프로필 입력' : '🔮 운세 프로필 정보 확인'}
+                    </Title>
+                    <Subtitle>
+                        {step === 'input'
+                            ? '정확한 운세를 위해 정보를 입력해주세요'
+                            : '입력하신 정보가 맞는지 확인하세요'}
+                    </Subtitle>
                     <CloseButton onClick={onClose}>&times;</CloseButton>
                 </Header>
 
@@ -1013,7 +1023,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                     {step === 'confirm' && (
                         <>
                             <ConfirmSection>
-                                <ConfirmTitle>입력하신 정보를 확인해주세요</ConfirmTitle>
+                                <ConfirmTitle>운세 프로필 정보</ConfirmTitle>
 
                                 <ConfirmItem>
                                     <ConfirmLabel>이름</ConfirmLabel>
@@ -1031,7 +1041,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                     <ConfirmItem>
                                         <ConfirmLabel>음력</ConfirmLabel>
                                         <ConfirmValue style={{ fontSize: '13px', color: '#667eea' }}>
-                                            {calculateZodiacAnimal(birthYear)}띠 {lunarDate}
+                                            ({calculateZodiacAnimal(lunarData?.lunarYear || birthYear)}띠) {lunarDate}
                                         </ConfirmValue>
                                     </ConfirmItem>
                                 )}

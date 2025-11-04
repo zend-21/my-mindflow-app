@@ -242,6 +242,45 @@ const Text = styled.p`
     }
 `;
 
+const SajuInfoBox = styled.div`
+    background: #fefcfb;
+    border: 1px solid #d4a574;
+    border-radius: 12px;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+
+    @media (min-width: 768px) {
+        padding: 18px 24px;
+    }
+`;
+
+const SajuInfoItem = styled.div`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+`;
+
+const SajuInfoLabel = styled.span`
+    font-size: 12px;
+    color: #8b5e34;
+    font-weight: 500;
+`;
+
+const SajuInfoValue = styled.span`
+    font-size: 16px;
+    color: #2d3748;
+    font-weight: 700;
+
+    @media (min-width: 768px) {
+        font-size: 17px;
+    }
+`;
+
 const LuckyContainer = styled.div`
     display: flex;
     flex-direction: column;
@@ -359,8 +398,7 @@ const TarotText = styled.p`
 const ButtonGroup = styled.div`
     display: flex;
     gap: 12px;
-    margin-top: 8px;
-    padding: 0 24px 24px;
+    padding: 24px;
 `;
 
 const Button = styled.button`
@@ -534,6 +572,26 @@ ${fortuneResult.starSign.content}
                             <CategoryTitle $color="#8b5e34" $borderColor="#d4a574">
                                 🔮 사주 운세
                             </CategoryTitle>
+
+                            {/* 사주 정보 */}
+                            {fortuneResult.lunarDate && (
+                                <SajuInfoBox>
+                                    <SajuInfoItem>
+                                        <SajuInfoLabel>일간</SajuInfoLabel>
+                                        <SajuInfoValue>{fortuneResult.userDayStem}</SajuInfoValue>
+                                    </SajuInfoItem>
+                                    <SajuInfoItem>
+                                        <SajuInfoLabel>오늘 일진</SajuInfoLabel>
+                                        <SajuInfoValue>{fortuneResult.todayPillar}</SajuInfoValue>
+                                    </SajuInfoItem>
+                                </SajuInfoBox>
+                            )}
+
+                            {!fortuneResult.lunarDate && (
+                                <SectionContent $borderColor="#e2e8f0" style={{ textAlign: 'center', padding: '24px', color: '#999', marginBottom: '20px' }}>
+                                    ⚠️ 음력 정보가 없어 사주 결과를 표시할 수 없습니다.
+                                </SectionContent>
+                            )}
 
                             {/* 종합 운세 */}
                             <Section $delay="0s">
