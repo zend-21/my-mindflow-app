@@ -194,9 +194,9 @@ const FortuneNoticeModal = ({ onConfirm }) => {
                 <Icon>🔮</Icon>
                 <Title>오늘의 운세 안내</Title>
                 <Message>
-                    오늘의 운세는 <Highlight>로그인, 로그아웃 상태에서 각 1회, 하루에 총 2회</Highlight> 이용할 수 있습니다.
-                    {'\n'}
-                    운세를 확인한 후에는 <Highlight>다시 보기</Highlight>가 가능합니다.
+                    오늘의 운세는 로그인, 로그아웃 상태에서{'\n'}
+                    <Highlight>각 1회, 하루 총 2회</Highlight> 이용할 수 있습니다.{'\n'}
+                    운세를 확인한 후에는 다시 보기가 가능합니다.
                 </Message>
 
                 <CheckboxContainer onClick={handleCheckboxClick}>
