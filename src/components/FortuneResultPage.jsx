@@ -204,25 +204,25 @@ const SectionTitle = styled.h3`
 `;
 
 const SectionContent = styled.div`
-    background: #f7fafc;
+    background: transparent;
+    border: 2px solid ${props => props.$borderColor || '#667eea'};
     border-radius: 16px;
-    padding: 20px;
-    border-left: 4px solid ${props => props.$borderColor || '#667eea'};
+    padding: 24px 20px;
 
     @media (min-width: 768px) {
-        padding: 24px;
+        padding: 28px 24px;
     }
 `;
 
 const Keyword = styled.span`
     display: inline-block;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: ${props => props.$color || '#667eea'};
     color: white;
     font-size: 13px;
     font-weight: 600;
-    padding: 6px 14px;
+    padding: 7px 16px;
     border-radius: 20px;
-    margin-bottom: 12px;
+    margin-bottom: 14px;
 
     @media (min-width: 768px) {
         font-size: 14px;
@@ -559,29 +559,43 @@ const FortuneResultPage = ({ fortuneResult, onClose, onReset }) => {
 
     if (!fortuneResult) return null;
 
-    // 행운 색상에서 배경색과 텍스트 색상 계산
-    const getLuckyNumberColors = (colorName) => {
-        // 색상 계열별 매핑
+    // HEX 색상의 밝기를 계산하여 텍스트 색상 결정 (밝으면 검정, 어두우면 흰색)
+    const getTextColorForBg = (hexColor) => {
+        // HEX를 RGB로 변환
+        const hex = hexColor.replace('#', '');
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+
+        // 밝기 계산 (perceived brightness formula)
+        const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+
+        // 밝기가 155 이상이면 검정, 아니면 흰색
+        return brightness > 155 ? '#2d3748' : 'white';
+    };
+
+    // 행운 색상명을 HEX 코드로 변환
+    const getColorHex = (colorName) => {
         const colorMap = {
-            '녹색': { bg: '#48bb78', text: 'white' },
-            '청록': { bg: '#38b2ac', text: 'white' },
-            '연두': { bg: '#9ae6b4', text: '#2d3748' },
-            '청색': { bg: '#4299e1', text: 'white' },
-            '빨강': { bg: '#f56565', text: 'white' },
-            '주황': { bg: '#ed8936', text: 'white' },
-            '보라': { bg: '#9f7aea', text: 'white' },
-            '분홍': { bg: '#ed64a6', text: 'white' },
-            '노랑': { bg: '#ecc94b', text: '#2d3748' },
-            '갈색': { bg: '#a0522d', text: 'white' },
-            '베이지': { bg: '#d2b48c', text: '#2d3748' },
-            '황토': { bg: '#cd853f', text: 'white' },
-            '하양': { bg: '#f7fafc', text: '#2d3748' },
-            '금색': { bg: '#d4af37', text: '#2d3748' },
-            '은색': { bg: '#c0c0c0', text: '#2d3748' },
-            '회색': { bg: '#a0aec0', text: 'white' },
-            '검정': { bg: '#2d3748', text: 'white' },
-            '파랑': { bg: '#3182ce', text: 'white' },
-            '남색': { bg: '#2c5282', text: 'white' }
+            '녹색': '#48bb78',
+            '청록': '#38b2ac',
+            '연두': '#9ae6b4',
+            '청색': '#4299e1',
+            '빨강': '#f56565',
+            '주황': '#ed8936',
+            '보라': '#9f7aea',
+            '분홍': '#ed64a6',
+            '노랑': '#ecc94b',
+            '갈색': '#a0522d',
+            '베이지': '#d2b48c',
+            '황토': '#cd853f',
+            '하양': '#f7fafc',
+            '금색': '#d4af37',
+            '은색': '#c0c0c0',
+            '회색': '#a0aec0',
+            '검정': '#2d3748',
+            '파랑': '#3182ce',
+            '남색': '#2c5282'
         };
 
         // 색상 이름에서 기본 색상 찾기
@@ -592,11 +606,32 @@ const FortuneResultPage = ({ fortuneResult, onClose, onReset }) => {
         }
 
         // 기본값
-        return { bg: '#667eea', text: 'white' };
+        return '#667eea';
     };
 
-    const luckyColors = getLuckyNumberColors(fortuneResult.lucky.color);
+    // 행운의 색 HEX 코드와 텍스트 색상 계산
+    const luckyColorHex = getColorHex(fortuneResult.lucky.color);
+    const luckyTextColor = getTextColorForBg(luckyColorHex);
     const numbersArray = fortuneResult.lucky.numbers.split(', ');
+
+    // 받침 유무에 따라 조사 선택 (과/와)
+    const getJosa = (num) => {
+        const numStr = String(num);
+        const lastChar = numStr.charAt(numStr.length - 1);
+        const code = lastChar.charCodeAt(0);
+
+        // 한글인 경우
+        if (code >= 0xAC00 && code <= 0xD7A3) {
+            return (code - 0xAC00) % 28 > 0 ? '과' : '와';
+        }
+
+        // 숫자인 경우 (0, 1, 3, 6, 7, 8은 받침 있음으로 처리)
+        if (['0', '1', '3', '6', '7', '8'].includes(lastChar)) {
+            return '과';
+        }
+
+        return '와';
+    };
 
     // 운세 내용을 텍스트로 변환
     const formatFortuneText = () => {
@@ -715,15 +750,15 @@ ${fortuneResult.starSign.content}
                                             {numbersArray.map((num, idx) => (
                                                 <LuckyNumber
                                                     key={idx}
-                                                    $bgColor={luckyColors.bg}
-                                                    $textColor={luckyColors.text}
+                                                    $bgColor={luckyColorHex}
+                                                    $textColor={luckyTextColor}
                                                 >
                                                     {num}
                                                 </LuckyNumber>
                                             ))}
                                         </LuckyNumbers>
                                         <LuckyNumberCaption>
-                                            금일 행운의 숫자는 {numbersArray[0]}와 {numbersArray[1]}입니다
+                                            금일 행운의 숫자는 {numbersArray[0]}{getJosa(numbersArray[0])} {numbersArray[1]}입니다
                                         </LuckyNumberCaption>
                                     </LuckyNumbersWrapper>
 
@@ -752,7 +787,7 @@ ${fortuneResult.starSign.content}
                             <Section $delay="0s">
                                 <SectionTitle>🌟 종합 운세</SectionTitle>
                                 <SectionContent $borderColor="#667eea">
-                                    {fortuneResult.overall.keyword && <Keyword>{fortuneResult.overall.keyword}</Keyword>}
+                                    {fortuneResult.overall.keyword && <Keyword $color="#667eea">{fortuneResult.overall.keyword}</Keyword>}
                                     <Text style={{ whiteSpace: 'pre-wrap' }}>{fortuneResult.overall.content}</Text>
                                 </SectionContent>
                             </Section>
@@ -761,7 +796,7 @@ ${fortuneResult.starSign.content}
                             <Section $delay="0s">
                                 <SectionTitle>💰 재물운</SectionTitle>
                                 <SectionContent $borderColor="#f6ad55">
-                                    {fortuneResult.money.keyword && <Keyword>{fortuneResult.money.keyword}</Keyword>}
+                                    {fortuneResult.money.keyword && <Keyword $color="#f6ad55">{fortuneResult.money.keyword}</Keyword>}
                                     <Text>{fortuneResult.money.content}</Text>
                                 </SectionContent>
                             </Section>
@@ -770,7 +805,7 @@ ${fortuneResult.starSign.content}
                             <Section $delay="0s">
                                 <SectionTitle>💪 건강운</SectionTitle>
                                 <SectionContent $borderColor="#48bb78">
-                                    {fortuneResult.health.keyword && <Keyword>{fortuneResult.health.keyword}</Keyword>}
+                                    {fortuneResult.health.keyword && <Keyword $color="#48bb78">{fortuneResult.health.keyword}</Keyword>}
                                     <Text>{fortuneResult.health.content}</Text>
                                 </SectionContent>
                             </Section>
@@ -779,7 +814,7 @@ ${fortuneResult.starSign.content}
                             <Section $delay="0s">
                                 <SectionTitle>💕 애정운</SectionTitle>
                                 <SectionContent $borderColor="#f687b3">
-                                    {fortuneResult.love.keyword && <Keyword>{fortuneResult.love.keyword}</Keyword>}
+                                    {fortuneResult.love.keyword && <Keyword $color="#f687b3">{fortuneResult.love.keyword}</Keyword>}
                                     <Text>{fortuneResult.love.content}</Text>
                                 </SectionContent>
                             </Section>
@@ -788,7 +823,7 @@ ${fortuneResult.starSign.content}
                             <Section $delay="0s">
                                 <SectionTitle>💡 오늘의 조언</SectionTitle>
                                 <SectionContent $borderColor="#9f7aea">
-                                    {fortuneResult.advice.keyword && <Keyword>{fortuneResult.advice.keyword}</Keyword>}
+                                    {fortuneResult.advice.keyword && <Keyword $color="#9f7aea">{fortuneResult.advice.keyword}</Keyword>}
                                     <Text>{fortuneResult.advice.content}</Text>
                                 </SectionContent>
                             </Section>
@@ -837,7 +872,7 @@ ${fortuneResult.starSign.content}
                             <Section $delay="0s">
                                 <SectionTitle>✨ {fortuneResult.starSign.sign} 오늘의 운세</SectionTitle>
                                 <SectionContent $borderColor="#ed8936">
-                                    {fortuneResult.starSign.keyword && <Keyword>{fortuneResult.starSign.keyword}</Keyword>}
+                                    {fortuneResult.starSign.keyword && <Keyword $color="#ed8936">{fortuneResult.starSign.keyword}</Keyword>}
                                     <Text>{fortuneResult.starSign.content}</Text>
                                 </SectionContent>
                             </Section>
