@@ -115,6 +115,11 @@ const FortuneFlow = ({ onClose, profile }) => {
 
     // 🎯 Handler: 프로필 확인 모달에서 수정 버튼 클릭
     const handleProfileEdit = () => {
+        // 수정 모드로 돌아갈 때 음력 정보 제거 (날짜 변경 감지를 위해)
+        if (userProfile) {
+            const { lunarDate, ...profileWithoutLunar } = userProfile;
+            setUserProfile(profileWithoutLunar);
+        }
         // Go back to input modal for editing (편집 모드 활성화)
         setIsEditMode(true);
         setFlowState('inputProfile');

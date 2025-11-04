@@ -163,15 +163,7 @@ const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) 
     // 양력 → 음력 변환 및 띠 계산
     useEffect(() => {
         const fetchLunarDate = async () => {
-            // 이미 저장된 lunarDate와 lunarYear가 있으면 그것을 사용
-            if (profile.lunarDate && profile.lunarYear) {
-                setLunarDate(profile.lunarDate);
-                const animal = calculateZodiacAnimal(profile.lunarYear);
-                setZodiacAnimal(animal);
-                return;
-            }
-
-            // 저장된 음력 정보가 없으면 변환 시도
+            // 음력 변환 시도
             if (profile.birthYear && profile.birthMonth && profile.birthDay) {
                 const lunarData = await convertSolarToLunar(
                     profile.birthYear,
@@ -180,10 +172,15 @@ const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) 
                 );
 
                 if (lunarData) {
-                    setLunarDate(formatLunarDate(lunarData));
+                    const formattedDate = formatLunarDate(lunarData);
+                    setLunarDate(formattedDate);
 
-                    // 띠 계산 - 음력 연도 기준으로 계산
-                    const animal = calculateZodiacAnimal(lunarData.lunarYear);
+                    // 음력 날짜 문자열에서 연도 추출 (예: "1969년 12월 17일" -> 1969)
+                    const yearMatch = formattedDate.match(/(\d{4})년/);
+                    const lunarYear = yearMatch ? parseInt(yearMatch[1]) : lunarData.lunarYear;
+
+                    // 띠 계산 - 추출한 음력 연도 기준
+                    const animal = calculateZodiacAnimal(lunarYear);
                     setZodiacAnimal(animal);
                 } else {
                     // 음력 변환 실패 시 양력 연도로 계산
@@ -194,7 +191,7 @@ const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) 
         };
 
         fetchLunarDate();
-    }, [profile.birthYear, profile.birthMonth, profile.birthDay, profile.lunarDate, profile.lunarYear]);
+    }, [profile.birthYear, profile.birthMonth, profile.birthDay]);
 
     // 생년월일 포맷팅 (개별 필드로 저장된 경우)
     const formatBirthday = () => {

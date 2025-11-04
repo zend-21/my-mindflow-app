@@ -596,15 +596,27 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
 
     // 음력 날짜 표시용
     const [lunarDate, setLunarDate] = useState(initialData?.lunarDate || '');
-    const [lunarData, setLunarData] = useState(null); // 음력 데이터 객체 저장
     const [isLoadingLunar, setIsLoadingLunar] = useState(false);
     const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
+    // 날짜 변경 추적을 위한 ref
+    const [prevBirthDate, setPrevBirthDate] = useState({
+        year: birthYear,
+        month: birthMonth,
+        day: birthDay
+    });
+
     // 날짜 변경 감지하여 음력 초기화
     useEffect(() => {
-        if (lunarDate && !initialData?.lunarDate) {
+        // 날짜가 실제로 변경되었는지 확인
+        const dateChanged =
+            birthYear !== prevBirthDate.year ||
+            birthMonth !== prevBirthDate.month ||
+            birthDay !== prevBirthDate.day;
+
+        if (dateChanged && lunarDate) {
             setLunarDate('');
-            setLunarData(null);
+            setPrevBirthDate({ year: birthYear, month: birthMonth, day: birthDay });
         }
     }, [birthYear, birthMonth, birthDay]);
 
@@ -694,11 +706,9 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
 
             if (convertedLunarData) {
                 setLunarDate(formatLunarDate(convertedLunarData));
-                setLunarData(convertedLunarData); // 음력 데이터 객체 저장
                 setCooldownSeconds(5); // 5초 쿨다운
             } else {
                 setLunarDate('');
-                setLunarData(null);
                 setErrorMessage('음력 변환에 실패했습니다. 날짜를 확인해주세요.');
                 setShowErrorModal(true);
             }
@@ -815,8 +825,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
             birthMonth: parseInt(birthMonth),
             birthDay: parseInt(birthDay),
             gender,
-            lunarDate: lunarDate, // 음력 날짜 문자열 저장
-            lunarYear: lunarData?.lunarYear // 음력 연도 저장 (띠 계산용)
+            lunarDate: lunarDate // 음력 날짜 문자열 저장 (띠는 이 문자열에서 추출)
         };
 
         // 출생 시간 추가 (선택 - 값이 있으면)
@@ -1042,7 +1051,12 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                     <ConfirmItem>
                                         <ConfirmLabel>음력</ConfirmLabel>
                                         <ConfirmValue style={{ fontSize: '13px', color: '#667eea' }}>
-                                            ({calculateZodiacAnimal(lunarData?.lunarYear || birthYear)}띠) {lunarDate}
+                                            {(() => {
+                                                // 음력 날짜 문자열에서 연도 추출 (예: "1969년 12월 17일" -> 1969)
+                                                const yearMatch = lunarDate.match(/(\d{4})년/);
+                                                const lunarYear = yearMatch ? parseInt(yearMatch[1]) : birthYear;
+                                                return `(${calculateZodiacAnimal(lunarYear)}띠)`;
+                                            })()} {lunarDate}
                                         </ConfirmValue>
                                     </ConfirmItem>
                                 )}
