@@ -37,7 +37,7 @@ const loadTarotData = () => {
     return TAROT_DATA;
 };
 
-// 별자리 운세 데이터 로드 (240개: 12별자리 × 20개)
+// 별자리 운세 데이터 로드 (2400개: 12별자리 × 200개)
 let HOROSCOPE_DATA = null;
 
 const loadHoroscopeData = () => {
@@ -359,7 +359,7 @@ const selectHoroscopeFortune = (zodiacSign, date) => {
 
     const zodiacCode = zodiacMap[zodiacSign] || 'AR';
 
-    // 해당 별자리의 운세만 필터링 (20개)
+    // 해당 별자리의 운세만 필터링 (200개)
     const zodiacFortunes = horoscopeData.filter(item =>
         item.ID && item.ID.startsWith(`H_${zodiacCode}_`)
     );
@@ -371,7 +371,7 @@ const selectHoroscopeFortune = (zodiacSign, date) => {
         };
     }
 
-    // 오늘 날짜로 인덱스 결정 (같은 날은 같은 운세)
+    // 오늘 날짜로 인덱스 결정 (같은 날은 같은 운세, 200개 순환)
     const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000);
     const index = dayOfYear % zodiacFortunes.length;
     const selectedFortune = zodiacFortunes[index];
