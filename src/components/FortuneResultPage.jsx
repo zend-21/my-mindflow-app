@@ -220,8 +220,8 @@ const Keyword = styled.span`
     color: white;
     font-size: 13px;
     font-weight: 600;
-    padding: 7px 16px;
-    border-radius: 20px;
+    padding: 6px 14px;
+    border-radius: 16px;
     margin-bottom: 14px;
 
     @media (min-width: 768px) {
@@ -283,11 +283,12 @@ const SajuInfoValue = styled.span`
 
 const LuckyWrapper = styled.div`
     position: relative;
+    padding-top: 20px;
 `;
 
 const LuckyTabTitle = styled.div`
     position: absolute;
-    top: -12px;
+    top: 0;
     left: 20px;
     background: #d4a574;
     color: white;
@@ -301,7 +302,6 @@ const LuckyTabTitle = styled.div`
         font-size: 16px;
         padding: 10px 24px;
         left: 24px;
-        top: -14px;
     }
 `;
 
@@ -314,9 +314,15 @@ const LuckyContainer = styled.div`
     border: 2px solid #d4a574;
     border-radius: 20px;
     padding: 32px 24px;
+    padding-top: 44px;
     text-align: center;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     position: relative;
+    margin-top: 15px;
+
+    @media (min-width: 768px) {
+        padding-top: 48px;
+    }
 `;
 
 const LuckyIntroText = styled.p`
@@ -414,6 +420,48 @@ const LuckyValue = styled.span`
 
     @media (min-width: 768px) {
         font-size: 16px;
+    }
+`;
+
+const FortuneWrapper = styled.div`
+    position: relative;
+    padding-top: 20px;
+`;
+
+const FortuneTabTitle = styled.div`
+    position: absolute;
+    top: 0;
+    left: 20px;
+    background: ${props => props.$bgColor || '#667eea'};
+    color: white;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 8px 20px;
+    border-radius: 8px 8px 0 0;
+    z-index: 1;
+
+    @media (min-width: 768px) {
+        font-size: 16px;
+        padding: 10px 24px;
+        left: 24px;
+    }
+`;
+
+const FortuneContainer = styled.div`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: transparent;
+    border: 2px solid ${props => props.$borderColor || '#667eea'};
+    border-radius: 20px;
+    padding: 32px 20px;
+    padding-top: 44px;
+    position: relative;
+    margin-top: 15px;
+
+    @media (min-width: 768px) {
+        padding: 36px 24px;
+        padding-top: 48px;
     }
 `;
 
@@ -812,47 +860,57 @@ ${fortuneResult.starSign.content}
 
                             {/* 종합 운세 */}
                             <Section $delay="0s">
-                                <SectionTitle>🌟 종합 운세</SectionTitle>
-                                <SectionContent $borderColor="#667eea">
-                                    {fortuneResult.overall.keyword && <Keyword $color="#667eea">{fortuneResult.overall.keyword}</Keyword>}
-                                    <Text style={{ whiteSpace: 'pre-wrap' }}>{fortuneResult.overall.content}</Text>
-                                </SectionContent>
+                                <FortuneWrapper>
+                                    <FortuneTabTitle $bgColor="#667eea">🌟 종합 운세</FortuneTabTitle>
+                                    <FortuneContainer $borderColor="#667eea">
+                                        {fortuneResult.overall.keyword && <Keyword $color="#667eea">{fortuneResult.overall.keyword}</Keyword>}
+                                        <Text style={{ whiteSpace: 'pre-wrap' }}>{fortuneResult.overall.content}</Text>
+                                    </FortuneContainer>
+                                </FortuneWrapper>
                             </Section>
 
                             {/* 재물운 */}
                             <Section $delay="0s">
-                                <SectionTitle>💰 재물운</SectionTitle>
-                                <SectionContent $borderColor="#f6ad55">
-                                    {fortuneResult.money.keyword && <Keyword $color="#f6ad55">{fortuneResult.money.keyword}</Keyword>}
-                                    <Text>{fortuneResult.money.content}</Text>
-                                </SectionContent>
+                                <FortuneWrapper>
+                                    <FortuneTabTitle $bgColor="#f6ad55">💰 재물운</FortuneTabTitle>
+                                    <FortuneContainer $borderColor="#f6ad55">
+                                        {fortuneResult.money.keyword && <Keyword $color="#f6ad55">{fortuneResult.money.keyword}</Keyword>}
+                                        <Text>{fortuneResult.money.content}</Text>
+                                    </FortuneContainer>
+                                </FortuneWrapper>
                             </Section>
 
                             {/* 건강운 */}
                             <Section $delay="0s">
-                                <SectionTitle>💪 건강운</SectionTitle>
-                                <SectionContent $borderColor="#48bb78">
-                                    {fortuneResult.health.keyword && <Keyword $color="#48bb78">{fortuneResult.health.keyword}</Keyword>}
-                                    <Text>{fortuneResult.health.content}</Text>
-                                </SectionContent>
+                                <FortuneWrapper>
+                                    <FortuneTabTitle $bgColor="#48bb78">💪 건강운</FortuneTabTitle>
+                                    <FortuneContainer $borderColor="#48bb78">
+                                        {fortuneResult.health.keyword && <Keyword $color="#48bb78">{fortuneResult.health.keyword}</Keyword>}
+                                        <Text>{fortuneResult.health.content}</Text>
+                                    </FortuneContainer>
+                                </FortuneWrapper>
                             </Section>
 
                             {/* 애정운 */}
                             <Section $delay="0s">
-                                <SectionTitle>💕 애정운</SectionTitle>
-                                <SectionContent $borderColor="#f687b3">
-                                    {fortuneResult.love.keyword && <Keyword $color="#f687b3">{fortuneResult.love.keyword}</Keyword>}
-                                    <Text>{fortuneResult.love.content}</Text>
-                                </SectionContent>
+                                <FortuneWrapper>
+                                    <FortuneTabTitle $bgColor="#f687b3">💕 애정운</FortuneTabTitle>
+                                    <FortuneContainer $borderColor="#f687b3">
+                                        {fortuneResult.love.keyword && <Keyword $color="#f687b3">{fortuneResult.love.keyword}</Keyword>}
+                                        <Text>{fortuneResult.love.content}</Text>
+                                    </FortuneContainer>
+                                </FortuneWrapper>
                             </Section>
 
                             {/* 오늘의 조언 */}
                             <Section $delay="0s">
-                                <SectionTitle>💡 오늘의 조언</SectionTitle>
-                                <SectionContent $borderColor="#9f7aea">
-                                    {fortuneResult.advice.keyword && <Keyword $color="#9f7aea">{fortuneResult.advice.keyword}</Keyword>}
-                                    <Text>{fortuneResult.advice.content}</Text>
-                                </SectionContent>
+                                <FortuneWrapper>
+                                    <FortuneTabTitle $bgColor="#9f7aea">💡 오늘의 조언</FortuneTabTitle>
+                                    <FortuneContainer $borderColor="#9f7aea">
+                                        {fortuneResult.advice.keyword && <Keyword $color="#9f7aea">{fortuneResult.advice.keyword}</Keyword>}
+                                        <Text>{fortuneResult.advice.content}</Text>
+                                    </FortuneContainer>
+                                </FortuneWrapper>
                             </Section>
                         </CategoryContainer>
 
