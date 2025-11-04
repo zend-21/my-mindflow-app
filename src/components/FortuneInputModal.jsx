@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { getCountries, getCities } from '../utils/timeZoneData';
 import { convertSolarToLunar, formatLunarDate } from '../utils/lunarConverter';
-import { searchCity } from '../utils/geocoding';
+import { searchCity, getTimezoneFromCoords } from '../utils/geocoding';
 import { calculateZodiacAnimal } from '../utils/fortuneLogic';
 
 // 🎨 Styled Components
@@ -582,6 +582,9 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
     // 출생 장소 (선택 사항)
     const [country, setCountry] = useState(initialData?.country || '');
     const [city, setCity] = useState(initialData?.city || '');
+    const [birthLat, setBirthLat] = useState(initialData?.birthLat || null);
+    const [birthLon, setBirthLon] = useState(initialData?.birthLon || null);
+    const [birthTimezone, setBirthTimezone] = useState(initialData?.birthTimezone || null);
 
     // 도시 검색
     const [cityQuery, setCityQuery] = useState(
@@ -657,10 +660,24 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
     };
 
     // 도시 선택 핸들러
-    const handleCitySelect = (suggestion) => {
+    const handleCitySelect = async (suggestion) => {
         setCity(suggestion.city);
         setCountry(suggestion.country);
         setCityQuery(suggestion.displayName);
+
+        // 위도/경도 저장
+        setBirthLat(suggestion.lat);
+        setBirthLon(suggestion.lon);
+
+        // 타임존 가져오기
+        try {
+            const timezone = await getTimezoneFromCoords(suggestion.lat, suggestion.lon);
+            setBirthTimezone(timezone);
+        } catch (error) {
+            console.error('타임존 가져오기 실패:', error);
+            setBirthTimezone(null);
+        }
+
         setShowCitySearchModal(false);
         setModalCityQuery('');
         setCitySuggestions([]);
@@ -849,6 +866,15 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
         if (country && city) {
             userData.country = country;
             userData.city = city;
+        }
+
+        // 출생 위치 좌표 및 타임존 추가 (태양시 보정용)
+        if (birthLat !== null && birthLon !== null) {
+            userData.birthLat = birthLat;
+            userData.birthLon = birthLon;
+        }
+        if (birthTimezone) {
+            userData.birthTimezone = birthTimezone;
         }
 
         onSubmit(userData);

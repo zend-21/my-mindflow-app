@@ -134,14 +134,81 @@ const getStemElement = (stem) => {
 };
 
 /**
+ * 태양시 보정 (Solar Time Correction)
+ * 출생지의 경도에 따라 실제 태양 시간으로 보정
+ *
+ * @param {number} birthHour - 출생 시간 (0-23)
+ * @param {number} birthMinute - 출생 분 (0-59)
+ * @param {number} longitude - 출생지 경도 (예: 서울 127°, 부산 129°)
+ * @returns {Object} { correctedHour, correctedMinute } - 보정된 시간
+ */
+export const applySolarTimeCorrection = (birthHour, birthMinute, longitude) => {
+    // 경도 15° = 1시간 차이 (지구 360° / 24시간)
+    // 한국 표준시 기준 경도: 135° (UTC+9 기준)
+    // 실제 서울 경도: 126.978° (약 127°)
+    const REFERENCE_LONGITUDE = 135; // 한국 표준시 기준 경도 (UTC+9)
+
+    // 경도 차이로 인한 시간 차이 (분 단위)
+    const timeDiffMinutes = (longitude - REFERENCE_LONGITUDE) * 4; // 1° = 4분
+
+    // 총 분으로 변환하여 계산
+    let totalMinutes = birthHour * 60 + birthMinute + timeDiffMinutes;
+
+    // 음수 처리 (전날로 넘어가는 경우)
+    if (totalMinutes < 0) {
+        totalMinutes += 24 * 60;
+    }
+
+    // 24시간 초과 처리 (다음날로 넘어가는 경우)
+    if (totalMinutes >= 24 * 60) {
+        totalMinutes -= 24 * 60;
+    }
+
+    // 시/분으로 다시 분리
+    const correctedHour = Math.floor(totalMinutes / 60);
+    const correctedMinute = Math.floor(totalMinutes % 60);
+
+    return {
+        correctedHour,
+        correctedMinute,
+        timeDiffMinutes: Math.round(timeDiffMinutes) // 보정량 (참고용)
+    };
+};
+
+/**
  * 생년월일로부터 일간(Day Master) 계산
- * @param {Object} userData - { birthYear, birthMonth, birthDay }
+ * 태양시 보정이 있는 경우, 보정된 시간이 자정을 넘으면 날짜가 변경됨
+ * @param {Object} userData - { birthYear, birthMonth, birthDay, birthHour?, birthMinute?, birthLon? }
  * @returns {string} 일간 (천간)
  */
 export const calculateDayStem = (userData) => {
-    const { birthYear, birthMonth, birthDay } = userData;
-    const birthDate = new Date(birthYear, birthMonth - 1, birthDay);
-    const dayPillar = calculateDayPillar(birthDate);
+    const { birthYear, birthMonth, birthDay, birthHour, birthMinute, birthLon } = userData;
+    let adjustedDate = new Date(birthYear, birthMonth - 1, birthDay);
+
+    // 태양시 보정 적용 (출생 시간과 경도가 모두 있는 경우)
+    if (birthHour !== undefined && birthMinute !== undefined && birthLon !== null && birthLon !== undefined) {
+        const correction = applySolarTimeCorrection(birthHour, birthMinute, birthLon);
+
+        // 보정된 시간이 자정을 넘는 경우 날짜 조정
+        // 원래 시간과 보정된 시간 비교
+        if (birthHour >= 23 && correction.correctedHour < birthHour) {
+            // 23시에서 다음날 0시로 넘어간 경우
+            adjustedDate.setDate(adjustedDate.getDate() + 1);
+        } else if (birthHour === 0 && correction.correctedHour === 23) {
+            // 0시에서 전날 23시로 넘어간 경우
+            adjustedDate.setDate(adjustedDate.getDate() - 1);
+        }
+
+        // 디버깅용 로그 (개발 시에만 출력)
+        if (typeof console !== 'undefined') {
+            console.log(`🌞 태양시 보정: ${birthHour}:${birthMinute.toString().padStart(2, '0')} → ${correction.correctedHour}:${correction.correctedMinute.toString().padStart(2, '0')} (${correction.timeDiffMinutes > 0 ? '+' : ''}${correction.timeDiffMinutes}분)`);
+            if (adjustedDate.getDate() !== birthDay) {
+                console.log(`📅 날짜 변경: ${birthYear}-${birthMonth}-${birthDay} → ${adjustedDate.getFullYear()}-${adjustedDate.getMonth() + 1}-${adjustedDate.getDate()}`);
+            }
+        }
+    }
+
+    const dayPillar = calculateDayPillar(adjustedDate);
     return dayPillar.stem;
 };
 
@@ -518,7 +585,7 @@ const calculateCategoryScore = (userDayStem, todayPillar, categoryIndex) => {
  * @param {Date} today - 오늘 날짜
  * @returns {Object} 행운 요소 { introText, numbers, color, direction, items, concepts }
  */
-const selectLuckyElements = async (dayStem, today) => {
+const selectLuckyElements = async (dayStem, today, userData) => {
     try {
         const luckyElementsData = await getLuckyElementsData();
         if (!luckyElementsData) {
@@ -547,9 +614,11 @@ const selectLuckyElements = async (dayStem, today) => {
             };
         }
 
-        // 날짜 기반 시드로 랜덤 선택 (같은 날 같은 결과)
+        // 날짜 + 사용자 생년월일 기반 시드로 개인화된 랜덤 선택
         const dateString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
-        const seed = dateString.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+        const birthString = `${userData.birthYear}-${userData.birthMonth}-${userData.birthDay}`;
+        const combinedString = dateString + birthString;
+        const seed = combinedString.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
         const random = (max) => {
             const x = Math.sin(seed + max) * 10000;
@@ -642,8 +711,8 @@ export const calculateFortune = async (userData, fortuneData) => {
         };
     });
 
-    // 6. 행운 요소 계산 (오행 기반)
-    const luckyElements = await selectLuckyElements(userDayStem, today);
+    // 6. 행운 요소 계산 (오행 + 개인 생년월일 기반)
+    const luckyElements = await selectLuckyElements(userDayStem, today, userData);
 
     // 7. 타로 카드 선택 (개선된 로직)
     const tarot = selectTarotCard(userData, today);
@@ -694,25 +763,25 @@ export const calculateFortune = async (userData, fortuneData) => {
 };
 
 /**
- * 운세 저장 키 생성 (로그인 상태에 따라 다른 키 사용)
- * ✨ 게스트와 로그인 사용자가 서로 다른 키를 사용하여 중복 사용 방지
+ * 운세 저장 키 생성 (로그인 상태별 키 사용)
+ * ✨ 게스트와 로그인 각각 하루 1회씩 가능 (총 2회)
  * @returns {string} localStorage 키
  */
 const getFortuneStorageKey = () => {
     if (isUserLoggedIn()) {
-        // Logged-in user: use email-based key
+        // 로그인 사용자: 이메일 기반 키
         const userProfile = JSON.parse(localStorage.getItem('userProfile'));
         const userEmail = userProfile?.email || 'logged_in_user';
         return `todayFortune_${userEmail}`;
     } else {
-        // Guest user: use guest key
+        // 게스트: 게스트 전용 키
         return 'todayFortune_guest';
     }
 };
 
 /**
  * 오늘의 운세가 이미 생성되었는지 확인
- * ✨ 로그인 상태별로 별도 저장하여 게스트/로그인 중복 사용 방지
+ * ✨ 로그인 상태별로 별도 저장 (게스트 1회 + 로그인 1회 = 총 2회)
  * @returns {Object|null} 저장된 운세 또는 null
  */
 export const getTodayFortune = () => {
@@ -735,7 +804,7 @@ export const getTodayFortune = () => {
 
 /**
  * 운세 결과 저장
- * ✨ 로그인 상태별로 별도 저장하여 게스트/로그인 중복 사용 방지
+ * ✨ 로그인 상태별로 별도 저장
  * @param {Object} fortuneResult - calculateFortune()의 결과
  */
 export const saveTodayFortune = (fortuneResult) => {
@@ -755,34 +824,56 @@ export const isUserLoggedIn = () => {
 
 /**
  * 사용자 프로필 저장
- * ✨ 로그인된 사용자만 저장, 게스트는 저장하지 않음
+ * ✨ 로그인 사용자와 게스트 모두 저장 (게스트는 당일만 유지)
  * @param {Object} userData - 사용자 정보
  */
 export const saveUserProfile = (userData) => {
-    // Only save if user is logged in
     if (isUserLoggedIn()) {
+        // 로그인 사용자: 영구 저장
         localStorage.setItem('fortuneUserProfile', JSON.stringify(userData));
+    } else {
+        // 게스트: 날짜와 함께 저장 (당일만 유효)
+        const dataWithDate = {
+            ...userData,
+            savedDate: new Date().toLocaleDateString('ko-KR')
+        };
+        localStorage.setItem('fortuneUserProfile_guest', JSON.stringify(dataWithDate));
     }
-    // Guest users: do not save (they will need to re-enter each time)
 };
 
 /**
  * 사용자 프로필 불러오기
- * ✨ 로그인된 사용자만 불러옴, 게스트는 항상 null 반환
+ * ✨ 로그인 사용자는 영구 프로필, 게스트는 당일 프로필만 반환
  * @returns {Object|null} 사용자 정보 또는 null
  */
 export const getUserProfile = () => {
-    // Only load if user is logged in
     if (isUserLoggedIn()) {
+        // 로그인 사용자: 영구 저장된 프로필 반환
         const saved = localStorage.getItem('fortuneUserProfile');
         return saved ? JSON.parse(saved) : null;
+    } else {
+        // 게스트: 당일 저장된 프로필만 반환
+        const saved = localStorage.getItem('fortuneUserProfile_guest');
+        if (!saved) return null;
+
+        const savedData = JSON.parse(saved);
+        const today = new Date().toLocaleDateString('ko-KR');
+
+        // 저장된 날짜가 오늘과 같으면 반환
+        if (savedData.savedDate === today) {
+            // savedDate 필드 제거 후 반환
+            const { savedDate, ...userData } = savedData;
+            return userData;
+        }
+
+        // 날짜가 다르면 삭제하고 null 반환
+        localStorage.removeItem('fortuneUserProfile_guest');
+        return null;
     }
-    // Guest users: always return null (forcing re-entry)
-    return null;
 };
 
 /**
  * 가챠 테스트 모드 플래그
  * true로 설정하면 하루 1회 제한 무시
  */
-export const IS_TESTING_MODE = true; // ⚠️ 테스트용: true, 배포 시 false로 변경
+export const IS_TESTING_MODE = false; // ⚠️ 테스트용: true, 배포 시 false로 변경

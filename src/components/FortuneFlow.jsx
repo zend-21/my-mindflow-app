@@ -77,11 +77,19 @@ const FortuneFlow = ({ onClose, profile }) => {
         }
     };
 
-    // 🎬 Step 2: 정보 확인창으로 이동
+    // 🎬 Step 2: 운세 확인 및 가차 시작
     useEffect(() => {
         if (flowState === 'checkFortune') {
-            // 항상 정보 확인창(confirmProfile)으로 이동
-            setFlowState('confirmProfile');
+            // 이미 저장된 운세가 있는지 확인
+            const savedFortune = getTodayFortune();
+            if (savedFortune) {
+                // 저장된 운세가 있으면 바로 결과 표시
+                setFortuneResult(savedFortune);
+                setFlowState('result');
+            } else {
+                // 저장된 운세가 없으면 가차 애니메이션 시작
+                setFlowState('gacha');
+            }
         }
     }, [flowState]);
 

@@ -536,6 +536,23 @@ const TarotText = styled.p`
     }
 `;
 
+const TarotNotice = styled.p`
+    margin: -8px 0 24px 0;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 10px;
+    line-height: 1.5;
+    text-align: center;
+    font-style: italic;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+
+    @media (min-width: 768px) {
+        font-size: 11px;
+        margin: -8px 0 28px 0;
+    }
+`;
+
 const ButtonGroup = styled.div`
     display: flex;
     gap: 12px;
@@ -927,6 +944,10 @@ ${fortuneResult.starSign.content}
                             </CategoryTitle>
 
                             <TarotContainer>
+                                <TarotNotice>
+                                    타로는 사용자의 선택 또한 운명의 일부로 받아들입니다.<br />
+                                    타로점을 실행한 시간에 따라 그날의 운세가 변동될 수 있습니다.
+                                </TarotNotice>
                                 {fortuneResult.tarot.imageFile && (
                                     <TarotImageWrapper>
                                         <TarotImage
