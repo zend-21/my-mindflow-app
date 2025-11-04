@@ -77,20 +77,11 @@ const FortuneFlow = ({ onClose, profile }) => {
         }
     };
 
-    // 🎬 Step 2: 오늘의 운세 확인 (프로필이 있는 경우)
+    // 🎬 Step 2: 정보 확인창으로 이동
     useEffect(() => {
         if (flowState === 'checkFortune') {
-            // Check if today's fortune already exists
-            const savedFortune = getTodayFortune();
-
-            if (savedFortune && !IS_TESTING_MODE) {
-                // Today's fortune already exists, show directly
-                setFortuneResult(savedFortune);
-                setFlowState('result');
-            } else {
-                // No fortune yet, start gacha
-                setFlowState('gacha');
-            }
+            // 항상 정보 확인창(confirmProfile)으로 이동
+            setFlowState('confirmProfile');
         }
     }, [flowState]);
 
@@ -181,6 +172,14 @@ const FortuneFlow = ({ onClose, profile }) => {
                     onConfirm={handleProfileConfirm}
                     onEdit={handleProfileEdit}
                     onClose={onClose}
+                    hasSeenTodayFortune={!!getTodayFortune()}
+                    onViewAgain={() => {
+                        const savedFortune = getTodayFortune();
+                        if (savedFortune) {
+                            setFortuneResult(savedFortune);
+                            setFlowState('result');
+                        }
+                    }}
                 />
             )}
 

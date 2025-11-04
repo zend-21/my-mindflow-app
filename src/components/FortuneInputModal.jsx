@@ -1017,13 +1017,16 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                             {/* 출생 도시 (선택사항) */}
                             <div>
                                 <Label>출생 도시 (선택사항)</Label>
+                                <InfoText style={{ marginTop: '8px', marginBottom: '8px' }}>
+                                    태양시 보정을 위해 출생 도시를 입력하세요
+                                </InfoText>
                                 <Input
                                     type="text"
-                                    placeholder="태양시 보정을 위해 입력하세요"
+                                    placeholder="서울, Paris, つくば"
                                     value={cityQuery}
                                     onClick={handleOpenCitySearchModal}
                                     readOnly
-                                    style={{ cursor: 'pointer', background: '#f9fafb', marginTop: '8px' }}
+                                    style={{ cursor: 'pointer', background: '#f9fafb' }}
                                 />
                                 {city && country && (
                                     <InfoText style={{ marginTop: '4px', color: '#667eea' }}>

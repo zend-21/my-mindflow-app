@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { convertSolarToLunar, formatLunarDate } from '../utils/lunarConverter';
-import { calculateZodiacAnimal } from '../utils/fortuneLogic';
+import { calculateZodiacAnimal, IS_TESTING_MODE } from '../utils/fortuneLogic';
 
 const Overlay = styled.div`
     position: fixed;
@@ -156,7 +156,7 @@ const LunarNote = styled.div`
     }
 `;
 
-const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) => {
+const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName, hasSeenTodayFortune, onViewAgain }) => {
     const [lunarDate, setLunarDate] = useState('');
     const [zodiacAnimal, setZodiacAnimal] = useState('');
 
@@ -260,8 +260,16 @@ const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) 
                 </Notice>
 
                 <ButtonGroup>
-                    <Button onClick={onEdit}>정보 수정</Button>
-                    <Button onClick={onConfirm} $primary>확인</Button>
+                    {/* 테스트 모드 또는 오늘 운세를 아직 안 본 경우: 정보 수정 + 확인 */}
+                    {(IS_TESTING_MODE || !hasSeenTodayFortune) ? (
+                        <>
+                            <Button onClick={onEdit}>정보 수정</Button>
+                            <Button onClick={onConfirm} $primary>확인</Button>
+                        </>
+                    ) : (
+                        // 배포 모드 + 오늘 운세를 이미 본 경우: 다시보기만
+                        <Button onClick={onViewAgain} $primary style={{ width: '100%' }}>다시보기</Button>
+                    )}
                 </ButtonGroup>
             </Modal>
         </Overlay>

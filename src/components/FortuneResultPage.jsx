@@ -969,7 +969,6 @@ ${fortuneResult.starSign.content}
                     {/* 버튼 그룹 */}
                     <ButtonGroup>
                         <Button onClick={handleCopy} $secondary>복사</Button>
-                        <Button onClick={onReset}>다시보기</Button>
                         <Button onClick={onClose} $primary>확인</Button>
                     </ButtonGroup>
                 </Container>
