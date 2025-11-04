@@ -372,25 +372,21 @@ const Fireworks = styled.div`
     transition: opacity 0.5s;
 `;
 
-const FireworkParticle = styled.div`
+const FireworkParticle = styled.div.attrs(props => ({
+    style: {
+        left: `${props.$x}%`,
+        top: `${props.$y}%`,
+        background: props.$color,
+        animationDelay: `${props.$delay}s`,
+        '--tx': `${props.$tx}px`,
+        '--ty': `${props.$ty}px`,
+    }
+}))`
     position: absolute;
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background: ${props => props.$color};
-    --tx: ${props => props.$tx}px;
-    --ty: ${props => props.$ty}px;
     animation: ${firework} 1s ease-out forwards;
-    animation-delay: ${props => props.$delay}s;
-
-    ${props => {
-        const left = props.$x;
-        const top = props.$y;
-        return css`
-            left: ${left}%;
-            top: ${top}%;
-        `;
-    }}
 `;
 
 const ProgressBar = styled.div`
@@ -428,14 +424,17 @@ const TarotDeck = styled.div`
     transition: opacity 0.5s;
 `;
 
-const ShuffleCard = styled.div`
+const ShuffleCard = styled.div.attrs(props => ({
+    style: {
+        animationDelay: `${props.$delay}s`,
+    }
+}))`
     width: 50px;
     height: 75px;
     background: linear-gradient(135deg, #2d3561 0%, #1a1f3a 100%);
     border: 2px solid rgba(255, 215, 0, 0.5);
     border-radius: 8px;
     animation: ${shuffle} 0.8s ease-in-out infinite;
-    animation-delay: ${props => props.$delay}s;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 `;
 
@@ -451,7 +450,11 @@ const TarotSpread = styled.div`
     transition: opacity 0.5s;
 `;
 
-const SpreadCard = styled.div`
+const SpreadCard = styled.div.attrs(props => ({
+    style: {
+        animationDelay: `${props.$delay}s`,
+    }
+}))`
     width: 60px;
     height: 90px;
     background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
@@ -462,7 +465,6 @@ const SpreadCard = styled.div`
     justify-content: center;
     font-size: 28px;
     animation: ${cardReveal} 0.6s ease-out forwards;
-    animation-delay: ${props => props.$delay}s;
     opacity: 0;
     box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
 `;
@@ -479,10 +481,13 @@ const SajuSymbols = styled.div`
     transition: opacity 0.5s;
 `;
 
-const SajuSymbol = styled.div`
+const SajuSymbol = styled.div.attrs(props => ({
+    style: {
+        animationDelay: `${props.$delay}s`,
+    }
+}))`
     font-size: 36px;
     animation: ${pulse} 1.2s ease-in-out infinite;
-    animation-delay: ${props => props.$delay}s;
     text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
 `;
 
