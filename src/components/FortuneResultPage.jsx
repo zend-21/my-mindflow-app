@@ -281,6 +281,30 @@ const SajuInfoValue = styled.span`
     }
 `;
 
+const LuckyWrapper = styled.div`
+    position: relative;
+    padding-top: 20px;
+`;
+
+const LuckyTabTitle = styled.div`
+    position: absolute;
+    top: 0;
+    left: 20px;
+    background: #d4a574;
+    color: white;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 8px 20px;
+    border-radius: 8px 8px 0 0;
+    z-index: 1;
+
+    @media (min-width: 768px) {
+        font-size: 16px;
+        padding: 10px 24px;
+        left: 24px;
+    }
+`;
+
 const LuckyContainer = styled.div`
     display: flex;
     flex-direction: column;
@@ -290,8 +314,15 @@ const LuckyContainer = styled.div`
     border: 2px solid #d4a574;
     border-radius: 20px;
     padding: 32px 24px;
+    padding-top: 44px;
     text-align: center;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    position: relative;
+    margin-top: 16px;
+
+    @media (min-width: 768px) {
+        padding-top: 48px;
+    }
 `;
 
 const LuckyIntroText = styled.p`
@@ -741,46 +772,48 @@ ${fortuneResult.starSign.content}
 
                             {/* 행운 요소 */}
                             <Section $delay="0s">
-                                <SectionTitle>🌈 행운 요소</SectionTitle>
-                                <LuckyContainer>
-                                    <LuckyIntroText>{fortuneResult.lucky.introText}</LuckyIntroText>
+                                <LuckyWrapper>
+                                    <LuckyTabTitle>🌈 행운 요소</LuckyTabTitle>
+                                    <LuckyContainer>
+                                        <LuckyIntroText>{fortuneResult.lucky.introText}</LuckyIntroText>
 
-                                    <LuckyNumbersWrapper>
-                                        <LuckyNumbers>
-                                            {numbersArray.map((num, idx) => (
-                                                <LuckyNumber
-                                                    key={idx}
-                                                    $bgColor={luckyColorHex}
-                                                    $textColor={luckyTextColor}
-                                                >
-                                                    {num}
-                                                </LuckyNumber>
-                                            ))}
-                                        </LuckyNumbers>
-                                        <LuckyNumberCaption>
-                                            금일 행운의 숫자는 {numbersArray[0]}{getJosa(numbersArray[0])} {numbersArray[1]}입니다
-                                        </LuckyNumberCaption>
-                                    </LuckyNumbersWrapper>
+                                        <LuckyNumbersWrapper>
+                                            <LuckyNumbers>
+                                                {numbersArray.map((num, idx) => (
+                                                    <LuckyNumber
+                                                        key={idx}
+                                                        $bgColor={luckyColorHex}
+                                                        $textColor={luckyTextColor}
+                                                    >
+                                                        {num}
+                                                    </LuckyNumber>
+                                                ))}
+                                            </LuckyNumbers>
+                                            <LuckyNumberCaption>
+                                                금일 행운의 숫자는 {numbersArray[0]}{getJosa(numbersArray[0])} {numbersArray[1]}입니다
+                                            </LuckyNumberCaption>
+                                        </LuckyNumbersWrapper>
 
-                                    <LuckyDetailsBox>
-                                        <LuckyDetailRow>
-                                            <LuckyLabel>행운의 색</LuckyLabel>
-                                            <LuckyValue>{fortuneResult.lucky.color}</LuckyValue>
-                                        </LuckyDetailRow>
-                                        <LuckyDetailRow>
-                                            <LuckyLabel>행운의 방향</LuckyLabel>
-                                            <LuckyValue>{fortuneResult.lucky.direction}</LuckyValue>
-                                        </LuckyDetailRow>
-                                        <LuckyDetailRow>
-                                            <LuckyLabel>행운의 상징</LuckyLabel>
-                                            <LuckyValue>{fortuneResult.lucky.items}</LuckyValue>
-                                        </LuckyDetailRow>
-                                        <LuckyDetailRow>
-                                            <LuckyLabel>긍정 키워드</LuckyLabel>
-                                            <LuckyValue>{fortuneResult.lucky.concepts}</LuckyValue>
-                                        </LuckyDetailRow>
-                                    </LuckyDetailsBox>
-                                </LuckyContainer>
+                                        <LuckyDetailsBox>
+                                            <LuckyDetailRow>
+                                                <LuckyLabel>행운의 색</LuckyLabel>
+                                                <LuckyValue>{fortuneResult.lucky.color}</LuckyValue>
+                                            </LuckyDetailRow>
+                                            <LuckyDetailRow>
+                                                <LuckyLabel>행운의 방향</LuckyLabel>
+                                                <LuckyValue>{fortuneResult.lucky.direction}</LuckyValue>
+                                            </LuckyDetailRow>
+                                            <LuckyDetailRow>
+                                                <LuckyLabel>행운의 상징</LuckyLabel>
+                                                <LuckyValue>{fortuneResult.lucky.items}</LuckyValue>
+                                            </LuckyDetailRow>
+                                            <LuckyDetailRow>
+                                                <LuckyLabel>긍정 키워드</LuckyLabel>
+                                                <LuckyValue>{fortuneResult.lucky.concepts}</LuckyValue>
+                                            </LuckyDetailRow>
+                                        </LuckyDetailsBox>
+                                    </LuckyContainer>
+                                </LuckyWrapper>
                             </Section>
 
                             {/* 종합 운세 */}
