@@ -163,8 +163,17 @@ const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) 
     // 양력 → 음력 변환 및 띠 계산
     useEffect(() => {
         const fetchLunarDate = async () => {
-            // 음력 변환 시도
+            // 1. 이미 저장된 음력 정보가 있으면 그대로 사용 (API 호출 안 함)
+            if (profile.lunarDate && profile.zodiacAnimal) {
+                console.log('✅ 저장된 음력 정보 사용:', profile.lunarDate, profile.zodiacAnimal);
+                setLunarDate(profile.lunarDate);
+                setZodiacAnimal(profile.zodiacAnimal);
+                return;
+            }
+
+            // 2. 저장된 정보가 없으면 API 호출하여 음력 변환
             if (profile.birthYear && profile.birthMonth && profile.birthDay) {
+                console.log('🔄 음력 정보가 없어 API 호출:', profile.birthYear, profile.birthMonth, profile.birthDay);
                 const lunarData = await convertSolarToLunar(
                     profile.birthYear,
                     profile.birthMonth,
@@ -191,7 +200,7 @@ const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) 
         };
 
         fetchLunarDate();
-    }, [profile.birthYear, profile.birthMonth, profile.birthDay]);
+    }, [profile.birthYear, profile.birthMonth, profile.birthDay, profile.lunarDate, profile.zodiacAnimal]);
 
     // 생년월일 포맷팅 (개별 필드로 저장된 경우)
     const formatBirthday = () => {

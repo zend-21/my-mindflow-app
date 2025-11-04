@@ -216,8 +216,9 @@ const SectionContent = styled.div`
 
 const Keyword = styled.span`
     display: inline-block;
+    align-self: flex-start;
     background: ${props => props.$color || '#667eea'};
-    color: white;
+    color: #1a202c;
     font-size: 13px;
     font-weight: 600;
     padding: 6px 14px;
@@ -433,7 +434,7 @@ const FortuneTabTitle = styled.div`
     top: 0;
     left: 20px;
     background: ${props => props.$bgColor || '#667eea'};
-    color: white;
+    color: #1a202c;
     font-size: 15px;
     font-weight: 700;
     padding: 8px 20px;
@@ -450,18 +451,17 @@ const FortuneTabTitle = styled.div`
 const FortuneContainer = styled.div`
     display: flex;
     flex-direction: column;
-    align-items: center;
     background: transparent;
     border: 2px solid ${props => props.$borderColor || '#667eea'};
     border-radius: 20px;
-    padding: 32px 20px;
-    padding-top: 44px;
+    padding: 24px 20px;
+    padding-top: 18px;
     position: relative;
     margin-top: 15px;
 
     @media (min-width: 768px) {
-        padding: 36px 24px;
-        padding-top: 48px;
+        padding: 28px 24px;
+        padding-top: 20px;
     }
 `;
 
@@ -711,10 +711,20 @@ const FortuneResultPage = ({ fortuneResult, onClose, onReset }) => {
         return `
 🔮 ${fortuneResult.userName}님의 오늘의 운세
 📅 ${fortuneResult.date}
-🌟 일간: ${fortuneResult.userDayStem} | 오늘 일진: ${fortuneResult.todayPillar}
-♈ 별자리: ${fortuneResult.zodiacSign}
 
 ━━━━━━━━━━━━━━━━━━━━
+
+🔮 사주 운세
+일간: ${fortuneResult.userDayStem}
+오늘 일진: ${fortuneResult.todayPillar}
+
+🌈 행운 요소
+${fortuneResult.lucky.introText}
+행운의 숫자: ${fortuneResult.lucky.numbers}
+행운의 색: ${fortuneResult.lucky.color}
+행운의 방향: ${fortuneResult.lucky.direction}
+행운의 상징: ${fortuneResult.lucky.items}
+긍정 키워드: ${fortuneResult.lucky.concepts}
 
 🌟 종합 운세
 ${fortuneResult.overall.keyword ? `[${fortuneResult.overall.keyword}]` : ''}
@@ -731,14 +741,6 @@ ${fortuneResult.health.content}
 💕 애정운
 ${fortuneResult.love.keyword ? `[${fortuneResult.love.keyword}]` : ''}
 ${fortuneResult.love.content}
-
-🌈 행운 요소
-${fortuneResult.lucky.introText}
-행운의 숫자: ${fortuneResult.lucky.numbers}
-행운의 색: ${fortuneResult.lucky.color}
-행운의 방향: ${fortuneResult.lucky.direction}
-행운의 상징: ${fortuneResult.lucky.items}
-긍정 키워드: ${fortuneResult.lucky.concepts}
 
 💡 오늘의 조언
 ${fortuneResult.advice.keyword ? `[${fortuneResult.advice.keyword}]` : ''}
@@ -861,9 +863,9 @@ ${fortuneResult.starSign.content}
                             {/* 종합 운세 */}
                             <Section $delay="0s">
                                 <FortuneWrapper>
-                                    <FortuneTabTitle $bgColor="#667eea">🌟 종합 운세</FortuneTabTitle>
-                                    <FortuneContainer $borderColor="#667eea">
-                                        {fortuneResult.overall.keyword && <Keyword $color="#667eea">{fortuneResult.overall.keyword}</Keyword>}
+                                    <FortuneTabTitle $bgColor="#a5b4fc">🌟 종합 운세</FortuneTabTitle>
+                                    <FortuneContainer $borderColor="#a5b4fc">
+                                        {fortuneResult.overall.keyword && <Keyword $color="#a5b4fc">{fortuneResult.overall.keyword}</Keyword>}
                                         <Text style={{ whiteSpace: 'pre-wrap' }}>{fortuneResult.overall.content}</Text>
                                     </FortuneContainer>
                                 </FortuneWrapper>
@@ -905,9 +907,9 @@ ${fortuneResult.starSign.content}
                             {/* 오늘의 조언 */}
                             <Section $delay="0s">
                                 <FortuneWrapper>
-                                    <FortuneTabTitle $bgColor="#9f7aea">💡 오늘의 조언</FortuneTabTitle>
-                                    <FortuneContainer $borderColor="#9f7aea">
-                                        {fortuneResult.advice.keyword && <Keyword $color="#9f7aea">{fortuneResult.advice.keyword}</Keyword>}
+                                    <FortuneTabTitle $bgColor="#c4b5fd">💡 오늘의 조언</FortuneTabTitle>
+                                    <FortuneContainer $borderColor="#c4b5fd">
+                                        {fortuneResult.advice.keyword && <Keyword $color="#c4b5fd">{fortuneResult.advice.keyword}</Keyword>}
                                         <Text>{fortuneResult.advice.content}</Text>
                                     </FortuneContainer>
                                 </FortuneWrapper>
