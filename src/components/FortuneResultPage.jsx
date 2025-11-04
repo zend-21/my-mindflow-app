@@ -147,9 +147,46 @@ const Content = styled.div`
     }
 `;
 
+// 큰 카테고리 컨테이너 (사주/타로/별자리 구분용)
+const CategoryContainer = styled.div`
+    background: ${props => props.$bgColor || '#ffffff'};
+    border-radius: 20px;
+    padding: 32px 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    border: 2px solid ${props => props.$borderColor || '#e2e8f0'};
+    animation: ${slideUp} 0.6s ease-out backwards;
+    animation-delay: ${props => props.$delay || '0s'};
+    margin-bottom: 32px;
+
+    @media (min-width: 768px) {
+        padding: 40px 32px;
+    }
+`;
+
+const CategoryTitle = styled.h2`
+    margin: 0 0 28px 0;
+    font-size: 24px;
+    font-weight: 700;
+    color: ${props => props.$color || '#2d3748'};
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid ${props => props.$borderColor || '#e2e8f0'};
+
+    @media (min-width: 768px) {
+        font-size: 28px;
+    }
+`;
+
 const Section = styled.div`
     animation: ${slideUp} 0.5s ease-out backwards;
     animation-delay: ${props => props.$delay || '0s'};
+    margin-bottom: 20px;
+
+    &:last-child {
+        margin-bottom: 0;
+    }
 `;
 
 const SectionTitle = styled.h3`
@@ -519,88 +556,106 @@ ${fortuneResult.starSign.content}
                     </Header>
 
                     <Content>
-                        {/* 사주 정보 */}
-                        <Section $delay="0.05s">
-                            <SectionTitle>🌟 사주 정보</SectionTitle>
-                            {fortuneResult.lunarDate ? (
-                                <InfoGrid>
-                                    <InfoItem>
-                                        <InfoLabel>일간</InfoLabel>
-                                        <InfoValue>{fortuneResult.userDayStem}</InfoValue>
-                                    </InfoItem>
-                                    <InfoItem>
-                                        <InfoLabel>오늘 일진</InfoLabel>
-                                        <InfoValue>{fortuneResult.todayPillar}</InfoValue>
-                                    </InfoItem>
-                                    <InfoItem>
-                                        <InfoLabel>별자리</InfoLabel>
-                                        <InfoValue>{fortuneResult.zodiacSign}</InfoValue>
-                                    </InfoItem>
-                                </InfoGrid>
-                            ) : (
-                                <SectionContent $borderColor="#e2e8f0" style={{ textAlign: 'center', padding: '24px', color: '#999' }}>
-                                    ⚠️ 음력 정보가 없어 사주 결과를 표시할 수 없습니다.
+                        {/* ========== 사주 운세 ========== */}
+                        <CategoryContainer
+                            $bgColor="#fefcfb"
+                            $borderColor="#d4a574"
+                            $delay="0.1s"
+                        >
+                            <CategoryTitle $color="#8b5e34" $borderColor="#d4a574">
+                                🔮 사주 운세
+                            </CategoryTitle>
+
+                            {/* 사주 정보 */}
+                            <Section $delay="0s">
+                                <SectionTitle>🌟 사주 정보</SectionTitle>
+                                {fortuneResult.lunarDate ? (
+                                    <InfoGrid>
+                                        <InfoItem>
+                                            <InfoLabel>일간</InfoLabel>
+                                            <InfoValue>{fortuneResult.userDayStem}</InfoValue>
+                                        </InfoItem>
+                                        <InfoItem>
+                                            <InfoLabel>오늘 일진</InfoLabel>
+                                            <InfoValue>{fortuneResult.todayPillar}</InfoValue>
+                                        </InfoItem>
+                                        <InfoItem>
+                                            <InfoLabel>별자리</InfoLabel>
+                                            <InfoValue>{fortuneResult.zodiacSign}</InfoValue>
+                                        </InfoItem>
+                                    </InfoGrid>
+                                ) : (
+                                    <SectionContent $borderColor="#e2e8f0" style={{ textAlign: 'center', padding: '24px', color: '#999' }}>
+                                        ⚠️ 음력 정보가 없어 사주 결과를 표시할 수 없습니다.
+                                    </SectionContent>
+                                )}
+                            </Section>
+
+                            {/* 종합 운세 */}
+                            <Section $delay="0s">
+                                <SectionTitle>🌟 종합 운세</SectionTitle>
+                                <SectionContent $borderColor="#667eea">
+                                    {fortuneResult.overall.keyword && <Keyword>{fortuneResult.overall.keyword}</Keyword>}
+                                    <Text style={{ whiteSpace: 'pre-wrap' }}>{fortuneResult.overall.content}</Text>
                                 </SectionContent>
-                            )}
-                        </Section>
+                            </Section>
 
-                        {/* 종합 운세 */}
-                        <Section $delay="0.1s">
-                            <SectionTitle>🌟 종합 운세</SectionTitle>
-                            <SectionContent $borderColor="#667eea">
-                                {fortuneResult.overall.keyword && <Keyword>{fortuneResult.overall.keyword}</Keyword>}
-                                <Text style={{ whiteSpace: 'pre-wrap' }}>{fortuneResult.overall.content}</Text>
-                            </SectionContent>
-                        </Section>
+                            {/* 재물운 */}
+                            <Section $delay="0s">
+                                <SectionTitle>💰 재물운</SectionTitle>
+                                <SectionContent $borderColor="#f6ad55">
+                                    {fortuneResult.money.keyword && <Keyword>{fortuneResult.money.keyword}</Keyword>}
+                                    <Text>{fortuneResult.money.content}</Text>
+                                </SectionContent>
+                            </Section>
 
-                        {/* 재물운 */}
-                        <Section $delay="0.2s">
-                            <SectionTitle>💰 재물운</SectionTitle>
-                            <SectionContent $borderColor="#f6ad55">
-                                {fortuneResult.money.keyword && <Keyword>{fortuneResult.money.keyword}</Keyword>}
-                                <Text>{fortuneResult.money.content}</Text>
-                            </SectionContent>
-                        </Section>
+                            {/* 건강운 */}
+                            <Section $delay="0s">
+                                <SectionTitle>💊 건강운</SectionTitle>
+                                <SectionContent $borderColor="#48bb78">
+                                    {fortuneResult.health.keyword && <Keyword>{fortuneResult.health.keyword}</Keyword>}
+                                    <Text>{fortuneResult.health.content}</Text>
+                                </SectionContent>
+                            </Section>
 
-                        {/* 건강운 */}
-                        <Section $delay="0.25s">
-                            <SectionTitle>💊 건강운</SectionTitle>
-                            <SectionContent $borderColor="#48bb78">
-                                {fortuneResult.health.keyword && <Keyword>{fortuneResult.health.keyword}</Keyword>}
-                                <Text>{fortuneResult.health.content}</Text>
-                            </SectionContent>
-                        </Section>
+                            {/* 애정운 */}
+                            <Section $delay="0s">
+                                <SectionTitle>💕 애정운</SectionTitle>
+                                <SectionContent $borderColor="#f687b3">
+                                    {fortuneResult.love.keyword && <Keyword>{fortuneResult.love.keyword}</Keyword>}
+                                    <Text>{fortuneResult.love.content}</Text>
+                                </SectionContent>
+                            </Section>
 
-                        {/* 애정운 */}
-                        <Section $delay="0.3s">
-                            <SectionTitle>💕 애정운</SectionTitle>
-                            <SectionContent $borderColor="#f687b3">
-                                {fortuneResult.love.keyword && <Keyword>{fortuneResult.love.keyword}</Keyword>}
-                                <Text>{fortuneResult.love.content}</Text>
-                            </SectionContent>
-                        </Section>
+                            {/* 행운 요소 */}
+                            <Section $delay="0s">
+                                <SectionTitle>🌈 행운 요소</SectionTitle>
+                                <LuckyContainer>
+                                    <LuckyNumber>{fortuneResult.lucky.keyword}</LuckyNumber>
+                                    <LuckyText>{fortuneResult.lucky.content}</LuckyText>
+                                </LuckyContainer>
+                            </Section>
 
-                        {/* 행운 요소 */}
-                        <Section $delay="0.35s">
-                            <SectionTitle>🌈 행운 요소</SectionTitle>
-                            <LuckyContainer>
-                                <LuckyNumber>{fortuneResult.lucky.keyword}</LuckyNumber>
-                                <LuckyText>{fortuneResult.lucky.content}</LuckyText>
-                            </LuckyContainer>
-                        </Section>
+                            {/* 오늘의 조언 */}
+                            <Section $delay="0s">
+                                <SectionTitle>💡 오늘의 조언</SectionTitle>
+                                <SectionContent $borderColor="#9f7aea">
+                                    {fortuneResult.advice.keyword && <Keyword>{fortuneResult.advice.keyword}</Keyword>}
+                                    <Text>{fortuneResult.advice.content}</Text>
+                                </SectionContent>
+                            </Section>
+                        </CategoryContainer>
 
-                        {/* 오늘의 조언 */}
-                        <Section $delay="0.4s">
-                            <SectionTitle>💡 오늘의 조언</SectionTitle>
-                            <SectionContent $borderColor="#9f7aea">
-                                {fortuneResult.advice.keyword && <Keyword>{fortuneResult.advice.keyword}</Keyword>}
-                                <Text>{fortuneResult.advice.content}</Text>
-                            </SectionContent>
-                        </Section>
+                        {/* ========== 타로점 ========== */}
+                        <CategoryContainer
+                            $bgColor="#faf5ff"
+                            $borderColor="#9f7aea"
+                            $delay="0.2s"
+                        >
+                            <CategoryTitle $color="#6b46c1" $borderColor="#9f7aea">
+                                🃏 타로점
+                            </CategoryTitle>
 
-                        {/* 타로점 */}
-                        <Section $delay="0.45s">
-                            <SectionTitle>🃏 타로점</SectionTitle>
                             <TarotContainer>
                                 {fortuneResult.tarot.imageFile && (
                                     <TarotImageWrapper>
@@ -619,16 +674,26 @@ ${fortuneResult.starSign.content}
                                     <TarotText>{fortuneResult.tarot.content}</TarotText>
                                 )}
                             </TarotContainer>
-                        </Section>
+                        </CategoryContainer>
 
-                        {/* 별자리 운세 */}
-                        <Section $delay="0.5s">
-                            <SectionTitle>♈ 별자리 운세 ({fortuneResult.starSign.sign})</SectionTitle>
-                            <SectionContent $borderColor="#ed8936">
-                                {fortuneResult.starSign.keyword && <Keyword>{fortuneResult.starSign.keyword}</Keyword>}
-                                <Text>{fortuneResult.starSign.content}</Text>
-                            </SectionContent>
-                        </Section>
+                        {/* ========== 별자리 운세 ========== */}
+                        <CategoryContainer
+                            $bgColor="#fffaf0"
+                            $borderColor="#ed8936"
+                            $delay="0.3s"
+                        >
+                            <CategoryTitle $color="#c05621" $borderColor="#ed8936">
+                                ♈ 별자리 운세
+                            </CategoryTitle>
+
+                            <Section $delay="0s">
+                                <SectionTitle>✨ {fortuneResult.starSign.sign} 오늘의 운세</SectionTitle>
+                                <SectionContent $borderColor="#ed8936">
+                                    {fortuneResult.starSign.keyword && <Keyword>{fortuneResult.starSign.keyword}</Keyword>}
+                                    <Text>{fortuneResult.starSign.content}</Text>
+                                </SectionContent>
+                            </Section>
+                        </CategoryContainer>
                     </Content>
 
                     {/* 버튼 그룹 */}
