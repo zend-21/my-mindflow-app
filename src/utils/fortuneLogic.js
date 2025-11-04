@@ -645,7 +645,7 @@ export const saveTodayFortune = (fortuneResult) => {
  * 로그인 여부 확인 헬퍼 함수
  * @returns {boolean} 로그인 상태 여부
  */
-const isUserLoggedIn = () => {
+export const isUserLoggedIn = () => {
     // Check if user is logged in by looking for Google profile in localStorage
     const userProfile = localStorage.getItem('userProfile');
     return !!userProfile;
