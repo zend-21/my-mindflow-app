@@ -3,7 +3,7 @@
 // 🌟 사주팔자 기반 운세 계산 로직
 
 import { getTarotData, getHoroscopeData } from './fortuneData';
-import { getRandomFortune } from './fortuneSelector';
+import { getRandomFortune, getCombinedFortune } from './fortuneSelector';
 
 // 천간 (Heavenly Stems) - 10개
 const HEAVENLY_STEMS = ['갑', '을', '병', '정', '무', '기', '경', '신', '임', '계'];
@@ -469,13 +469,19 @@ export const calculateFortune = (userData, fortuneData) => {
     // 3. 별자리 계산
     const zodiacSign = calculateZodiacSign(userData);
 
-    // 4. 새 JSON DB 사용: 각 카테고리별로 점수 → 키워드 → 랜덤 콘텐츠 선택
-    const categories = ['Main', 'Money', 'Health', 'Love', 'Advice', 'Lucky'];
+    // 4. 종합 운세 계산 (Main + Main2 조합)
+    const overallScore = calculateCategoryScore(userDayStem, todayPillar, 0);
+    const overallKeyword = mapScoreToKeyword(overallScore, 'Main');
+    const overallContent = getCombinedFortune(overallKeyword);
+
+    // 5. 세부 운세 계산: 각 카테고리별로 점수 → 키워드 → 랜덤 콘텐츠 선택
+    const categories = ['Money', 'Health', 'Love', 'Advice', 'Lucky'];
     const results = {};
 
     categories.forEach((category, index) => {
         // 사주 기반 점수 계산 (0~100)
-        const score = calculateCategoryScore(userDayStem, todayPillar, index);
+        // index + 1 을 사용하여 Main(0)과 다른 시드값 사용
+        const score = calculateCategoryScore(userDayStem, todayPillar, index + 1);
 
         // 점수를 키워드로 변환
         const keyword = mapScoreToKeyword(score, category);
@@ -489,22 +495,17 @@ export const calculateFortune = (userData, fortuneData) => {
         };
     });
 
-    // 5. 행운 요소는 results에서 가져옴 (이미 위에서 계산됨)
+    // 6. 행운 요소는 results에서 가져옴 (이미 위에서 계산됨)
     const luckyElement = {
         keyword: results.lucky.keyword,
         content: results.lucky.content
     };
 
-    // 6. 타로 카드 선택 (개선된 로직)
+    // 7. 타로 카드 선택 (개선된 로직)
     const tarot = selectTarotCard(userData, today);
 
-    // 7. 별자리 운세 선택 (신문 스타일: 날짜 기반)
+    // 8. 별자리 운세 선택 (신문 스타일: 날짜 기반)
     const horoscopeFortune = selectHoroscopeFortune(zodiacSign, today);
-
-    // 8. 오늘의 운세 (Main과 동일)
-    const todayScore = calculateCategoryScore(userDayStem, todayPillar, 0);
-    const todayKeyword = mapScoreToKeyword(todayScore, 'Main');
-    const todayContent = getRandomFortune('Main', todayKeyword);
 
     return {
         date: today.toLocaleDateString('ko-KR'),
@@ -514,12 +515,13 @@ export const calculateFortune = (userData, fortuneData) => {
         zodiacSign,
         lunarDate: userData.lunarDate, // 음력 날짜 추가
 
-        // 운세 결과
-        today: {
-            keyword: todayKeyword || '',
-            content: todayContent || '오늘은 좋은 일이 있을 거예요!'
+        // 종합 운세 (Main + Main2 조합)
+        overall: {
+            keyword: overallKeyword || '',
+            content: overallContent || '오늘도 좋은 하루 되세요!'
         },
-        main: results.main,
+
+        // 세부 운세
         money: results.money,
         health: results.health,
         love: results.love,
