@@ -457,13 +457,9 @@ const FortuneResultPage = ({ fortuneResult, onClose, onReset }) => {
 
 ━━━━━━━━━━━━━━━━━━━━
 
-📅 오늘의 운세
-${fortuneResult.today.keyword ? `[${fortuneResult.today.keyword}]` : ''}
-${fortuneResult.today.content}
-
-⭐ 메인 운세
-${fortuneResult.main.keyword ? `[${fortuneResult.main.keyword}]` : ''}
-${fortuneResult.main.content}
+🌟 종합 운세
+${fortuneResult.overall.keyword ? `[${fortuneResult.overall.keyword}]` : ''}
+${fortuneResult.overall.content}
 
 💰 재물운
 ${fortuneResult.money.keyword ? `[${fortuneResult.money.keyword}]` : ''}
@@ -548,21 +544,12 @@ ${fortuneResult.starSign.content}
                             )}
                         </Section>
 
-                        {/* 오늘의 운세 */}
+                        {/* 종합 운세 */}
                         <Section $delay="0.1s">
-                            <SectionTitle>📅 오늘의 운세</SectionTitle>
+                            <SectionTitle>🌟 종합 운세</SectionTitle>
                             <SectionContent $borderColor="#667eea">
-                                {fortuneResult.today.keyword && <Keyword>{fortuneResult.today.keyword}</Keyword>}
-                                <Text>{fortuneResult.today.content}</Text>
-                            </SectionContent>
-                        </Section>
-
-                        {/* 메인 운세 */}
-                        <Section $delay="0.15s">
-                            <SectionTitle>⭐ 메인 운세</SectionTitle>
-                            <SectionContent $borderColor="#764ba2">
-                                {fortuneResult.main.keyword && <Keyword>{fortuneResult.main.keyword}</Keyword>}
-                                <Text>{fortuneResult.main.content}</Text>
+                                {fortuneResult.overall.keyword && <Keyword>{fortuneResult.overall.keyword}</Keyword>}
+                                <Text style={{ whiteSpace: 'pre-wrap' }}>{fortuneResult.overall.content}</Text>
                             </SectionContent>
                         </Section>
 
