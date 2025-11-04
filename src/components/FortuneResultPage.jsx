@@ -283,12 +283,11 @@ const SajuInfoValue = styled.span`
 
 const LuckyWrapper = styled.div`
     position: relative;
-    padding-top: 20px;
 `;
 
 const LuckyTabTitle = styled.div`
     position: absolute;
-    top: 0;
+    top: -12px;
     left: 20px;
     background: #d4a574;
     color: white;
@@ -302,6 +301,7 @@ const LuckyTabTitle = styled.div`
         font-size: 16px;
         padding: 10px 24px;
         left: 24px;
+        top: -14px;
     }
 `;
 
@@ -314,15 +314,9 @@ const LuckyContainer = styled.div`
     border: 2px solid #d4a574;
     border-radius: 20px;
     padding: 32px 24px;
-    padding-top: 44px;
     text-align: center;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     position: relative;
-    margin-top: 15px;
-
-    @media (min-width: 768px) {
-        padding-top: 48px;
-    }
 `;
 
 const LuckyIntroText = styled.p`
