@@ -98,25 +98,25 @@ const Header = styled.div`
 
 const Title = styled.h2`
     margin: 0;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 600;
     letter-spacing: -0.5px;
 
     @media (min-width: 768px) {
-        font-size: 28px;
+        font-size: 24px;
     }
 `;
 
 const UserInfo = styled.div`
-    margin-top: 12px;
+    margin-top: 8px;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    font-size: 14px;
+    gap: 3px;
+    font-size: 13px;
     opacity: 0.95;
 
     @media (min-width: 768px) {
-        font-size: 15px;
+        font-size: 14px;
     }
 `;
 
@@ -239,37 +239,6 @@ const Text = styled.p`
     @media (min-width: 768px) {
         font-size: 16px;
         line-height: 1.8;
-    }
-`;
-
-const InfoGrid = styled.div`
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: 12px;
-    background: #f7fafc;
-    border-radius: 16px;
-    padding: 20px;
-`;
-
-const InfoItem = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-`;
-
-const InfoLabel = styled.span`
-    font-size: 12px;
-    color: #718096;
-    font-weight: 500;
-`;
-
-const InfoValue = styled.span`
-    font-size: 16px;
-    color: #2d3748;
-    font-weight: 600;
-
-    @media (min-width: 768px) {
-        font-size: 17px;
     }
 `;
 

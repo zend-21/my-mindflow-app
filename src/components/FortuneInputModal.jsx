@@ -5,6 +5,7 @@ import styled from 'styled-components';
 import { getCountries, getCities } from '../utils/timeZoneData';
 import { convertSolarToLunar, formatLunarDate } from '../utils/lunarConverter';
 import { searchCity } from '../utils/geocoding';
+import { calculateZodiacAnimal } from '../utils/fortuneLogic';
 
 // 🎨 Styled Components
 
@@ -1029,7 +1030,9 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 {lunarDate && (
                                     <ConfirmItem>
                                         <ConfirmLabel>음력</ConfirmLabel>
-                                        <ConfirmValue style={{ fontSize: '13px', color: '#667eea' }}>{lunarDate}</ConfirmValue>
+                                        <ConfirmValue style={{ fontSize: '13px', color: '#667eea' }}>
+                                            {calculateZodiacAnimal(birthYear)}띠 {lunarDate}
+                                        </ConfirmValue>
                                     </ConfirmItem>
                                 )}
 

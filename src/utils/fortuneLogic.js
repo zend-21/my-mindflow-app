@@ -104,9 +104,11 @@ const getBranchHanja = (branch) => {
  * @returns {string} 띠 이름 (쥐, 소, 호랑이, 토끼, 용, 뱀, 말, 양, 원숭이, 닭, 개, 돼지)
  */
 export const calculateZodiacAnimal = (birthYear) => {
-    // 1900년은 쥐띠 (자)
+    // 1900년은 쥐띠 (자), 1901년은 소띠 (축), ...
     const baseYear = 1900;
-    const index = (birthYear - baseYear) % 12;
+    let index = (birthYear - baseYear) % 12;
+    // 음수가 나올 경우 양수로 변환
+    if (index < 0) index += 12;
     return ZODIAC_ANIMALS[index];
 };
 
