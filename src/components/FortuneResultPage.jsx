@@ -285,11 +285,31 @@ const LuckyContainer = styled.div`
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
+    gap: 20px;
     background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
     border-radius: 20px;
     padding: 32px 24px;
     text-align: center;
+`;
+
+const LuckyIntroText = styled.p`
+    margin: 0;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.6;
+
+    @media (min-width: 768px) {
+        font-size: 17px;
+    }
+`;
+
+const LuckyNumbers = styled.div`
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin: 8px 0;
 `;
 
 const LuckyNumber = styled.div`
@@ -300,24 +320,52 @@ const LuckyNumber = styled.div`
     color: #19547b;
     font-size: 36px;
     font-weight: 700;
-    width: 100px;
-    height: 100px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
 
     @media (min-width: 768px) {
         font-size: 42px;
-        width: 120px;
-        height: 120px;
+        width: 90px;
+        height: 90px;
     }
 `;
 
-const LuckyText = styled.p`
-    margin: 0;
+const LuckyDetailsBox = styled.div`
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    padding: 20px 24px;
+    width: 100%;
+    max-width: 500px;
+`;
+
+const LuckyDetailRow = styled.div`
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+
+    &:last-child {
+        margin-bottom: 0;
+    }
+`;
+
+const LuckyLabel = styled.span`
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    font-weight: 500;
+
+    @media (min-width: 768px) {
+        font-size: 15px;
+    }
+`;
+
+const LuckyValue = styled.span`
     color: white;
     font-size: 15px;
-    line-height: 1.6;
-    font-weight: 500;
+    font-weight: 600;
+    text-align: right;
 
     @media (min-width: 768px) {
         font-size: 16px;
@@ -518,8 +566,12 @@ ${fortuneResult.love.keyword ? `[${fortuneResult.love.keyword}]` : ''}
 ${fortuneResult.love.content}
 
 🌈 행운 요소
-${fortuneResult.lucky.keyword}
-${fortuneResult.lucky.content}
+${fortuneResult.lucky.introText}
+행운의 숫자: ${fortuneResult.lucky.numbers}
+행운의 색: ${fortuneResult.lucky.color}
+행운의 방향: ${fortuneResult.lucky.direction}
+행운의 상징: ${fortuneResult.lucky.items}
+긍정 키워드: ${fortuneResult.lucky.concepts}
 
 💡 오늘의 조언
 ${fortuneResult.advice.keyword ? `[${fortuneResult.advice.keyword}]` : ''}
@@ -633,8 +685,32 @@ ${fortuneResult.starSign.content}
                             <Section $delay="0s">
                                 <SectionTitle>🌈 행운 요소</SectionTitle>
                                 <LuckyContainer>
-                                    <LuckyNumber>{fortuneResult.lucky.keyword}</LuckyNumber>
-                                    <LuckyText>{fortuneResult.lucky.content}</LuckyText>
+                                    <LuckyIntroText>{fortuneResult.lucky.introText}</LuckyIntroText>
+
+                                    <LuckyNumbers>
+                                        {fortuneResult.lucky.numbers.split(', ').map((num, idx) => (
+                                            <LuckyNumber key={idx}>{num}</LuckyNumber>
+                                        ))}
+                                    </LuckyNumbers>
+
+                                    <LuckyDetailsBox>
+                                        <LuckyDetailRow>
+                                            <LuckyLabel>행운의 색</LuckyLabel>
+                                            <LuckyValue>{fortuneResult.lucky.color}</LuckyValue>
+                                        </LuckyDetailRow>
+                                        <LuckyDetailRow>
+                                            <LuckyLabel>행운의 방향</LuckyLabel>
+                                            <LuckyValue>{fortuneResult.lucky.direction}</LuckyValue>
+                                        </LuckyDetailRow>
+                                        <LuckyDetailRow>
+                                            <LuckyLabel>행운의 상징</LuckyLabel>
+                                            <LuckyValue>{fortuneResult.lucky.items}</LuckyValue>
+                                        </LuckyDetailRow>
+                                        <LuckyDetailRow>
+                                            <LuckyLabel>긍정 키워드</LuckyLabel>
+                                            <LuckyValue>{fortuneResult.lucky.concepts}</LuckyValue>
+                                        </LuckyDetailRow>
+                                    </LuckyDetailsBox>
                                 </LuckyContainer>
                             </Section>
 

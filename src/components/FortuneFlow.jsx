@@ -127,7 +127,7 @@ const FortuneFlow = ({ onClose, profile }) => {
     };
 
     // 🎯 Handler: 가차 애니메이션 완료
-    const handleGachaComplete = () => {
+    const handleGachaComplete = async () => {
         if (!userProfile || !fortuneData) {
             console.error('데이터를 불러오는 중 오류가 발생했습니다.');
             onClose();
@@ -135,7 +135,7 @@ const FortuneFlow = ({ onClose, profile }) => {
         }
 
         // Calculate fortune
-        const result = calculateFortune(userProfile, fortuneData);
+        const result = await calculateFortune(userProfile, fortuneData);
 
         // Save fortune
         saveTodayFortune(result);

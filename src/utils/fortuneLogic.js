@@ -2,7 +2,7 @@
 
 // 🌟 사주팔자 기반 운세 계산 로직
 
-import { getTarotData, getHoroscopeData } from './fortuneData';
+import { getTarotData, getHoroscopeData, getLuckyElementsData } from './fortuneData';
 import { getRandomFortune, getCombinedFortune } from './fortuneSelector';
 
 // 천간 (Heavenly Stems) - 10개
@@ -110,6 +110,27 @@ export const calculateZodiacAnimal = (birthYear) => {
     // 음수가 나올 경우 양수로 변환
     if (index < 0) index += 12;
     return ZODIAC_ANIMALS[index];
+};
+
+/**
+ * 천간으로부터 오행(五行) 계산
+ * @param {string} stem - 천간 (갑, 을, 병, 정, 무, 기, 경, 신, 임, 계)
+ * @returns {string} 오행 (Wood, Fire, Earth, Metal, Water)
+ */
+const getStemElement = (stem) => {
+    const elementMap = {
+        '갑': 'Wood',  // 甲 - 양목
+        '을': 'Wood',  // 乙 - 음목
+        '병': 'Fire',  // 丙 - 양화
+        '정': 'Fire',  // 丁 - 음화
+        '무': 'Earth', // 戊 - 양토
+        '기': 'Earth', // 己 - 음토
+        '경': 'Metal', // 庚 - 양금
+        '신': 'Metal', // 辛 - 음금
+        '임': 'Water', // 壬 - 양수
+        '계': 'Water'  // 癸 - 음수
+    };
+    return elementMap[stem] || 'Wood';
 };
 
 /**
@@ -492,12 +513,99 @@ const calculateCategoryScore = (userDayStem, todayPillar, categoryIndex) => {
 };
 
 /**
+ * 오행 기반 행운 요소 선택
+ * @param {string} dayStem - 일간 (천간)
+ * @param {Date} today - 오늘 날짜
+ * @returns {Object} 행운 요소 { introText, numbers, color, direction, items, concepts }
+ */
+const selectLuckyElements = async (dayStem, today) => {
+    try {
+        const luckyElementsData = await getLuckyElementsData();
+        if (!luckyElementsData) {
+            return {
+                introText: "오늘은 균형잡힌 기운이 흐르는 날입니다",
+                numbers: "1, 5",
+                color: "흰색 계열",
+                direction: "中",
+                items: "빛, 물",
+                concepts: "조화, 평온"
+            };
+        }
+
+        // 일간의 오행 계산
+        const element = getStemElement(dayStem);
+        const elementData = luckyElementsData[element];
+
+        if (!elementData) {
+            return {
+                introText: "오늘은 균형잡힌 기운이 흐르는 날입니다",
+                numbers: "1, 5",
+                color: "흰색 계열",
+                direction: "中",
+                items: "빛, 물",
+                concepts: "조화, 평온"
+            };
+        }
+
+        // 날짜 기반 시드로 랜덤 선택 (같은 날 같은 결과)
+        const dateString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
+        const seed = dateString.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+
+        const random = (max) => {
+            const x = Math.sin(seed + max) * 10000;
+            return Math.floor((x - Math.floor(x)) * max);
+        };
+
+        // 요소 선택
+        const color = elementData.colors[random(elementData.colors.length)];
+        const direction = elementData.direction;
+        const selectedItems = [];
+        const selectedConcepts = [];
+
+        // 아이템 2개 선택
+        const itemsCopy = [...elementData.items];
+        for (let i = 0; i < Math.min(2, itemsCopy.length); i++) {
+            const idx = random(itemsCopy.length - i);
+            selectedItems.push(itemsCopy[idx]);
+            itemsCopy.splice(idx, 1);
+        }
+
+        // 개념 2개 선택
+        const conceptsCopy = [...elementData.concepts];
+        for (let i = 0; i < Math.min(2, conceptsCopy.length); i++) {
+            const idx = random(conceptsCopy.length - i);
+            selectedConcepts.push(conceptsCopy[idx]);
+            conceptsCopy.splice(idx, 1);
+        }
+
+        return {
+            introText: elementData.introText,
+            numbers: elementData.numbers.join(', '),
+            color: color,
+            direction: direction,
+            items: selectedItems.join(', '),
+            concepts: selectedConcepts.join(', ')
+        };
+    } catch (error) {
+        console.error('Failed to select lucky elements:', error);
+        return {
+            introText: "오늘은 균형잡힌 기운이 흐르는 날입니다",
+            numbers: "1, 5",
+            color: "흰색 계열",
+            direction: "中",
+            items: "빛, 물",
+            concepts: "조화, 평온"
+        };
+    }
+};
+
+/**
  * 메인 운세 계산 함수 (새 JSON DB 사용)
  * @param {Object} userData - { name, birthYear, birthMonth, birthDay, gender, birthTime, birthCity }
  * @param {Object} fortuneData - getFortuneData()로 받은 카테고리별 데이터
  * @returns {Object} 전체 운세 결과
  */
-export const calculateFortune = (userData, fortuneData) => {
+export const calculateFortune = async (userData, fortuneData) => {
     // 1. 사용자 일간 계산
     const userDayStem = calculateDayStem(userData);
 
@@ -514,7 +622,7 @@ export const calculateFortune = (userData, fortuneData) => {
     const overallContent = getCombinedFortune(overallKeyword);
 
     // 5. 세부 운세 계산: 각 카테고리별로 점수 → 키워드 → 랜덤 콘텐츠 선택
-    const categories = ['Money', 'Health', 'Love', 'Advice', 'Lucky'];
+    const categories = ['Money', 'Health', 'Love', 'Advice'];
     const results = {};
 
     categories.forEach((category, index) => {
@@ -534,11 +642,8 @@ export const calculateFortune = (userData, fortuneData) => {
         };
     });
 
-    // 6. 행운 요소는 results에서 가져옴 (이미 위에서 계산됨)
-    const luckyElement = {
-        keyword: results.lucky.keyword,
-        content: results.lucky.content
-    };
+    // 6. 행운 요소 계산 (오행 기반)
+    const luckyElements = await selectLuckyElements(userDayStem, today);
 
     // 7. 타로 카드 선택 (개선된 로직)
     const tarot = selectTarotCard(userData, today);
@@ -566,11 +671,8 @@ export const calculateFortune = (userData, fortuneData) => {
         love: results.love,
         advice: results.advice,
 
-        // 행운 요소
-        lucky: {
-            keyword: luckyElement.keyword,
-            content: luckyElement.content
-        },
+        // 행운 요소 (오행 기반)
+        lucky: luckyElements,
 
         // 타로
         tarot: {

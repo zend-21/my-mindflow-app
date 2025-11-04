@@ -86,3 +86,17 @@ export const getHoroscopeData = () => {
     const horoscopeData = parseCsv(rawHoroscopeData);
     return horoscopeData;
 };
+
+/**
+ * 오행별 행운 요소 데이터를 반환
+ * @returns {Promise<Object>} 오행별 행운 요소 데이터
+ */
+export const getLuckyElementsData = () => {
+    return fetch('/src/data/fortune_database.json')
+        .then(response => response.json())
+        .then(data => data.LuckyElements)
+        .catch(error => {
+            console.error('Failed to load lucky elements data:', error);
+            return null;
+        });
+};
