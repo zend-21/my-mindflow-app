@@ -1,0 +1,9 @@
+{
+  "name": "mindflow-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "geo-tz": "^8.1.4"
+  }
+}
