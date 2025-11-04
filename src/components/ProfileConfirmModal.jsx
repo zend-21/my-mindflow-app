@@ -227,7 +227,7 @@ const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) 
                         <div style={{ textAlign: 'right' }}>
                             <InfoValue>{formatBirthday()}</InfoValue>
                             {lunarDate && (
-                                <LunarNote>({zodiacAnimal}띠) 음력: {lunarDate}</LunarNote>
+                                <LunarNote>({zodiacAnimal}띠) {lunarDate}</LunarNote>
                             )}
                         </div>
                     </InfoRow>

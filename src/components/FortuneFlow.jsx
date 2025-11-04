@@ -13,6 +13,7 @@ import {
     saveTodayFortune,
     getUserProfile,
     saveUserProfile,
+    isUserLoggedIn,
     IS_TESTING_MODE
 } from '../utils/fortuneLogic';
 
@@ -144,9 +145,15 @@ const FortuneFlow = ({ onClose, profile }) => {
         setFlowState('result');
     };
 
-    // 🎯 Handler: 다시 보기 (프로필 재입력)
+    // 🎯 Handler: 다시 보기 (프로필 확인 또는 재입력)
     const handleReset = () => {
-        setFlowState('inputProfile');
+        // 로그인 상태이고 저장된 프로필이 있으면 확인창으로
+        if (userProfile && isUserLoggedIn()) {
+            setFlowState('confirmProfile');
+        } else {
+            // 게스트는 바로 입력창으로
+            setFlowState('inputProfile');
+        }
     };
 
     // 🎬 Render based on flow state
