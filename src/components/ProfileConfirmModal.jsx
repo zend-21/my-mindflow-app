@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { convertSolarToLunar, formatLunarDate } from '../utils/lunarConverter';
+import { calculateZodiacAnimal } from '../utils/fortuneLogic';
 
 const Overlay = styled.div`
     position: fixed;
@@ -157,8 +158,9 @@ const LunarNote = styled.div`
 
 const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) => {
     const [lunarDate, setLunarDate] = useState('');
+    const [zodiacAnimal, setZodiacAnimal] = useState('');
 
-    // 양력 → 음력 변환
+    // 양력 → 음력 변환 및 띠 계산
     useEffect(() => {
         const fetchLunarDate = async () => {
             if (profile.birthYear && profile.birthMonth && profile.birthDay) {
@@ -171,6 +173,10 @@ const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) 
                 if (lunarData) {
                     setLunarDate(formatLunarDate(lunarData));
                 }
+
+                // 띠 계산
+                const animal = calculateZodiacAnimal(profile.birthYear);
+                setZodiacAnimal(animal);
             }
         };
 
@@ -211,7 +217,7 @@ const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName }) 
                         <div style={{ textAlign: 'right' }}>
                             <InfoValue>{formatBirthday()}</InfoValue>
                             {lunarDate && (
-                                <LunarNote>음력: {lunarDate}</LunarNote>
+                                <LunarNote>{zodiacAnimal}띠 음력: {lunarDate}</LunarNote>
                             )}
                         </div>
                     </InfoRow>

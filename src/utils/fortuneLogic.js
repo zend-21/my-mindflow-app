@@ -7,9 +7,14 @@ import { getRandomFortune, getCombinedFortune } from './fortuneSelector';
 
 // 천간 (Heavenly Stems) - 10개
 const HEAVENLY_STEMS = ['갑', '을', '병', '정', '무', '기', '경', '신', '임', '계'];
+const HEAVENLY_STEMS_HANJA = ['甲', '乙', '丙', '丁', '戊', '己', '庚', '辛', '壬', '癸'];
 
 // 지지 (Earthly Branches) - 12개
 const EARTHLY_BRANCHES = ['자', '축', '인', '묘', '진', '사', '오', '미', '신', '유', '술', '해'];
+const EARTHLY_BRANCHES_HANJA = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+
+// 12띠 (12 Zodiac Animals)
+const ZODIAC_ANIMALS = ['쥐', '소', '호랑이', '토끼', '용', '뱀', '말', '양', '원숭이', '닭', '개', '돼지'];
 
 // 12 별자리
 const ZODIAC_SIGNS = [
@@ -71,6 +76,38 @@ export const calculateDayPillar = (date) => {
         branch: EARTHLY_BRANCHES[branchIndex],
         index: dayIndex
     };
+};
+
+/**
+ * 천간의 한자 가져오기
+ * @param {string} stem - 천간 한글 (갑, 을, 병, 정, 무, 기, 경, 신, 임, 계)
+ * @returns {string} 천간 한자
+ */
+const getStemHanja = (stem) => {
+    const index = HEAVENLY_STEMS.indexOf(stem);
+    return index >= 0 ? HEAVENLY_STEMS_HANJA[index] : '';
+};
+
+/**
+ * 지지의 한자 가져오기
+ * @param {string} branch - 지지 한글 (자, 축, 인, 묘, 진, 사, 오, 미, 신, 유, 술, 해)
+ * @returns {string} 지지 한자
+ */
+const getBranchHanja = (branch) => {
+    const index = EARTHLY_BRANCHES.indexOf(branch);
+    return index >= 0 ? EARTHLY_BRANCHES_HANJA[index] : '';
+};
+
+/**
+ * 생년으로부터 띠(12지) 계산
+ * @param {number} birthYear - 출생 연도
+ * @returns {string} 띠 이름 (쥐, 소, 호랑이, 토끼, 용, 뱀, 말, 양, 원숭이, 닭, 개, 돼지)
+ */
+export const calculateZodiacAnimal = (birthYear) => {
+    // 1900년은 쥐띠 (자)
+    const baseYear = 1900;
+    const index = (birthYear - baseYear) % 12;
+    return ZODIAC_ANIMALS[index];
 };
 
 /**
@@ -510,8 +547,8 @@ export const calculateFortune = (userData, fortuneData) => {
     return {
         date: today.toLocaleDateString('ko-KR'),
         userName: userData.name,
-        userDayStem,
-        todayPillar: `${todayPillar.stem}${todayPillar.branch}`,
+        userDayStem: `${userDayStem}(${getStemHanja(userDayStem)})`,
+        todayPillar: `${todayPillar.stem}${todayPillar.branch}(${getStemHanja(todayPillar.stem)}${getBranchHanja(todayPillar.branch)})`,
         zodiacSign,
         lunarDate: userData.lunarDate, // 음력 날짜 추가
 

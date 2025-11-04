@@ -77,7 +77,7 @@ const Container = styled.div`
 `;
 
 const Header = styled.div`
-    padding: 32px 24px;
+    padding: 17px 24px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     text-align: center;
@@ -565,31 +565,6 @@ ${fortuneResult.starSign.content}
                             <CategoryTitle $color="#8b5e34" $borderColor="#d4a574">
                                 🔮 사주 운세
                             </CategoryTitle>
-
-                            {/* 사주 정보 */}
-                            <Section $delay="0s">
-                                <SectionTitle>🌟 사주 정보</SectionTitle>
-                                {fortuneResult.lunarDate ? (
-                                    <InfoGrid>
-                                        <InfoItem>
-                                            <InfoLabel>일간</InfoLabel>
-                                            <InfoValue>{fortuneResult.userDayStem}</InfoValue>
-                                        </InfoItem>
-                                        <InfoItem>
-                                            <InfoLabel>오늘 일진</InfoLabel>
-                                            <InfoValue>{fortuneResult.todayPillar}</InfoValue>
-                                        </InfoItem>
-                                        <InfoItem>
-                                            <InfoLabel>별자리</InfoLabel>
-                                            <InfoValue>{fortuneResult.zodiacSign}</InfoValue>
-                                        </InfoItem>
-                                    </InfoGrid>
-                                ) : (
-                                    <SectionContent $borderColor="#e2e8f0" style={{ textAlign: 'center', padding: '24px', color: '#999' }}>
-                                        ⚠️ 음력 정보가 없어 사주 결과를 표시할 수 없습니다.
-                                    </SectionContent>
-                                )}
-                            </Section>
 
                             {/* 종합 운세 */}
                             <Section $delay="0s">
