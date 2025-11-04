@@ -286,15 +286,17 @@ const LuckyContainer = styled.div`
     flex-direction: column;
     align-items: center;
     gap: 20px;
-    background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+    background: #fefcfb;
+    border: 2px solid #d4a574;
     border-radius: 20px;
     padding: 32px 24px;
     text-align: center;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 `;
 
 const LuckyIntroText = styled.p`
     margin: 0;
-    color: white;
+    color: #8b5e34;
     font-size: 16px;
     font-weight: 600;
     line-height: 1.6;
@@ -304,26 +306,32 @@ const LuckyIntroText = styled.p`
     }
 `;
 
+const LuckyNumbersWrapper = styled.div`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+`;
+
 const LuckyNumbers = styled.div`
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 20px;
-    margin: 8px 0;
 `;
 
 const LuckyNumber = styled.div`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: white;
-    color: #19547b;
+    background: ${props => props.$bgColor || '#ffffff'};
+    color: ${props => props.$textColor || '#2d3748'};
     font-size: 36px;
     font-weight: 700;
     width: 80px;
     height: 80px;
     border-radius: 50%;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 
     @media (min-width: 768px) {
         font-size: 42px;
@@ -332,12 +340,24 @@ const LuckyNumber = styled.div`
     }
 `;
 
+const LuckyNumberCaption = styled.p`
+    margin: 0;
+    color: #8b5e34;
+    font-size: 13px;
+    font-weight: 500;
+
+    @media (min-width: 768px) {
+        font-size: 14px;
+    }
+`;
+
 const LuckyDetailsBox = styled.div`
-    background: rgba(255, 255, 255, 0.15);
+    background: #f7f5f3;
     border-radius: 12px;
     padding: 20px 24px;
     width: 100%;
     max-width: 500px;
+    border: 1px solid #e6dfd8;
 `;
 
 const LuckyDetailRow = styled.div`
@@ -352,7 +372,7 @@ const LuckyDetailRow = styled.div`
 `;
 
 const LuckyLabel = styled.span`
-    color: rgba(255, 255, 255, 0.9);
+    color: #6b5d54;
     font-size: 14px;
     font-weight: 500;
 
@@ -362,7 +382,7 @@ const LuckyLabel = styled.span`
 `;
 
 const LuckyValue = styled.span`
-    color: white;
+    color: #2d3748;
     font-size: 15px;
     font-weight: 600;
     text-align: right;
@@ -539,6 +559,45 @@ const FortuneResultPage = ({ fortuneResult, onClose, onReset }) => {
 
     if (!fortuneResult) return null;
 
+    // 행운 색상에서 배경색과 텍스트 색상 계산
+    const getLuckyNumberColors = (colorName) => {
+        // 색상 계열별 매핑
+        const colorMap = {
+            '녹색': { bg: '#48bb78', text: 'white' },
+            '청록': { bg: '#38b2ac', text: 'white' },
+            '연두': { bg: '#9ae6b4', text: '#2d3748' },
+            '청색': { bg: '#4299e1', text: 'white' },
+            '빨강': { bg: '#f56565', text: 'white' },
+            '주황': { bg: '#ed8936', text: 'white' },
+            '보라': { bg: '#9f7aea', text: 'white' },
+            '분홍': { bg: '#ed64a6', text: 'white' },
+            '노랑': { bg: '#ecc94b', text: '#2d3748' },
+            '갈색': { bg: '#a0522d', text: 'white' },
+            '베이지': { bg: '#d2b48c', text: '#2d3748' },
+            '황토': { bg: '#cd853f', text: 'white' },
+            '하양': { bg: '#f7fafc', text: '#2d3748' },
+            '금색': { bg: '#d4af37', text: '#2d3748' },
+            '은색': { bg: '#c0c0c0', text: '#2d3748' },
+            '회색': { bg: '#a0aec0', text: 'white' },
+            '검정': { bg: '#2d3748', text: 'white' },
+            '파랑': { bg: '#3182ce', text: 'white' },
+            '남색': { bg: '#2c5282', text: 'white' }
+        };
+
+        // 색상 이름에서 기본 색상 찾기
+        for (const [key, value] of Object.entries(colorMap)) {
+            if (colorName.includes(key)) {
+                return value;
+            }
+        }
+
+        // 기본값
+        return { bg: '#667eea', text: 'white' };
+    };
+
+    const luckyColors = getLuckyNumberColors(fortuneResult.lucky.color);
+    const numbersArray = fortuneResult.lucky.numbers.split(', ');
+
     // 운세 내용을 텍스트로 변환
     const formatFortuneText = () => {
         return `
@@ -557,7 +616,7 @@ ${fortuneResult.overall.content}
 ${fortuneResult.money.keyword ? `[${fortuneResult.money.keyword}]` : ''}
 ${fortuneResult.money.content}
 
-💊 건강운
+💪 건강운
 ${fortuneResult.health.keyword ? `[${fortuneResult.health.keyword}]` : ''}
 ${fortuneResult.health.content}
 
@@ -645,53 +704,28 @@ ${fortuneResult.starSign.content}
                                 </SectionContent>
                             )}
 
-                            {/* 종합 운세 */}
-                            <Section $delay="0s">
-                                <SectionTitle>🌟 종합 운세</SectionTitle>
-                                <SectionContent $borderColor="#667eea">
-                                    {fortuneResult.overall.keyword && <Keyword>{fortuneResult.overall.keyword}</Keyword>}
-                                    <Text style={{ whiteSpace: 'pre-wrap' }}>{fortuneResult.overall.content}</Text>
-                                </SectionContent>
-                            </Section>
-
-                            {/* 재물운 */}
-                            <Section $delay="0s">
-                                <SectionTitle>💰 재물운</SectionTitle>
-                                <SectionContent $borderColor="#f6ad55">
-                                    {fortuneResult.money.keyword && <Keyword>{fortuneResult.money.keyword}</Keyword>}
-                                    <Text>{fortuneResult.money.content}</Text>
-                                </SectionContent>
-                            </Section>
-
-                            {/* 건강운 */}
-                            <Section $delay="0s">
-                                <SectionTitle>💊 건강운</SectionTitle>
-                                <SectionContent $borderColor="#48bb78">
-                                    {fortuneResult.health.keyword && <Keyword>{fortuneResult.health.keyword}</Keyword>}
-                                    <Text>{fortuneResult.health.content}</Text>
-                                </SectionContent>
-                            </Section>
-
-                            {/* 애정운 */}
-                            <Section $delay="0s">
-                                <SectionTitle>💕 애정운</SectionTitle>
-                                <SectionContent $borderColor="#f687b3">
-                                    {fortuneResult.love.keyword && <Keyword>{fortuneResult.love.keyword}</Keyword>}
-                                    <Text>{fortuneResult.love.content}</Text>
-                                </SectionContent>
-                            </Section>
-
                             {/* 행운 요소 */}
                             <Section $delay="0s">
                                 <SectionTitle>🌈 행운 요소</SectionTitle>
                                 <LuckyContainer>
                                     <LuckyIntroText>{fortuneResult.lucky.introText}</LuckyIntroText>
 
-                                    <LuckyNumbers>
-                                        {fortuneResult.lucky.numbers.split(', ').map((num, idx) => (
-                                            <LuckyNumber key={idx}>{num}</LuckyNumber>
-                                        ))}
-                                    </LuckyNumbers>
+                                    <LuckyNumbersWrapper>
+                                        <LuckyNumbers>
+                                            {numbersArray.map((num, idx) => (
+                                                <LuckyNumber
+                                                    key={idx}
+                                                    $bgColor={luckyColors.bg}
+                                                    $textColor={luckyColors.text}
+                                                >
+                                                    {num}
+                                                </LuckyNumber>
+                                            ))}
+                                        </LuckyNumbers>
+                                        <LuckyNumberCaption>
+                                            금일 행운의 숫자는 {numbersArray[0]}와 {numbersArray[1]}입니다
+                                        </LuckyNumberCaption>
+                                    </LuckyNumbersWrapper>
 
                                     <LuckyDetailsBox>
                                         <LuckyDetailRow>
@@ -712,6 +746,42 @@ ${fortuneResult.starSign.content}
                                         </LuckyDetailRow>
                                     </LuckyDetailsBox>
                                 </LuckyContainer>
+                            </Section>
+
+                            {/* 종합 운세 */}
+                            <Section $delay="0s">
+                                <SectionTitle>🌟 종합 운세</SectionTitle>
+                                <SectionContent $borderColor="#667eea">
+                                    {fortuneResult.overall.keyword && <Keyword>{fortuneResult.overall.keyword}</Keyword>}
+                                    <Text style={{ whiteSpace: 'pre-wrap' }}>{fortuneResult.overall.content}</Text>
+                                </SectionContent>
+                            </Section>
+
+                            {/* 재물운 */}
+                            <Section $delay="0s">
+                                <SectionTitle>💰 재물운</SectionTitle>
+                                <SectionContent $borderColor="#f6ad55">
+                                    {fortuneResult.money.keyword && <Keyword>{fortuneResult.money.keyword}</Keyword>}
+                                    <Text>{fortuneResult.money.content}</Text>
+                                </SectionContent>
+                            </Section>
+
+                            {/* 건강운 */}
+                            <Section $delay="0s">
+                                <SectionTitle>💪 건강운</SectionTitle>
+                                <SectionContent $borderColor="#48bb78">
+                                    {fortuneResult.health.keyword && <Keyword>{fortuneResult.health.keyword}</Keyword>}
+                                    <Text>{fortuneResult.health.content}</Text>
+                                </SectionContent>
+                            </Section>
+
+                            {/* 애정운 */}
+                            <Section $delay="0s">
+                                <SectionTitle>💕 애정운</SectionTitle>
+                                <SectionContent $borderColor="#f687b3">
+                                    {fortuneResult.love.keyword && <Keyword>{fortuneResult.love.keyword}</Keyword>}
+                                    <Text>{fortuneResult.love.content}</Text>
+                                </SectionContent>
                             </Section>
 
                             {/* 오늘의 조언 */}
