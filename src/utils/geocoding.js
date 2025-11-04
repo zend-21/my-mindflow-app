@@ -1,5 +1,4 @@
 // src/utils/geocoding.js
-import { find } from 'geo-tz';
 
 /**
  * Nominatim API를 사용한 도시 검색
@@ -221,20 +220,36 @@ const formatDisplayName = (primaryName, district, state, country) => {
 
 /**
  * 좌표로부터 타임존 정보 가져오기 (사주 계산용)
- * geo-tz 라이브러리를 사용하여 오프라인으로 정확한 타임존 계산
+ * Vercel serverless function을 통해 geo-tz 라이브러리로 정확한 타임존 계산
  * 역사적 타임존 변경사항도 지원 (예: 한국 1961년 이전 UTC+8:30)
  *
  * @param {number} lat - 위도
  * @param {number} lon - 경도
- * @returns {string} - IANA 타임존 문자열 (예: "Asia/Seoul", "America/New_York")
+ * @returns {Promise<string>} - IANA 타임존 문자열 (예: "Asia/Seoul", "America/New_York")
  */
-export const getTimezoneFromCoords = (lat, lon) => {
+export const getTimezoneFromCoords = async (lat, lon) => {
     try {
-        // geo-tz는 [lat, lon] 형식의 배열을 받고, 타임존 문자열 배열을 반환
-        const timezones = find(lat, lon);
+        // 개발 환경에서는 Vite proxy, 프로덕션에서는 Vercel serverless function 사용
+        const isDevelopment = import.meta.env.DEV;
+        const baseUrl = isDevelopment
+            ? '/api/timezone'
+            : '/api/timezone';
 
-        if (timezones && timezones.length > 0) {
-            return timezones[0]; // 첫 번째 매칭 타임존 반환
+        const params = new URLSearchParams({
+            lat: lat.toString(),
+            lon: lon.toString()
+        });
+
+        const response = await fetch(`${baseUrl}?${params.toString()}`);
+
+        if (!response.ok) {
+            throw new Error('타임존 API 호출 실패');
+        }
+
+        const data = await response.json();
+
+        if (data.timezone) {
+            return data.timezone;
         }
 
         // 타임존을 찾지 못한 경우 (드문 경우 - 대양 한가운데 등)
