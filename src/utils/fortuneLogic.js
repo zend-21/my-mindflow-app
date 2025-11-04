@@ -3,6 +3,7 @@
 // 🌟 사주팔자 기반 운세 계산 로직
 
 import { getTarotData, getHoroscopeData } from './fortuneData';
+import { getRandomFortune } from './fortuneSelector';
 
 // 천간 (Heavenly Stems) - 10개
 const HEAVENLY_STEMS = ['갑', '을', '병', '정', '무', '기', '경', '신', '임', '계'];
@@ -382,7 +383,77 @@ const selectHoroscopeFortune = (zodiacSign, date) => {
 };
 
 /**
- * 메인 운세 계산 함수
+ * 사주 결과 점수를 새로운 키워드로 매핑
+ * @param {number} score - 0~100 점수
+ * @param {string} category - 카테고리 ('Main', 'Money', 'Love', 'Health', 'Advice', 'Lucky')
+ * @returns {string} 키워드
+ */
+const mapScoreToKeyword = (score, category) => {
+    // Main, Money, Love, Health, Lucky: 4단계
+    if (category === 'Main') {
+        if (score >= 75) return '매우좋음';
+        if (score >= 50) return '좋음';
+        if (score >= 25) return '보통';
+        return '주의';
+    }
+
+    if (category === 'Money') {
+        if (score >= 75) return '재물상승';
+        if (score >= 50) return '현상유지';
+        if (score >= 25) return '지출주의';
+        return '재정악화';
+    }
+
+    if (category === 'Love') {
+        if (score >= 75) return '애정최고';
+        if (score >= 50) return '관계발전';
+        if (score >= 25) return '소강상태';
+        return '다툼주의';
+    }
+
+    if (category === 'Health') {
+        if (score >= 75) return '건강좋음';
+        if (score >= 50) return '활력넘침';
+        if (score >= 25) return '피로누적';
+        return '질병주의';
+    }
+
+    if (category === 'Lucky') {
+        if (score >= 75) return '행운최고';
+        if (score >= 50) return '행운좋음';
+        if (score >= 25) return '행운보통';
+        return '행운주의';
+    }
+
+    // Advice: 3단계
+    if (category === 'Advice') {
+        if (score >= 66) return '조언강조';
+        if (score >= 33) return '신중요함';
+        return '실행권유';
+    }
+
+    return '좋음'; // 기본값
+};
+
+/**
+ * 사주 계산 결과로 점수 산출 (0~100)
+ * @param {string} userDayStem - 사용자 일간
+ * @param {Object} todayPillar - 오늘 일진
+ * @param {number} categoryIndex - 카테고리 인덱스 (각 카테고리마다 다른 점수)
+ * @returns {number} 0~100 점수
+ */
+const calculateCategoryScore = (userDayStem, todayPillar, categoryIndex) => {
+    const userStemIndex = HEAVENLY_STEMS.indexOf(userDayStem);
+
+    // 천간 인덱스 + 지지 인덱스 + 카테고리별 가중치
+    const baseScore = (userStemIndex + todayPillar.index + categoryIndex * 7) % 100;
+
+    // 0~100 범위로 정규화
+    return baseScore;
+};
+
+/**
+ * 메인 운세 계산 함수 (새 JSON DB 사용)
  * @param {Object} userData - { name, birthYear, birthMonth, birthDay, gender, birthTime, birthCity }
  * @param {Object} fortuneData - getFortuneData()로 받은 카테고리별 데이터
  * @returns {Object} 전체 운세 결과
@@ -398,25 +469,31 @@ export const calculateFortune = (userData, fortuneData) => {
     // 3. 별자리 계산
     const zodiacSign = calculateZodiacSign(userData);
 
-    // 4. 각 카테고리별로 키워드 선택 → 랜덤 콘텐츠 선택
-    const categories = ['Main', 'Money', 'Health', 'Love', 'Advice'];
+    // 4. 새 JSON DB 사용: 각 카테고리별로 점수 → 키워드 → 랜덤 콘텐츠 선택
+    const categories = ['Main', 'Money', 'Health', 'Love', 'Advice', 'Lucky'];
     const results = {};
 
-    categories.forEach(category => {
-        const categoryData = fortuneData[category] || [];
-        const keyword = selectKeyword(userDayStem, todayPillar, categoryData);
-        const selectedItem = selectRandomContentByKeyword(keyword, categoryData);
+    categories.forEach((category, index) => {
+        // 사주 기반 점수 계산 (0~100)
+        const score = calculateCategoryScore(userDayStem, todayPillar, index);
+
+        // 점수를 키워드로 변환
+        const keyword = mapScoreToKeyword(score, category);
+
+        // 새 JSON DB에서 랜덤 문장 선택
+        const content = getRandomFortune(category, keyword);
 
         results[category.toLowerCase()] = {
             keyword: keyword || '',
-            content: selectedItem?.Content || `${category} 운세를 불러올 수 없습니다.`,
-            id: selectedItem?.ID || ''
+            content: content || `${category} 운세를 불러올 수 없습니다.`
         };
     });
 
-    // 5. 행운 요소 선택
-    const luckyData = fortuneData.Lucky || [];
-    const luckyElement = selectLuckyElement(userData, luckyData);
+    // 5. 행운 요소는 results에서 가져옴 (이미 위에서 계산됨)
+    const luckyElement = {
+        keyword: results.lucky.keyword,
+        content: results.lucky.content
+    };
 
     // 6. 타로 카드 선택 (개선된 로직)
     const tarot = selectTarotCard(userData, today);
@@ -424,9 +501,10 @@ export const calculateFortune = (userData, fortuneData) => {
     // 7. 별자리 운세 선택 (신문 스타일: 날짜 기반)
     const horoscopeFortune = selectHoroscopeFortune(zodiacSign, today);
 
-    // 8. 오늘의 운세 (Main에서 한번 더 선택)
-    const todayKeyword = selectKeyword(userDayStem, todayPillar, fortuneData.Main || []);
-    const todayItem = selectRandomContentByKeyword(todayKeyword, fortuneData.Main || []);
+    // 8. 오늘의 운세 (Main과 동일)
+    const todayScore = calculateCategoryScore(userDayStem, todayPillar, 0);
+    const todayKeyword = mapScoreToKeyword(todayScore, 'Main');
+    const todayContent = getRandomFortune('Main', todayKeyword);
 
     return {
         date: today.toLocaleDateString('ko-KR'),
@@ -439,7 +517,7 @@ export const calculateFortune = (userData, fortuneData) => {
         // 운세 결과
         today: {
             keyword: todayKeyword || '',
-            content: todayItem?.Content || '오늘은 좋은 일이 있을 거예요!'
+            content: todayContent || '오늘은 좋은 일이 있을 거예요!'
         },
         main: results.main,
         money: results.money,
