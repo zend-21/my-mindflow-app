@@ -92,7 +92,7 @@ export const getHoroscopeData = () => {
  * @returns {Promise<Object>} 오행별 행운 요소 데이터
  */
 export const getLuckyElementsData = () => {
-    return fetch('/src/data/fortune_database.json')
+    return fetch('/fortune_data/fortune_database.json')
         .then(response => response.json())
         .then(data => data.LuckyElements)
         .catch(error => {
