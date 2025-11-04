@@ -318,7 +318,7 @@ const LuckyContainer = styled.div`
     text-align: center;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
     position: relative;
-    margin-top: 16px;
+    margin-top: 15px;
 
     @media (min-width: 768px) {
         padding-top: 48px;
