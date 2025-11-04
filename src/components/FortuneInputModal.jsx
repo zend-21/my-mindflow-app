@@ -815,7 +815,8 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
             birthMonth: parseInt(birthMonth),
             birthDay: parseInt(birthDay),
             gender,
-            lunarDate: lunarDate // 음력 날짜 저장
+            lunarDate: lunarDate, // 음력 날짜 문자열 저장
+            lunarYear: lunarData?.lunarYear // 음력 연도 저장 (띠 계산용)
         };
 
         // 출생 시간 추가 (선택 - 값이 있으면)
@@ -838,7 +839,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
             <Container>
                 <Header>
                     <Title>
-                        {step === 'input' ? '🔮 운세 프로필 입력' : '🔮 운세 프로필 정보 확인'}
+                        {step === 'input' ? '운세 프로필 입력' : '운세 프로필 정보 확인'}
                     </Title>
                     <Subtitle>
                         {step === 'input'
