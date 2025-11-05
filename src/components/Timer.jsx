@@ -22,11 +22,11 @@ const TimerContainer = styled.div`
     flex-direction: column;
     align-items: center;
     padding: 50px 40px;
-    background: #fcfcf3ff;
+    background: #fffef4ff;
     border-radius: 32px;
     box-shadow:
-        0 10px 30px rgba(0, 0, 0, 0.15),
-        0 5px 15px rgba(0, 0, 0, 0.08);
+        0 4px 12px rgba(0, 0, 0, 0.06),
+        0 2px 6px rgba(0, 0, 0, 0.04);
     width: 95%;
     max-width: 600px;
     z-index: 10;
