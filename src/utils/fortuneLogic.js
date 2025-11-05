@@ -302,17 +302,22 @@ const calculateCosmicEnergy = (date) => {
  * @returns {number} 운명 에너지 값
  */
 const calculateDestinyEnergy = (userData) => {
-    const { birthYear, birthMonth, birthDay } = userData;
+    const { birthYear, birthMonth, birthDay, birthHour, birthMinute } = userData;
 
     // 생년월일 기반 에너지
     const lifePathNumber = (birthYear + birthMonth * 31 + birthDay * 17);
+
+    // 출생 시간 에너지 추가 (시간이 있으면)
+    const timeEnergy = (birthHour !== undefined && birthMinute !== undefined)
+        ? (birthHour * 60 + birthMinute)
+        : 0;
 
     // 일간 반영 (이미 계산된 사주 데이터 활용)
     const dayStem = calculateDayStem(userData);
     const stemIndex = HEAVENLY_STEMS.indexOf(dayStem);
     const stemBoost = stemIndex * 7;
 
-    return lifePathNumber + stemBoost;
+    return lifePathNumber + timeEnergy + stemBoost;
 };
 
 /**
@@ -614,10 +619,13 @@ const selectLuckyElements = async (dayStem, today, userData) => {
             };
         }
 
-        // 날짜 + 사용자 생년월일 기반 시드로 개인화된 랜덤 선택
+        // 날짜 + 사용자 생년월일 + 출생시간 기반 시드로 개인화된 랜덤 선택
         const dateString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
         const birthString = `${userData.birthYear}-${userData.birthMonth}-${userData.birthDay}`;
-        const combinedString = dateString + birthString;
+        const birthTimeString = (userData.birthHour !== undefined && userData.birthMinute !== undefined)
+            ? `-${userData.birthHour}-${userData.birthMinute}`
+            : '';
+        const combinedString = dateString + birthString + birthTimeString;
         const seed = combinedString.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
         const random = (max) => {

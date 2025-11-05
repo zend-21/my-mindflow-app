@@ -229,18 +229,23 @@ const formatDisplayName = (primaryName, district, state, country) => {
  */
 export const getTimezoneFromCoords = async (lat, lon) => {
     try {
-        // 개발 환경에서는 Vite proxy, 프로덕션에서는 Vercel serverless function 사용
+        // 프로덕션 환경에서만 Vercel serverless function 사용
+        // 개발 환경에서는 브라우저 타임존 사용 (Vite proxy 설정 불필요)
         const isDevelopment = import.meta.env.DEV;
-        const baseUrl = isDevelopment
-            ? '/api/timezone'
-            : '/api/timezone';
 
+        if (isDevelopment) {
+            // 개발 환경: 브라우저 타임존 반환 (사주 계산은 경도만 사용하므로 정확도에 큰 영향 없음)
+            console.log('🔧 개발 모드: 브라우저 타임존 사용');
+            return Intl.DateTimeFormat().resolvedOptions().timeZone;
+        }
+
+        // 프로덕션 환경: Vercel serverless function 호출
         const params = new URLSearchParams({
             lat: lat.toString(),
             lon: lon.toString()
         });
 
-        const response = await fetch(`${baseUrl}?${params.toString()}`);
+        const response = await fetch(`/api/timezone?${params.toString()}`);
 
         if (!response.ok) {
             throw new Error('타임존 API 호출 실패');
