@@ -85,27 +85,24 @@ const BottomControlRow = styled.div`
 
 const VolumeControlContainer = styled.div`
     display: flex;
-    align-items: center;
-    gap: 12px;
+    flex-direction: column;
+    gap: 8px;
     background: #ffffff;
-    padding: 12px 20px;
+    padding: 12px 16px;
     border-radius: 12px;
     box-shadow:
         0 2px 8px rgba(0, 0, 0, 0.12),
         0 1px 4px rgba(0, 0, 0, 0.08);
-    width: 196px; /* 고정 너비: 20px(icon) + 12px(gap) + 100px(slider) + 12px(gap) + 32px(vibration space) + 20px(padding) */
     flex-shrink: 0;
 
     @media (max-width: 480px) {
-        width: 168px; /* 고정 너비: 18px(icon) + 10px(gap) + 80px(slider) + 10px(gap) + 32px(vibration space) + 18px(padding) */
-        padding: 10px 16px;
-        gap: 10px;
+        padding: 10px 14px;
+        gap: 6px;
     }
 
     @media (orientation: landscape) and (max-height: 500px) {
-        width: 168px;
-        padding: 10px 16px;
-        gap: 10px;
+        padding: 10px 14px;
+        gap: 6px;
     }
 `;
 
@@ -254,6 +251,55 @@ const VibrationIcon = styled.svg`
     @media (max-width: 480px) {
         width: 18px;
         height: 18px;
+    }
+`;
+
+const VolumeButtonRow = styled.div`
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+`;
+
+const VolumeButton = styled.button`
+    background: #f5f5f5;
+    border: none;
+    color: #5c5c5c;
+    font-size: 16px;
+    font-weight: 600;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+
+    &:hover {
+        background: #e8e6e3;
+        color: #4a4a4a;
+        transform: scale(1.05);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
+
+    &:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+        &:hover {
+            transform: none;
+            background: #f5f5f5;
+        }
+    }
+
+    @media (max-width: 480px) {
+        width: 28px;
+        height: 28px;
+        font-size: 14px;
     }
 `;
 
@@ -643,6 +689,52 @@ const Timer = ({ onClose }) => {
         if (newVolume === 0) {
             setVibrationMode(false);
             localStorage.setItem('timerVibration', 'false');
+        }
+    };
+
+    // 음량 감소 (한 단계 내리기)
+    const decreaseVolume = () => {
+        const currentIndex = volumeLevels.findIndex(level => level === volume);
+        if (currentIndex > 0) {
+            const newVolume = volumeLevels[currentIndex - 1];
+            setVolume(newVolume);
+            localStorage.setItem('timerVolume', newVolume.toString());
+
+            if (audioRef.current) {
+                audioRef.current.volume = newVolume;
+            }
+
+            // 볼륨이 0이 되면 진동 모드는 유지하지 않음
+            if (newVolume === 0) {
+                setVibrationMode(false);
+                localStorage.setItem('timerVibration', 'false');
+            }
+
+            // 테스트 사운드 재생
+            playTestSound(newVolume);
+        }
+    };
+
+    // 음량 증가 (한 단계 올리기)
+    const increaseVolume = () => {
+        const currentIndex = volumeLevels.findIndex(level => level === volume);
+        if (currentIndex < volumeLevels.length - 1) {
+            const newVolume = volumeLevels[currentIndex + 1];
+            setVolume(newVolume);
+            localStorage.setItem('timerVolume', newVolume.toString());
+
+            if (audioRef.current) {
+                audioRef.current.volume = newVolume;
+            }
+
+            // 볼륨이 0이 아니면 진동 모드 해제
+            if (newVolume > 0 && vibrationMode) {
+                setVibrationMode(false);
+                localStorage.setItem('timerVibration', 'false');
+            }
+
+            // 테스트 사운드 재생
+            playTestSound(newVolume);
         }
     };
 
@@ -1115,6 +1207,24 @@ const Timer = ({ onClose }) => {
                                     </VibrationIcon>
                                 </VibrationButton>
                             </VolumeControlInner>
+                            <VolumeButtonRow>
+                                <VolumeButton
+                                    onClick={decreaseVolume}
+                                    disabled={volume === 0}
+                                    onMouseUp={stopTestSound}
+                                    onTouchEnd={stopTestSound}
+                                >
+                                    −
+                                </VolumeButton>
+                                <VolumeButton
+                                    onClick={increaseVolume}
+                                    disabled={volume === 1.0}
+                                    onMouseUp={stopTestSound}
+                                    onTouchEnd={stopTestSound}
+                                >
+                                    +
+                                </VolumeButton>
+                            </VolumeButtonRow>
                         </VolumeControlContainer>
                         <CloseButton onClick={handleClose} disabled={isRunning}>
                             CLOSE
