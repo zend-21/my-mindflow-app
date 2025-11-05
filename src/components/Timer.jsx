@@ -29,6 +29,8 @@ const TimerContainer = styled.div`
         0 1px 3px rgba(0, 0, 0, 0.05);
     width: 90%;
     max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
     z-index: 10;
     box-sizing: border-box;
 
@@ -43,9 +45,11 @@ const TimerContainer = styled.div`
         padding: 20px 15px;
     }
 
-    /* 세로 모드 강제 (CSS로도 처리) */
-    @media (orientation: landscape) and (max-height: 500px) {
-        padding: 15px 20px;
+    /* 가로 모드 대응 - 컨텐츠가 화면에 맞도록 축소 */
+    @media (orientation: landscape) {
+        padding: 10px 20px;
+        max-height: 95vh;
+        gap: 5px;
     }
 `;
 
@@ -63,6 +67,19 @@ const CloseButton = styled.button`
     box-shadow:
         0 2px 8px rgba(0, 0, 0, 0.12),
         0 1px 4px rgba(0, 0, 0, 0.08);
+
+    &:disabled {
+        background: #e8e6e3;
+        color: #afafaf;
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    @media (orientation: landscape) {
+        font-size: 14px;
+        padding: 8px 20px;
+        margin-top: 10px;
+    }
 `;
 
 const ConfirmModal = styled.div`
@@ -174,6 +191,16 @@ const Display = styled.div`
         line-height: 100px;
         padding: 25px;
     }
+
+    /* 가로 모드 대응 */
+    @media (orientation: landscape) {
+        font-size: 50px;
+        width: 200px;
+        height: 70px;
+        line-height: 70px;
+        padding: 15px;
+        margin-bottom: 10px;
+    }
 `;
 
 const TimeButtonRow = styled.div`
@@ -191,6 +218,11 @@ const TimeButtonRow = styled.div`
     @media (max-width: 360px) {
         gap: 8px;
         margin-bottom: 15px;
+    }
+
+    @media (orientation: landscape) {
+        gap: 8px;
+        margin-bottom: 8px;
     }
 `;
 
@@ -229,6 +261,12 @@ const TimeButton = styled.button`
         padding: 12px 18px;
         min-width: 60px;
     }
+
+    @media (orientation: landscape) {
+        font-size: 14px;
+        padding: 8px 14px;
+        min-width: 55px;
+    }
 `;
 
 const ControlRow = styled.div`
@@ -250,6 +288,18 @@ const ResetButton = styled.button`
     box-shadow:
         0 2px 8px rgba(0, 0, 0, 0.12),
         0 1px 4px rgba(0, 0, 0, 0.08);
+
+    &:disabled {
+        background: #e8e6e3;
+        color: #afafaf;
+        cursor: not-allowed;
+        opacity: 0.5;
+    }
+
+    @media (orientation: landscape) {
+        font-size: 14px;
+        padding: 10px 18px;
+    }
 `;
 
 const StartStopButton = styled.button`
@@ -286,6 +336,12 @@ const StartStopButton = styled.button`
         font-size: 18px;
         padding: 20px 40px;
         min-width: 160px;
+    }
+
+    @media (orientation: landscape) {
+        font-size: 16px;
+        padding: 12px 30px;
+        min-width: 120px;
     }
 `;
 
@@ -578,6 +634,8 @@ const Timer = ({ onClose }) => {
                             onMouseDown={() => handleMouseDownMinutes(5)}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
+                            onTouchStart={() => handleMouseDownMinutes(5)}
+                            onTouchEnd={handleMouseUp}
                             disabled={isRunning}
                         >
                             5M
@@ -587,6 +645,8 @@ const Timer = ({ onClose }) => {
                             onMouseDown={() => handleMouseDownMinutes(1)}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
+                            onTouchStart={() => handleMouseDownMinutes(1)}
+                            onTouchEnd={handleMouseUp}
                             disabled={isRunning}
                         >
                             1M
@@ -596,6 +656,8 @@ const Timer = ({ onClose }) => {
                             onMouseDown={() => handleMouseDownSeconds(10)}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
+                            onTouchStart={() => handleMouseDownSeconds(10)}
+                            onTouchEnd={handleMouseUp}
                             disabled={isRunning}
                         >
                             10S
@@ -603,7 +665,7 @@ const Timer = ({ onClose }) => {
                     </TimeButtonRow>
 
                     <ControlRow>
-                        <ResetButton onClick={resetTimer}>
+                        <ResetButton onClick={resetTimer} disabled={isRunning}>
                             RESET
                         </ResetButton>
                         <StartStopButton
@@ -615,7 +677,7 @@ const Timer = ({ onClose }) => {
                         </StartStopButton>
                     </ControlRow>
 
-                    <CloseButton onClick={handleClose}>
+                    <CloseButton onClick={handleClose} disabled={isRunning}>
                         CLOSE
                     </CloseButton>
                 </TimerContainer>
