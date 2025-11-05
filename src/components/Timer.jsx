@@ -23,6 +23,7 @@ const Overlay = styled.div`
 `;
 
 const TimerContainer = styled.div`
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -30,11 +31,42 @@ const TimerContainer = styled.div`
     background: #f5f3f0;
     border-radius: 32px;
     box-shadow:
-        0 20px 60px rgba(0, 0, 0, 0.25),
         0 10px 30px rgba(0, 0, 0, 0.15),
-        0 5px 15px rgba(0, 0, 0, 0.1);
+        0 5px 15px rgba(0, 0, 0, 0.08);
     width: 95%;
     max-width: 600px;
+    z-index: 10;
+`;
+
+const CloseButton = styled.button`
+    background: #ffffff;
+    border: none;
+    color: #5c5c5c;
+    font-size: 16px;
+    font-weight: 500;
+    padding: 14px 32px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    margin-top: 35px;
+    box-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.08),
+        0 1px 3px rgba(0, 0, 0, 0.06);
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow:
+            0 6px 16px rgba(0, 0, 0, 0.12),
+            0 2px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    &:active {
+        transform: translateY(0);
+        box-shadow:
+            0 2px 6px rgba(0, 0, 0, 0.08),
+            0 1px 2px rgba(0, 0, 0, 0.06);
+    }
 `;
 
 const Display = styled.div`
@@ -189,6 +221,13 @@ const Timer = ({ onClose }) => {
     const longPressTimerRef = useRef(null);
     const longPressIntervalRef = useRef(null);
 
+    // 닫기 확인
+    const handleClose = () => {
+        if (window.confirm('타이머를 종료하시겠습니까?')) {
+            onClose();
+        }
+    };
+
     // 시간 포맷팅 (MM:SS)
     const formatTime = (totalSeconds) => {
         const mins = Math.floor(totalSeconds / 60);
@@ -322,8 +361,8 @@ const Timer = ({ onClose }) => {
     }, []);
 
     return (
-        <Overlay onClick={onClose}>
-            <TimerContainer onClick={(e) => e.stopPropagation()}>
+        <Overlay>
+            <TimerContainer>
                 <Display>{formatTime(seconds)}</Display>
 
                 <TimeButtonRow>
@@ -371,6 +410,10 @@ const Timer = ({ onClose }) => {
                         {isRunning ? 'STOP' : 'START'}
                     </StartStopButton>
                 </ControlRow>
+
+                <CloseButton onClick={handleClose}>
+                    CLOSE
+                </CloseButton>
             </TimerContainer>
         </Overlay>
     );
