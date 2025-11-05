@@ -492,7 +492,6 @@ const Timer = ({ onClose }) => {
             setIsRunning(false);
             setSeconds(0); // 타이머를 완전히 리셋
             releaseWakeLock();
-            exitFullscreen();
             return;
         }
 
@@ -501,8 +500,6 @@ const Timer = ({ onClose }) => {
         // 타이머 시작 시
         if (!isRunning) {
             requestWakeLock();
-            requestFullscreen();
-            lockOrientation();
         } else {
             // 타이머 일시정지 시
             releaseWakeLock();
@@ -580,7 +577,8 @@ const Timer = ({ onClose }) => {
 
     // 컴포넌트 마운트/언마운트 시 처리
     useEffect(() => {
-        // 컴포넌트 마운트 시 화면 방향 잠금
+        // 컴포넌트 마운트 시 전체화면과 화면 방향 잠금
+        requestFullscreen();
         lockOrientation();
 
         return () => {
