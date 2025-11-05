@@ -133,42 +133,46 @@ const Display = styled.div`
     color: #2c2c2c;
     font-size: 90px;
     font-weight: 700;
-    font-family: 'Courier New', 'Consolas', monospace;
-    padding: 40px 40px 40px 50px;
+    font-family: ${props => props.$fontFamily || "'Courier New', 'Consolas', monospace"};
+    padding: 40px;
     border-radius: 20px;
     margin-bottom: 40px;
     box-shadow:
         inset 0 4px 12px rgba(0, 0, 0, 0.15),
         inset 0 2px 6px rgba(0, 0, 0, 0.1);
-    letter-spacing: 12px;
+    letter-spacing: 0;
     text-align: center;
-    width: 100%;
-    max-width: 350px;
-    min-width: 280px;
+    width: 350px;
+    height: 130px;
     box-sizing: border-box;
     overflow: hidden;
-    line-height: 1;
+    line-height: 130px;
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 
-    /* 디지털 숫자 효과 */
+    /* 디지털 숫자 효과 - 고정폭 숫자 */
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
+    font-feature-settings: "tnum";
+    white-space: nowrap;
 
     /* 반응형 폰트 크기 */
     @media (max-width: 480px) {
         font-size: 70px;
-        padding: 30px 20px 30px 30px;
-        letter-spacing: 10px;
-        min-width: 240px;
+        width: 280px;
+        height: 110px;
+        line-height: 110px;
+        padding: 30px;
     }
 
     @media (max-width: 360px) {
         font-size: 60px;
-        padding: 25px 15px 25px 25px;
-        letter-spacing: 8px;
-        min-width: 200px;
+        width: 240px;
+        height: 100px;
+        line-height: 100px;
+        padding: 25px;
     }
 `;
 
@@ -321,51 +325,8 @@ const Timer = ({ onClose }) => {
         }
     };
 
-    // 전체화면 요청
-    const requestFullscreen = async () => {
-        try {
-            const elem = document.documentElement;
-            if (elem.requestFullscreen) {
-                await elem.requestFullscreen();
-            } else if (elem.webkitRequestFullscreen) {
-                await elem.webkitRequestFullscreen();
-            } else if (elem.mozRequestFullScreen) {
-                await elem.mozRequestFullScreen();
-            } else if (elem.msRequestFullscreen) {
-                await elem.msRequestFullscreen();
-            }
-        } catch (err) {
-            // 전체화면 지원하지 않는 브라우저
-        }
-    };
-
-    // 전체화면 해제
-    const exitFullscreen = async () => {
-        try {
-            if (document.fullscreenElement) {
-                await document.exitFullscreen();
-            } else if (document.webkitFullscreenElement) {
-                await document.webkitExitFullscreen();
-            } else if (document.mozFullScreenElement) {
-                await document.mozCancelFullScreen();
-            } else if (document.msFullscreenElement) {
-                await document.msExitFullscreen();
-            }
-        } catch (err) {
-            // 무시
-        }
-    };
-
-    // 화면 방향 잠금 (세로 고정)
-    const lockOrientation = async () => {
-        try {
-            if (screen.orientation && screen.orientation.lock) {
-                await screen.orientation.lock('portrait');
-            }
-        } catch (err) {
-            // 화면 방향 잠금 지원하지 않는 브라우저
-        }
-    };
+    // 전체화면 API 제거 - 모바일에서 화면 요동 방지
+    // CSS Overlay(z-index: 20000)로 충분히 몰입형 UI 제공
 
     // 닫기 확인
     const handleClose = () => {
@@ -379,8 +340,6 @@ const Timer = ({ onClose }) => {
         }
         // Wake Lock 해제
         releaseWakeLock();
-        // 전체화면 해제
-        exitFullscreen();
         onClose();
     };
 
@@ -590,10 +549,6 @@ const Timer = ({ onClose }) => {
         preloadAudio.load();
         preloadedAudioRef.current = preloadAudio;
 
-        // 컴포넌트 마운트 시 전체화면과 화면 방향 잠금
-        requestFullscreen();
-        lockOrientation();
-
         return () => {
             handleMouseUp();
             if (intervalRef.current) {
@@ -606,8 +561,6 @@ const Timer = ({ onClose }) => {
             }
             // Wake Lock 해제
             releaseWakeLock();
-            // 전체화면 해제
-            exitFullscreen();
         };
     }, []);
 
@@ -615,7 +568,9 @@ const Timer = ({ onClose }) => {
         <Overlay>
             {!showConfirmModal && (
                 <TimerContainer>
-                    <Display>{formatTime(seconds)}</Display>
+                    <Display $fontFamily="'DSEG7', monospace">
+                        {formatTime(seconds)}
+                    </Display>
 
                     <TimeButtonRow>
                         <TimeButton
