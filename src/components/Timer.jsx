@@ -152,7 +152,7 @@ const StartStopButton = styled.button`
     color: ${props => props.$isRunning ? '#5c5c5c' : '#ffffff'};
     font-size: 22px;
     font-weight: 700;
-    padding: 28px 80px;
+    padding: 28px 60px;
     border-radius: 14px;
     cursor: pointer;
     transition: all 0.2s;
