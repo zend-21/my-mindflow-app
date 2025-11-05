@@ -79,17 +79,24 @@ export const useTrash = (autoDeleteDays = 30) => {
     };
 
     /**
-     * 자동 삭제 기간이 지난 아이템 자동 삭제
+     * 자동 삭제 기간이 지난 아이템 자동 삭제 (자정 기준)
      */
     const autoDeleteExpiredItems = () => {
-        const now = Date.now();
-        const millisecondsInDay = 1000 * 60 * 60 * 24;
-        const expirationTime = autoDeletePeriod * millisecondsInDay;
+        // 오늘 자정
+        const todayMidnight = new Date();
+        todayMidnight.setHours(0, 0, 0, 0);
 
         const beforeCount = trashedItems.length;
         const updatedItems = trashedItems.filter(item => {
-            const elapsed = now - item.deletedAt;
-            return elapsed < expirationTime;
+            // 삭제일 자정
+            const deletedDate = new Date(item.deletedAt);
+            deletedDate.setHours(0, 0, 0, 0);
+
+            // 날짜 차이 계산 (자정 기준)
+            const diffTime = todayMidnight - deletedDate;
+            const daysElapsed = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            return daysElapsed < autoDeletePeriod;
         });
 
         if (updatedItems.length < beforeCount) {

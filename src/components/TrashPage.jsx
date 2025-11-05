@@ -584,6 +584,7 @@ const TrashPage = ({ showToast }) => {
 
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
 
     // 검색/필터/정렬 상태
     const [searchQuery, setSearchQuery] = useState('');
@@ -640,9 +641,18 @@ const TrashPage = ({ showToast }) => {
     };
 
     const calculateDaysLeft = (deletedAt) => {
-        const now = Date.now();
-        const elapsed = now - deletedAt;
-        const daysElapsed = Math.floor(elapsed / (1000 * 60 * 60 * 24));
+        // 오늘 자정
+        const todayMidnight = new Date();
+        todayMidnight.setHours(0, 0, 0, 0);
+
+        // 삭제일 자정
+        const deletedDate = new Date(deletedAt);
+        deletedDate.setHours(0, 0, 0, 0);
+
+        // 날짜 차이 계산 (자정 기준)
+        const diffTime = todayMidnight - deletedDate;
+        const daysElapsed = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
         return autoDeletePeriod - daysElapsed;
     };
 
@@ -725,9 +735,7 @@ const TrashPage = ({ showToast }) => {
                         $hasSelection={selectedIds.size > 0}
                         onClick={() => {
                             if (selectedIds.size === 0) return;
-                            const restoredItems = restoreFromTrash(Array.from(selectedIds));
-                            showToast(`${restoredItems.length}개 항목이 복원되었습니다 ✅`);
-                            setSelectedIds(new Set());
+                            setIsRestoreConfirmOpen(true);
                         }}
                         disabled={selectedIds.size === 0}
                     >
@@ -862,6 +870,22 @@ const TrashPage = ({ showToast }) => {
                         );
                     })}
                 </TrashList>
+            )}
+
+            {/* 복원 확인 모달 */}
+            {isRestoreConfirmOpen && (
+                <ConfirmationModal
+                    isOpen={true}
+                    message={`선택한 ${selectedIds.size}개 항목을 복원하시겠습니까?`}
+                    confirmText="복원"
+                    onConfirm={() => {
+                        const restoredItems = restoreFromTrash(Array.from(selectedIds));
+                        showToast(`${restoredItems.length}개 항목이 복원되었습니다 ✅`);
+                        setSelectedIds(new Set());
+                        setIsRestoreConfirmOpen(false);
+                    }}
+                    onCancel={() => setIsRestoreConfirmOpen(false)}
+                />
             )}
 
             {/* 영구 삭제 확인 모달 */}

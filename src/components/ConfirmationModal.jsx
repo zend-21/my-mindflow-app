@@ -92,9 +92,9 @@ const ConfirmButton = styled(ModalButton)`
     }
 `;
 
-const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel }) => {
+const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel, confirmText = '삭제' }) => {
     console.log('ConfirmationModal rendered:', { isOpen, message });
-    
+
     if (!isOpen) return null;
 
     const handleConfirmClick = () => {
@@ -114,7 +114,7 @@ const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel }) => {
                 <ModalMessage>{message}</ModalMessage>
                 <ButtonContainer>
                     <CancelButton onClick={handleCancelClick}>취소</CancelButton>
-                    <ConfirmButton onClick={handleConfirmClick}>삭제</ConfirmButton>
+                    <ConfirmButton onClick={handleConfirmClick}>{confirmText}</ConfirmButton>
                 </ButtonContainer>
             </ModalContent>
         </Overlay>
