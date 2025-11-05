@@ -764,7 +764,8 @@ function App() {
                 calendarSchedules,
                 recentActivities,
                 widgets,
-                displayCount
+                displayCount,
+                trashedItems: JSON.parse(localStorage.getItem('trashedItems_shared') || '[]')
             }
         };
         exportData('mindflow_backup', dataToExport);
@@ -796,6 +797,9 @@ function App() {
                     if (data.recentActivities) setRecentActivities(data.recentActivities);
                     if (data.widgets) setWidgets(data.widgets);
                     if (data.displayCount) setDisplayCount(data.displayCount);
+                    if (data.trashedItems) {
+                        localStorage.setItem('trashedItems_shared', JSON.stringify(data.trashedItems));
+                    }
                 } else if (Array.isArray(importedData)) {
                     // 구 형식 (메모만 있는 경우)
                     setMemos(importedData);
@@ -1205,6 +1209,7 @@ function App() {
                 recentActivities,
                 displayCount,
                 widgets,
+                trashedItems: JSON.parse(localStorage.getItem('trashedItems_shared') || '[]'),
                 userEmail: profile.email,
             };
 
@@ -1304,6 +1309,7 @@ function App() {
                     recentActivities,
                     displayCount,
                     widgets,
+                    trashedItems: JSON.parse(localStorage.getItem('trashedItems_shared') || '[]'),
                     userEmail: profile.email,
                 };
 
@@ -1351,6 +1357,9 @@ function App() {
                 if (result.data.recentActivities) setRecentActivities(result.data.recentActivities);
                 if (result.data.displayCount) setDisplayCount(result.data.displayCount);
                 if (result.data.widgets) setWidgets(result.data.widgets);
+                if (result.data.trashedItems) {
+                    localStorage.setItem('trashedItems_shared', JSON.stringify(result.data.trashedItems));
+                }
 
                 addActivity('복원', 'Google Drive에서 복원 완료');
                 showToast('데이터가 성공적으로 복원되었습니다 ✅');
