@@ -218,23 +218,23 @@ const Display = styled.div`
 
 const TimeButtonRow = styled.div`
     display: flex;
-    gap: 16px;
+    gap: 30px;
     margin-bottom: 45px;
     justify-content: center;
     flex-wrap: wrap;
 
     @media (max-width: 480px) {
-        gap: 12px;
+        gap: 22px;
         margin-bottom: 35px;
     }
 
     @media (max-width: 360px) {
-        gap: 8px;
+        gap: 16px;
         margin-bottom: 30px;
     }
 
     @media (orientation: landscape) and (max-height: 500px) {
-        gap: 10px;
+        gap: 18px;
         margin-bottom: 18px;
     }
 `;
@@ -462,8 +462,6 @@ const Timer = ({ onClose }) => {
         });
     };
 
-
-
     // 길게 누르기 시작 (분 버튼용)
     const handleMouseDownMinutes = (minutes) => {
         // 첫 번째 클릭은 즉시 실행
@@ -489,7 +487,10 @@ const Timer = ({ onClose }) => {
     };
 
     // 길게 누르기 종료
-    const handleMouseUp = () => {
+    const handleMouseUp = (e) => {
+        if (e) {
+            e.preventDefault();
+        }
         if (longPressTimerRef.current) {
             clearTimeout(longPressTimerRef.current);
         }
@@ -654,49 +655,34 @@ const Timer = ({ onClose }) => {
 
                     <TimeButtonRow>
                         <TimeButton
-                            onMouseDown={(e) => {
+                            onPointerDown={(e) => {
                                 e.preventDefault();
                                 handleMouseDownMinutes(5);
                             }}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseUp}
-                            onTouchStart={(e) => {
-                                e.preventDefault();
-                                handleMouseDownMinutes(5);
-                            }}
-                            onTouchEnd={handleMouseUp}
+                            onPointerUp={handleMouseUp}
+                            onPointerLeave={handleMouseUp}
                             disabled={isRunning}
                         >
                             5M
                         </TimeButton>
                         <TimeButton
-                            onMouseDown={(e) => {
+                            onPointerDown={(e) => {
                                 e.preventDefault();
                                 handleMouseDownMinutes(1);
                             }}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseUp}
-                            onTouchStart={(e) => {
-                                e.preventDefault();
-                                handleMouseDownMinutes(1);
-                            }}
-                            onTouchEnd={handleMouseUp}
+                            onPointerUp={handleMouseUp}
+                            onPointerLeave={handleMouseUp}
                             disabled={isRunning}
                         >
                             1M
                         </TimeButton>
                         <TimeButton
-                            onMouseDown={(e) => {
+                            onPointerDown={(e) => {
                                 e.preventDefault();
                                 handleMouseDownSeconds(10);
                             }}
-                            onMouseUp={handleMouseUp}
-                            onMouseLeave={handleMouseUp}
-                            onTouchStart={(e) => {
-                                e.preventDefault();
-                                handleMouseDownSeconds(10);
-                            }}
-                            onTouchEnd={handleMouseUp}
+                            onPointerUp={handleMouseUp}
+                            onPointerLeave={handleMouseUp}
                             disabled={isRunning}
                         >
                             10S
