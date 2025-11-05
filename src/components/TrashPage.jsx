@@ -6,6 +6,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { useTrashContext } from '../contexts/TrashContext';
 import ConfirmationModal from './ConfirmationModal';
+import Portal from './Portal';
 
 const PageContainer = styled.div`
     padding: 0;
@@ -177,6 +178,8 @@ const DetailModalOverlay = styled.div`
     align-items: center;
     z-index: 30000;
     padding: 20px;
+    touch-action: none; /* 모든 터치 제스처 방지 */
+    pointer-events: auto; /* 모달 뒤의 모든 요소 비활성화 */
 `;
 
 const DetailModalContainer = styled.div`
@@ -188,6 +191,7 @@ const DetailModalContainer = styled.div`
     display: flex;
     flex-direction: column;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    pointer-events: auto; /* 모달 자체는 클릭 가능 */
 `;
 
 const DetailModalHeader = styled.div`
@@ -857,47 +861,49 @@ const TrashPage = ({ showToast }) => {
 
             {/* 상세보기 모달 */}
             {isDetailModalOpen && selectedItem && (
-                <DetailModalOverlay onClick={() => setIsDetailModalOpen(false)}>
-                    <DetailModalContainer onClick={(e) => e.stopPropagation()}>
-                        <DetailModalHeader>
-                            <DetailModalTitle>
-                                <DetailTypeLabel $type={selectedItem.type}>
-                                    {getTypeLabel(selectedItem.type)}
-                                </DetailTypeLabel>
-                                <DetailDeleteInfo>
-                                    삭제일: {format(new Date(selectedItem.deletedAt), 'yyyy.MM.dd HH:mm', { locale: ko })}
-                                </DetailDeleteInfo>
-                                <DetailDaysLeft $days={calculateDaysLeft(selectedItem.deletedAt)}>
-                                    {calculateDaysLeft(selectedItem.deletedAt) > 0
-                                        ? `${calculateDaysLeft(selectedItem.deletedAt)}일 후 자동 삭제`
-                                        : '곧 자동 삭제됨'}
-                                </DetailDaysLeft>
-                            </DetailModalTitle>
-                            <CloseIconButton onClick={() => setIsDetailModalOpen(false)}>
-                                ×
-                            </CloseIconButton>
-                        </DetailModalHeader>
+                <Portal>
+                    <DetailModalOverlay onClick={() => setIsDetailModalOpen(false)}>
+                        <DetailModalContainer onClick={(e) => e.stopPropagation()}>
+                            <DetailModalHeader>
+                                <DetailModalTitle>
+                                    <DetailTypeLabel $type={selectedItem.type}>
+                                        {getTypeLabel(selectedItem.type)}
+                                    </DetailTypeLabel>
+                                    <DetailDeleteInfo>
+                                        삭제일: {format(new Date(selectedItem.deletedAt), 'yyyy.MM.dd HH:mm', { locale: ko })}
+                                    </DetailDeleteInfo>
+                                    <DetailDaysLeft $days={calculateDaysLeft(selectedItem.deletedAt)}>
+                                        {calculateDaysLeft(selectedItem.deletedAt) > 0
+                                            ? `${calculateDaysLeft(selectedItem.deletedAt)}일 후 자동 삭제`
+                                            : '곧 자동 삭제됨'}
+                                    </DetailDaysLeft>
+                                </DetailModalTitle>
+                                <CloseIconButton onClick={() => setIsDetailModalOpen(false)}>
+                                    ×
+                                </CloseIconButton>
+                            </DetailModalHeader>
 
-                        <DetailModalContent>
-                            {selectedItem.content}
-                        </DetailModalContent>
+                            <DetailModalContent>
+                                {selectedItem.originalData?.content || selectedItem.content}
+                            </DetailModalContent>
 
-                        <DetailModalActions>
-                            <DetailActionButton
-                                $variant="restore"
-                                onClick={handleRestoreFromDetail}
-                            >
-                                복원
-                            </DetailActionButton>
-                            <DetailActionButton
-                                $variant="delete"
-                                onClick={handleDeleteFromDetail}
-                            >
-                                영구 삭제
-                            </DetailActionButton>
-                        </DetailModalActions>
-                    </DetailModalContainer>
-                </DetailModalOverlay>
+                            <DetailModalActions>
+                                <DetailActionButton
+                                    $variant="restore"
+                                    onClick={handleRestoreFromDetail}
+                                >
+                                    복원
+                                </DetailActionButton>
+                                <DetailActionButton
+                                    $variant="delete"
+                                    onClick={handleDeleteFromDetail}
+                                >
+                                    영구 삭제
+                                </DetailActionButton>
+                            </DetailModalActions>
+                        </DetailModalContainer>
+                    </DetailModalOverlay>
+                </Portal>
             )}
         </PageContainer>
     );
