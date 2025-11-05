@@ -40,10 +40,10 @@ const TimerContainer = styled.div`
 const Display = styled.div`
     background: #e8e6e3;
     color: #2c2c2c;
-    font-size: 76px;
+    font-size: 90px;
     font-weight: 700;
     font-family: 'Courier New', 'Consolas', monospace;
-    padding: 40px 176px 60px 40px;
+    padding: 40px 40px 40px 50px;
     border-radius: 20px;
     margin-bottom: 40px;
     box-shadow:
@@ -53,10 +53,13 @@ const Display = styled.div`
     text-align: center;
     width: 100%;
     max-width: 350px;
-    min-width: 350px; 
+    min-width: 350px;
     box-sizing: border-box;
     overflow: hidden;
     line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     /* 디지털 숫자 효과 */
     font-variant-numeric: tabular-nums;
@@ -117,12 +120,13 @@ const ResetButton = styled.button`
     background: #ffffff;
     border: none;
     color: #5c5c5c;
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 500;
-    padding: 20px 40px;
+    padding: 18px 28px;
     border-radius: 12px;
     cursor: pointer;
     transition: all 0.2s;
+    user-select: none;
     box-shadow:
         0 4px 12px rgba(0, 0, 0, 0.08),
         0 1px 3px rgba(0, 0, 0, 0.06);
