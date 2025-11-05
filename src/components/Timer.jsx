@@ -14,13 +14,6 @@ const Overlay = styled.div`
     justify-content: center;
     align-items: center;
     z-index: 20000;
-    
-    /* 모바일 화면 회전 고정 - 항상 세로 방향 유지 */
-    @supports (transform: rotate(0deg)) {
-        @media (orientation: landscape) and (max-width: 1024px) {
-            transform-origin: center center;
-        }
-    }
 `;
 
 const TimerContainer = styled.div`
@@ -52,20 +45,22 @@ const TimerContainer = styled.div`
         padding: 20px 15px;
     }
 
-    /* 가로 모드 대응 - 화면 회전 시 세로 방향 유지 */
-    @media (orientation: landscape) and (max-width: 1024px) {
-        /* 모바일 가로 모드: 회전하여 세로 방향 유지 */
-        transform: rotate(90deg);
+    /* 가로 모드 대응 - 컨테이너를 90도 회전 */
+    @media (orientation: landscape) and (max-height: 500px) {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(90deg);
         transform-origin: center center;
-        width: 85vh;
-        height: 85vw;
-        max-width: 85vh;
+        width: 80vh;
+        max-width: 80vh;
+        height: auto;
         max-height: 85vw;
-        padding: 40px 30px;
+        padding: 30px 25px;
     }
 
     /* 태블릿 이상 큰 화면의 가로 모드 */
-    @media (orientation: landscape) and (min-width: 1025px) {
+    @media (orientation: landscape) and (min-height: 501px) {
         padding: 40px 35px;
         max-height: 85vh;
     }
@@ -93,10 +88,10 @@ const CloseButton = styled.button`
         opacity: 0.5;
     }
 
-    @media (orientation: landscape) and (max-width: 1024px) {
-        font-size: 15px;
-        padding: 12px 28px;
-        margin-top: 25px;
+    @media (orientation: landscape) and (max-height: 500px) {
+        font-size: 14px;
+        padding: 12px 26px;
+        margin-top: 20px;
     }
 `;
 
@@ -210,14 +205,14 @@ const Display = styled.div`
         padding: 25px;
     }
 
-    /* 가로 모드 - 회전되어 있으므로 세로 모드와 동일하게 유지 */
-    @media (orientation: landscape) and (max-width: 1024px) {
-        font-size: 70px;
-        width: 280px;
-        height: 110px;
-        line-height: 110px;
-        padding: 30px;
-        margin-bottom: 30px;
+    /* 가로 모드 - 회전되므로 세로와 비슷한 크기 유지 */
+    @media (orientation: landscape) and (max-height: 500px) {
+        font-size: 65px;
+        width: 260px;
+        height: 105px;
+        line-height: 105px;
+        padding: 28px;
+        margin-bottom: 25px;
     }
 `;
 
@@ -238,9 +233,9 @@ const TimeButtonRow = styled.div`
         margin-bottom: 15px;
     }
 
-    @media (orientation: landscape) and (max-width: 1024px) {
-        gap: 12px;
-        margin-bottom: 20px;
+    @media (orientation: landscape) and (max-height: 500px) {
+        gap: 10px;
+        margin-bottom: 18px;
     }
 `;
 
@@ -280,10 +275,10 @@ const TimeButton = styled.button`
         min-width: 60px;
     }
 
-    @media (orientation: landscape) and (max-width: 1024px) {
-        font-size: 16px;
-        padding: 14px 22px;
-        min-width: 70px;
+    @media (orientation: landscape) and (max-height: 500px) {
+        font-size: 15px;
+        padding: 13px 20px;
+        min-width: 65px;
     }
 `;
 
@@ -314,9 +309,9 @@ const ResetButton = styled.button`
         opacity: 0.5;
     }
 
-    @media (orientation: landscape) and (max-width: 1024px) {
+    @media (orientation: landscape) and (max-height: 500px) {
         font-size: 16px;
-        padding: 16px 24px;
+        padding: 15px 24px;
     }
 `;
 
@@ -333,7 +328,7 @@ const StartStopButton = styled.button`
     box-shadow:
         0 2px 8px rgba(0, 0, 0, 0.12),
         0 1px 4px rgba(0, 0, 0, 0.08);
-    min-width: 200px; /* 버튼 너비 고정 */
+    min-width: 200px;
 
     &:disabled {
         background: #e8e6e3;
@@ -356,10 +351,10 @@ const StartStopButton = styled.button`
         min-width: 160px;
     }
 
-    @media (orientation: landscape) and (max-width: 1024px) {
-        font-size: 20px;
-        padding: 24px 50px;
-        min-width: 180px;
+    @media (orientation: landscape) and (max-height: 500px) {
+        font-size: 19px;
+        padding: 22px 48px;
+        min-width: 170px;
     }
 `;
 
