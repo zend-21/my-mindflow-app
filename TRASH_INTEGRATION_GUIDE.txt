@@ -1,0 +1,223 @@
+// 휴지통 기능 App.jsx 연동 가이드
+// ==========================================
+
+/*
+ * 1. import 추가 (파일 상단)
+ */
+
+// 기존 import 아래에 추가:
+import { TrashProvider } from './contexts/TrashContext';
+import { useTrashContext } from './contexts/TrashContext';
+import TrashPage from './components/TrashPage.jsx';
+
+
+/*
+ * 2. App 컴포넌트 전체를 TrashProvider로 감싸기
+ */
+
+// 기존 코드:
+function App() {
+    // ... 기존 코드 ...
+    return (
+        <>
+            <GlobalStyle />
+            <Screen>
+                {/* ... */}
+            </Screen>
+        </>
+    );
+}
+
+// 변경 후:
+function App() {
+    // ... 기존 코드 ...
+    return (
+        <TrashProvider autoDeleteDays={30}>
+            <GlobalStyle />
+            <Screen>
+                {/* ... */}
+            </Screen>
+        </TrashProvider>
+    );
+}
+
+
+/*
+ * 3. 휴지통 탭 상태 추가
+ */
+
+// 기존 activeTab 관련 코드 근처에 추가:
+// const [activeTab, setActiveTab] = useState('home'); // 기존 코드
+
+
+/*
+ * 4. ContentArea 내부에 휴지통 페이지 추가
+ */
+
+// 기존 탭 렌더링 부분에 추가:
+<ContentArea>
+    {activeTab === 'home' && (/* ... 기존 홈 코드 ... */)}
+    {activeTab === 'calendar' && (/* ... 기존 캘린더 코드 ... */)}
+    {activeTab === 'memo' && (/* ... 기존 메모 코드 ... */)}
+    
+    {/* 추가: 휴지통 탭 */}
+    {activeTab === 'trash' && (
+        <TrashPage showToast={showToast} />
+    )}
+</ContentArea>
+
+
+/*
+ * 5. SideMenu의 onOpenTrash 연결
+ */
+
+// 기존 코드:
+<SideMenu
+    // ... 기존 props ...
+    onOpenTrash={() => showToast('휴지통 기능은 곧 제공됩니다')}
+/>
+
+// 변경 후:
+<SideMenu
+    // ... 기존 props ...
+    onOpenTrash={() => {
+        setIsMenuOpen(false);
+        setActiveTab('trash');
+    }}
+/>
+
+
+/*
+ * 6. 메모/스케줄 삭제 시 휴지통으로 이동하도록 수정
+ */
+
+// AppContent 컴포넌트 생성 (TrashProvider 내부에서 useTrashContext 사용)
+const AppContent = () => {
+    const { moveToTrash, restoreFromTrash } = useTrashContext();
+    
+    // 기존 handleDeleteMemo 함수 수정:
+    const handleDeleteMemo = (id) => {
+        const deletedMemo = memos.find(memo => memo.id === id);
+        if (deletedMemo) {
+            // 휴지통으로 이동
+            moveToTrash(
+                id,
+                'memo',
+                deletedMemo.content.substring(0, 50), // 미리보기용
+                deletedMemo // 복원을 위한 원본 데이터
+            );
+            
+            // 메모 목록에서 제거
+            setMemos(prevMemos => prevMemos.filter(memo => memo.id !== id));
+            addActivity('메모 삭제', deletedMemo.content, id);
+            quietSync();
+        }
+        return deletedMemo;
+    };
+
+    // 기존 executeCalendarDelete 함수 수정:
+    const executeCalendarDelete = () => {
+        if (!dateToDelete) return;
+        const key = format(dateToDelete, 'yyyy-MM-dd');
+        const deletedEntry = calendarSchedules[key];
+    
+        if (deletedEntry) {
+            // 휴지통으로 이동
+            moveToTrash(
+                key,
+                'schedule',
+                `${key} - ${deletedEntry.text}`,
+                { date: dateToDelete, ...deletedEntry }
+            );
+            
+            // 스케줄 목록에서 제거
+            setCalendarSchedules(prev => {
+                const updated = { ...prev };
+                delete updated[key];
+                return updated;
+            });
+            
+            addActivity('스케줄 삭제', `${key} - ${deletedEntry.text}`);
+            quietSync();
+        }
+
+        showToast?.('스케줄이 삭제되었습니다 🗑️');
+        setIsCalendarConfirmOpen(false);
+        setDateToDelete(null);
+    };
+    
+    // ... 나머지 기존 코드 ...
+};
+
+
+/*
+ * 7. 복원 로직 추가
+ */
+
+// useEffect로 복원 이벤트 감지
+useEffect(() => {
+    const handleRestore = (event) => {
+        const restoredItems = event.detail;
+        
+        restoredItems.forEach(item => {
+            if (item.type === 'memo') {
+                // 메모 복원
+                setMemos(prev => [item.originalData, ...prev]);
+                addActivity('메모 복원', item.content);
+            } else if (item.type === 'schedule') {
+                // 스케줄 복원
+                const { date, ...scheduleData } = item.originalData;
+                const key = format(new Date(date), 'yyyy-MM-dd');
+                setCalendarSchedules(prev => ({
+                    ...prev,
+                    [key]: scheduleData
+                }));
+                addActivity('스케줄 복원', item.content);
+            }
+        });
+        
+        quietSync();
+    };
+
+    window.addEventListener('itemsRestored', handleRestore);
+    return () => window.removeEventListener('itemsRestored', handleRestore);
+}, []);
+
+
+/*
+ * 8. 최종 구조
+ */
+
+function App() {
+    // ... 모든 기존 상태와 함수들 ...
+    
+    return (
+        <TrashProvider autoDeleteDays={30}>
+            <GlobalStyle />
+            <Screen>
+                <AppContent />
+            </Screen>
+        </TrashProvider>
+    );
+}
+
+// TrashProvider 내부에서만 useTrashContext 사용 가능
+const AppContent = () => {
+    const { moveToTrash, restoreFromTrash } = useTrashContext();
+    
+    // ... 기존 모든 코드 ...
+    // ... moveToTrash를 사용하도록 삭제 로직 수정 ...
+    
+    return (
+        <>
+            <Header {...headerProps} />
+            <ContentArea>
+                {/* ... 모든 탭 렌더링 ... */}
+                {activeTab === 'trash' && <TrashPage showToast={showToast} />}
+            </ContentArea>
+            {/* ... 나머지 UI ... */}
+        </>
+    );
+};
+
+export default App;

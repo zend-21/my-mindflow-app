@@ -35,6 +35,9 @@ import LoginModal from './components/LoginModal.jsx';
 import FortuneFlow from './components/FortuneFlow.jsx';
 import ProfilePage from './components/ProfilePage.jsx';
 import Timer from './components/Timer.jsx';
+import { TrashProvider } from './contexts/TrashContext';
+import TrashPage from './components/TrashPage.jsx';
+import AppContent from './components/AppContent.jsx';
 
 // ★★★ 토스트 메시지 스타일 ★★★
 const fadeIn = keyframes`
@@ -851,6 +854,18 @@ function App() {
     const handleDeleteMemo = (id) => {
             const deletedMemo = memos.find(memo => memo.id === id);
             if (deletedMemo) {
+                // 휴지통으로 이동 이벤트 발생
+                const event = new CustomEvent('moveToTrash', {
+                    detail: {
+                        id: deletedMemo.id,
+                        type: 'memo',
+                        content: deletedMemo.content.substring(0, 50) + (deletedMemo.content.length > 50 ? '...' : ''),
+                        originalData: deletedMemo
+                    }
+                });
+                window.dispatchEvent(event);
+                
+                // 메모 목록에서 제거
                 setMemos(prevMemos => prevMemos.filter(memo => memo.id !== id));
                 addActivity('메모 삭제', deletedMemo.content, id);
                 quietSync(); // ✅ 추가
@@ -897,6 +912,22 @@ function App() {
 
         if (isBulkDelete) {
             const idsToDelete = new Set(memoToDelete);
+            
+            // 각 메모를 휴지통으로 이동
+            memos.forEach(memo => {
+                if (idsToDelete.has(memo.id)) {
+                    const event = new CustomEvent('moveToTrash', {
+                        detail: {
+                            id: memo.id,
+                            type: 'memo',
+                            content: memo.content.substring(0, 50) + (memo.content.length > 50 ? '...' : ''),
+                            originalData: memo
+                        }
+                    });
+                    window.dispatchEvent(event);
+                }
+            });
+            
             setMemos(prevMemos => prevMemos.filter(memo => !idsToDelete.has(memo.id)));
             message = `${idsToDelete.size}개의 메모가 삭제되었습니다.`;
             handleExitSelectionMode();
@@ -1411,7 +1442,19 @@ function App() {
         const deletedEntry = calendarSchedules[key];
     
         if (deletedEntry) {
-            addActivity('스케줄 삭제', `${key} - ${deletedEntry.text}`); // ✅ 활동 내역 추가
+            // 휴지통으로 이동 이벤트 발생
+            const event = new CustomEvent('moveToTrash', {
+                detail: {
+                    id: key,
+                    type: 'schedule',
+                    content: `${key} - ${deletedEntry.text}`,
+                    originalData: { date: dateToDelete, ...deletedEntry }
+                }
+            });
+            window.dispatchEvent(event);
+            
+            // 활동 내역 추가
+            addActivity('스케줄 삭제', `${key} - ${deletedEntry.text}`);
         }
 
         setCalendarSchedules(prev => {
@@ -1419,15 +1462,11 @@ function App() {
             delete updated[key];
             return updated;
         });
-        
-        // 활동 로그 추가
-        if (deletedEntry) {
-            addActivity('스케줄 삭제', `${key} - ${deletedEntry.text}`);
-        }
 
         showToast?.('스케줄이 삭제되었습니다 🗑️');
         setIsCalendarConfirmOpen(false);
         setDateToDelete(null);
+        quietSync();
     };
     
     const handleTouchStart = (e) => {
@@ -1512,6 +1551,39 @@ function App() {
         };
     }, []);
 
+    // ✅ 휴지통에서 복원 이벤트 리스너
+    useEffect(() => {
+        const handleRestore = (event) => {
+            const restoredItems = event.detail;
+            
+            console.log('♻️ 복원 이벤트 수신:', restoredItems);
+            
+            restoredItems.forEach(item => {
+                if (item.type === 'memo') {
+                    // 메모 복원
+                    setMemos(prev => [item.originalData, ...prev]);
+                    addActivity('메모 복원', item.content);
+                    console.log('✅ 메모 복원됨:', item.originalData);
+                } else if (item.type === 'schedule') {
+                    // 스케줄 복원
+                    const { date, ...scheduleData } = item.originalData;
+                    const key = format(new Date(date), 'yyyy-MM-dd');
+                    setCalendarSchedules(prev => ({
+                        ...prev,
+                        [key]: scheduleData
+                    }));
+                    addActivity('스케줄 복원', item.content);
+                    console.log('✅ 스케줄 복원됨:', { key, scheduleData });
+                }
+            });
+            
+            quietSync();
+        };
+
+        window.addEventListener('restoreToApp', handleRestore);
+        return () => window.removeEventListener('restoreToApp', handleRestore);
+    }, []);
+
 if (isLoading) {
         return (
             <Screen>
@@ -1523,8 +1595,9 @@ if (isLoading) {
     }
 
     return (
-        <>
-            <GlobalStyle />
+        <TrashProvider autoDeleteDays={30}>
+            <AppContent>
+                <GlobalStyle />
             <Screen>
                 {/* ★★★ 더 이상 로그인 여부로 화면을 막지 않고, 항상 메인 앱을 보여줍니다. ★★★ */}
                 <>
@@ -1620,6 +1693,7 @@ if (isLoading) {
                         {activeTab === 'review' && <div>리뷰 페이지</div>}
                         {activeTab === 'todo' && <div>할 일 페이지</div>}
                         {activeTab === 'recent-detail' && <div>최근 활동 상세 페이지</div>}
+                        {activeTab === 'trash' && <TrashPage showToast={showToast} />}
                     </ContentArea>
 
                     <FloatingButton onClick={handleOpenNewMemoFromFAB} activeTab={activeTab} />
@@ -1640,7 +1714,10 @@ if (isLoading) {
                         onLogout={handleLogout}
                         onLoginClick={() => setIsLoginModalOpen(true)}
                         onOpenTimer={() => setIsTimerOpen(true)}
-                        onOpenTrash={() => showToast('휴지통 기능은 곧 제공됩니다')}
+                        onOpenTrash={() => {
+                            setIsMenuOpen(false);
+                            setActiveTab('trash');
+                        }}
                     />
                 </>
             </Screen>
@@ -1782,7 +1859,8 @@ if (isLoading) {
                     onClose={() => setActiveTab('home')}
                 />
             )}
-        </>
+            </AppContent>
+        </TrashProvider>
     );
 }
 
