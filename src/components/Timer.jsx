@@ -76,7 +76,7 @@ const CloseButton = styled.button`
     border-radius: 12px;
     cursor: pointer;
     user-select: none;
-    margin-top: 35px;
+    margin-top: 0;
     box-shadow:
         0 2px 8px rgba(0, 0, 0, 0.12),
         0 1px 4px rgba(0, 0, 0, 0.08);
@@ -91,7 +91,7 @@ const CloseButton = styled.button`
     @media (orientation: landscape) and (max-height: 500px) {
         font-size: 14px;
         padding: 12px 26px;
-        margin-top: 20px;
+        margin-top: 0;
     }
 `;
 
@@ -219,18 +219,18 @@ const Display = styled.div`
 const TimeButtonRow = styled.div`
     display: flex;
     gap: 16px;
-    margin-bottom: 30px;
+    margin-bottom: 45px;
     justify-content: center;
     flex-wrap: wrap;
 
     @media (max-width: 480px) {
         gap: 12px;
-        margin-bottom: 20px;
+        margin-bottom: 35px;
     }
 
     @media (max-width: 360px) {
         gap: 8px;
-        margin-bottom: 15px;
+        margin-bottom: 30px;
     }
 
     @media (orientation: landscape) and (max-height: 500px) {
@@ -286,6 +286,19 @@ const ControlRow = styled.div`
     display: flex;
     gap: 16px;
     align-items: center;
+    margin-bottom: 45px;
+
+    @media (max-width: 480px) {
+        margin-bottom: 35px;
+    }
+
+    @media (max-width: 360px) {
+        margin-bottom: 30px;
+    }
+
+    @media (orientation: landscape) and (max-height: 500px) {
+        margin-bottom: 18px;
+    }
 `;
 
 const ResetButton = styled.button`
