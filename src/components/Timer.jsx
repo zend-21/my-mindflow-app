@@ -129,23 +129,29 @@ const VolumeIconButton = styled.button`
     flex-shrink: 0;
     transition: all 0.2s;
 
-    &:hover {
+    &:hover:not(:disabled) {
         color: #4a4a4a;
         transform: scale(1.1);
     }
 
-    &:active {
+    &:active:not(:disabled) {
         transform: scale(0.95);
+    }
+
+    &:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+        color: #afafaf;
     }
 `;
 
 const SpeakerIcon = styled.svg`
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
 
     @media (max-width: 480px) {
-        width: 18px;
-        height: 18px;
+        width: 22px;
+        height: 22px;
     }
 `;
 
@@ -159,11 +165,16 @@ const VolumeSlider = styled.input`
     outline: none;
     cursor: pointer;
 
+    &:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+    }
+
     &::-webkit-slider-thumb {
         -webkit-appearance: none;
         appearance: none;
-        width: 16px;
-        height: 16px;
+        width: 18px;
+        height: 18px;
         border-radius: 50%;
         background: #4a4a4a;
         cursor: pointer;
@@ -175,9 +186,18 @@ const VolumeSlider = styled.input`
         }
     }
 
+    &:disabled::-webkit-slider-thumb {
+        background: #afafaf;
+        cursor: not-allowed;
+        &:hover {
+            transform: none;
+            box-shadow: none;
+        }
+    }
+
     &::-moz-range-thumb {
-        width: 16px;
-        height: 16px;
+        width: 18px;
+        height: 18px;
         border-radius: 50%;
         background: #4a4a4a;
         border: none;
@@ -190,18 +210,27 @@ const VolumeSlider = styled.input`
         }
     }
 
+    &:disabled::-moz-range-thumb {
+        background: #afafaf;
+        cursor: not-allowed;
+        &:hover {
+            transform: none;
+            box-shadow: none;
+        }
+    }
+
     @media (max-width: 480px) {
         width: 80px;
         height: 3px;
 
         &::-webkit-slider-thumb {
-            width: 14px;
-            height: 14px;
+            width: 16px;
+            height: 16px;
         }
 
         &::-moz-range-thumb {
-            width: 14px;
-            height: 14px;
+            width: 16px;
+            height: 16px;
         }
     }
 `;
@@ -211,46 +240,54 @@ const VibrationButton = styled.button`
     border: none;
     cursor: pointer;
     user-select: none;
-    display: ${props => props.$show ? 'flex' : 'none'};
+    display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     transition: all 0.2s;
     padding: 0;
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     border-radius: 4px;
+    opacity: ${props => props.$show ? '1' : '0.15'};
+    pointer-events: ${props => props.$show ? 'auto' : 'none'};
 
-    ${props => props.$active && `
+    ${props => props.$active && props.$show && `
         background: #e8e6e3;
     `}
 
-    &:hover {
-        background: #e8e6e3;
+    &:hover:not(:disabled) {
+        background: ${props => props.$show ? '#e8e6e3' : 'none'};
     }
 
-    &:active {
-        background: #d8d6d3;
+    &:active:not(:disabled) {
+        background: ${props => props.$show ? '#d8d6d3' : 'none'};
+    }
+
+    &:disabled {
+        opacity: 0.15;
+        cursor: not-allowed;
+        pointer-events: none;
     }
 
     @media (max-width: 480px) {
-        width: 18px;
-        height: 18px;
+        width: 22px;
+        height: 22px;
     }
 
     @media (orientation: landscape) and (max-height: 500px) {
-        width: 18px;
-        height: 18px;
+        width: 22px;
+        height: 22px;
     }
 `;
 
 const VibrationIcon = styled.svg`
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
 
     @media (max-width: 480px) {
-        width: 18px;
-        height: 18px;
+        width: 22px;
+        height: 22px;
     }
 `;
 
@@ -258,48 +295,50 @@ const VolumeButtonRow = styled.div`
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: 24px;
+    min-width: 88px; /* 고정 너비 - gap 증가로 인해 조정 */
 `;
 
 const VolumeButton = styled.button`
     background: #f5f5f5;
     border: none;
     color: #5c5c5c;
-    font-size: 16px;
+    font-size: 18px;
     font-weight: 600;
     width: 32px;
     height: 32px;
+    min-width: 32px; /* 최소 너비 고정 */
+    max-width: 32px; /* 최대 너비 고정 */
     border-radius: 8px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: all 0.2s;
+    transition: background 0.2s, color 0.2s, opacity 0.2s;
     flex-shrink: 0;
 
-    &:hover {
+    &:hover:not(:disabled) {
         background: #e8e6e3;
         color: #4a4a4a;
-        transform: scale(1.05);
     }
 
-    &:active {
-        transform: scale(0.95);
+    &:active:not(:disabled) {
+        background: #d8d6d3;
     }
 
     &:disabled {
         opacity: 0.3;
         cursor: not-allowed;
-        &:hover {
-            transform: none;
-            background: #f5f5f5;
-        }
+        background: #f5f5f5;
+        color: #afafaf;
     }
 
     @media (max-width: 480px) {
         width: 28px;
         height: 28px;
-        font-size: 14px;
+        min-width: 28px;
+        max-width: 28px;
+        font-size: 16px;
     }
 `;
 
@@ -710,8 +749,8 @@ const Timer = ({ onClose }) => {
                 localStorage.setItem('timerVibration', 'false');
             }
 
-            // 테스트 사운드 재생
-            playTestSound(newVolume);
+            // 버튼용 테스트 사운드 재생 (1초 제한)
+            playTestSoundButton(newVolume);
         }
     };
 
@@ -733,8 +772,8 @@ const Timer = ({ onClose }) => {
                 localStorage.setItem('timerVibration', 'false');
             }
 
-            // 테스트 사운드 재생
-            playTestSound(newVolume);
+            // 버튼용 테스트 사운드 재생 (1초 제한)
+            playTestSoundButton(newVolume);
         }
     };
 
@@ -769,7 +808,7 @@ const Timer = ({ onClose }) => {
         return null;
     };
 
-    // 테스트 사운드 재생 (볼륨 조절 시 - 실시간 재생)
+    // 테스트 사운드 재생 (슬라이더용 - 실시간 재생)
     const playTestSound = (volumeLevel) => {
         // 진동 모드이거나 볼륨이 0이면 테스트 사운드 중지
         if (volumeLevel === 0 || vibrationMode) {
@@ -799,12 +838,47 @@ const Timer = ({ onClose }) => {
         });
     };
 
+    // 테스트 사운드 재생 (버튼용 - 1초 제한)
+    const playTestSoundButton = (volumeLevel) => {
+        // 진동 모드이거나 볼륨이 0이면 테스트 사운드 중지
+        if (volumeLevel === 0 || vibrationMode) {
+            stopTestSound();
+            return;
+        }
+
+        // 기존에 재생 중인 테스트 사운드가 있으면 즉시 중지
+        stopTestSound();
+
+        // 새 테스트 오디오 생성
+        const testAudio = new Audio('/sound/Timer_alarm/01.mp3');
+        testAudio.volume = volumeLevel;
+        testAudio.loop = false;
+        testAudioRef.current = testAudio;
+
+        // 재생 시작
+        testAudio.play().catch(err => {
+            console.log('Test audio play failed:', err);
+        });
+
+        // 1초 후 자동 중지
+        if (testAudioTimeoutRef.current) {
+            clearTimeout(testAudioTimeoutRef.current);
+        }
+        testAudioTimeoutRef.current = setTimeout(() => {
+            stopTestSound();
+        }, 1000);
+    };
+
     // 테스트 사운드 중지
     const stopTestSound = () => {
         if (testAudioRef.current) {
             testAudioRef.current.pause();
             testAudioRef.current.currentTime = 0;
             testAudioRef.current = null;
+        }
+        if (testAudioTimeoutRef.current) {
+            clearTimeout(testAudioTimeoutRef.current);
+            testAudioTimeoutRef.current = null;
         }
     };
 
@@ -1160,7 +1234,7 @@ const Timer = ({ onClose }) => {
                     <BottomControlRow>
                         <VolumeControlContainer>
                             <VolumeControlInner>
-                                <VolumeIconButton onClick={toggleVolume}>
+                                <VolumeIconButton onClick={toggleVolume} disabled={isRunning}>
                                     {volume === 0 ? (
                                         // 음소거 아이콘 (X 표시)
                                         <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -1168,18 +1242,26 @@ const Timer = ({ onClose }) => {
                                             <line x1="18" y1="9" x2="22" y2="15" strokeLinecap="round"/>
                                             <line x1="22" y1="9" x2="18" y2="15" strokeLinecap="round"/>
                                         </SpeakerIcon>
-                                    ) : volume < 0.5 ? (
-                                        // 낮은 볼륨 아이콘
+                                    ) : volume <= 0.1 ? (
+                                        // 매우 낮은 볼륨 아이콘 - )
                                         <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                             <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
                                             <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
                                         </SpeakerIcon>
-                                    ) : (
-                                        // 높은 볼륨 아이콘
+                                    ) : volume <= 0.5 ? (
+                                        // 중간 볼륨 아이콘 - ))
                                         <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                             <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
                                             <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
                                             <path d="M18 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </SpeakerIcon>
+                                    ) : (
+                                        // 높은 볼륨 아이콘 - )))
+                                        <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                            <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M18 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M20.5 6c1.5 1.5 2.3 3.5 2.3 6s-.8 4.5-2.3 6" strokeLinecap="round" strokeLinejoin="round"/>
                                         </SpeakerIcon>
                                     )}
                                 </VolumeIconButton>
@@ -1192,11 +1274,13 @@ const Timer = ({ onClose }) => {
                                     onChange={handleVolumeChange}
                                     onMouseUp={stopTestSound}
                                     onTouchEnd={stopTestSound}
+                                    disabled={isRunning}
                                 />
                                 <VibrationButton
                                     $show={volume === 0}
                                     $active={vibrationMode}
                                     onClick={toggleVibrationMode}
+                                    disabled={isRunning}
                                 >
                                     <VibrationIcon viewBox="0 0 24 24" fill="none" stroke={vibrationMode ? "#4a4a4a" : "#5c5c5c"} strokeWidth="1.5">
                                         <line x1="8" y1="6" x2="8" y2="18" strokeLinecap="round"/>
@@ -1210,17 +1294,13 @@ const Timer = ({ onClose }) => {
                             <VolumeButtonRow>
                                 <VolumeButton
                                     onClick={decreaseVolume}
-                                    disabled={volume === 0}
-                                    onMouseUp={stopTestSound}
-                                    onTouchEnd={stopTestSound}
+                                    disabled={isRunning || volume === 0}
                                 >
                                     −
                                 </VolumeButton>
                                 <VolumeButton
                                     onClick={increaseVolume}
-                                    disabled={volume === 1.0}
-                                    onMouseUp={stopTestSound}
-                                    onTouchEnd={stopTestSound}
+                                    disabled={isRunning || volume === 1.0}
                                 >
                                     +
                                 </VolumeButton>
