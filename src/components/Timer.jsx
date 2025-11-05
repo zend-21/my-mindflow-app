@@ -14,6 +14,13 @@ const Overlay = styled.div`
     justify-content: center;
     align-items: center;
     z-index: 20000;
+    
+    /* 모바일 화면 회전 고정 - 항상 세로 방향 유지 */
+    @supports (transform: rotate(0deg)) {
+        @media (orientation: landscape) and (max-width: 1024px) {
+            transform-origin: center center;
+        }
+    }
 `;
 
 const TimerContainer = styled.div`
@@ -45,16 +52,27 @@ const TimerContainer = styled.div`
         padding: 20px 15px;
     }
 
-    /* 가로 모드 대응 - 컨텐츠가 화면에 맞도록 축소 */
-    @media (orientation: landscape) {
-        padding: 10px 20px;
-        max-height: 95vh;
-        gap: 5px;
+    /* 가로 모드 대응 - 화면 회전 시 세로 방향 유지 */
+    @media (orientation: landscape) and (max-width: 1024px) {
+        /* 모바일 가로 모드: 회전하여 세로 방향 유지 */
+        transform: rotate(90deg);
+        transform-origin: center center;
+        width: 85vh;
+        height: 85vw;
+        max-width: 85vh;
+        max-height: 85vw;
+        padding: 40px 30px;
+    }
+
+    /* 태블릿 이상 큰 화면의 가로 모드 */
+    @media (orientation: landscape) and (min-width: 1025px) {
+        padding: 40px 35px;
+        max-height: 85vh;
     }
 `;
 
 const CloseButton = styled.button`
-    background: #e8e6e3;
+    background: #ffffff;
     border: none;
     color: #5c5c5c;
     font-size: 16px;
@@ -75,10 +93,10 @@ const CloseButton = styled.button`
         opacity: 0.5;
     }
 
-    @media (orientation: landscape) {
-        font-size: 14px;
-        padding: 8px 20px;
-        margin-top: 10px;
+    @media (orientation: landscape) and (max-width: 1024px) {
+        font-size: 15px;
+        padding: 12px 28px;
+        margin-top: 25px;
     }
 `;
 
@@ -192,14 +210,14 @@ const Display = styled.div`
         padding: 25px;
     }
 
-    /* 가로 모드 대응 */
-    @media (orientation: landscape) {
-        font-size: 50px;
-        width: 200px;
-        height: 70px;
-        line-height: 70px;
-        padding: 15px;
-        margin-bottom: 10px;
+    /* 가로 모드 - 회전되어 있으므로 세로 모드와 동일하게 유지 */
+    @media (orientation: landscape) and (max-width: 1024px) {
+        font-size: 70px;
+        width: 280px;
+        height: 110px;
+        line-height: 110px;
+        padding: 30px;
+        margin-bottom: 30px;
     }
 `;
 
@@ -220,9 +238,9 @@ const TimeButtonRow = styled.div`
         margin-bottom: 15px;
     }
 
-    @media (orientation: landscape) {
-        gap: 8px;
-        margin-bottom: 8px;
+    @media (orientation: landscape) and (max-width: 1024px) {
+        gap: 12px;
+        margin-bottom: 20px;
     }
 `;
 
@@ -262,10 +280,10 @@ const TimeButton = styled.button`
         min-width: 60px;
     }
 
-    @media (orientation: landscape) {
-        font-size: 14px;
-        padding: 8px 14px;
-        min-width: 55px;
+    @media (orientation: landscape) and (max-width: 1024px) {
+        font-size: 16px;
+        padding: 14px 22px;
+        min-width: 70px;
     }
 `;
 
@@ -296,9 +314,9 @@ const ResetButton = styled.button`
         opacity: 0.5;
     }
 
-    @media (orientation: landscape) {
-        font-size: 14px;
-        padding: 10px 18px;
+    @media (orientation: landscape) and (max-width: 1024px) {
+        font-size: 16px;
+        padding: 16px 24px;
     }
 `;
 
@@ -338,10 +356,10 @@ const StartStopButton = styled.button`
         min-width: 160px;
     }
 
-    @media (orientation: landscape) {
-        font-size: 16px;
-        padding: 12px 30px;
-        min-width: 120px;
+    @media (orientation: landscape) and (max-width: 1024px) {
+        font-size: 20px;
+        padding: 24px 50px;
+        min-width: 180px;
     }
 `;
 
@@ -436,18 +454,13 @@ const Timer = ({ onClose }) => {
         });
     };
 
-    // 클릭 처리 (분 버튼용)
-    const handleClickMinutes = (minutes) => {
-        addMinutes(minutes);
-    };
 
-    // 클릭 처리 (초 버튼용)
-    const handleClickSeconds = (amount) => {
-        addSeconds(amount);
-    };
 
     // 길게 누르기 시작 (분 버튼용)
     const handleMouseDownMinutes = (minutes) => {
+        // 첫 번째 클릭은 즉시 실행
+        addMinutes(minutes);
+        // 길게 누르면 반복 실행
         longPressTimerRef.current = setTimeout(() => {
             longPressIntervalRef.current = setInterval(() => {
                 addMinutes(minutes);
@@ -457,6 +470,9 @@ const Timer = ({ onClose }) => {
 
     // 길게 누르기 시작 (초 버튼용)
     const handleMouseDownSeconds = (amount) => {
+        // 첫 번째 클릭은 즉시 실행
+        addSeconds(amount);
+        // 길게 누르면 반복 실행
         longPressTimerRef.current = setTimeout(() => {
             longPressIntervalRef.current = setInterval(() => {
                 addSeconds(amount);
@@ -630,33 +646,48 @@ const Timer = ({ onClose }) => {
 
                     <TimeButtonRow>
                         <TimeButton
-                            onClick={() => handleClickMinutes(5)}
-                            onMouseDown={() => handleMouseDownMinutes(5)}
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleMouseDownMinutes(5);
+                            }}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
-                            onTouchStart={() => handleMouseDownMinutes(5)}
+                            onTouchStart={(e) => {
+                                e.preventDefault();
+                                handleMouseDownMinutes(5);
+                            }}
                             onTouchEnd={handleMouseUp}
                             disabled={isRunning}
                         >
                             5M
                         </TimeButton>
                         <TimeButton
-                            onClick={() => handleClickMinutes(1)}
-                            onMouseDown={() => handleMouseDownMinutes(1)}
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleMouseDownMinutes(1);
+                            }}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
-                            onTouchStart={() => handleMouseDownMinutes(1)}
+                            onTouchStart={(e) => {
+                                e.preventDefault();
+                                handleMouseDownMinutes(1);
+                            }}
                             onTouchEnd={handleMouseUp}
                             disabled={isRunning}
                         >
                             1M
                         </TimeButton>
                         <TimeButton
-                            onClick={() => handleClickSeconds(10)}
-                            onMouseDown={() => handleMouseDownSeconds(10)}
+                            onMouseDown={(e) => {
+                                e.preventDefault();
+                                handleMouseDownSeconds(10);
+                            }}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
-                            onTouchStart={() => handleMouseDownSeconds(10)}
+                            onTouchStart={(e) => {
+                                e.preventDefault();
+                                handleMouseDownSeconds(10);
+                            }}
                             onTouchEnd={handleMouseUp}
                             disabled={isRunning}
                         >
