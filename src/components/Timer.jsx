@@ -255,16 +255,51 @@ const Timer = ({ onClose }) => {
     const addTime = (amount) => {
         setSeconds(prev => {
             const newTime = prev + amount;
+            // 최대 59분 59초
             return Math.min(newTime, 59 * 60 + 59);
         });
     };
 
-    // 길게 누르기 시작
-    const handleMouseDown = (amount) => {
+    // 초만 추가 (60초 넘지 않도록)
+    const addSeconds = (amount) => {
+        setSeconds(prev => {
+            const currentMinutes = Math.floor(prev / 60);
+            const currentSeconds = prev % 60;
+            const newSeconds = currentSeconds + amount;
+
+            // 초가 60을 넘으면 59로 제한
+            if (newSeconds >= 60) {
+                return currentMinutes * 60 + 59;
+            }
+
+            return currentMinutes * 60 + newSeconds;
+        });
+    };
+
+    // 클릭 처리 (분 버튼용)
+    const handleClick = (amount) => {
         addTime(amount);
+    };
+
+    // 클릭 처리 (초 버튼용)
+    const handleClickSeconds = (amount) => {
+        addSeconds(amount);
+    };
+
+    // 길게 누르기 시작 (분 버튼용)
+    const handleMouseDown = (amount) => {
         longPressTimerRef.current = setTimeout(() => {
             longPressIntervalRef.current = setInterval(() => {
                 addTime(amount);
+            }, 100);
+        }, 500);
+    };
+
+    // 길게 누르기 시작 (초 버튼용)
+    const handleMouseDownSeconds = (amount) => {
+        longPressTimerRef.current = setTimeout(() => {
+            longPressIntervalRef.current = setInterval(() => {
+                addSeconds(amount);
             }, 100);
         }, 500);
     };
@@ -400,31 +435,28 @@ const Timer = ({ onClose }) => {
 
                     <TimeButtonRow>
                         <TimeButton
+                            onClick={() => handleClick(5 * 60)}
                             onMouseDown={() => handleMouseDown(5 * 60)}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
-                            onTouchStart={() => handleMouseDown(5 * 60)}
-                            onTouchEnd={handleMouseUp}
                             disabled={isRunning}
                         >
                             5M
                         </TimeButton>
                         <TimeButton
+                            onClick={() => handleClick(60)}
                             onMouseDown={() => handleMouseDown(60)}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
-                            onTouchStart={() => handleMouseDown(60)}
-                            onTouchEnd={handleMouseUp}
                             disabled={isRunning}
                         >
                             1M
                         </TimeButton>
                         <TimeButton
-                            onMouseDown={() => handleMouseDown(10)}
+                            onClick={() => handleClickSeconds(10)}
+                            onMouseDown={() => handleMouseDownSeconds(10)}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
-                            onTouchStart={() => handleMouseDown(10)}
-                            onTouchEnd={handleMouseUp}
                             disabled={isRunning}
                         >
                             10S
