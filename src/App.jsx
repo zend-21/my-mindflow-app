@@ -25,7 +25,8 @@ import SearchModal from './components/SearchModal.jsx';
 import MemoPage from './components/MemoPage.jsx';
 import MemoDetailModal from './components/MemoDetailModal.jsx';
 import NewMemoModal from './components/NewMemoModal.jsx';
-import ConfirmationModal from './components/ConfirmationModal.jsx'; 
+import ConfirmationModal from './components/ConfirmationModal.jsx';
+import ConfirmModal from './components/ConfirmModal.jsx';
 import Calendar from './modules/calendar/Calendar.jsx';
 import CalendarEditorModal from './modules/calendar/CalendarEditorModal.jsx';
 import AlarmModal from './modules/calendar/AlarmModal.jsx';
@@ -33,6 +34,7 @@ import DateSelectorModal from './modules/calendar/DateSelectorModal.jsx';
 import LoginModal from './components/LoginModal.jsx';
 import FortuneFlow from './components/FortuneFlow.jsx';
 import ProfilePage from './components/ProfilePage.jsx';
+import Timer from './components/Timer.jsx';
 
 // ★★★ 토스트 메시지 스타일 ★★★
 const fadeIn = keyframes`
@@ -335,6 +337,10 @@ function App() {
     const [activeTab, setActiveTab] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isFortuneFlowOpen, setIsFortuneFlowOpen] = useState(false);
+    const [isTimerOpen, setIsTimerOpen] = useState(false);
+    const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
+    const [restoreType, setRestoreType] = useState('phone'); // 'phone' or 'google'
+    const [pendingRestoreFile, setPendingRestoreFile] = useState(null);
 
     const [isDragging, setIsDragging] = useState(false);
     const pullStartTime = useRef(0);
@@ -459,12 +465,106 @@ function App() {
         };
     }, []);  
 
-    const storageKeySuffix = profile ? profile.email : 'guest';
-    const [widgets, setWidgets] = useLocalStorage(`widgets_${storageKeySuffix}`, ['StatsGrid', 'QuickActions', 'RecentActivity']);
-    const [memos, setMemos] = useLocalStorage(`memos_${storageKeySuffix}`, []);
-    const [recentActivities, setRecentActivities] = useLocalStorage(`recentActivities_${storageKeySuffix}`, []);
-    const [calendarSchedules, setCalendarSchedules] = useLocalStorage(`calendarSchedules_${storageKeySuffix}`, {});
-    const [displayCount, setDisplayCount] = useLocalStorage(`displayCount_${storageKeySuffix}`, 5);
+    // 🔄 일반 데이터는 로그인/게스트 공통 저장 (동일한 localStorage 키 사용)
+    // ✅ 휴대폰 환경: 로그인 상태를 인지 못한 채 메모 작성 시 데이터 유실 방지
+    // ✅ Google Drive 동기화는 로그인 시에만 가능
+    // ✅ 백업/복원 기능은 게스트와 로그인 모두 가능
+
+    // 📦 기존 데이터 마이그레이션 (최초 1회만 실행)
+    useEffect(() => {
+        const migrationKey = 'data_migration_v1_completed';
+        if (localStorage.getItem(migrationKey)) return; // 이미 마이그레이션 완료
+
+        console.log('📦 데이터 마이그레이션 시작...');
+
+        // 모든 localStorage 키 확인
+        const allKeys = Object.keys(localStorage);
+        const guestKeys = allKeys.filter(key => key.endsWith('_guest'));
+        const userKeys = allKeys.filter(key => key.includes('@') && !key.includes('_shared'));
+
+        // 병합할 데이터 타입들
+        const dataTypes = ['memos', 'calendarSchedules', 'recentActivities', 'widgets', 'displayCount'];
+
+        dataTypes.forEach(dataType => {
+            const sharedKey = `${dataType}_shared`;
+            const existingShared = localStorage.getItem(sharedKey);
+
+            // 이미 _shared 키에 데이터가 있으면 스킵 (수동으로 생성한 경우)
+            if (existingShared) {
+                console.log(`✅ ${dataType}: 이미 공통 데이터 존재 (스킵)`);
+                return;
+            }
+
+            // guest 데이터와 user 데이터를 모두 찾아서 병합
+            let mergedData = dataType === 'calendarSchedules' ? {} : [];
+            let foundData = false;
+
+            // guest 키에서 데이터 가져오기
+            const guestKey = `${dataType}_guest`;
+            const guestData = localStorage.getItem(guestKey);
+            if (guestData) {
+                try {
+                    const parsed = JSON.parse(guestData);
+                    if (dataType === 'calendarSchedules') {
+                        mergedData = { ...mergedData, ...parsed };
+                    } else if (Array.isArray(parsed)) {
+                        mergedData = [...mergedData, ...parsed];
+                    } else if (dataType === 'displayCount') {
+                        mergedData = parsed;
+                    }
+                    foundData = true;
+                    console.log(`📥 ${dataType}_guest 데이터 발견:`, parsed);
+                } catch (e) {
+                    console.error(`❌ ${guestKey} 파싱 실패:`, e);
+                }
+            }
+
+            // user 키에서 데이터 가져오기 (이메일 주소 포함된 키)
+            userKeys.forEach(key => {
+                if (key.startsWith(dataType + '_')) {
+                    const userData = localStorage.getItem(key);
+                    if (userData) {
+                        try {
+                            const parsed = JSON.parse(userData);
+                            if (dataType === 'calendarSchedules') {
+                                mergedData = { ...mergedData, ...parsed };
+                            } else if (Array.isArray(parsed)) {
+                                mergedData = [...mergedData, ...parsed];
+                            } else if (dataType === 'displayCount' && !foundData) {
+                                // displayCount는 첫 번째 값만 사용
+                                mergedData = parsed;
+                            }
+                            foundData = true;
+                            console.log(`📥 ${key} 데이터 발견:`, parsed);
+                        } catch (e) {
+                            console.error(`❌ ${key} 파싱 실패:`, e);
+                        }
+                    }
+                }
+            });
+
+            // 병합된 데이터가 있으면 _shared 키로 저장
+            if (foundData) {
+                localStorage.setItem(sharedKey, JSON.stringify(mergedData));
+                console.log(`✅ ${sharedKey}로 마이그레이션 완료:`, mergedData);
+            } else {
+                console.log(`📭 ${dataType}: 마이그레이션할 데이터 없음`);
+            }
+        });
+
+        // 마이그레이션 완료 플래그 저장
+        localStorage.setItem(migrationKey, 'true');
+        console.log('✅ 데이터 마이그레이션 완료');
+
+        // 페이지 새로고침하여 새로운 키로 데이터 로드
+        window.location.reload();
+    }, []);
+
+    const [widgets, setWidgets] = useLocalStorage('widgets_shared', ['StatsGrid', 'QuickActions', 'RecentActivity']);
+    const [memos, setMemos] = useLocalStorage('memos_shared', []);
+    const [recentActivities, setRecentActivities] = useLocalStorage('recentActivities_shared', []);
+    const [calendarSchedules, setCalendarSchedules] = useLocalStorage('calendarSchedules_shared', {});
+    const [displayCount, setDisplayCount] = useLocalStorage('displayCount_shared', 5);
     
     const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
     const contentAreaRef = useRef(null);
@@ -552,7 +652,7 @@ function App() {
             return;
         }
 
-        const trimmedDescription = description.length > 13 ? description.substring(0, 13) + '...' : description;
+        const trimmedDescription = description.length > 18 ? description.substring(0, 18) + '...' : description;
         const formattedDescription = `${type} - ${trimmedDescription}`;
 
         setRecentActivities(prevActivities => {
@@ -651,18 +751,68 @@ function App() {
     };
     
     const handleDataExport = () => {
-        exportData(memos);
-        addActivity('백업', '전체 메모 백업');
-        showToast("백업완료 되었습니다.");
+        // 전체 데이터 백업 (운세 제외)
+        const dataToExport = {
+            version: '1.0',
+            exportDate: new Date().toISOString(),
+            exportTimestamp: Date.now(),
+            data: {
+                memos,
+                calendarSchedules,
+                recentActivities,
+                widgets,
+                displayCount
+            }
+        };
+        exportData('mindflow_backup', dataToExport);
+        addActivity('백업', '전체 데이터 백업 (휴대폰)');
+        showToast("백업 완료 되었습니다.");
     };
 
-    const handleDataImport = async () => {
-        const imported = await importData();
-        if (imported) {
-            showToast('데이터가 성공적으로 복원되었습니다.');
-            addActivity('복원', '전체 메모 복원');
-            setTimeout(() => window.location.reload(), 1500);
-        }
+    const handleDataImport = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        // 파일을 저장하고 확인 모달 표시
+        setPendingRestoreFile(file);
+        setRestoreType('phone');
+        setIsRestoreConfirmOpen(true);
+    };
+
+    const executeDataImport = () => {
+        if (!pendingRestoreFile) return;
+
+        importData(pendingRestoreFile, (importedData) => {
+            try {
+                // 버전 체크
+                if (importedData.version && importedData.data) {
+                    // v1.0 형식 (새 형식)
+                    const { data } = importedData;
+                    if (data.memos) setMemos(data.memos);
+                    if (data.calendarSchedules) setCalendarSchedules(data.calendarSchedules);
+                    if (data.recentActivities) setRecentActivities(data.recentActivities);
+                    if (data.widgets) setWidgets(data.widgets);
+                    if (data.displayCount) setDisplayCount(data.displayCount);
+                } else if (Array.isArray(importedData)) {
+                    // 구 형식 (메모만 있는 경우)
+                    setMemos(importedData);
+                } else {
+                    // 알 수 없는 형식
+                    throw new Error('지원하지 않는 백업 파일 형식입니다.');
+                }
+
+                showToast('데이터가 성공적으로 복원되었습니다.');
+                addActivity('복원', '전체 데이터 복원 (휴대폰)');
+                setTimeout(() => window.location.reload(), 1500);
+            } catch (error) {
+                console.error('복원 실패:', error);
+                showToast('복원에 실패했습니다. 올바른 백업 파일인지 확인해주세요.');
+            }
+        });
+
+        // 초기화
+        setPendingRestoreFile(null);
+        setIsRestoreConfirmOpen(false);
     };
     
     const handleSaveNewMemo = (newMemoContent, isImportant) => {
@@ -1155,19 +1305,25 @@ function App() {
             return;
         }
 
+        // 확인 모달 표시
+        setRestoreType('google');
+        setIsRestoreConfirmOpen(true);
+    };
+
+    const executeGoogleDriveRestore = async () => {
         try {
             const result = await loadFromGoogleDrive();
-            
+
             if (result.success && result.data) {
                 if (result.data.memos) setMemos(result.data.memos);
                 if (result.data.calendarSchedules) setCalendarSchedules(result.data.calendarSchedules);
                 if (result.data.recentActivities) setRecentActivities(result.data.recentActivities);
                 if (result.data.displayCount) setDisplayCount(result.data.displayCount);
                 if (result.data.widgets) setWidgets(result.data.widgets);
-                
+
                 addActivity('복원', 'Google Drive에서 복원 완료');
                 showToast('데이터가 성공적으로 복원되었습니다 ✅');
-                
+
                 setIsMenuOpen(false);
             } else if (result.message === 'NO_FILE') {
                 showToast('복원할 데이터가 없습니다.');
@@ -1181,6 +1337,9 @@ function App() {
             console.error('복원 중 오류:', error);
             showToast('복원 중 오류가 발생했습니다.');
         }
+
+        // 초기화
+        setIsRestoreConfirmOpen(false);
     };
 
     // ✅ 로그아웃 (확장됨)
@@ -1472,13 +1631,16 @@ if (isLoading) {
                         setDisplayCount={setDisplayCount}
                         showToast={showToast}
                         onOpenFortune={handleOpenFortune}
-                        onExport={handleDataExport} 
+                        onExport={handleDataExport}
                         onImport={handleDataImport}
                         onRestoreFromDrive={handleRestoreFromDrive}
-                        profile={profile} 
+                        onSync={handleSync}
+                        profile={profile}
                         onProfileClick={handleProfileClick}
                         onLogout={handleLogout}
-                        onLoginClick={() => setIsLoginModalOpen(true)} // ★ 로그인 모달 여는 함수 전달
+                        onLoginClick={() => setIsLoginModalOpen(true)}
+                        onOpenTimer={() => setIsTimerOpen(true)}
+                        onOpenTrash={() => showToast('휴지통 기능은 곧 제공됩니다')}
                     />
                 </>
             </Screen>
@@ -1500,6 +1662,24 @@ if (isLoading) {
                         {toastMessage}
                     </ToastBox>
                 </ToastOverlay>
+            )}
+
+            {/* 복원 확인 모달 */}
+            {isRestoreConfirmOpen && (
+                <ConfirmModal
+                    type={restoreType}
+                    onConfirm={() => {
+                        if (restoreType === 'phone') {
+                            executeDataImport();
+                        } else {
+                            executeGoogleDriveRestore();
+                        }
+                    }}
+                    onCancel={() => {
+                        setIsRestoreConfirmOpen(false);
+                        setPendingRestoreFile(null);
+                    }}
+                />
             )}
 
             {isSearchModalOpen && (
@@ -1585,6 +1765,11 @@ if (isLoading) {
                     profile={profile}
                     // 운세 결과 및 기타 상태를 FortuneFlow 내부에서 관리
                 />
+            )}
+
+            {/* ⏱️ 타이머 모달 */}
+            {isTimerOpen && (
+                <Timer onClose={() => setIsTimerOpen(false)} />
             )}
 
             {/* 👤 프로필 페이지 모달 */}

@@ -165,18 +165,32 @@ const FileInput = styled.input`
     display: none;
 `;
 
+const MenuGroup = styled.div`
+    border-bottom: 3px solid #d1d5db;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+
+    &:last-of-type {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+`;
+
 const SideMenu = ({
     isOpen,
     onClose,
     onExport,
     onImport,
-    onRestoreFromDrive,  // ⭐ 이 줄 추가
+    onRestoreFromDrive,
     profile,
     onProfileClick,
     onLogout,
     onLoginClick,
     onSync,
-    onOpenFortune  // 🔮 운세 기능 추가
+    onOpenFortune,
+    onOpenTimer,  // ⏱️ 타이머 기능 추가
+    onOpenTrash   // 🗑️ 휴지통 기능 추가
 }) => {
     const fileInputRef = useRef(null);
     const [imageError, setImageError] = useState(false); // ✅ 추가: 이미지 로드 오류 상태
@@ -229,45 +243,67 @@ const SideMenu = ({
                         </MenuHeader>
 
                         <MenuItemsWrapper>
+                            {/* 📱 그룹 1: 백업/복원 */}
+                            <MenuGroup>
+                                <MenuItem onClick={onExport}>
+                                    <span className="icon">💾</span> 휴대폰 백업
+                                </MenuItem>
+                                <MenuItem onClick={handleImportClick}>
+                                    <span className="icon">📂</span> 휴대폰 복원
+                                    <FileInput
+                                        type="file"
+                                        accept=".json"
+                                        onChange={onImport}
+                                        ref={fileInputRef}
+                                    />
+                                </MenuItem>
+                            </MenuGroup>
+
+                            {/* ☁️ 그룹 2: 동기화 (로그인 사용자 전용) */}
                             {profile && (
-                                <>
+                                <MenuGroup>
                                     <MenuItem onClick={onSync}>
-                                        <span className="icon">🔄</span> 동기화
+                                        <span className="icon">☁️</span> 동기화 (폰→구글)
                                     </MenuItem>
                                     <MenuItem onClick={onRestoreFromDrive}>
-                                        <span className="icon">☁️</span> Google Drive에서 복원
-                                    </MenuItem>                                    
-                                    <MenuItem onClick={onExport}>
-                                        <span className="icon">💾</span> 백업하기
+                                        <span className="icon">📥</span> 동기화 (구글→폰)
                                     </MenuItem>
-                                    <MenuItem onClick={handleImportClick}>
-                                        <span className="icon">📂</span> 복원하기
-                                        <FileInput 
-                                            type="file" 
-                                            accept=".json" 
-                                            onChange={onImport}
-                                            ref={fileInputRef}
-                                        />
-                                    </MenuItem>
-                                </>
+                                </MenuGroup>
                             )}
-                            {/* 🔮 오늘의 운세 탭 활성화 */}
-                            <MenuItem onClick={() => {
-                                onClose(); // 메뉴 닫기
-                                onOpenFortune(); // 운세 시작 함수 호출
-                            }}>
-                                <span className="icon">🔮</span> 오늘의 운세
-                            </MenuItem>            
-                            <MenuItem>
-                                <span className="icon">📝</span> 메모
-                            </MenuItem>
-                            <MenuItem>
-                                <span className="icon">📅</span> 캘린더
-                            </MenuItem>
-                            <MenuItem>
-                                <span className="icon">⚙️</span> 설정
-                            </MenuItem>
-                            
+
+                            {/* 🔮 그룹 3: 기능 */}
+                            <MenuGroup>
+                                <MenuItem onClick={() => {
+                                    onClose();
+                                    onOpenFortune();
+                                }}>
+                                    <span className="icon">🔮</span> 오늘의 운세
+                                </MenuItem>
+                                <MenuItem onClick={() => {
+                                    onClose();
+                                    if (onOpenTimer) onOpenTimer();
+                                }}>
+                                    <span className="icon">⏱️</span> 타이머
+                                </MenuItem>
+                            </MenuGroup>
+
+                            {/* 🗑️ 그룹 4: 관리 */}
+                            <MenuGroup>
+                                <MenuItem onClick={() => {
+                                    onClose();
+                                    if (onOpenTrash) onOpenTrash();
+                                }}>
+                                    <span className="icon">🗑️</span> 휴지통
+                                </MenuItem>
+                            </MenuGroup>
+
+                            {/* ⚙️ 그룹 5: 설정 */}
+                            <MenuGroup>
+                                <MenuItem>
+                                    <span className="icon">⚙️</span> 설정
+                                </MenuItem>
+                            </MenuGroup>
+
                             {profile && (
                                 <MenuItem className="logout-button" onClick={onLogout}>
                                     <span className="icon">🚪</span> 로그아웃
