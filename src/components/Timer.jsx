@@ -14,12 +14,6 @@ const Overlay = styled.div`
     justify-content: center;
     align-items: center;
     z-index: 20000;
-    animation: fadeIn 0.3s ease-out;
-
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
 `;
 
 const TimerContainer = styled.div`
@@ -28,7 +22,7 @@ const TimerContainer = styled.div`
     flex-direction: column;
     align-items: center;
     padding: 50px 40px;
-    background: #f5f3f0;
+    background: #F5F5DC;
     border-radius: 32px;
     box-shadow:
         0 10px 30px rgba(0, 0, 0, 0.15),
@@ -39,7 +33,7 @@ const TimerContainer = styled.div`
 `;
 
 const CloseButton = styled.button`
-    background: #ffffff;
+    background: #F5F5DC;
     border: none;
     color: #5c5c5c;
     font-size: 16px;
@@ -80,7 +74,7 @@ const ConfirmModal = styled.div`
     box-shadow:
         0 20px 60px rgba(0, 0, 0, 0.3),
         0 10px 30px rgba(0, 0, 0, 0.2);
-    z-index: 30;
+    z-index: 30001;
     min-width: 300px;
 `;
 
@@ -128,8 +122,8 @@ const ModalOverlay = styled.div`
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 25;
+    background: #ffffff;
+    z-index: 30000;
 `;
 
 const Display = styled.div`
@@ -432,59 +426,61 @@ const Timer = ({ onClose }) => {
 
     return (
         <Overlay>
-            <TimerContainer>
-                <Display>{formatTime(seconds)}</Display>
+            {!showConfirmModal && (
+                <TimerContainer>
+                    <Display>{formatTime(seconds)}</Display>
 
-                <TimeButtonRow>
-                    <TimeButton
-                        onMouseDown={() => handleMouseDown(5 * 60)}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={handleMouseUp}
-                        onTouchStart={() => handleMouseDown(5 * 60)}
-                        onTouchEnd={handleMouseUp}
-                        disabled={isRunning}
-                    >
-                        5M
-                    </TimeButton>
-                    <TimeButton
-                        onMouseDown={() => handleMouseDown(60)}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={handleMouseUp}
-                        onTouchStart={() => handleMouseDown(60)}
-                        onTouchEnd={handleMouseUp}
-                        disabled={isRunning}
-                    >
-                        1M
-                    </TimeButton>
-                    <TimeButton
-                        onMouseDown={() => handleMouseDown(10)}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={handleMouseUp}
-                        onTouchStart={() => handleMouseDown(10)}
-                        onTouchEnd={handleMouseUp}
-                        disabled={isRunning}
-                    >
-                        10S
-                    </TimeButton>
-                </TimeButtonRow>
+                    <TimeButtonRow>
+                        <TimeButton
+                            onMouseDown={() => handleMouseDown(5 * 60)}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseUp}
+                            onTouchStart={() => handleMouseDown(5 * 60)}
+                            onTouchEnd={handleMouseUp}
+                            disabled={isRunning}
+                        >
+                            5M
+                        </TimeButton>
+                        <TimeButton
+                            onMouseDown={() => handleMouseDown(60)}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseUp}
+                            onTouchStart={() => handleMouseDown(60)}
+                            onTouchEnd={handleMouseUp}
+                            disabled={isRunning}
+                        >
+                            1M
+                        </TimeButton>
+                        <TimeButton
+                            onMouseDown={() => handleMouseDown(10)}
+                            onMouseUp={handleMouseUp}
+                            onMouseLeave={handleMouseUp}
+                            onTouchStart={() => handleMouseDown(10)}
+                            onTouchEnd={handleMouseUp}
+                            disabled={isRunning}
+                        >
+                            10S
+                        </TimeButton>
+                    </TimeButtonRow>
 
-                <ControlRow>
-                    <ResetButton onClick={resetTimer}>
-                        RESET
-                    </ResetButton>
-                    <StartStopButton
-                        $isRunning={isRunning}
-                        onClick={toggleTimer}
-                        disabled={seconds === 0 && !isRunning}
-                    >
-                        {isRunning ? 'STOP' : 'START'}
-                    </StartStopButton>
-                </ControlRow>
+                    <ControlRow>
+                        <ResetButton onClick={resetTimer}>
+                            RESET
+                        </ResetButton>
+                        <StartStopButton
+                            $isRunning={isRunning}
+                            onClick={toggleTimer}
+                            disabled={seconds === 0 && !isRunning}
+                        >
+                            {isRunning ? 'STOP' : 'START'}
+                        </StartStopButton>
+                    </ControlRow>
 
-                <CloseButton onClick={handleClose}>
-                    CLOSE
-                </CloseButton>
-            </TimerContainer>
+                    <CloseButton onClick={handleClose}>
+                        CLOSE
+                    </CloseButton>
+                </TimerContainer>
+            )}
 
             {showConfirmModal && (
                 <>
