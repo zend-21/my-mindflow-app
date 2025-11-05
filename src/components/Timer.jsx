@@ -568,8 +568,8 @@ const Timer = ({ onClose }) => {
     const [isRunning, setIsRunning] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
-    // 7단계 볼륨: 0, 0.05, 0.1, 0.3, 0.5, 0.7, 1.0
-    const volumeLevels = [0, 0.05, 0.1, 0.3, 0.5, 0.7, 1.0];
+    // 7단계 볼륨: 0, 0.01, 0.03, 0.1, 0.3, 0.6, 1.0 (더 세밀한 조절)
+    const volumeLevels = [0, 0.01, 0.03, 0.1, 0.3, 0.6, 1.0];
 
     const [volume, setVolume] = useState(() => {
         const savedVolume = localStorage.getItem('timerVolume');
@@ -606,7 +606,7 @@ const Timer = ({ onClose }) => {
         return closestLevel;
     };
 
-    // 음량 변경 핸들러
+    // 음량 변경 핸들러 (실시간 재생)
     const handleVolumeChange = (e) => {
         const rawVolume = parseFloat(e.target.value);
         const snappedVolume = snapToVolumeLevel(rawVolume);
@@ -625,17 +625,8 @@ const Timer = ({ onClose }) => {
             localStorage.setItem('timerVibration', 'false');
         }
 
-        // 슬라이더 움직이는 동안 테스트 사운드 중지
-        stopTestSound();
-
-        // 슬라이더가 멈추면 1초간 테스트 사운드 재생 (디바운스 300ms)
-        if (testAudioTimeoutRef.current) {
-            clearTimeout(testAudioTimeoutRef.current);
-        }
-        testAudioTimeoutRef.current = setTimeout(() => {
-            playTestSound(snappedVolume);
-            testAudioTimeoutRef.current = null;
-        }, 300);
+        // 슬라이더 움직이는 동안 계속 테스트 사운드 재생
+        playTestSound(snappedVolume);
     };
 
     // 스피커 아이콘 클릭 - 음소거/최대 볼륨 토글
@@ -686,31 +677,34 @@ const Timer = ({ onClose }) => {
         return null;
     };
 
-    // 테스트 사운드 재생 (볼륨 조절 시 - 1초간만)
+    // 테스트 사운드 재생 (볼륨 조절 시 - 실시간 재생)
     const playTestSound = (volumeLevel) => {
-        // 진동 모드이거나 볼륨이 0이면 테스트 사운드 재생 안 함
+        // 진동 모드이거나 볼륨이 0이면 테스트 사운드 중지
         if (volumeLevel === 0 || vibrationMode) {
+            if (testAudioRef.current) {
+                testAudioRef.current.pause();
+                testAudioRef.current.currentTime = 0;
+                testAudioRef.current = null;
+            }
             return;
         }
 
-        // 새 테스트 오디오 생성
+        // 이미 재생 중이면 볼륨만 업데이트
+        if (testAudioRef.current) {
+            testAudioRef.current.volume = volumeLevel;
+            return;
+        }
+
+        // 새 테스트 오디오 생성 및 반복 재생
         const testAudio = new Audio('/sound/Timer_alarm/01.mp3');
         testAudio.volume = volumeLevel;
+        testAudio.loop = true;
         testAudioRef.current = testAudio;
 
         // 재생 시작
         testAudio.play().catch(err => {
             console.log('Test audio play failed:', err);
         });
-
-        // 1초 후 자동 정지
-        setTimeout(() => {
-            if (testAudioRef.current === testAudio) {
-                testAudio.pause();
-                testAudio.currentTime = 0;
-                testAudioRef.current = null;
-            }
-        }, 1000);
     };
 
     // 테스트 사운드 중지
@@ -1076,10 +1070,11 @@ const Timer = ({ onClose }) => {
                             <VolumeControlInner>
                                 <VolumeIconButton onClick={toggleVolume}>
                                     {volume === 0 ? (
-                                        // 음소거 아이콘
+                                        // 음소거 아이콘 (X 표시)
                                         <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                             <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <line x1="19" y1="9" x2="19" y2="15" strokeLinecap="round"/>
+                                            <line x1="18" y1="9" x2="22" y2="15" strokeLinecap="round"/>
+                                            <line x1="22" y1="9" x2="18" y2="15" strokeLinecap="round"/>
                                         </SpeakerIcon>
                                     ) : volume < 0.5 ? (
                                         // 낮은 볼륨 아이콘
@@ -1103,6 +1098,8 @@ const Timer = ({ onClose }) => {
                                     step="0.01"
                                     value={volume}
                                     onChange={handleVolumeChange}
+                                    onMouseUp={stopTestSound}
+                                    onTouchEnd={stopTestSound}
                                 />
                                 <VibrationButton
                                     $show={volume === 0}
