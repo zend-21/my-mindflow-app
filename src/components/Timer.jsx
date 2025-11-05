@@ -625,14 +625,17 @@ const Timer = ({ onClose }) => {
             localStorage.setItem('timerVibration', 'false');
         }
 
-        // 테스트 사운드 재생 (디바운스 100ms)
+        // 슬라이더 움직이는 동안 테스트 사운드 중지
+        stopTestSound();
+
+        // 슬라이더가 멈추면 1초간 테스트 사운드 재생 (디바운스 300ms)
         if (testAudioTimeoutRef.current) {
             clearTimeout(testAudioTimeoutRef.current);
         }
         testAudioTimeoutRef.current = setTimeout(() => {
             playTestSound(snappedVolume);
             testAudioTimeoutRef.current = null;
-        }, 100);
+        }, 300);
     };
 
     // 스피커 아이콘 클릭 - 음소거/최대 볼륨 토글
@@ -683,17 +686,11 @@ const Timer = ({ onClose }) => {
         return null;
     };
 
-    // 테스트 사운드 재생 (볼륨 조절 시)
+    // 테스트 사운드 재생 (볼륨 조절 시 - 1초간만)
     const playTestSound = (volumeLevel) => {
         // 진동 모드이거나 볼륨이 0이면 테스트 사운드 재생 안 함
         if (volumeLevel === 0 || vibrationMode) {
             return;
-        }
-
-        // 기존 테스트 오디오가 있으면 정리
-        if (testAudioRef.current) {
-            testAudioRef.current.pause();
-            testAudioRef.current = null;
         }
 
         // 새 테스트 오디오 생성
@@ -701,19 +698,28 @@ const Timer = ({ onClose }) => {
         testAudio.volume = volumeLevel;
         testAudioRef.current = testAudio;
 
-        // 짧게 재생 (300ms)
+        // 재생 시작
         testAudio.play().catch(err => {
             console.log('Test audio play failed:', err);
         });
 
-        // 300ms 후 정지
+        // 1초 후 자동 정지
         setTimeout(() => {
             if (testAudioRef.current === testAudio) {
                 testAudio.pause();
                 testAudio.currentTime = 0;
                 testAudioRef.current = null;
             }
-        }, 300);
+        }, 1000);
+    };
+
+    // 테스트 사운드 중지
+    const stopTestSound = () => {
+        if (testAudioRef.current) {
+            testAudioRef.current.pause();
+            testAudioRef.current.currentTime = 0;
+            testAudioRef.current = null;
+        }
     };
 
     // Wake Lock 요청 (화면 꺼짐 방지)
