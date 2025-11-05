@@ -464,6 +464,9 @@ const Timer = ({ onClose }) => {
 
     // 길게 누르기 시작 (분 버튼용)
     const handleMouseDownMinutes = (minutes) => {
+        // 타이머 실행 중이면 무시
+        if (isRunning) return;
+        
         // 첫 번째 클릭은 즉시 실행
         addMinutes(minutes);
         // 길게 누르면 반복 실행
@@ -476,6 +479,9 @@ const Timer = ({ onClose }) => {
 
     // 길게 누르기 시작 (초 버튼용)
     const handleMouseDownSeconds = (amount) => {
+        // 타이머 실행 중이면 무시
+        if (isRunning) return;
+        
         // 첫 번째 클릭은 즉시 실행
         addSeconds(amount);
         // 길게 누르면 반복 실행
