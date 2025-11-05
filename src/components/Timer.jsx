@@ -278,6 +278,8 @@ const Timer = ({ onClose }) => {
     const intervalRef = useRef(null);
     const longPressTimerRef = useRef(null);
     const longPressIntervalRef = useRef(null);
+    const audioRef = useRef(null);
+    const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
 
     // 닫기 확인
     const handleClose = () => {
@@ -330,6 +332,12 @@ const Timer = ({ onClose }) => {
     // 타이머 시작/정지
     const toggleTimer = () => {
         if (seconds === 0) return;
+
+        // STOP 버튼을 눌렀을 때 알람이 재생 중이면 중지
+        if (isRunning && isAlarmPlaying) {
+            stopAlarm();
+        }
+
         setIsRunning(prev => !prev);
     };
 
@@ -339,6 +347,10 @@ const Timer = ({ onClose }) => {
         setSeconds(0);
         if (intervalRef.current) {
             clearInterval(intervalRef.current);
+        }
+        // 알람이 재생 중이면 중지
+        if (isAlarmPlaying) {
+            stopAlarm();
         }
     };
 
@@ -368,50 +380,42 @@ const Timer = ({ onClose }) => {
         };
     }, [isRunning, seconds]);
 
+    // 알람 중지
+    const stopAlarm = () => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+            audioRef.current = null;
+        }
+        setIsAlarmPlaying(false);
+    };
+
     // 알람음 재생
     const playAlarm = () => {
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
+        setIsAlarmPlaying(true);
 
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
+        // 01.mp3 재생
+        const audio1 = new Audio('/sound/Timer_alarm/01.mp3');
+        audioRef.current = audio1;
 
-        oscillator.frequency.value = 800;
-        oscillator.type = 'sine';
+        audio1.play().catch(err => console.error('Audio 1 play error:', err));
 
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+        audio1.onended = () => {
+            // 02.mp3 재생
+            const audio2 = new Audio('/sound/Timer_alarm/02.mp3');
+            audioRef.current = audio2;
 
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.5);
+            audio2.play().catch(err => console.error('Audio 2 play error:', err));
 
-        // 3번 반복
-        setTimeout(() => {
-            const osc2 = audioContext.createOscillator();
-            const gain2 = audioContext.createGain();
-            osc2.connect(gain2);
-            gain2.connect(audioContext.destination);
-            osc2.frequency.value = 800;
-            osc2.type = 'sine';
-            gain2.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-            osc2.start();
-            osc2.stop(audioContext.currentTime + 0.5);
-        }, 600);
+            audio2.onended = () => {
+                // 03.mp3 반복 재생
+                const audio3 = new Audio('/sound/Timer_alarm/03.mp3');
+                audioRef.current = audio3;
+                audio3.loop = true;
 
-        setTimeout(() => {
-            const osc3 = audioContext.createOscillator();
-            const gain3 = audioContext.createGain();
-            osc3.connect(gain3);
-            gain3.connect(audioContext.destination);
-            osc3.frequency.value = 800;
-            osc3.type = 'sine';
-            gain3.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gain3.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-            osc3.start();
-            osc3.stop(audioContext.currentTime + 0.5);
-        }, 1200);
+                audio3.play().catch(err => console.error('Audio 3 play error:', err));
+            };
+        };
     };
 
     // 컴포넌트 언마운트 시 정리
@@ -420,6 +424,11 @@ const Timer = ({ onClose }) => {
             handleMouseUp();
             if (intervalRef.current) {
                 clearInterval(intervalRef.current);
+            }
+            // 알람 중지
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current = null;
             }
         };
     }, []);
