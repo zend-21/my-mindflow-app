@@ -66,6 +66,197 @@ const TimerContainer = styled.div`
     }
 `;
 
+const BottomControlRow = styled.div`
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 500px;
+
+    @media (max-width: 480px) {
+        gap: 12px;
+    }
+
+    @media (orientation: landscape) and (max-height: 500px) {
+        gap: 12px;
+    }
+`;
+
+const VolumeControlContainer = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #ffffff;
+    padding: 12px 20px;
+    border-radius: 12px;
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.12),
+        0 1px 4px rgba(0, 0, 0, 0.08);
+    width: 196px; /* 고정 너비: 20px(icon) + 12px(gap) + 100px(slider) + 12px(gap) + 32px(vibration space) + 20px(padding) */
+    flex-shrink: 0;
+
+    @media (max-width: 480px) {
+        width: 168px; /* 고정 너비: 18px(icon) + 10px(gap) + 80px(slider) + 10px(gap) + 32px(vibration space) + 18px(padding) */
+        padding: 10px 16px;
+        gap: 10px;
+    }
+
+    @media (orientation: landscape) and (max-height: 500px) {
+        width: 168px;
+        padding: 10px 16px;
+        gap: 10px;
+    }
+`;
+
+const VolumeControlInner = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+
+    @media (max-width: 480px) {
+        gap: 10px;
+    }
+`;
+
+const VolumeIconButton = styled.button`
+    background: none;
+    border: none;
+    color: #5c5c5c;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+
+    &:hover {
+        color: #4a4a4a;
+        transform: scale(1.1);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
+`;
+
+const SpeakerIcon = styled.svg`
+    width: 20px;
+    height: 20px;
+
+    @media (max-width: 480px) {
+        width: 18px;
+        height: 18px;
+    }
+`;
+
+const VolumeSlider = styled.input`
+    width: 100px;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: #e8e6e3;
+    outline: none;
+    cursor: pointer;
+
+    &::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #4a4a4a;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+            transform: scale(1.2);
+            box-shadow: 0 2px 8px rgba(74, 74, 74, 0.3);
+        }
+    }
+
+    &::-moz-range-thumb {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #4a4a4a;
+        border: none;
+        cursor: pointer;
+        transition: all 0.2s;
+
+        &:hover {
+            transform: scale(1.2);
+            box-shadow: 0 2px 8px rgba(74, 74, 74, 0.3);
+        }
+    }
+
+    @media (max-width: 480px) {
+        width: 80px;
+        height: 3px;
+
+        &::-webkit-slider-thumb {
+            width: 14px;
+            height: 14px;
+        }
+
+        &::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+        }
+    }
+`;
+
+const VibrationButton = styled.button`
+    background: none;
+    border: none;
+    cursor: pointer;
+    user-select: none;
+    display: ${props => props.$show ? 'flex' : 'none'};
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    padding: 0;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+
+    ${props => props.$active && `
+        background: #e8e6e3;
+    `}
+
+    &:hover {
+        background: #e8e6e3;
+    }
+
+    &:active {
+        background: #d8d6d3;
+    }
+
+    @media (max-width: 480px) {
+        width: 18px;
+        height: 18px;
+    }
+
+    @media (orientation: landscape) and (max-height: 500px) {
+        width: 18px;
+        height: 18px;
+    }
+`;
+
+const VibrationIcon = styled.svg`
+    width: 20px;
+    height: 20px;
+
+    @media (max-width: 480px) {
+        width: 18px;
+        height: 18px;
+    }
+`;
+
 const CloseButton = styled.button`
     background: #ffffff;
     border: none;
@@ -80,6 +271,7 @@ const CloseButton = styled.button`
     box-shadow:
         0 2px 8px rgba(0, 0, 0, 0.12),
         0 1px 4px rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
 
     &:disabled {
         background: #e8e6e3;
@@ -376,6 +568,17 @@ const Timer = ({ onClose }) => {
     const [isRunning, setIsRunning] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
+    // 7단계 볼륨: 0, 0.05, 0.1, 0.3, 0.5, 0.7, 1.0
+    const volumeLevels = [0, 0.05, 0.1, 0.3, 0.5, 0.7, 1.0];
+
+    const [volume, setVolume] = useState(() => {
+        const savedVolume = localStorage.getItem('timerVolume');
+        return savedVolume !== null ? parseFloat(savedVolume) : 0.5;
+    });
+    const [vibrationMode, setVibrationMode] = useState(() => {
+        const savedVibration = localStorage.getItem('timerVibration');
+        return savedVibration === 'true';
+    });
     const intervalRef = useRef(null);
     const longPressTimerRef = useRef(null);
     const longPressIntervalRef = useRef(null);
@@ -383,6 +586,135 @@ const Timer = ({ onClose }) => {
     const isAlarmPlayingRef = useRef(false);
     const wakeLockRef = useRef(null);
     const preloadedAudioRef = useRef(null);
+    const vibrationIntervalRef = useRef(null);
+    const testAudioRef = useRef(null);
+    const testAudioTimeoutRef = useRef(null);
+
+    // 가장 가까운 볼륨 레벨로 스냅
+    const snapToVolumeLevel = (rawVolume) => {
+        let closestLevel = volumeLevels[0];
+        let minDiff = Math.abs(rawVolume - closestLevel);
+
+        for (let level of volumeLevels) {
+            const diff = Math.abs(rawVolume - level);
+            if (diff < minDiff) {
+                minDiff = diff;
+                closestLevel = level;
+            }
+        }
+
+        return closestLevel;
+    };
+
+    // 음량 변경 핸들러
+    const handleVolumeChange = (e) => {
+        const rawVolume = parseFloat(e.target.value);
+        const snappedVolume = snapToVolumeLevel(rawVolume);
+
+        setVolume(snappedVolume);
+        localStorage.setItem('timerVolume', snappedVolume.toString());
+
+        // 오디오가 재생 중이면 즉시 볼륨 적용
+        if (audioRef.current) {
+            audioRef.current.volume = snappedVolume;
+        }
+
+        // 볼륨이 0이 아니면 진동 모드 해제
+        if (snappedVolume > 0 && vibrationMode) {
+            setVibrationMode(false);
+            localStorage.setItem('timerVibration', 'false');
+        }
+
+        // 테스트 사운드 재생 (디바운스 100ms)
+        if (testAudioTimeoutRef.current) {
+            clearTimeout(testAudioTimeoutRef.current);
+        }
+        testAudioTimeoutRef.current = setTimeout(() => {
+            playTestSound(snappedVolume);
+            testAudioTimeoutRef.current = null;
+        }, 100);
+    };
+
+    // 스피커 아이콘 클릭 - 음소거/최대 볼륨 토글
+    const toggleVolume = () => {
+        const newVolume = volume === 0 ? 1.0 : 0;
+        setVolume(newVolume);
+        localStorage.setItem('timerVolume', newVolume.toString());
+
+        if (audioRef.current) {
+            audioRef.current.volume = newVolume;
+        }
+
+        // 음소거로 전환 시 진동 모드는 유지하지 않음
+        if (newVolume === 0) {
+            setVibrationMode(false);
+            localStorage.setItem('timerVibration', 'false');
+        }
+    };
+
+    // 진동 모드 토글
+    const toggleVibrationMode = () => {
+        const newVibrationMode = !vibrationMode;
+        setVibrationMode(newVibrationMode);
+        localStorage.setItem('timerVibration', newVibrationMode.toString());
+
+        // 진동 모드 활성화 시 볼륨을 0으로
+        if (newVibrationMode) {
+            setVolume(0);
+            localStorage.setItem('timerVolume', '0');
+            if (audioRef.current) {
+                audioRef.current.volume = 0;
+            }
+        }
+    };
+
+    // 진동 실행
+    const triggerVibration = () => {
+        if ('vibrate' in navigator && vibrationMode) {
+            // 반복 진동 패턴: [진동 500ms, 쉼 300ms]
+            const vibratePattern = [500, 300];
+            const vibrateInterval = setInterval(() => {
+                navigator.vibrate(vibratePattern);
+            }, 800);
+
+            // 알람 중지 시 진동도 중지되도록 ref에 저장
+            return vibrateInterval;
+        }
+        return null;
+    };
+
+    // 테스트 사운드 재생 (볼륨 조절 시)
+    const playTestSound = (volumeLevel) => {
+        // 진동 모드이거나 볼륨이 0이면 테스트 사운드 재생 안 함
+        if (volumeLevel === 0 || vibrationMode) {
+            return;
+        }
+
+        // 기존 테스트 오디오가 있으면 정리
+        if (testAudioRef.current) {
+            testAudioRef.current.pause();
+            testAudioRef.current = null;
+        }
+
+        // 새 테스트 오디오 생성
+        const testAudio = new Audio('/sound/Timer_alarm/01.mp3');
+        testAudio.volume = volumeLevel;
+        testAudioRef.current = testAudio;
+
+        // 짧게 재생 (300ms)
+        testAudio.play().catch(err => {
+            console.log('Test audio play failed:', err);
+        });
+
+        // 300ms 후 정지
+        setTimeout(() => {
+            if (testAudioRef.current === testAudio) {
+                testAudio.pause();
+                testAudio.currentTime = 0;
+                testAudioRef.current = null;
+            }
+        }, 300);
+    };
 
     // Wake Lock 요청 (화면 꺼짐 방지)
     const requestWakeLock = async () => {
@@ -528,6 +860,14 @@ const Timer = ({ onClose }) => {
                 // 무시
             }
         }
+
+        // 진동 중지
+        if (vibrationIntervalRef.current) {
+            clearInterval(vibrationIntervalRef.current);
+            vibrationIntervalRef.current = null;
+            navigator.vibrate(0); // 진동 즉시 중지
+        }
+
         setIsAlarmPlaying(false);
     };
 
@@ -612,21 +952,30 @@ const Timer = ({ onClose }) => {
         setIsAlarmPlaying(true);
         isAlarmPlayingRef.current = true;
 
-        // 미리 로드된 오디오가 있으면 사용, 없으면 새로 생성
-        let audio;
-        if (preloadedAudioRef.current && preloadedAudioRef.current.readyState >= 2) {
-            audio = preloadedAudioRef.current;
-            audio.currentTime = 0; // 처음부터 재생
-        } else {
-            audio = new Audio('/sound/Timer_alarm/01.mp3');
+        // 진동 모드이거나 볼륨이 0인 경우 진동 실행
+        if (vibrationMode || volume === 0) {
+            vibrationIntervalRef.current = triggerVibration();
         }
 
-        audio.loop = true; // 반복 재생 설정
-        audioRef.current = audio;
+        // 볼륨이 0보다 크면 알람 소리 재생
+        if (volume > 0) {
+            // 미리 로드된 오디오가 있으면 사용, 없으면 새로 생성
+            let audio;
+            if (preloadedAudioRef.current && preloadedAudioRef.current.readyState >= 2) {
+                audio = preloadedAudioRef.current;
+                audio.currentTime = 0; // 처음부터 재생
+            } else {
+                audio = new Audio('/sound/Timer_alarm/01.mp3');
+            }
 
-        audio.play().catch(() => {
-            // 오디오 재생 실패 (사용자 제스처 필요 등)
-        });
+            audio.loop = true; // 반복 재생 설정
+            audio.volume = volume; // 볼륨 설정
+            audioRef.current = audio;
+
+            audio.play().catch(() => {
+                // 오디오 재생 실패 (사용자 제스처 필요 등)
+            });
+        }
     };
 
     // 컴포넌트 마운트/언마운트 시 처리
@@ -645,6 +994,14 @@ const Timer = ({ onClose }) => {
             if (audioRef.current) {
                 audioRef.current.pause();
                 audioRef.current = null;
+            }
+            // 테스트 오디오 정리
+            if (testAudioRef.current) {
+                testAudioRef.current.pause();
+                testAudioRef.current = null;
+            }
+            if (testAudioTimeoutRef.current) {
+                clearTimeout(testAudioTimeoutRef.current);
             }
             // Wake Lock 해제
             releaseWakeLock();
@@ -708,9 +1065,58 @@ const Timer = ({ onClose }) => {
                         </StartStopButton>
                     </ControlRow>
 
-                    <CloseButton onClick={handleClose} disabled={isRunning}>
-                        CLOSE
-                    </CloseButton>
+                    <BottomControlRow>
+                        <VolumeControlContainer>
+                            <VolumeControlInner>
+                                <VolumeIconButton onClick={toggleVolume}>
+                                    {volume === 0 ? (
+                                        // 음소거 아이콘
+                                        <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                            <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <line x1="19" y1="9" x2="19" y2="15" strokeLinecap="round"/>
+                                        </SpeakerIcon>
+                                    ) : volume < 0.5 ? (
+                                        // 낮은 볼륨 아이콘
+                                        <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                            <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </SpeakerIcon>
+                                    ) : (
+                                        // 높은 볼륨 아이콘
+                                        <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                            <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M18 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </SpeakerIcon>
+                                    )}
+                                </VolumeIconButton>
+                                <VolumeSlider
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.01"
+                                    value={volume}
+                                    onChange={handleVolumeChange}
+                                />
+                                <VibrationButton
+                                    $show={volume === 0}
+                                    $active={vibrationMode}
+                                    onClick={toggleVibrationMode}
+                                >
+                                    <VibrationIcon viewBox="0 0 24 24" fill="none" stroke={vibrationMode ? "#4a4a4a" : "#5c5c5c"} strokeWidth="1.5">
+                                        <line x1="8" y1="6" x2="8" y2="18" strokeLinecap="round"/>
+                                        <line x1="12" y1="4" x2="12" y2="20" strokeLinecap="round"/>
+                                        <line x1="16" y1="6" x2="16" y2="18" strokeLinecap="round"/>
+                                        <line x1="4" y1="10" x2="4" y2="14" strokeLinecap="round"/>
+                                        <line x1="20" y1="10" x2="20" y2="14" strokeLinecap="round"/>
+                                    </VibrationIcon>
+                                </VibrationButton>
+                            </VolumeControlInner>
+                        </VolumeControlContainer>
+                        <CloseButton onClick={handleClose} disabled={isRunning}>
+                            CLOSE
+                        </CloseButton>
+                    </BottomControlRow>
                 </TimerContainer>
             )}
 
