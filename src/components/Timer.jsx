@@ -296,6 +296,7 @@ const Timer = ({ onClose }) => {
     const audioRef = useRef(null);
     const isAlarmPlayingRef = useRef(false);
     const wakeLockRef = useRef(null);
+    const preloadedAudioRef = useRef(null);
 
     // Wake Lock 요청 (화면 꺼짐 방지)
     const requestWakeLock = async () => {
@@ -565,8 +566,15 @@ const Timer = ({ onClose }) => {
         setIsAlarmPlaying(true);
         isAlarmPlayingRef.current = true;
 
-        // 01.mp3 반복 재생
-        const audio = new Audio('/sound/Timer_alarm/01.mp3');
+        // 미리 로드된 오디오가 있으면 사용, 없으면 새로 생성
+        let audio;
+        if (preloadedAudioRef.current && preloadedAudioRef.current.readyState >= 2) {
+            audio = preloadedAudioRef.current;
+            audio.currentTime = 0; // 처음부터 재생
+        } else {
+            audio = new Audio('/sound/Timer_alarm/01.mp3');
+        }
+
         audio.loop = true; // 반복 재생 설정
         audioRef.current = audio;
 
@@ -577,6 +585,11 @@ const Timer = ({ onClose }) => {
 
     // 컴포넌트 마운트/언마운트 시 처리
     useEffect(() => {
+        // 오디오 파일 미리 로드
+        const preloadAudio = new Audio('/sound/Timer_alarm/01.mp3');
+        preloadAudio.load();
+        preloadedAudioRef.current = preloadAudio;
+
         // 컴포넌트 마운트 시 전체화면과 화면 방향 잠금
         requestFullscreen();
         lockOrientation();
