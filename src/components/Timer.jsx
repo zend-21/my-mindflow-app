@@ -69,6 +69,69 @@ const CloseButton = styled.button`
     }
 `;
 
+const ConfirmModal = styled.div`
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #ffffff;
+    border-radius: 16px;
+    padding: 30px;
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, 0.3),
+        0 10px 30px rgba(0, 0, 0, 0.2);
+    z-index: 30;
+    min-width: 300px;
+`;
+
+const ConfirmMessage = styled.p`
+    margin: 0 0 25px 0;
+    font-size: 18px;
+    font-weight: 500;
+    color: #2c2c2c;
+    text-align: center;
+`;
+
+const ConfirmButtonRow = styled.div`
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+`;
+
+const ConfirmButton = styled.button`
+    background: ${props => props.$primary ? '#4a4a4a' : '#e8e6e3'};
+    border: none;
+    color: ${props => props.$primary ? '#ffffff' : '#5c5c5c'};
+    font-size: 16px;
+    font-weight: 600;
+    padding: 12px 28px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow:
+            0 4px 12px rgba(0, 0, 0, 0.15),
+            0 2px 6px rgba(0, 0, 0, 0.08);
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
+`;
+
+const ModalOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 25;
+`;
+
 const Display = styled.div`
     background: #e8e6e3;
     color: #2c2c2c;
@@ -217,15 +280,22 @@ const StartStopButton = styled.button`
 const Timer = ({ onClose }) => {
     const [seconds, setSeconds] = useState(0);
     const [isRunning, setIsRunning] = useState(false);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
     const intervalRef = useRef(null);
     const longPressTimerRef = useRef(null);
     const longPressIntervalRef = useRef(null);
 
     // 닫기 확인
     const handleClose = () => {
-        if (window.confirm('타이머를 종료하시겠습니까?')) {
-            onClose();
-        }
+        setShowConfirmModal(true);
+    };
+
+    const confirmClose = () => {
+        onClose();
+    };
+
+    const cancelClose = () => {
+        setShowConfirmModal(false);
     };
 
     // 시간 포맷팅 (MM:SS)
@@ -415,6 +485,23 @@ const Timer = ({ onClose }) => {
                     CLOSE
                 </CloseButton>
             </TimerContainer>
+
+            {showConfirmModal && (
+                <>
+                    <ModalOverlay onClick={cancelClose} />
+                    <ConfirmModal>
+                        <ConfirmMessage>타이머를 종료하시겠습니까?</ConfirmMessage>
+                        <ConfirmButtonRow>
+                            <ConfirmButton onClick={cancelClose}>
+                                취소
+                            </ConfirmButton>
+                            <ConfirmButton $primary onClick={confirmClose}>
+                                확인
+                            </ConfirmButton>
+                        </ConfirmButtonRow>
+                    </ConfirmModal>
+                </>
+            )}
         </Overlay>
     );
 };
