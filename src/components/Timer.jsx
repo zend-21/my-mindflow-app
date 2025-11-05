@@ -22,18 +22,18 @@ const TimerContainer = styled.div`
     flex-direction: column;
     align-items: center;
     padding: 50px 40px;
-    background: #F5F5DC;
+    background: #e8e6e3;
     border-radius: 32px;
     box-shadow:
-        0 4px 12px rgba(0, 0, 0, 0.06),
-        0 2px 6px rgba(0, 0, 0, 0.04);
+        0 3px 6px rgba(0, 0, 0, 0.08),
+        0 1px 3px rgba(0, 0, 0, 0.05);
     width: 95%;
     max-width: 600px;
     z-index: 10;
 `;
 
 const CloseButton = styled.button`
-    background: #F5F5DC;
+    background: #e8e6e3;
     border: none;
     color: #5c5c5c;
     font-size: 16px;
