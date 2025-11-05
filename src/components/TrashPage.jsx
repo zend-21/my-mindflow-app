@@ -14,16 +14,13 @@ const PageContainer = styled.div`
 `;
 
 const Header = styled.div`
-    padding: 24px 0 20px 0;
+    padding: 12px 0 12px 0;
     border-bottom: 1px solid #f0f0f0;
-    margin-bottom: 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
+    margin-bottom: 16px;
 `;
 
 const TitleSection = styled.div`
-    flex: 1;
+    margin-bottom: 12px;
 `;
 
 const Title = styled.h2`
@@ -41,26 +38,102 @@ const SubTitle = styled.p`
     font-weight: 400;
 `;
 
-const SelectAllButton = styled.button`
-    background: transparent;
+const ActionButtonRow = styled.div`
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+`;
+
+const TopActionButton = styled.button`
+    flex: 1;
+    padding: 10px 16px;
+    border-radius: 10px;
     border: 1px solid #e0e0e0;
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 500;
-    color: #666;
+    font-size: 14px;
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
+    background: white;
+    color: #666;
 
-    &:hover {
+    ${props => props.$variant === 'select' && !props.$isAllSelected && `
+        &:hover {
+            border-color: #667eea;
+            color: #667eea;
+            background: #f8f9ff;
+        }
+    `}
+
+    ${props => props.$variant === 'select' && props.$isAllSelected && `
+        background: #10b981;
+        color: white;
+        border-color: #10b981;
+        &:hover {
+            background: #059669;
+            border-color: #059669;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+        }
+    `}
+
+    ${props => props.$variant === 'restore' && !props.$hasSelection && `
+        &:hover {
+            border-color: #667eea;
+            color: #667eea;
+            background: #f8f9ff;
+        }
+    `}
+
+    ${props => props.$variant === 'restore' && props.$hasSelection && `
+        background: #667eea;
+        color: white;
         border-color: #667eea;
-        color: #667eea;
-        background: #f8f9ff;
+        &:hover {
+            background: #5568d3;
+            border-color: #5568d3;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+    `}
+
+    ${props => props.$variant === 'delete' && !props.$hasSelection && `
+        &:hover {
+            border-color: #f5576c;
+            color: #f5576c;
+            background: #fff5f7;
+        }
+    `}
+
+    ${props => props.$variant === 'delete' && props.$hasSelection && `
+        background: #f5576c;
+        color: white;
+        border-color: #f5576c;
+        &:hover {
+            background: #e04757;
+            border-color: #e04757;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(245, 87, 108, 0.3);
+        }
+    `}
+
+    &:active {
+        transform: translateY(0);
+    }
+
+    &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        transform: none;
+        &:hover {
+            transform: none;
+            box-shadow: none;
+        }
     }
 `;
 
 const SearchAndFilterSection = styled.div`
-    margin-bottom: 20px;
+    margin-top: 8px;
+    margin-bottom: 16px;
 `;
 
 const SearchBox = styled.div`
@@ -365,6 +438,7 @@ const TrashItem = styled.div`
     border: 1px solid ${props => props.$isSelected ? '#667eea' : '#f0f0f0'};
     border-radius: 16px;
     padding: 20px;
+    padding-right: 60px; /* 라디오 버튼 공간 확보 */
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
     position: relative;
@@ -379,7 +453,7 @@ const TrashItem = styled.div`
         border-color: ${props => props.$isSelected ? '#667eea' : '#e0e0e0'};
         box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
     }
-    
+
     &::before {
         content: '';
         position: absolute;
@@ -396,6 +470,37 @@ const TrashItem = styled.div`
                 default: return '#e0e0e0';
             }
         }};
+        opacity: ${props => props.$isSelected ? '1' : '0'};
+        transition: opacity 0.2s;
+    }
+`;
+
+const RadioButton = styled.div`
+    position: absolute;
+    right: 16px;
+    bottom: 16px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid #667eea;
+    background: ${props => props.$isSelected ? '#667eea' : 'white'};
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    cursor: pointer;
+    z-index: 10;
+
+    &:hover {
+        transform: scale(1.1);
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    }
+
+    &::after {
+        content: '✓';
+        color: white;
+        font-size: 16px;
+        font-weight: bold;
         opacity: ${props => props.$isSelected ? '1' : '0'};
         transition: opacity 0.2s;
     }
@@ -467,90 +572,17 @@ const DaysLeft = styled.div`
     }
 `;
 
-const ActionBar = styled.div`
-    position: sticky;
-    bottom: 80px;
-    background: white;
-    padding: 16px;
-    border-top: 1px solid #f0f0f0;
-    display: flex;
-    gap: 12px;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.05);
-    margin: 0 -24px;
-    padding-left: 24px;
-    padding-right: 24px;
-    backdrop-filter: blur(10px);
-    background: rgba(255, 255, 255, 0.95);
-`;
-
-const ActionButton = styled.button`
-    flex: 1;
-    padding: 14px;
-    border-radius: 12px;
-    border: none;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-
-    ${props => props.$variant === 'restore' && `
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        &:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.4);
-        }
-        &:active {
-            transform: translateY(0);
-        }
-    `}
-
-    ${props => props.$variant === 'delete' && `
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        color: white;
-        &:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(245, 87, 108, 0.4);
-        }
-        &:active {
-            transform: translateY(0);
-        }
-    `}
-
-    ${props => props.$variant === 'empty' && `
-        background: linear-gradient(135deg, #868f96 0%, #596164 100%);
-        color: white;
-        &:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-        }
-        &:active {
-            transform: translateY(0);
-        }
-    `}
-
-    &:disabled {
-        background: #e0e0e0;
-        color: #999;
-        cursor: not-allowed;
-        transform: none;
-        box-shadow: none;
-    }
-`;
 
 const TrashPage = ({ showToast }) => {
     const {
         trashedItems,
         autoDeletePeriod,
         restoreFromTrash,
-        permanentDelete,
-        emptyTrash
+        permanentDelete
     } = useTrashContext();
 
     const [selectedIds, setSelectedIds] = useState(new Set());
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-    const [isEmptyConfirmOpen, setIsEmptyConfirmOpen] = useState(false);
 
     // 검색/필터/정렬 상태
     const [searchQuery, setSearchQuery] = useState('');
@@ -574,15 +606,10 @@ const TrashPage = ({ showToast }) => {
     };
 
     const handleItemClick = (item, event) => {
-        // 선택 모드가 아니면 상세보기 모달 열기
-        if (selectedIds.size === 0) {
-            event.stopPropagation();
-            setSelectedItem(item);
-            setIsDetailModalOpen(true);
-        } else {
-            // 선택 모드면 토글
-            handleToggleSelect(item.id);
-        }
+        // 항상 상세보기 모달 열기 (라디오 버튼은 별도 처리)
+        event.stopPropagation();
+        setSelectedItem(item);
+        setIsDetailModalOpen(true);
     };
 
     const handleRestoreFromDetail = () => {
@@ -683,9 +710,40 @@ const TrashPage = ({ showToast }) => {
                     <Title>🗑️ 휴지통 ({trashedItems.length})</Title>
                     <SubTitle>{autoDeletePeriod}일 후 자동으로 삭제됩니다</SubTitle>
                 </TitleSection>
-                <SelectAllButton onClick={handleSelectAll}>
-                    {selectedIds.size === filteredAndSortedItems.length ? '전체 해제' : '전체 선택'}
-                </SelectAllButton>
+
+                <ActionButtonRow>
+                    <TopActionButton
+                        $variant="select"
+                        $isAllSelected={selectedIds.size === filteredAndSortedItems.length && filteredAndSortedItems.length > 0}
+                        onClick={handleSelectAll}
+                    >
+                        {selectedIds.size === filteredAndSortedItems.length && filteredAndSortedItems.length > 0 ? '전체 해제' : '전체 선택'}
+                    </TopActionButton>
+                    <TopActionButton
+                        $variant="restore"
+                        $hasSelection={selectedIds.size > 0}
+                        onClick={() => {
+                            if (selectedIds.size === 0) return;
+                            const restoredItems = restoreFromTrash(Array.from(selectedIds));
+                            showToast(`${restoredItems.length}개 항목이 복원되었습니다 ✅`);
+                            setSelectedIds(new Set());
+                        }}
+                        disabled={selectedIds.size === 0}
+                    >
+                        복원{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+                    </TopActionButton>
+                    <TopActionButton
+                        $variant="delete"
+                        $hasSelection={selectedIds.size > 0}
+                        onClick={() => {
+                            if (selectedIds.size === 0) return;
+                            setIsDeleteConfirmOpen(true);
+                        }}
+                        disabled={selectedIds.size === 0}
+                    >
+                        영구 삭제{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+                    </TopActionButton>
+                </ActionButtonRow>
             </Header>
 
             {/* 검색 및 필터 섹션 */}
@@ -764,19 +822,25 @@ const TrashPage = ({ showToast }) => {
                 <TrashList>
                     {filteredAndSortedItems.map(item => {
                         const daysLeft = calculateDaysLeft(item.deletedAt);
+                        const isSelected = selectedIds.has(item.id);
                         return (
                             <TrashItem
                                 key={item.id}
-                                $isSelected={selectedIds.has(item.id)}
+                                $isSelected={isSelected}
                                 $type={item.type}
-                                onClick={(e) => handleItemClick(item, e)}
+                                onClick={(e) => {
+                                    // 라디오 버튼 클릭이 아니면 상세보기
+                                    if (!e.target.closest('[data-radio]')) {
+                                        handleItemClick(item, e);
+                                    }
+                                }}
                             >
                                 <ItemHeader>
                                     <ItemType $type={item.type}>
                                         {getTypeLabel(item.type)}
                                     </ItemType>
                                     <DeleteInfo>
-                                        {format(new Date(item.deletedAt), 'yyyy.MM.dd HH:mm', { locale: ko })}
+                                        삭제일 - {format(new Date(item.deletedAt), 'yyyy.MM.dd HH:mm', { locale: ko })}
                                     </DeleteInfo>
                                 </ItemHeader>
                                 <ItemContent>{item.content}</ItemContent>
@@ -785,42 +849,18 @@ const TrashPage = ({ showToast }) => {
                                         ? `${daysLeft}일 후 자동 삭제`
                                         : '곧 자동 삭제됨'}
                                 </DaysLeft>
+                                <RadioButton
+                                    data-radio
+                                    $isSelected={isSelected}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleSelect(item.id);
+                                    }}
+                                />
                             </TrashItem>
                         );
                     })}
                 </TrashList>
-            )}
-
-            {selectedIds.size > 0 && (
-                <ActionBar>
-                    <ActionButton
-                        $variant="restore"
-                        onClick={() => {
-                            const restoredItems = restoreFromTrash(Array.from(selectedIds));
-                            showToast(`${restoredItems.length}개 항목이 복원되었습니다 ✅`);
-                            setSelectedIds(new Set());
-                        }}
-                    >
-                        복원 ({selectedIds.size})
-                    </ActionButton>
-                    <ActionButton
-                        $variant="delete"
-                        onClick={() => setIsDeleteConfirmOpen(true)}
-                    >
-                        영구 삭제 ({selectedIds.size})
-                    </ActionButton>
-                </ActionBar>
-            )}
-
-            {selectedIds.size === 0 && trashedItems.length > 0 && (
-                <ActionBar>
-                    <ActionButton
-                        $variant="empty"
-                        onClick={() => setIsEmptyConfirmOpen(true)}
-                    >
-                        휴지통 비우기
-                    </ActionButton>
-                </ActionBar>
             )}
 
             {/* 영구 삭제 확인 모달 */}
@@ -835,27 +875,6 @@ const TrashPage = ({ showToast }) => {
                         setIsDeleteConfirmOpen(false);
                     }}
                     onCancel={() => setIsDeleteConfirmOpen(false)}
-                />
-            )}
-
-            {/* 휴지통 비우기 확인 모달 */}
-            {isEmptyConfirmOpen && (
-                <ConfirmationModal
-                    isOpen={true}
-                    message={
-                        <>
-                            휴지통을 비우시겠습니까?
-                            <br />
-                            모든 항목이 영구적으로 삭제됩니다.
-                        </>
-                    }
-                    onConfirm={() => {
-                        const count = trashedItems.length;
-                        emptyTrash();
-                        showToast(`휴지통이 비워졌습니다 (${count}개 삭제) 🧹`);
-                        setIsEmptyConfirmOpen(false);
-                    }}
-                    onCancel={() => setIsEmptyConfirmOpen(false)}
                 />
             )}
 
