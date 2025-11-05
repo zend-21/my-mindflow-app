@@ -27,9 +27,26 @@ const TimerContainer = styled.div`
     box-shadow:
         0 3px 6px rgba(0, 0, 0, 0.08),
         0 1px 3px rgba(0, 0, 0, 0.05);
-    width: 95%;
+    width: 90%;
     max-width: 600px;
     z-index: 10;
+    box-sizing: border-box;
+
+    /* 작은 화면 대응 */
+    @media (max-width: 480px) {
+        padding: 30px 20px;
+        width: 95%;
+    }
+
+    /* 매우 작은 화면 (작은 폰) */
+    @media (max-width: 360px) {
+        padding: 20px 15px;
+    }
+
+    /* 세로 모드 강제 (CSS로도 처리) */
+    @media (orientation: landscape) and (max-height: 500px) {
+        padding: 15px 20px;
+    }
 `;
 
 const CloseButton = styled.button`
@@ -107,7 +124,7 @@ const ModalOverlay = styled.div`
     left: 0;
     right: 0;
     bottom: 0;
-    background: #ffffff;
+    background: #222020ff;
     z-index: 30000;
 `;
 
@@ -127,7 +144,7 @@ const Display = styled.div`
     text-align: center;
     width: 100%;
     max-width: 350px;
-    min-width: 350px;
+    min-width: 280px;
     box-sizing: border-box;
     overflow: hidden;
     line-height: 1;
@@ -138,6 +155,21 @@ const Display = styled.div`
     /* 디지털 숫자 효과 */
     font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
+
+    /* 반응형 폰트 크기 */
+    @media (max-width: 480px) {
+        font-size: 70px;
+        padding: 30px 20px 30px 30px;
+        letter-spacing: 10px;
+        min-width: 240px;
+    }
+
+    @media (max-width: 360px) {
+        font-size: 60px;
+        padding: 25px 15px 25px 25px;
+        letter-spacing: 8px;
+        min-width: 200px;
+    }
 `;
 
 const TimeButtonRow = styled.div`
@@ -145,6 +177,17 @@ const TimeButtonRow = styled.div`
     gap: 16px;
     margin-bottom: 30px;
     justify-content: center;
+    flex-wrap: wrap;
+
+    @media (max-width: 480px) {
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    @media (max-width: 360px) {
+        gap: 8px;
+        margin-bottom: 15px;
+    }
 `;
 
 const TimeButton = styled.button`
@@ -160,6 +203,7 @@ const TimeButton = styled.button`
     box-shadow:
         0 2px 8px rgba(0, 0, 0, 0.12),
         0 1px 4px rgba(0, 0, 0, 0.08);
+    min-width: 80px;
 
     &:disabled {
         background: #e8e6e3;
@@ -168,6 +212,18 @@ const TimeButton = styled.button`
         box-shadow:
             0 2px 8px rgba(0, 0, 0, 0.12),
             0 1px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    @media (max-width: 480px) {
+        font-size: 16px;
+        padding: 14px 22px;
+        min-width: 70px;
+    }
+
+    @media (max-width: 360px) {
+        font-size: 14px;
+        padding: 12px 18px;
+        min-width: 60px;
     }
 `;
 
@@ -205,6 +261,7 @@ const StartStopButton = styled.button`
     box-shadow:
         0 2px 8px rgba(0, 0, 0, 0.12),
         0 1px 4px rgba(0, 0, 0, 0.08);
+    min-width: 200px; /* 버튼 너비 고정 */
 
     &:disabled {
         background: #e8e6e3;
@@ -213,6 +270,18 @@ const StartStopButton = styled.button`
         box-shadow:
             0 2px 8px rgba(0, 0, 0, 0.12),
             0 1px 4px rgba(0, 0, 0, 0.08);
+    }
+
+    @media (max-width: 480px) {
+        font-size: 20px;
+        padding: 24px 50px;
+        min-width: 180px;
+    }
+
+    @media (max-width: 360px) {
+        font-size: 18px;
+        padding: 20px 40px;
+        min-width: 160px;
     }
 `;
 
@@ -226,6 +295,76 @@ const Timer = ({ onClose }) => {
     const longPressIntervalRef = useRef(null);
     const audioRef = useRef(null);
     const isAlarmPlayingRef = useRef(false);
+    const wakeLockRef = useRef(null);
+
+    // Wake Lock 요청 (화면 꺼짐 방지)
+    const requestWakeLock = async () => {
+        try {
+            if ('wakeLock' in navigator) {
+                wakeLockRef.current = await navigator.wakeLock.request('screen');
+            }
+        } catch (err) {
+            // Wake Lock 지원하지 않는 브라우저
+        }
+    };
+
+    // Wake Lock 해제
+    const releaseWakeLock = async () => {
+        try {
+            if (wakeLockRef.current) {
+                await wakeLockRef.current.release();
+                wakeLockRef.current = null;
+            }
+        } catch (err) {
+            // 무시
+        }
+    };
+
+    // 전체화면 요청
+    const requestFullscreen = async () => {
+        try {
+            const elem = document.documentElement;
+            if (elem.requestFullscreen) {
+                await elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) {
+                await elem.webkitRequestFullscreen();
+            } else if (elem.mozRequestFullScreen) {
+                await elem.mozRequestFullScreen();
+            } else if (elem.msRequestFullscreen) {
+                await elem.msRequestFullscreen();
+            }
+        } catch (err) {
+            // 전체화면 지원하지 않는 브라우저
+        }
+    };
+
+    // 전체화면 해제
+    const exitFullscreen = async () => {
+        try {
+            if (document.fullscreenElement) {
+                await document.exitFullscreen();
+            } else if (document.webkitFullscreenElement) {
+                await document.webkitExitFullscreen();
+            } else if (document.mozFullScreenElement) {
+                await document.mozCancelFullScreen();
+            } else if (document.msFullscreenElement) {
+                await document.msExitFullscreen();
+            }
+        } catch (err) {
+            // 무시
+        }
+    };
+
+    // 화면 방향 잠금 (세로 고정)
+    const lockOrientation = async () => {
+        try {
+            if (screen.orientation && screen.orientation.lock) {
+                await screen.orientation.lock('portrait');
+            }
+        } catch (err) {
+            // 화면 방향 잠금 지원하지 않는 브라우저
+        }
+    };
 
     // 닫기 확인
     const handleClose = () => {
@@ -237,6 +376,10 @@ const Timer = ({ onClose }) => {
         if (isAlarmPlaying) {
             stopAlarm();
         }
+        // Wake Lock 해제
+        releaseWakeLock();
+        // 전체화면 해제
+        exitFullscreen();
         onClose();
     };
 
@@ -251,34 +394,35 @@ const Timer = ({ onClose }) => {
         return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     };
 
-    // 시간 추가 함수
-    const addTime = (amount) => {
+    // 분만 추가 (60분이 넘으면 0분으로)
+    const addMinutes = (minutes) => {
         setSeconds(prev => {
-            const newTime = prev + amount;
-            // 최대 59분 59초
-            return Math.min(newTime, 59 * 60 + 59);
+            const currentMinutes = Math.floor(prev / 60);
+            const currentSeconds = prev % 60;
+
+            // 분을 추가하고 60으로 나눈 나머지로 순환
+            const newMinutes = (currentMinutes + minutes) % 60;
+
+            return newMinutes * 60 + currentSeconds;
         });
     };
 
-    // 초만 추가 (60초 넘지 않도록)
+    // 초만 추가 (60초가 넘으면 0초로)
     const addSeconds = (amount) => {
         setSeconds(prev => {
             const currentMinutes = Math.floor(prev / 60);
             const currentSeconds = prev % 60;
-            const newSeconds = currentSeconds + amount;
 
-            // 초가 60을 넘으면 59로 제한
-            if (newSeconds >= 60) {
-                return currentMinutes * 60 + 59;
-            }
+            // 초를 추가하고 60으로 나눈 나머지로 순환
+            const newSeconds = (currentSeconds + amount) % 60;
 
             return currentMinutes * 60 + newSeconds;
         });
     };
 
     // 클릭 처리 (분 버튼용)
-    const handleClick = (amount) => {
-        addTime(amount);
+    const handleClickMinutes = (minutes) => {
+        addMinutes(minutes);
     };
 
     // 클릭 처리 (초 버튼용)
@@ -287,10 +431,10 @@ const Timer = ({ onClose }) => {
     };
 
     // 길게 누르기 시작 (분 버튼용)
-    const handleMouseDown = (amount) => {
+    const handleMouseDownMinutes = (minutes) => {
         longPressTimerRef.current = setTimeout(() => {
             longPressIntervalRef.current = setInterval(() => {
-                addTime(amount);
+                addMinutes(minutes);
             }, 100);
         }, 500);
     };
@@ -317,24 +461,53 @@ const Timer = ({ onClose }) => {
     // 알람 중지
     const stopAlarm = () => {
         isAlarmPlayingRef.current = false;
+
         if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-            audioRef.current = null;
+            try {
+                // loop 속성 먼저 제거
+                audioRef.current.loop = false;
+                // onended 이벤트 핸들러 제거
+                audioRef.current.onended = null;
+                // 볼륨 0으로 설정 (즉시 무음)
+                audioRef.current.volume = 0;
+                // 오디오 즉시 정지
+                audioRef.current.pause();
+                audioRef.current.currentTime = 0;
+                // src 제거하여 완전히 언로드
+                audioRef.current.src = '';
+                audioRef.current.load();
+                audioRef.current = null;
+            } catch (err) {
+                // 무시
+            }
         }
         setIsAlarmPlaying(false);
     };
 
     // 타이머 시작/정지
     const toggleTimer = () => {
-        // 알람이 울리는 중에 STOP 버튼을 누르면 알람 중지
+        // 알람이 울리는 중에 STOP 버튼을 누르면 알람 중지하고 타이머 완전 종료
         if (isAlarmPlaying) {
             stopAlarm();
             setIsRunning(false);
+            setSeconds(0); // 타이머를 완전히 리셋
+            releaseWakeLock();
+            exitFullscreen();
             return;
         }
 
         if (seconds === 0) return;
+
+        // 타이머 시작 시
+        if (!isRunning) {
+            requestWakeLock();
+            requestFullscreen();
+            lockOrientation();
+        } else {
+            // 타이머 일시정지 시
+            releaseWakeLock();
+        }
+
         setIsRunning(prev => !prev);
     };
 
@@ -349,6 +522,8 @@ const Timer = ({ onClose }) => {
         if (isAlarmPlaying) {
             stopAlarm();
         }
+        // Wake Lock 해제
+        releaseWakeLock();
     };
 
     // 타이머 카운트다운
@@ -379,41 +554,35 @@ const Timer = ({ onClose }) => {
 
     // 알람음 재생
     const playAlarm = () => {
+        // 이미 알람이 재생 중이면 중복 실행 방지
+        if (isAlarmPlayingRef.current) {
+            return;
+        }
+
+        // 기존 오디오가 있다면 먼저 정리
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current = null;
+        }
+
         setIsAlarmPlaying(true);
         isAlarmPlayingRef.current = true;
 
-        // 01.mp3 재생
-        const audio1 = new Audio('/sound/Timer_alarm/01.mp3');
-        audioRef.current = audio1;
+        // 01.mp3 반복 재생
+        const audio = new Audio('/sound/Timer_alarm/01.mp3');
+        audio.loop = true; // 반복 재생 설정
+        audioRef.current = audio;
 
-        audio1.play().catch(err => console.error('Audio 1 play error:', err));
-
-        audio1.onended = () => {
-            // 알람이 중지되었는지 확인
-            if (!isAlarmPlayingRef.current) return;
-
-            // 02.mp3 재생
-            const audio2 = new Audio('/sound/Timer_alarm/02.mp3');
-            audioRef.current = audio2;
-
-            audio2.play().catch(err => console.error('Audio 2 play error:', err));
-
-            audio2.onended = () => {
-                // 알람이 중지되었는지 확인
-                if (!isAlarmPlayingRef.current) return;
-
-                // 03.mp3 반복 재생
-                const audio3 = new Audio('/sound/Timer_alarm/03.mp3');
-                audioRef.current = audio3;
-                audio3.loop = true;
-
-                audio3.play().catch(err => console.error('Audio 3 play error:', err));
-            };
-        };
+        audio.play().catch(() => {
+            // 오디오 재생 실패 (사용자 제스처 필요 등)
+        });
     };
 
-    // 컴포넌트 언마운트 시 정리
+    // 컴포넌트 마운트/언마운트 시 처리
     useEffect(() => {
+        // 컴포넌트 마운트 시 화면 방향 잠금
+        lockOrientation();
+
         return () => {
             handleMouseUp();
             if (intervalRef.current) {
@@ -424,6 +593,10 @@ const Timer = ({ onClose }) => {
                 audioRef.current.pause();
                 audioRef.current = null;
             }
+            // Wake Lock 해제
+            releaseWakeLock();
+            // 전체화면 해제
+            exitFullscreen();
         };
     }, []);
 
@@ -435,8 +608,8 @@ const Timer = ({ onClose }) => {
 
                     <TimeButtonRow>
                         <TimeButton
-                            onClick={() => handleClick(5 * 60)}
-                            onMouseDown={() => handleMouseDown(5 * 60)}
+                            onClick={() => handleClickMinutes(5)}
+                            onMouseDown={() => handleMouseDownMinutes(5)}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
                             disabled={isRunning}
@@ -444,8 +617,8 @@ const Timer = ({ onClose }) => {
                             5M
                         </TimeButton>
                         <TimeButton
-                            onClick={() => handleClick(60)}
-                            onMouseDown={() => handleMouseDown(60)}
+                            onClick={() => handleClickMinutes(1)}
+                            onMouseDown={() => handleMouseDownMinutes(1)}
                             onMouseUp={handleMouseUp}
                             onMouseLeave={handleMouseUp}
                             disabled={isRunning}
