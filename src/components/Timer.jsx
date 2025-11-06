@@ -1312,7 +1312,7 @@ const Timer = ({ onClose }) => {
                                 <VolumeButton
                                     onClick={increaseVolume}
                                     disabled={isRunning || volume === 1.0}
-                                    style={{ marginLeft: '10px' }}
+                                    style={{ marginLeft: '15px' }}
                                 >
                                     +
                                 </VolumeButton>
