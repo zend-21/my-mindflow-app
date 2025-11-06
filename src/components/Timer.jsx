@@ -320,6 +320,25 @@ const VolumeButton = styled.button`
     }
 `;
 
+const WarningNotice = styled.div`
+    margin-top: 24px;
+    text-align: left;
+    font-size: 13px;
+    color: #4a4a4a;
+    line-height: 1.4;
+    opacity: 0.5;
+
+    @media (max-width: 480px) {
+        font-size: 12px;
+        margin-top: 20px;
+    }
+
+    @media (orientation: landscape) and (max-height: 500px) {
+        font-size: 12px;
+        margin-top: 16px;
+    }
+`;
+
 const CloseButton = styled.button`
     background: #ffffff;
     border: none;
@@ -1333,6 +1352,10 @@ const Timer = ({ onClose }) => {
                             CLOSE
                         </CloseButton>
                     </BottomControlRow>
+
+                    <WarningNotice>
+                        다른 앱 사용 시 타이머가 중단될 수 있습니다.<br />화면을 켜둔 상태에서 사용하세요.
+                    </WarningNotice>
                 </TimerContainer>
             )}
 
