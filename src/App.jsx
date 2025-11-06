@@ -607,14 +607,26 @@ function App() {
                 const copy = { ...prev };
 
                 if (!text || text.trim() === "") {
+                    // 텍스트가 비어있으면 text만 삭제하되, alarm이 있으면 엔트리 유지
                     if (copy[key]) {
-                        delete copy[key];
+                        if (copy[key].alarm && copy[key].alarm.registeredAlarms && copy[key].alarm.registeredAlarms.length > 0) {
+                            // 알람이 있으면 text만 빈 문자열로
+                            copy[key] = {
+                                ...copy[key],
+                                text: '',
+                                updatedAt: now
+                            };
+                        } else {
+                            // 알람도 없으면 전체 삭제
+                            delete copy[key];
+                        }
                     }
                 } else {
                     copy[key] = {
                         text,
                         createdAt: copy[key]?.createdAt ?? now,
                         updatedAt: now,
+                        alarm: copy[key]?.alarm, // 기존 알람 정보 보존
                     };
                 }
                 return copy;
@@ -711,12 +723,6 @@ function App() {
         }
         const key = format(new Date(scheduleForAlarm.date), 'yyyy-MM-dd');
 
-        console.log('💾 알람 저장 시작:', {
-            key,
-            alarmSettings,
-            registeredAlarmsCount: alarmSettings.registeredAlarms?.length || 0
-        });
-
         // 2. calendarSchedules 상태를 업데이트합니다.
         setCalendarSchedules(prevSchedules => {
             const updatedSchedules = { ...prevSchedules };
@@ -740,7 +746,6 @@ function App() {
                 };
             }
 
-            console.log('💾 알람 저장 완료:', updatedSchedules[key]);
             return updatedSchedules;
         });
 

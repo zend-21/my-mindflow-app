@@ -563,15 +563,14 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   // Initialize state when modal opens
   useEffect(() => {
     if (isOpen && scheduleData) {
-      console.log('📋 AlarmModal 초기화:', {
-        hasScheduleData: !!scheduleData,
-        hasAlarm: !!scheduleData.alarm,
-        registeredAlarmsCount: scheduleData.alarm?.registeredAlarms?.length || 0,
-        scheduleData
-      });
+      // alarm 객체가 있고 registeredAlarms에 실제 알람이 있는 경우에만 기존 데이터 로드
+      const hasActiveAlarms = scheduleData.alarm &&
+                              scheduleData.alarm.registeredAlarms &&
+                              scheduleData.alarm.registeredAlarms.length > 0;
 
-      if (scheduleData.alarm) {
-        setAlarmTitle(scheduleData.alarm.alarmTitle || '');
+      if (hasActiveAlarms) {
+        // 알람 타이틀은 항상 비우기 - 새 알람 추가용
+        setAlarmTitle('');
         setEventTime(scheduleData.alarm.eventTime || '09:00');
         setRegisteredAlarms(scheduleData.alarm.registeredAlarms || []);
         setNotificationType(scheduleData.alarm.notificationType || 'both');
@@ -583,12 +582,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         setCustomSoundName(scheduleData.alarm.customSoundName || '');
         setVolume(scheduleData.alarm.volume ?? 80);
         setRepeat(scheduleData.alarm.repeat || 'none');
-
-        console.log('📋 기존 알람 데이터 로드 완료:', {
-          registeredAlarmsCount: scheduleData.alarm.registeredAlarms?.length || 0
-        });
       } else {
-        // Reset to defaults
+        // Reset to defaults (알람이 없거나 registeredAlarms가 비어있으면 초기화)
         setAlarmTitle('');
         setEventTime('09:00');
         setRegisteredAlarms([]);
@@ -601,8 +596,6 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         setCustomSoundName('');
         setVolume(80);
         setRepeat('none');
-
-        console.log('📋 기본값으로 초기화 완료');
       }
 
       // Set direct date to schedule date
@@ -616,7 +609,6 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   // Calculate actual alarm time from event time and offset
   const calculateAlarmTime = (eventTimeStr, offsetConfig) => {
     if (!scheduleData?.date) {
-      console.error('❌ calculateAlarmTime: scheduleData.date가 없습니다', { scheduleData });
       return null;
     }
 
@@ -630,14 +622,6 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       alarmTime = subDays(alarmTime, days);
       alarmTime = subHours(alarmTime, hours);
       alarmTime = subMinutes(alarmTime, minutes);
-
-      console.log('⏰ 알람 시간 계산 완료:', {
-        eventTime: eventTimeStr,
-        eventDateTime,
-        offset: { days, hours, minutes },
-        calculatedAlarmTime: alarmTime
-      });
-
       return alarmTime;
     } else if (offsetConfig.type === 'absolute') {
       return new Date(offsetConfig.dateTime);
@@ -648,47 +632,45 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   // Add preset alarm
   const handleAddPresetAlarm = (days, hours, minutes) => {
-    try {
-      console.log('➕ Preset 알람 추가 시도:', { days, hours, minutes, eventTime });
-
-      const offsetConfig = {
-        type: 'preset',
-        days,
-        hours,
-        minutes
-      };
-
-      const alarmTime = calculateAlarmTime(eventTime, offsetConfig);
-      if (!alarmTime) {
-        console.error('❌ 알람 시간 계산 실패');
-        return;
-      }
-
-      const newAlarm = {
-        id: Date.now(),
-        type: 'preset',
-        offset: { days, hours, minutes },
-        calculatedTime: alarmTime,
-        displayText: `${days}일 ${hours}시간 ${minutes}분 전`.replace(/0일 /g, '').replace(/0시간 /g, '').replace(/0분 /g, '').trim() + (days === 0 && hours === 0 && minutes === 0 ? '정각' : '')
-      };
-
-      const updatedAlarms = [...registeredAlarms, newAlarm].sort((a, b) =>
-        a.calculatedTime - b.calculatedTime
-      );
-
-      console.log('✅ Preset 알람 추가 완료:', {
-        newAlarm,
-        totalAlarms: updatedAlarms.length
-      });
-
-      setRegisteredAlarms(updatedAlarms);
-    } catch (error) {
-      console.error('❌ Preset 알람 추가 중 에러:', error);
+    if (!alarmTitle.trim()) {
+      alert('알람 타이틀을 입력해주세요.');
+      return;
     }
+
+    const offsetConfig = {
+      type: 'preset',
+      days,
+      hours,
+      minutes
+    };
+
+    const alarmTime = calculateAlarmTime(eventTime, offsetConfig);
+    if (!alarmTime) return;
+
+    const newAlarm = {
+      id: Date.now(),
+      type: 'preset',
+      title: alarmTitle,  // 각 알람에 타이틀 저장
+      offset: { days, hours, minutes },
+      calculatedTime: alarmTime,
+      displayText: `${days}일 ${hours}시간 ${minutes}분 전`.replace(/0일 /g, '').replace(/0시간 /g, '').replace(/0분 /g, '').trim() + (days === 0 && hours === 0 && minutes === 0 ? '정각' : '')
+    };
+
+    setRegisteredAlarms([...registeredAlarms, newAlarm].sort((a, b) =>
+      a.calculatedTime - b.calculatedTime
+    ));
+
+    // 알람 추가 후 타이틀 비우기
+    setAlarmTitle('');
   };
 
   // Add custom alarm
   const handleAddCustomAlarm = () => {
+    if (!alarmTitle.trim()) {
+      alert('알람 타이틀을 입력해주세요.');
+      return;
+    }
+
     const offsetConfig = {
       type: 'custom',
       days: customDays,
@@ -702,6 +684,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     const newAlarm = {
       id: Date.now(),
       type: 'custom',
+      title: alarmTitle,  // 각 알람에 타이틀 저장
       offset: { days: customDays, hours: customHours, minutes: customMinutes },
       calculatedTime: alarmTime,
       displayText: `${customDays}일 ${customHours}시간 ${customMinutes}분 전`.replace(/0일 /g, '').replace(/0시간 /g, '').replace(/0분 /g, '').trim()
@@ -710,10 +693,17 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     setRegisteredAlarms([...registeredAlarms, newAlarm].sort((a, b) =>
       a.calculatedTime - b.calculatedTime
     ));
+
+    // 알람 추가 후 타이틀 비우기
+    setAlarmTitle('');
   };
 
   // Add direct time alarm
   const handleAddDirectAlarm = () => {
+    if (!alarmTitle.trim()) {
+      alert('알람 타이틀을 입력해주세요.');
+      return;
+    }
     if (!directDate || !directTime) return;
 
     const [hour, minute] = directTime.split(':').map(Number);
@@ -723,6 +713,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     const newAlarm = {
       id: Date.now(),
       type: 'absolute',
+      title: alarmTitle,  // 각 알람에 타이틀 저장
       dateTime: dateTime.toISOString(),
       calculatedTime: dateTime,
       displayText: format(dateTime, 'yyyy-MM-dd HH:mm')
@@ -731,6 +722,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     setRegisteredAlarms([...registeredAlarms, newAlarm].sort((a, b) =>
       a.calculatedTime - b.calculatedTime
     ));
+
+    // 알람 추가 후 타이틀 비우기
+    setAlarmTitle('');
   };
 
   // Delete alarm
@@ -790,10 +784,31 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   // Save alarm settings
   const handleSave = () => {
+    // 등록된 알람이 없지만 알람 타이틀이 있으면, 이벤트 시간 정각에 알람 자동 추가
+    let finalRegisteredAlarms = [...registeredAlarms];
+
+    if (finalRegisteredAlarms.length === 0 && alarmTitle.trim()) {
+      // 이벤트 시간 정각 알람 자동 추가
+      const [eventHour, eventMinute] = eventTime.split(':').map(Number);
+      const eventDateTime = new Date(scheduleData.date);
+      eventDateTime.setHours(eventHour, eventMinute, 0, 0);
+
+      const exactTimeAlarm = {
+        id: Date.now(),
+        type: 'preset',
+        title: alarmTitle,  // 타이틀 포함
+        offset: { days: 0, hours: 0, minutes: 0 },
+        calculatedTime: eventDateTime,
+        displayText: '정각'
+      };
+
+      finalRegisteredAlarms = [exactTimeAlarm];
+    }
+
     const alarmSettings = {
-      alarmTitle,
+      // alarmTitle 제거 - 각 알람에 개별 저장됨
       eventTime,
-      registeredAlarms,
+      registeredAlarms: finalRegisteredAlarms,
       notificationType,
       snoozeEnabled,
       snoozeInterval,
@@ -804,14 +819,6 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       volume,
       repeat
     };
-
-    console.log('💾 AlarmModal 저장 버튼 클릭:', {
-      alarmTitle,
-      eventTime,
-      registeredAlarmsCount: registeredAlarms.length,
-      registeredAlarms,
-      alarmSettings
-    });
 
     onSave(alarmSettings);
   };
@@ -892,6 +899,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   {registeredAlarms.map((alarm) => (
                     <AlarmItem key={alarm.id}>
                       <AlarmInfo>
+                        <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: '4px', color: '#333' }}>
+                          {alarm.title || '제목 없음'}
+                        </div>
                         <AlarmTimeDisplay>
                           {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
                         </AlarmTimeDisplay>

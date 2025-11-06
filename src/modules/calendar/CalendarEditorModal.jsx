@@ -499,24 +499,35 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
               <div style={{
                   display: 'flex',
                   flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px',
+                  gap: '8px',
                   padding: '12px',
-                  backgroundColor: '#fff',
+                  backgroundColor: '#fff5f5',
                   borderRadius: '8px',
-                  marginBottom: '12px',
-                  border: '1px solid #e2e8f0'
+                  border: '1px solid #ffebeb',
+                  marginBottom: '16px'
               }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '14px', color: '#333' }}>
-                      <AlarmClock size={18} color="red" />
-                      <span>이벤트 시간 - {data.alarm.eventTime || '설정 안 됨'}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', color: '#d63031', borderBottom: '2px solid #ffebeb', paddingBottom: '8px' }}>
+                      <AlarmClock size={18} color="#d63031" />
+                      <span>등록된 알람 ({data.alarm.registeredAlarms.length}개)</span>
                   </div>
-                  {data.alarm.alarmTitle && (
-                      <div style={{ fontSize: '13px', color: '#666', fontWeight: 500 }}>
-                          {data.alarm.alarmTitle}
+                  {data.alarm.registeredAlarms.map((alarm, index) => (
+                      <div key={alarm.id || index} style={{
+                          padding: '10px',
+                          backgroundColor: '#ffffff',
+                          borderRadius: '6px',
+                          border: '1px solid #ffe0e0'
+                      }}>
+                          <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#333', marginBottom: '4px' }}>
+                              {alarm.title || '제목 없음'}
+                          </div>
+                          <div style={{ fontSize: '12px', color: '#666' }}>
+                              {format(new Date(alarm.calculatedTime), 'yyyy-MM-dd HH:mm')}
+                          </div>
+                          <div style={{ fontSize: '11px', color: '#999' }}>
+                              {alarm.displayText}
+                          </div>
                       </div>
-                  )}
+                  ))}
               </div>
           )}
 

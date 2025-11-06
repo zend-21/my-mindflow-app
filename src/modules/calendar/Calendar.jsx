@@ -1497,6 +1497,61 @@ const Calendar = ({
             onRequestDelete(selectedDate);
         }
     };
+
+    const handleDeleteScheduleOnly = () => {
+        // 일정 텍스트만 삭제, 알람은 보존
+        if (!currentEntry) return;
+
+        const key = format(selectedDate, 'yyyy-MM-dd');
+
+        setSchedules((prevSchedules) => {
+            const updatedSchedules = { ...prevSchedules };
+
+            if (updatedSchedules[key]) {
+                if (updatedSchedules[key].alarm && updatedSchedules[key].alarm.registeredAlarms && updatedSchedules[key].alarm.registeredAlarms.length > 0) {
+                    // 알람이 있으면 텍스트만 빈 문자열로
+                    updatedSchedules[key] = {
+                        ...updatedSchedules[key],
+                        text: '',
+                        updatedAt: Date.now()
+                    };
+                } else {
+                    // 알람이 없으면 전체 삭제
+                    delete updatedSchedules[key];
+                }
+            }
+
+            return updatedSchedules;
+        });
+
+        setScheduleText('');
+        setIsEditing(false);
+        showToast('일정이 삭제되었습니다.');
+    };
+
+    const handleDeleteAlarmOnly = () => {
+        // 알람만 삭제, 일정 텍스트는 보존
+        if (!currentEntry || !currentEntry.alarm) return;
+
+        const key = format(selectedDate, 'yyyy-MM-dd');
+
+        setSchedules((prevSchedules) => {
+            const updatedSchedules = { ...prevSchedules };
+
+            if (updatedSchedules[key]) {
+                // alarm 필드 제거
+                const { alarm, ...restOfEntry } = updatedSchedules[key];
+                updatedSchedules[key] = {
+                    ...restOfEntry,
+                    updatedAt: Date.now()
+                };
+            }
+
+            return updatedSchedules;
+        });
+
+        showToast('알람이 삭제되었습니다.');
+    };
     
     const handleAlarmClick = () => {
         const today = startOfDay(new Date());
@@ -1511,15 +1566,6 @@ const Calendar = ({
         if (onOpenAlarm) {
             const entryData = currentEntry || { text: '', createdAt: Date.now(), updatedAt: Date.now() };
             const dataToPass = { ...entryData, date: selectedDate };
-
-            console.log('🔔 알람 모달 열기:', {
-                date: format(selectedDate, 'yyyy-MM-dd'),
-                hasCurrentEntry: !!currentEntry,
-                hasAlarm: !!currentEntry?.alarm,
-                registeredAlarmsCount: currentEntry?.alarm?.registeredAlarms?.length || 0,
-                dataToPass
-            });
-
             onOpenAlarm(dataToPass);
         }
     };
@@ -1736,25 +1782,35 @@ const Calendar = ({
                                 <div style={{
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: '4px',
-                                    padding: '8px 0',
-                                    borderBottom: '1px dashed #ddd',
-                                    marginBottom: '8px',
-                                    color: '#555',
-                                    fontWeight: 600,
-                                    fontSize: '14px'
+                                    gap: '8px',
+                                    padding: '12px',
+                                    backgroundColor: '#fff5f5',
+                                    borderRadius: '8px',
+                                    border: '1px solid #ffebeb',
+                                    marginBottom: '12px'
                                 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <AlarmClock size={18} color="red" />
-                                        <span>이벤트 시간 - {currentEntry.alarm.eventTime || '설정 안 됨'}</span>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', color: '#d63031' }}>
+                                        <AlarmClock size={18} color="#d63031" />
+                                        <span>등록된 알람 ({currentEntry.alarm.registeredAlarms.length}개)</span>
                                     </div>
-                                    {currentEntry.alarm.alarmTitle && (
-                                        <div style={{ fontSize: '13px', color: '#666', fontWeight: 500 }}>
-                                            {currentEntry.alarm.alarmTitle}
+                                    {currentEntry.alarm.registeredAlarms.map((alarm, index) => (
+                                        <div key={alarm.id || index} style={{
+                                            padding: '8px',
+                                            backgroundColor: '#ffffff',
+                                            borderRadius: '6px',
+                                            border: '1px solid #ffe0e0'
+                                        }}>
+                                            <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#333', marginBottom: '4px' }}>
+                                                {alarm.title || '제목 없음'}
+                                            </div>
+                                            <div style={{ fontSize: '12px', color: '#666' }}>
+                                                {format(new Date(alarm.calculatedTime), 'yyyy-MM-dd HH:mm')}
+                                            </div>
+                                            <div style={{ fontSize: '11px', color: '#999' }}>
+                                                {alarm.displayText}
+                                            </div>
                                         </div>
-                                    )}
+                                    ))}
                                 </div>
                             )}
 
@@ -1781,9 +1837,18 @@ const Calendar = ({
                     {currentEntry ? (
                         <>
                         <ButtonGroup>
-                            <DeleteButton onClick={handleDelete}>
-                            스케줄 삭제
-                            </DeleteButton>
+                            {/* 일정 텍스트가 있으면 스케줄 삭제 버튼 표시 */}
+                            {currentEntry.text && currentEntry.text.trim() && (
+                                <DeleteButton onClick={handleDeleteScheduleOnly}>
+                                    일정 삭제
+                                </DeleteButton>
+                            )}
+                            {/* 알람이 있으면 알람 삭제 버튼 표시 */}
+                            {currentEntry.alarm && currentEntry.alarm.registeredAlarms && currentEntry.alarm.registeredAlarms.length > 0 && (
+                                <DeleteButton onClick={handleDeleteAlarmOnly} style={{ backgroundColor: '#ff6b6b' }}>
+                                    알람 삭제
+                                </DeleteButton>
+                            )}
                         </ButtonGroup>
                         · 처음 작성일: {formatTs(currentEntry?.createdAt)} <br />
                         · 마지막 수정일: {formatTs(currentEntry?.updatedAt)}
