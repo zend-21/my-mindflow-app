@@ -728,107 +728,49 @@ const Timer = ({ onClose }) => {
     };
 
     // 음량 감소 (한 단계 내리기)
-    const decreaseVolume = (playSound = true) => {
-        setVolume(currentVolume => {
-            const currentIndex = volumeLevels.findIndex(level => level === currentVolume);
-            if (currentIndex > 0) {
-                const newVolume = volumeLevels[currentIndex - 1];
-                localStorage.setItem('timerVolume', newVolume.toString());
+    const decreaseVolume = () => {
+        const currentIndex = volumeLevels.findIndex(level => level === volume);
+        if (currentIndex > 0) {
+            const newVolume = volumeLevels[currentIndex - 1];
+            setVolume(newVolume);
+            localStorage.setItem('timerVolume', newVolume.toString());
 
-                if (audioRef.current) {
-                    audioRef.current.volume = newVolume;
-                }
-
-                // 볼륨이 0이 되면 진동 모드는 유지하지 않음
-                if (newVolume === 0) {
-                    setVibrationMode(false);
-                    localStorage.setItem('timerVibration', 'false');
-                }
-
-                // 버튼용 테스트 사운드 재생 (1초 제한) - playSound가 true일 때만
-                if (playSound) {
-                    playTestSoundButton(newVolume);
-                }
-
-                return newVolume;
+            if (audioRef.current) {
+                audioRef.current.volume = newVolume;
             }
-            return currentVolume;
-        });
+
+            // 볼륨이 0이 되면 진동 모드는 유지하지 않음
+            if (newVolume === 0) {
+                setVibrationMode(false);
+                localStorage.setItem('timerVibration', 'false');
+            }
+
+            // 버튼용 테스트 사운드 재생 (1초 제한)
+            playTestSoundButton(newVolume);
+        }
     };
 
     // 음량 증가 (한 단계 올리기)
-    const increaseVolume = (playSound = true) => {
-        setVolume(currentVolume => {
-            const currentIndex = volumeLevels.findIndex(level => level === currentVolume);
-            if (currentIndex < volumeLevels.length - 1) {
-                const newVolume = volumeLevels[currentIndex + 1];
-                localStorage.setItem('timerVolume', newVolume.toString());
+    const increaseVolume = () => {
+        const currentIndex = volumeLevels.findIndex(level => level === volume);
+        if (currentIndex < volumeLevels.length - 1) {
+            const newVolume = volumeLevels[currentIndex + 1];
+            setVolume(newVolume);
+            localStorage.setItem('timerVolume', newVolume.toString());
 
-                if (audioRef.current) {
-                    audioRef.current.volume = newVolume;
-                }
-
-                // 볼륨이 0이 아니면 진동 모드 해제
-                if (newVolume > 0 && vibrationMode) {
-                    setVibrationMode(false);
-                    localStorage.setItem('timerVibration', 'false');
-                }
-
-                // 버튼용 테스트 사운드 재생 (1초 제한) - playSound가 true일 때만
-                if (playSound) {
-                    playTestSoundButton(newVolume);
-                }
-
-                return newVolume;
+            if (audioRef.current) {
+                audioRef.current.volume = newVolume;
             }
-            return currentVolume;
-        });
-    };
 
-    // 볼륨 증가 버튼 길게 누르기 시작
-    const handleIncreaseVolumeStart = () => {
-        // 즉시 한 번 실행 (소리 재생)
-        increaseVolume(true);
-
-        // 300ms 후부터 연속 실행 시작 (소리 없이)
-        longPressTimerRef.current = setTimeout(() => {
-            longPressIntervalRef.current = setInterval(() => {
-                increaseVolume(false); // 소리 재생 안 함
-            }, 200); // 200ms마다 반복
-        }, 300);
-    };
-
-    // 볼륨 감소 버튼 길게 누르기 시작
-    const handleDecreaseVolumeStart = () => {
-        // 즉시 한 번 실행 (소리 재생)
-        decreaseVolume(true);
-
-        // 300ms 후부터 연속 실행 시작 (소리 없이)
-        longPressTimerRef.current = setTimeout(() => {
-            longPressIntervalRef.current = setInterval(() => {
-                decreaseVolume(false); // 소리 재생 안 함
-            }, 200); // 200ms마다 반복
-        }, 300);
-    };
-
-    // 볼륨 버튼 길게 누르기 종료
-    const handleVolumeButtonEnd = () => {
-        if (longPressTimerRef.current) {
-            clearTimeout(longPressTimerRef.current);
-            longPressTimerRef.current = null;
-        }
-        if (longPressIntervalRef.current) {
-            clearInterval(longPressIntervalRef.current);
-            longPressIntervalRef.current = null;
-        }
-
-        // 버튼에서 손을 뗐을 때 현재 볼륨으로 테스트 사운드 재생
-        setVolume(currentVolume => {
-            if (currentVolume > 0) {
-                playTestSoundButton(currentVolume);
+            // 볼륨이 0이 아니면 진동 모드 해제
+            if (newVolume > 0 && vibrationMode) {
+                setVibrationMode(false);
+                localStorage.setItem('timerVibration', 'false');
             }
-            return currentVolume;
-        });
+
+            // 버튼용 테스트 사운드 재생 (1초 제한)
+            playTestSoundButton(newVolume);
+        }
     };
 
     // 진동 모드 토글
