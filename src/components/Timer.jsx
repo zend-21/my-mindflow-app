@@ -649,8 +649,8 @@ const Timer = ({ onClose }) => {
     const [isRunning, setIsRunning] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
-    // 7단계 볼륨: 0, 0.002, 0.03, 0.1, 0.4, 0.6, 1.0 (실질적 음량 차이 반영)
-    const volumeLevels = [0, 0.002, 0.03, 0.1, 0.4, 0.6, 1.0];
+    // 6단계 볼륨: 0, 0.002, 0.03, 0.4, 0.6, 1.0 (실질적 음량 차이 반영)
+    const volumeLevels = [0, 0.002, 0.03, 0.4, 0.6, 1.0];
 
     const [volume, setVolume] = useState(() => {
         const savedVolume = localStorage.getItem('timerVolume');
@@ -1233,32 +1233,51 @@ const Timer = ({ onClose }) => {
                             <VolumeControlInner>
                                 <VolumeIconButton onClick={toggleVolume} disabled={isRunning}>
                                     {volume === 0 ? (
-                                        // 음소거 아이콘 (X 표시)
+                                        // 0단계: 음소거 (X 표시)
                                         <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                             <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
                                             <line x1="18" y1="9" x2="22" y2="15" strokeLinecap="round"/>
                                             <line x1="22" y1="9" x2="18" y2="15" strokeLinecap="round"/>
                                         </SpeakerIcon>
-                                    ) : volume <= 0.1 ? (
-                                        // 매우 낮은 볼륨 아이콘 - )
+                                    ) : volume <= 0.002 ? (
+                                        // 1단계: 작대기 1줄 - 0.002 (0.2%)
                                         <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                             <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
                                             <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
                                         </SpeakerIcon>
-                                    ) : volume <= 0.5 ? (
-                                        // 중간 볼륨 아이콘 - ))
+                                    ) : volume <= 0.03 ? (
+                                        // 2단계: 작대기 2줄 - 0.03 (3%)
                                         <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                             <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
                                             <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
                                             <path d="M18 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
                                         </SpeakerIcon>
-                                    ) : (
-                                        // 높은 볼륨 아이콘 - )))
+                                    ) : volume <= 0.4 ? (
+                                        // 3단계: 작대기 3줄 - 0.4 (40%)
                                         <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                             <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
                                             <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
                                             <path d="M18 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
                                             <path d="M20.5 6c1.5 1.5 2.3 3.5 2.3 6s-.8 4.5-2.3 6" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </SpeakerIcon>
+                                    ) : volume <= 0.6 ? (
+                                        // 4단계: 작대기 4줄 - 0.6 (60%)
+                                        <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                            <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M18 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M20.5 6c1.5 1.5 2.3 3.5 2.3 6s-.8 4.5-2.3 6" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M22 4.5c2 2 3 4.5 3 7.5s-1 5.5-3 7.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </SpeakerIcon>
+                                    ) : (
+                                        // 5단계: 작대기 5줄 - 1.0 (100%)
+                                        <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                            <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M18 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M20.5 6c1.5 1.5 2.3 3.5 2.3 6s-.8 4.5-2.3 6" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M22 4.5c2 2 3 4.5 3 7.5s-1 5.5-3 7.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M23.5 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9" strokeLinecap="round" strokeLinejoin="round"/>
                                         </SpeakerIcon>
                                     )}
                                 </VolumeIconButton>
