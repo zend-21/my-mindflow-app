@@ -1290,21 +1290,13 @@ const Timer = ({ onClose }) => {
                             </VolumeControlInner>
                             <VolumeButtonRow>
                                 <VolumeButton
-                                    onMouseDown={handleDecreaseVolumeStart}
-                                    onMouseUp={handleVolumeButtonEnd}
-                                    onMouseLeave={handleVolumeButtonEnd}
-                                    onTouchStart={handleDecreaseVolumeStart}
-                                    onTouchEnd={handleVolumeButtonEnd}
+                                    onClick={decreaseVolume}
                                     disabled={isRunning || volume === 0}
                                 >
                                     −
                                 </VolumeButton>
                                 <VolumeButton
-                                    onMouseDown={handleIncreaseVolumeStart}
-                                    onMouseUp={handleVolumeButtonEnd}
-                                    onMouseLeave={handleVolumeButtonEnd}
-                                    onTouchStart={handleIncreaseVolumeStart}
-                                    onTouchEnd={handleVolumeButtonEnd}
+                                    onClick={increaseVolume}
                                     disabled={isRunning || volume === 1.0}
                                 >
                                     +
