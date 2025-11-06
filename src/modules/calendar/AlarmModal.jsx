@@ -774,7 +774,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     ? format(new Date(scheduleData.date), 'yyyy년 M월 d일')
     : '날짜 선택';
 
-  const hasSchedule = scheduleData?.content;
+  const hasSchedule = scheduleData?.content || scheduleData?.text;
 
   // Don't allow alarm settings for days without schedules
   if (!hasSchedule) {
