@@ -609,20 +609,75 @@ const DateCell = styled.div`
         font-weight: 700;
     ` : ''}
     
-    ${props => props.$hasSchedule ? `
-        &::after {
-            content: '';
-            position: absolute;
-            top: 3px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 5px;
-            height: 5px;
-            background-color: ${props.$isPastDate ? 'rgba(141, 141, 141, 0.4)' : 'red'};
-            border-radius: 50%;
-            background-color: ${props.$isCurrentMonth ? 'red' : 'rgba(255, 0, 0, 0.4)'};
+    ${props => {
+        const hasSchedule = props.$hasSchedule;
+        const hasAlarm = props.$hasAlarm;
+        const isCurrentMonth = props.$isCurrentMonth;
+
+        // 일정 점: 파란색 (dodgerblue)
+        const scheduleColor = isCurrentMonth ? 'dodgerblue' : 'rgba(30, 144, 255, 0.4)';
+        // 알람 점: 빨간색 (tomato)
+        const alarmColor = isCurrentMonth ? 'tomato' : 'rgba(255, 99, 71, 0.4)';
+
+        if (hasSchedule && hasAlarm) {
+            // 둘 다 있을 때: 상단에 나란히 5px 간격으로 배치 (등록 순서 무관, 항상 일정→알람 순서)
+            return `
+                &::after {
+                    content: '';
+                    position: absolute;
+                    top: 3px;
+                    left: 50%;
+                    transform: translateX(-7.5px); /* 일정 점 - 왼쪽(앞) */
+                    width: 5px;
+                    height: 5px;
+                    background-color: ${scheduleColor};
+                    border-radius: 50%;
+                }
+                &::before {
+                    content: '';
+                    position: absolute;
+                    top: 3px;
+                    left: 50%;
+                    transform: translateX(2.5px); /* 알람 점 - 오른쪽(뒤) */
+                    width: 5px;
+                    height: 5px;
+                    background-color: ${alarmColor};
+                    border-radius: 50%;
+                }
+            `;
+        } else if (hasSchedule) {
+            // 일정만 있을 때: 상단 중앙에 파란색 점
+            return `
+                &::after {
+                    content: '';
+                    position: absolute;
+                    top: 3px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    width: 5px;
+                    height: 5px;
+                    background-color: ${scheduleColor};
+                    border-radius: 50%;
+                }
+            `;
+        } else if (hasAlarm) {
+            // 알람만 있을 때: 상단 중앙에 빨간색 점
+            return `
+                &::before {
+                    content: '';
+                    position: absolute;
+                    top: 3px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    width: 5px;
+                    height: 5px;
+                    background-color: ${alarmColor};
+                    border-radius: 50%;
+                }
+            `;
         }
-    ` : ''}
+        return '';
+    }}
 `;
 
 const ScheduleContainer = styled.div`
@@ -887,7 +942,7 @@ const Calendar = ({
     const [isHolidayText, setIsHolidayText] = useState(false);
     const [isNationalDay, setIsNationalDay] = useState(false);
     const [isLoadingSpecialDates, setIsLoadingSpecialDates] = useState(false);
-    
+
     // API 데이터를 저장할 새로운 상태를 추가합니다.
     const [specialDates, setSpecialDates] = useState({});
     const [cacheStatus, setCacheStatus] = useState({ loading: false, error: null });
@@ -1285,7 +1340,16 @@ const Calendar = ({
 
     const hasSchedule = (date) => {
         const key = format(date, 'yyyy-MM-dd');
-        return schedules[key] && schedules[key].text && schedules[key].text.trim().length > 0;
+        const entry = schedules[key];
+        // 일정 텍스트가 있고 비어있지 않은 경우에만 true
+        return entry && entry.text && entry.text.trim().length > 0;
+    };
+
+    const hasAlarm = (date) => {
+        const key = format(date, 'yyyy-MM-dd');
+        const entry = schedules[key];
+        const result = entry && entry.alarm && entry.alarm.registeredAlarms && entry.alarm.registeredAlarms.length > 0;
+        return result;
     };
 
     const handleGoToToday = () => {
@@ -1435,11 +1499,6 @@ const Calendar = ({
     };
     
     const handleAlarmClick = () => {
-        console.log('알람 버튼 클릭됨');
-        console.log('selectedDate:', selectedDate);
-        console.log('currentEntry:', currentEntry);
-        console.log('onOpenAlarm 함수:', onOpenAlarm);
-        
         const today = startOfDay(new Date());
         const selectedDay = startOfDay(selectedDate);
 
@@ -1447,16 +1506,21 @@ const Calendar = ({
             showToast('과거 날짜에는 알람을 설정할 수 없습니다.');
             return;
         }
-        
-        if (currentEntry && currentEntry.text && currentEntry.text.trim() !== '') {
-            console.log('알람 모달 열기 시도');
-            if (onOpenAlarm) {
-                onOpenAlarm({ ...currentEntry, date: selectedDate });
-            } else {
-                console.error('onOpenAlarm 함수가 전달되지 않았습니다.');
-            }
-        } else {
-            showToast('스케줄이 비어 있어 알람 설정을 할 수 없습니다.');
+
+        // 일정이 없어도 알람 설정 가능
+        if (onOpenAlarm) {
+            const entryData = currentEntry || { text: '', createdAt: Date.now(), updatedAt: Date.now() };
+            const dataToPass = { ...entryData, date: selectedDate };
+
+            console.log('🔔 알람 모달 열기:', {
+                date: format(selectedDate, 'yyyy-MM-dd'),
+                hasCurrentEntry: !!currentEntry,
+                hasAlarm: !!currentEntry?.alarm,
+                registeredAlarmsCount: currentEntry?.alarm?.registeredAlarms?.length || 0,
+                dataToPass
+            });
+
+            onOpenAlarm(dataToPass);
         }
     };
 
@@ -1577,17 +1641,19 @@ const Calendar = ({
                                 const isToday = isSameDay(date, today);
                                 const isSelected = selectedDate && isSameDay(date, selectedDate);
                                 const isSchedule = hasSchedule(date);
+                                const isAlarm = hasAlarm(date);
                                 const dateKey = format(date, 'yyyy-MM-dd');
                                 const isPastDate = isBefore(startOfDay(date), startOfDay(today));
                                 const isHoliday = isNationalHoliday(date);
 
                                 return (
-                                    <DateCell 
+                                    <DateCell
                                         key={`${dateKey}-${index}`}
-                                        $isCurrentMonth={date.getMonth() === currentMonth.getMonth()} 
+                                        $isCurrentMonth={date.getMonth() === currentMonth.getMonth()}
                                         $isToday={isToday}
                                         $isSelected={isSelected}
                                         $hasSchedule={isSchedule}
+                                        $hasAlarm={isAlarm}
                                         $isNationalHoliday={isHoliday}
                                         $dateDay={date.getDay()}
                                         $isPastDate={isPastDate}
@@ -1625,17 +1691,6 @@ const Calendar = ({
 
                         <div style={{ textAlign: "center" }}>
                         {format(selectedDate, 'yyyy년 M월 d일', { locale: ko })} 스케줄
-                        {currentEntry?.alarm?.isEnabled && (
-                            <span 
-                                title={`알람 설정됨: ${currentEntry.alarm.time}`} 
-                                style={{ marginLeft: '8px', verticalAlign: 'middle' }}
-                            >
-                                <AlarmClock 
-                                    size={16} 
-                                    color={isTodaySelected ? 'orange' : 'green'} 
-                                />
-                            </span>
-                        )}
                         <SmallNote>(오늘: {format(today, 'yyyy년 M월 d일', { locale: ko })})</SmallNote>
                         </div>
 
@@ -1677,11 +1732,37 @@ const Calendar = ({
                                 </div>
                             )}
 
+                            {currentEntry?.alarm && currentEntry.alarm.registeredAlarms && currentEntry.alarm.registeredAlarms.length > 0 && (
+                                <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '4px',
+                                    padding: '8px 0',
+                                    borderBottom: '1px dashed #ddd',
+                                    marginBottom: '8px',
+                                    color: '#555',
+                                    fontWeight: 600,
+                                    fontSize: '14px'
+                                }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <AlarmClock size={18} color="red" />
+                                        <span>이벤트 시간 - {currentEntry.alarm.eventTime || '설정 안 됨'}</span>
+                                    </div>
+                                    {currentEntry.alarm.alarmTitle && (
+                                        <div style={{ fontSize: '13px', color: '#666', fontWeight: 500 }}>
+                                            {currentEntry.alarm.alarmTitle}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {scheduleText ? (
-                                <span style={{ 
-                                    whiteSpace: 'pre-wrap', 
-                                    color: '#4a5568', 
-                                    display: 'block', 
+                                <span style={{
+                                    whiteSpace: 'pre-wrap',
+                                    color: '#4a5568',
+                                    display: 'block',
                                     paddingBottom: '12px',
                                     padding: '0 5px 12px 5px'   // ✅ 위0, 오른쪽5, 아래12, 왼쪽5
                                   }}

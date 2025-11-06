@@ -584,12 +584,13 @@ function App() {
         const key = format(new Date(date), 'yyyy-MM-dd');
         const scheduleData = calendarSchedules[key] || {}; // 날짜 키로 전체 스케줄 데이터 조회
 
-        // 모달에 전달할 데이터에 타임스탬프 추가
+        // 모달에 전달할 데이터에 타임스탬프와 알람 정보 추가
         setCalendarModalData({
             date,
             text: scheduleData.text ?? text, // 텍스트는 기존 방식을 유지
             createdAt: scheduleData.createdAt, // 작성일 추가
-            updatedAt: scheduleData.updatedAt  // 수정일 추가
+            updatedAt: scheduleData.updatedAt, // 수정일 추가
+            alarm: scheduleData.alarm // 알람 정보 추가
         });
         setIsCalendarEditorOpen(true);
     };
@@ -697,17 +698,9 @@ function App() {
     const [isDateSelectorOpen, setIsDateSelectorOpen] = useState(false);
 
     const handleOpenAlarmModal = (scheduleData) => {
-        console.log('handleOpenAlarmModal 호출됨:', scheduleData); // 디버깅용
-        console.log('현재 isAlarmModalOpen 상태:', isAlarmModalOpen);
-        console.log('현재 scheduleForAlarm 상태:', scheduleForAlarm);
-        
+        console.log('✅ handleOpenAlarmModal 호출됨:', scheduleData);
         setScheduleForAlarm(scheduleData);
         setIsAlarmModalOpen(true);
-
-        setTimeout(() => {
-            console.log('상태 변경 후 isAlarmModalOpen:', isAlarmModalOpen);
-            console.log('상태 변경 후 scheduleForAlarm:', scheduleForAlarm);
-        }, 100);
     };
 
     const handleSaveAlarm = (alarmSettings) => {
@@ -718,6 +711,12 @@ function App() {
         }
         const key = format(new Date(scheduleForAlarm.date), 'yyyy-MM-dd');
 
+        console.log('💾 알람 저장 시작:', {
+            key,
+            alarmSettings,
+            registeredAlarmsCount: alarmSettings.registeredAlarms?.length || 0
+        });
+
         // 2. calendarSchedules 상태를 업데이트합니다.
         setCalendarSchedules(prevSchedules => {
             const updatedSchedules = { ...prevSchedules };
@@ -725,16 +724,29 @@ function App() {
 
             // 3. 해당 날짜의 스케줄에 'alarm' 객체를 추가하거나 업데이트합니다.
             if (targetSchedule) {
+                // 기존 일정이 있는 경우
                 updatedSchedules[key] = {
                     ...targetSchedule,
                     alarm: alarmSettings
                 };
+            } else {
+                // 일정이 없는 경우 새로운 스케줄 엔트리 생성
+                const now = Date.now();
+                updatedSchedules[key] = {
+                    text: '',  // 빈 일정
+                    createdAt: now,
+                    updatedAt: now,
+                    alarm: alarmSettings
+                };
             }
+
+            console.log('💾 알람 저장 완료:', updatedSchedules[key]);
             return updatedSchedules;
         });
 
         // 4. 사용자에게 피드백을 주고 모달을 닫습니다.
-        showToast('알람이 설정되었습니다. 🔔');
+        const hasAlarms = alarmSettings.registeredAlarms && alarmSettings.registeredAlarms.length > 0;
+        showToast(hasAlarms ? '알람이 설정되었습니다. 🔔' : '이벤트 시간이 저장되었습니다.');
         setIsAlarmModalOpen(false);
         setScheduleForAlarm(null);
     };
@@ -1670,8 +1682,9 @@ if (isLoading) {
                                 </SortableContext>
                             </DndContext>
                         )}
-                        <div style={{ display: activeTab === 'calendar' ? 'block' : 'none' }}>
+                        {activeTab === 'calendar' && (
                             <Calendar
+                                key="calendar"
                                 onSelectDate={handleSelectDate}
                                 addActivity={addActivity}
                                 schedules={calendarSchedules}
@@ -1682,7 +1695,7 @@ if (isLoading) {
                                 onOpenEditor={handleOpenCalendarEditor}
                                 onOpenDateSelector={() => setIsDateSelectorOpen(true)}
                             />
-                        </div>
+                        )}
                         {activeTab === 'memo' &&
                             <MemoPage
                                 memos={memos}

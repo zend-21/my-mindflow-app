@@ -4,6 +4,7 @@ import styled, { keyframes } from "styled-components";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import Portal from '../../components/Portal';
+import { AlarmClock } from "lucide-react";
 
 /* 애니메이션 */
 const fadeIn = keyframes`
@@ -494,13 +495,38 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
             </ButtonRow>
           </Header>
 
+          {data?.alarm && data.alarm.registeredAlarms && data.alarm.registeredAlarms.length > 0 && (
+              <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '4px',
+                  padding: '12px',
+                  backgroundColor: '#fff',
+                  borderRadius: '8px',
+                  marginBottom: '12px',
+                  border: '1px solid #e2e8f0'
+              }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, fontSize: '14px', color: '#333' }}>
+                      <AlarmClock size={18} color="red" />
+                      <span>이벤트 시간 - {data.alarm.eventTime || '설정 안 됨'}</span>
+                  </div>
+                  {data.alarm.alarmTitle && (
+                      <div style={{ fontSize: '13px', color: '#666', fontWeight: 500 }}>
+                          {data.alarm.alarmTitle}
+                      </div>
+                  )}
+              </div>
+          )}
+
           {data?.createdAt && (
               <SmallNote>
                   · 처음 작성일: {format(new Date(data.createdAt), 'yyyy년 M월 d일 HH:mm', { locale: ko })}
                   <br />
                   · 마지막 수정일: {format(new Date(data.updatedAt), 'yyyy년 M월 d일 HH:mm', { locale: ko })}
               </SmallNote>
-          )}     
+          )}
 
               <SmallNote style={{ marginTop: -8, marginBottom: 5, textAlign: 'left' }}>
                 · 입력창을 두 번 탭하여 등록(수정)하거나 창을 닫을 수 있습니다.

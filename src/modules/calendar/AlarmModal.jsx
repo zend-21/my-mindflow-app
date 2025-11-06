@@ -563,6 +563,13 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   // Initialize state when modal opens
   useEffect(() => {
     if (isOpen && scheduleData) {
+      console.log('📋 AlarmModal 초기화:', {
+        hasScheduleData: !!scheduleData,
+        hasAlarm: !!scheduleData.alarm,
+        registeredAlarmsCount: scheduleData.alarm?.registeredAlarms?.length || 0,
+        scheduleData
+      });
+
       if (scheduleData.alarm) {
         setAlarmTitle(scheduleData.alarm.alarmTitle || '');
         setEventTime(scheduleData.alarm.eventTime || '09:00');
@@ -576,6 +583,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         setCustomSoundName(scheduleData.alarm.customSoundName || '');
         setVolume(scheduleData.alarm.volume ?? 80);
         setRepeat(scheduleData.alarm.repeat || 'none');
+
+        console.log('📋 기존 알람 데이터 로드 완료:', {
+          registeredAlarmsCount: scheduleData.alarm.registeredAlarms?.length || 0
+        });
       } else {
         // Reset to defaults
         setAlarmTitle('');
@@ -590,6 +601,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         setCustomSoundName('');
         setVolume(80);
         setRepeat('none');
+
+        console.log('📋 기본값으로 초기화 완료');
       }
 
       // Set direct date to schedule date
@@ -624,27 +637,43 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   // Add preset alarm
   const handleAddPresetAlarm = (days, hours, minutes) => {
-    const offsetConfig = {
-      type: 'preset',
-      days,
-      hours,
-      minutes
-    };
+    try {
+      console.log('➕ Preset 알람 추가 시도:', { days, hours, minutes, eventTime });
 
-    const alarmTime = calculateAlarmTime(eventTime, offsetConfig);
-    if (!alarmTime) return;
+      const offsetConfig = {
+        type: 'preset',
+        days,
+        hours,
+        minutes
+      };
 
-    const newAlarm = {
-      id: Date.now(),
-      type: 'preset',
-      offset: { days, hours, minutes },
-      calculatedTime: alarmTime,
-      displayText: `${days}일 ${hours}시간 ${minutes}분 전`.replace(/0일 /g, '').replace(/0시간 /g, '').replace(/0분 /g, '').trim() + (days === 0 && hours === 0 && minutes === 0 ? '정각' : '')
-    };
+      const alarmTime = calculateAlarmTime(eventTime, offsetConfig);
+      if (!alarmTime) {
+        console.error('❌ 알람 시간 계산 실패');
+        return;
+      }
 
-    setRegisteredAlarms([...registeredAlarms, newAlarm].sort((a, b) =>
-      a.calculatedTime - b.calculatedTime
-    ));
+      const newAlarm = {
+        id: Date.now(),
+        type: 'preset',
+        offset: { days, hours, minutes },
+        calculatedTime: alarmTime,
+        displayText: `${days}일 ${hours}시간 ${minutes}분 전`.replace(/0일 /g, '').replace(/0시간 /g, '').replace(/0분 /g, '').trim() + (days === 0 && hours === 0 && minutes === 0 ? '정각' : '')
+      };
+
+      const updatedAlarms = [...registeredAlarms, newAlarm].sort((a, b) =>
+        a.calculatedTime - b.calculatedTime
+      );
+
+      console.log('✅ Preset 알람 추가 완료:', {
+        newAlarm,
+        totalAlarms: updatedAlarms.length
+      });
+
+      setRegisteredAlarms(updatedAlarms);
+    } catch (error) {
+      console.error('❌ Preset 알람 추가 중 에러:', error);
+    }
   };
 
   // Add custom alarm
@@ -765,6 +794,14 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       repeat
     };
 
+    console.log('💾 AlarmModal 저장 버튼 클릭:', {
+      alarmTitle,
+      eventTime,
+      registeredAlarmsCount: registeredAlarms.length,
+      registeredAlarms,
+      alarmSettings
+    });
+
     onSave(alarmSettings);
   };
 
@@ -776,33 +813,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   const hasSchedule = scheduleData?.content || scheduleData?.text;
 
-  // Don't allow alarm settings for days without schedules
-  if (!hasSchedule) {
-    return (
-      <Portal>
-        <Overlay onClick={onClose}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <Header>
-              <div style={{ width: '32px' }}></div>
-              <HeaderTitle>알람 설정</HeaderTitle>
-              <CloseButton onClick={onClose}>×</CloseButton>
-            </Header>
-            <FormArea>
-              <Section style={{ textAlign: 'center', padding: '40px 20px' }}>
-                <AlertIcon style={{ margin: '0 auto 12px', color: '#6c757d' }} />
-                <p style={{ color: '#6c757d', margin: 0 }}>
-                  스케줄이 등록되지 않은 날은<br />알람 설정을 할 수 없습니다.
-                </p>
-              </Section>
-            </FormArea>
-            <Footer>
-              <CancelButton onClick={onClose}>닫기</CancelButton>
-            </Footer>
-          </ModalContent>
-        </Overlay>
-      </Portal>
-    );
-  }
+  // 일정이 없어도 알람 설정 가능하도록 제약 제거
+  // (이전에는 일정이 없으면 알람 설정 불가 메시지만 표시)
 
   // Generate hour and minute options
   const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
