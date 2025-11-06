@@ -253,7 +253,7 @@ const VibrationButton = styled.button`
     pointer-events: ${props => props.$show ? 'auto' : 'none'};
 
     &:hover:not(:disabled) {
-        background: ${props => (props.$active && props.$show) ? '#d8d6d3' : (props.$show ? '#f5f5f5' : 'transparent')};
+        background: ${props => (props.$active && props.$show) ? '#d8d6d3' : 'transparent'};
     }
 
     &:active:not(:disabled) {
@@ -298,7 +298,7 @@ const VolumeButtonRow = styled.div`
 const VolumeButton = styled.button`
     background: #f5f5f5;
     border: none;
-    color: #5c5c5c;
+    color: #4a4a4a;
     font-size: 18px;
     font-weight: 600;
     width: 32px;
@@ -649,8 +649,8 @@ const Timer = ({ onClose }) => {
     const [isRunning, setIsRunning] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
-    // 7단계 볼륨: 0, 0.005, 0.01, 0.03, 0.2, 0.5, 1.0 (실질적 음량 차이 반영)
-    const volumeLevels = [0, 0.005, 0.01, 0.03, 0.2, 0.5, 1.0];
+    // 7단계 볼륨: 0, 0.005, 0.01, 0.03, 0.15, 0.45, 1.0 (실질적 음량 차이 반영)
+    const volumeLevels = [0, 0.005, 0.01, 0.03, 0.15, 0.45, 1.0];
 
     const [volume, setVolume] = useState(() => {
         const savedVolume = localStorage.getItem('timerVolume');
