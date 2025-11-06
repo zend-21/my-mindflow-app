@@ -146,17 +146,17 @@ const VolumeIconButton = styled.button`
 `;
 
 const SpeakerIcon = styled.svg`
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
 
     @media (max-width: 480px) {
-        width: 22px;
-        height: 22px;
+        width: 26px;
+        height: 26px;
     }
 `;
 
 const VolumeSlider = styled.input`
-    width: 100px;
+    width: 80px;
     -webkit-appearance: none;
     appearance: none;
     height: 4px;
@@ -1242,54 +1242,18 @@ const Timer = ({ onClose }) => {
                         <VolumeControlContainer>
                             <VolumeControlInner>
                                 <VolumeIconButton onClick={toggleVolume} disabled={isRunning}>
-                                    {volume === 0 ? (
-                                        // 0단계: 음소거 (X 표시)
-                                        <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                            <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <line x1="18" y1="9" x2="22" y2="15" strokeLinecap="round"/>
-                                            <line x1="22" y1="9" x2="18" y2="15" strokeLinecap="round"/>
-                                        </SpeakerIcon>
-                                    ) : volume <= 0.002 ? (
-                                        // 1단계: 작대기 1줄 - 0.002 (0.2%)
-                                        <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                            <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </SpeakerIcon>
-                                    ) : volume <= 0.03 ? (
-                                        // 2단계: 작대기 2줄 - 0.03 (3%)
-                                        <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                            <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M18 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </SpeakerIcon>
-                                    ) : volume <= 0.4 ? (
-                                        // 3단계: 작대기 3줄 - 0.4 (40%)
-                                        <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                            <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M18 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M20.5 6c1.5 1.5 2.3 3.5 2.3 6s-.8 4.5-2.3 6" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </SpeakerIcon>
-                                    ) : volume <= 0.6 ? (
-                                        // 4단계: 작대기 4줄 - 0.6 (60%)
-                                        <SpeakerIcon viewBox="0 0 28 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                            <path d="M13 4L8 8H5v8h3l5 4V4z" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M16.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M19 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M21.5 6c1.5 1.5 2.3 3.5 2.3 6s-.8 4.5-2.3 6" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M24 4.5c2 2 3 4.5 3 7.5s-1 5.5-3 7.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </SpeakerIcon>
-                                    ) : (
-                                        // 5단계: 작대기 5줄 - 1.0 (100%)
-                                        <SpeakerIcon viewBox="0 0 32 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                            <path d="M13 4L8 8H5v8h3l5 4V4z" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M16.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M19 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M21.5 6c1.5 1.5 2.3 3.5 2.3 6s-.8 4.5-2.3 6" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M24 4.5c2 2 3 4.5 3 7.5s-1 5.5-3 7.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M26.5 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9" strokeLinecap="round" strokeLinejoin="round"/>
-                                        </SpeakerIcon>
-                                    )}
+                                    <SpeakerIcon viewBox="0 0 28 24" fill="currentColor">
+                                        {/* 막대 1 (가장 낮음) */}
+                                        <rect x="2" y="14" width="3" height="6" rx="1.5" opacity={volume === 0 ? 0.2 : 1}/>
+                                        {/* 막대 2 */}
+                                        <rect x="7" y="11" width="3" height="9" rx="1.5" opacity={volume === 0 || volume <= 0.002 ? 0.2 : 1}/>
+                                        {/* 막대 3 (중간) */}
+                                        <rect x="12" y="8" width="3" height="12" rx="1.5" opacity={volume === 0 || volume <= 0.03 ? 0.2 : 1}/>
+                                        {/* 막대 4 */}
+                                        <rect x="17" y="5" width="3" height="15" rx="1.5" opacity={volume === 0 || volume <= 0.4 ? 0.2 : 1}/>
+                                        {/* 막대 5 (가장 높음) */}
+                                        <rect x="22" y="2" width="3" height="18" rx="1.5" opacity={volume === 0 || volume <= 0.6 ? 0.2 : 1}/>
+                                    </SpeakerIcon>
                                 </VolumeIconButton>
                                 <VolumeSlider
                                     type="range"
@@ -1309,11 +1273,20 @@ const Timer = ({ onClose }) => {
                                     disabled={isRunning}
                                 >
                                     <VibrationIcon viewBox="0 0 24 24" fill="none" stroke={vibrationMode ? "#4a4a4a" : "#5c5c5c"} strokeWidth="1.5">
-                                        <line x1="8" y1="6" x2="8" y2="18" strokeLinecap="round"/>
-                                        <line x1="12" y1="4" x2="12" y2="20" strokeLinecap="round"/>
-                                        <line x1="16" y1="6" x2="16" y2="18" strokeLinecap="round"/>
-                                        <line x1="4" y1="10" x2="4" y2="14" strokeLinecap="round"/>
-                                        <line x1="20" y1="10" x2="20" y2="14" strokeLinecap="round"/>
+                                        {/* 휴대폰 본체 */}
+                                        <rect x="7" y="3" width="10" height="18" rx="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                        {/* 상단 영역 (스피커 부분) */}
+                                        <rect x="7" y="3" width="10" height="2.5" rx="1.5" fill={vibrationMode ? "#4a4a4a" : "#5c5c5c"} stroke="none"/>
+                                        {/* 스피커 (가늘고 짧은 선) */}
+                                        <line x1="10" y1="4.2" x2="14" y2="4.2" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
+                                        {/* 하단 영역 (홈버튼 부분) */}
+                                        <rect x="7" y="18.5" width="10" height="2.5" rx="1.5" fill={vibrationMode ? "#4a4a4a" : "#5c5c5c"} stroke="none"/>
+                                        {/* 홈버튼 (작은 원) */}
+                                        <circle cx="12" cy="19.7" r="0.7" fill="white"/>
+                                        {/* 좌측 진동 물결 (꼬불꼬불) */}
+                                        <path d="M4.5 8 Q3.5 9 4.5 10 Q5.5 11 4.5 12 Q3.5 13 4.5 14 Q5.5 15 4.5 16" strokeLinecap="round"/>
+                                        {/* 우측 진동 물결 (꼬불꼬불) */}
+                                        <path d="M19.5 8 Q20.5 9 19.5 10 Q18.5 11 19.5 12 Q20.5 13 19.5 14 Q18.5 15 19.5 16" strokeLinecap="round"/>
                                     </VibrationIcon>
                                 </VibrationButton>
                             </VolumeControlInner>
