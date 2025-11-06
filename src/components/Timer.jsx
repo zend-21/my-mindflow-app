@@ -1141,9 +1141,21 @@ const Timer = ({ onClose }) => {
                 audio = new Audio('/sound/Timer_alarm/01.mp3');
             }
 
-            audio.loop = true; // 반복 재생 설정
+            audio.loop = false; // loop 대신 ended 이벤트 사용
             audio.volume = volume; // 볼륨 설정
             audioRef.current = audio;
+
+            // 알람이 끝나면 0.2초 텀을 두고 재생
+            audio.addEventListener('ended', () => {
+                setTimeout(() => {
+                    if (audioRef.current && isAlarmPlayingRef.current) {
+                        audioRef.current.currentTime = 0;
+                        audioRef.current.play().catch(() => {
+                            // 재생 실패 무시
+                        });
+                    }
+                }, 300); // 0.2초 = 200ms (원하는 간격으로 조절 가능)
+            });
 
             audio.play().catch(() => {
                 // 오디오 재생 실패 (사용자 제스처 필요 등)
