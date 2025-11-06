@@ -68,14 +68,14 @@ const TimerContainer = styled.div`
 
 const BottomControlRow = styled.div`
     display: flex;
-    gap: 16px;
+    gap: 26px;
     align-items: center;
     justify-content: center;
     width: 100%;
     max-width: 500px;
 
     @media (max-width: 480px) {
-        gap: 12px;
+        gap: 22px;
     }
 
     @media (orientation: landscape) and (max-height: 500px) {
@@ -652,10 +652,27 @@ const Timer = ({ onClose }) => {
     // 6단계 볼륨: 0(무음), 0.002(0.2%), 0.03(3%), 0.1(10%), 0.3(30%), 1.0(100%)
     const volumeLevels = [0, 0.002, 0.03, 0.1, 0.3, 1.0];
 
-    const [volume, setVolume] = useState(() => {
+    // 볼륨 레벨 인덱스 (0~5)를 저장하고, 실제 볼륨값으로 변환
+    const [volumeLevelIndex, setVolumeLevelIndex] = useState(() => {
         const savedVolume = localStorage.getItem('timerVolume');
-        return savedVolume !== null ? parseFloat(savedVolume) : 0.5;
+        if (savedVolume !== null) {
+            const vol = parseFloat(savedVolume);
+            // 저장된 볼륨값에서 가장 가까운 레벨 인덱스 찾기
+            let closestIndex = 0;
+            let minDiff = Math.abs(vol - volumeLevels[0]);
+            for (let i = 1; i < volumeLevels.length; i++) {
+                const diff = Math.abs(vol - volumeLevels[i]);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closestIndex = i;
+                }
+            }
+            return closestIndex;
+        }
+        return 4; // 기본값 0.3 (인덱스 4)
     });
+
+    const volume = volumeLevels[volumeLevelIndex];
     const [vibrationMode, setVibrationMode] = useState(() => {
         const savedVibration = localStorage.getItem('timerVibration');
         return savedVibration === 'true';
@@ -671,49 +688,35 @@ const Timer = ({ onClose }) => {
     const testAudioRef = useRef(null);
     const testAudioTimeoutRef = useRef(null);
 
-    // 가장 가까운 볼륨 레벨로 스냅
-    const snapToVolumeLevel = (rawVolume) => {
-        let closestLevel = volumeLevels[0];
-        let minDiff = Math.abs(rawVolume - closestLevel);
-
-        for (let level of volumeLevels) {
-            const diff = Math.abs(rawVolume - level);
-            if (diff < minDiff) {
-                minDiff = diff;
-                closestLevel = level;
-            }
-        }
-
-        return closestLevel;
-    };
-
     // 음량 변경 핸들러 (실시간 재생)
     const handleVolumeChange = (e) => {
-        const rawVolume = parseFloat(e.target.value);
-        const snappedVolume = snapToVolumeLevel(rawVolume);
+        const newIndex = parseInt(e.target.value);
+        setVolumeLevelIndex(newIndex);
 
-        setVolume(snappedVolume);
-        localStorage.setItem('timerVolume', snappedVolume.toString());
+        const newVolume = volumeLevels[newIndex];
+        localStorage.setItem('timerVolume', newVolume.toString());
 
         // 오디오가 재생 중이면 즉시 볼륨 적용
         if (audioRef.current) {
-            audioRef.current.volume = snappedVolume;
+            audioRef.current.volume = newVolume;
         }
 
         // 볼륨이 0이 아니면 진동 모드 해제
-        if (snappedVolume > 0 && vibrationMode) {
+        if (newVolume > 0 && vibrationMode) {
             setVibrationMode(false);
             localStorage.setItem('timerVibration', 'false');
         }
 
         // 슬라이더 움직이는 동안 계속 테스트 사운드 재생
-        playTestSound(snappedVolume);
+        playTestSound(newVolume);
     };
 
     // 스피커 아이콘 클릭 - 음소거/최대 볼륨 토글
     const toggleVolume = () => {
-        const newVolume = volume === 0 ? 1.0 : 0;
-        setVolume(newVolume);
+        const newIndex = volumeLevelIndex === 0 ? 5 : 0;
+        setVolumeLevelIndex(newIndex);
+
+        const newVolume = volumeLevels[newIndex];
         localStorage.setItem('timerVolume', newVolume.toString());
 
         if (audioRef.current) {
@@ -729,10 +732,11 @@ const Timer = ({ onClose }) => {
 
     // 음량 감소 (한 단계 내리기)
     const decreaseVolume = () => {
-        const currentIndex = volumeLevels.findIndex(level => level === volume);
-        if (currentIndex > 0) {
-            const newVolume = volumeLevels[currentIndex - 1];
-            setVolume(newVolume);
+        if (volumeLevelIndex > 0) {
+            const newIndex = volumeLevelIndex - 1;
+            setVolumeLevelIndex(newIndex);
+
+            const newVolume = volumeLevels[newIndex];
             localStorage.setItem('timerVolume', newVolume.toString());
 
             if (audioRef.current) {
@@ -752,10 +756,11 @@ const Timer = ({ onClose }) => {
 
     // 음량 증가 (한 단계 올리기)
     const increaseVolume = () => {
-        const currentIndex = volumeLevels.findIndex(level => level === volume);
-        if (currentIndex < volumeLevels.length - 1) {
-            const newVolume = volumeLevels[currentIndex + 1];
-            setVolume(newVolume);
+        if (volumeLevelIndex < volumeLevels.length - 1) {
+            const newIndex = volumeLevelIndex + 1;
+            setVolumeLevelIndex(newIndex);
+
+            const newVolume = volumeLevels[newIndex];
             localStorage.setItem('timerVolume', newVolume.toString());
 
             if (audioRef.current) {
@@ -782,7 +787,7 @@ const Timer = ({ onClose }) => {
 
         // 진동 모드 활성화 시 볼륨을 0으로
         if (newVibrationMode) {
-            setVolume(0);
+            setVolumeLevelIndex(0);
             localStorage.setItem('timerVolume', '0');
             if (audioRef.current) {
                 audioRef.current.volume = 0;
@@ -1255,24 +1260,24 @@ const Timer = ({ onClose }) => {
                             <VolumeControlInner>
                                 <VolumeIconButton onClick={toggleVolume} disabled={isRunning}>
                                     <SpeakerIcon viewBox="0 0 28 24" fill="currentColor">
-                                        {/* 막대 1 (가장 낮음) - 0.002 */}
-                                        <rect x="2" y="14" width="3" height="6" rx="1.5" opacity={volume === 0 ? 0.2 : 1}/>
-                                        {/* 막대 2 - 0.03 */}
-                                        <rect x="7" y="11" width="3" height="9" rx="1.5" opacity={volume === 0 || volume <= 0.002 ? 0.2 : 1}/>
-                                        {/* 막대 3 (중간) - 0.1 */}
-                                        <rect x="12" y="8" width="3" height="12" rx="1.5" opacity={volume === 0 || volume <= 0.03 ? 0.2 : 1}/>
-                                        {/* 막대 4 - 0.3 */}
-                                        <rect x="17" y="5" width="3" height="15" rx="1.5" opacity={volume === 0 || volume <= 0.1 ? 0.2 : 1}/>
-                                        {/* 막대 5 (가장 높음) - 1.0 */}
-                                        <rect x="22" y="2" width="3" height="18" rx="1.5" opacity={volume === 0 || volume <= 0.3 ? 0.2 : 1}/>
+                                        {/* 막대 1 (가장 낮음) - 레벨 1 */}
+                                        <rect x="2" y="14" width="3" height="6" rx="1.5" opacity={volumeLevelIndex === 0 ? 0.2 : 1}/>
+                                        {/* 막대 2 - 레벨 2 */}
+                                        <rect x="7" y="11" width="3" height="9" rx="1.5" opacity={volumeLevelIndex <= 1 ? 0.2 : 1}/>
+                                        {/* 막대 3 (중간) - 레벨 3 */}
+                                        <rect x="12" y="8" width="3" height="12" rx="1.5" opacity={volumeLevelIndex <= 2 ? 0.2 : 1}/>
+                                        {/* 막대 4 - 레벨 4 */}
+                                        <rect x="17" y="5" width="3" height="15" rx="1.5" opacity={volumeLevelIndex <= 3 ? 0.2 : 1}/>
+                                        {/* 막대 5 (가장 높음) - 레벨 5 */}
+                                        <rect x="22" y="2" width="3" height="18" rx="1.5" opacity={volumeLevelIndex <= 4 ? 0.2 : 1}/>
                                     </SpeakerIcon>
                                 </VolumeIconButton>
                                 <VolumeSlider
                                     type="range"
                                     min="0"
-                                    max="1"
-                                    step="0.01"
-                                    value={volume}
+                                    max="5"
+                                    step="1"
+                                    value={volumeLevelIndex}
                                     onChange={handleVolumeChange}
                                     onMouseUp={stopTestSound}
                                     onTouchEnd={stopTestSound}
@@ -1305,13 +1310,13 @@ const Timer = ({ onClose }) => {
                             <VolumeButtonRow>
                                 <VolumeButton
                                     onClick={decreaseVolume}
-                                    disabled={isRunning || volume === 0}
+                                    disabled={isRunning || volumeLevelIndex === 0}
                                 >
                                     −
                                 </VolumeButton>
                                 <VolumeButton
                                     onClick={increaseVolume}
-                                    disabled={isRunning || volume === 1.0}
+                                    disabled={isRunning || volumeLevelIndex === 5}
                                     style={{ marginLeft: '15px' }}
                                 >
                                     +
