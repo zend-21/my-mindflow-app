@@ -224,19 +224,19 @@ const VolumeSlider = styled.input`
         height: 3px;
 
         &::-webkit-slider-thumb {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
         }
 
         &::-moz-range-thumb {
-            width: 16px;
-            height: 16px;
+            width: 14px;
+            height: 14px;
         }
     }
 `;
 
 const VibrationButton = styled.button`
-    background: none;
+    background: ${props => (props.$active && props.$show) ? '#e8e6e3' : 'transparent'};
     border: none;
     cursor: pointer;
     user-select: none;
@@ -252,16 +252,12 @@ const VibrationButton = styled.button`
     opacity: ${props => props.$show ? '1' : '0.15'};
     pointer-events: ${props => props.$show ? 'auto' : 'none'};
 
-    ${props => props.$active && props.$show && `
-        background: #e8e6e3;
-    `}
-
     &:hover:not(:disabled) {
-        background: ${props => props.$show ? '#e8e6e3' : 'none'};
+        background: ${props => (props.$active && props.$show) ? '#d8d6d3' : (props.$show ? '#f5f5f5' : 'transparent')};
     }
 
     &:active:not(:disabled) {
-        background: ${props => props.$show ? '#d8d6d3' : 'none'};
+        background: ${props => (props.$active && props.$show) ? '#c8c6c3' : (props.$show ? '#e8e6e3' : 'transparent')};
     }
 
     &:disabled {
@@ -345,7 +341,7 @@ const VolumeButton = styled.button`
 const CloseButton = styled.button`
     background: #ffffff;
     border: none;
-    color: #5c5c5c;
+    color: #4a4a4a;
     font-size: 16px;
     font-weight: 500;
     padding: 14px 32px;
@@ -519,7 +515,7 @@ const TimeButtonRow = styled.div`
 const TimeButton = styled.button`
     background: #ffffff;
     border: none;
-    color: #5c5c5c;
+    color: #4a4a4a;
     font-size: 18px;
     font-weight: 500;
     padding: 18px 28px;
@@ -581,7 +577,7 @@ const ControlRow = styled.div`
 const ResetButton = styled.button`
     background: #ffffff;
     border: none;
-    color: #5c5c5c;
+    color: #4a4a4a;
     font-size: 18px;
     font-weight: 500;
     padding: 18px 28px;
@@ -780,6 +776,7 @@ const Timer = ({ onClose }) => {
     // 진동 모드 토글
     const toggleVibrationMode = () => {
         const newVibrationMode = !vibrationMode;
+        console.log('진동 모드 토글:', vibrationMode, '->', newVibrationMode);
         setVibrationMode(newVibrationMode);
         localStorage.setItem('timerVibration', newVibrationMode.toString());
 
