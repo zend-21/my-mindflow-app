@@ -649,8 +649,8 @@ const Timer = ({ onClose }) => {
     const [isRunning, setIsRunning] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
-    // 7단계 볼륨: 0, 0.01, 0.03, 0.1, 0.3, 0.6, 1.0 (더 세밀한 조절)
-    const volumeLevels = [0, 0.01, 0.03, 0.1, 0.3, 0.6, 1.0];
+    // 7단계 볼륨: 0, 0.005, 0.01, 0.03, 0.2, 0.5, 1.0 (실질적 음량 차이 반영)
+    const volumeLevels = [0, 0.005, 0.01, 0.03, 0.2, 0.5, 1.0];
 
     const [volume, setVolume] = useState(() => {
         const savedVolume = localStorage.getItem('timerVolume');
