@@ -787,6 +787,16 @@ const Timer = ({ onClose }) => {
             if (audioRef.current) {
                 audioRef.current.volume = 0;
             }
+
+            // 진동 모드 활성화 시 0.5초간 진동 피드백
+            if ('vibrate' in navigator) {
+                navigator.vibrate(500); // 500ms 진동
+            }
+        } else {
+            // 진동 모드 해제 시 진동 즉시 중지
+            if ('vibrate' in navigator) {
+                navigator.vibrate(0); // 진동 중지
+            }
         }
     };
 
