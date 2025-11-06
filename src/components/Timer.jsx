@@ -1262,22 +1262,22 @@ const Timer = ({ onClose }) => {
                                         </SpeakerIcon>
                                     ) : volume <= 0.6 ? (
                                         // 4단계: 작대기 4줄 - 0.6 (60%)
-                                        <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                            <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M18 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M20.5 6c1.5 1.5 2.3 3.5 2.3 6s-.8 4.5-2.3 6" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M22 4.5c2 2 3 4.5 3 7.5s-1 5.5-3 7.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                        <SpeakerIcon viewBox="0 0 28 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                            <path d="M13 4L8 8H5v8h3l5 4V4z" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M16.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M19 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M21.5 6c1.5 1.5 2.3 3.5 2.3 6s-.8 4.5-2.3 6" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M24 4.5c2 2 3 4.5 3 7.5s-1 5.5-3 7.5" strokeLinecap="round" strokeLinejoin="round"/>
                                         </SpeakerIcon>
                                     ) : (
                                         // 5단계: 작대기 5줄 - 1.0 (100%)
-                                        <SpeakerIcon viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                            <path d="M12 5L7 9H4v6h3l5 4V5z" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M15.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M18 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M20.5 6c1.5 1.5 2.3 3.5 2.3 6s-.8 4.5-2.3 6" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M22 4.5c2 2 3 4.5 3 7.5s-1 5.5-3 7.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                            <path d="M23.5 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9" strokeLinecap="round" strokeLinejoin="round"/>
+                                        <SpeakerIcon viewBox="0 0 32 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                            <path d="M13 4L8 8H5v8h3l5 4V4z" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M16.5 10.5c.5.5.8 1.2.8 2s-.3 1.5-.8 2" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M19 8c1 1 1.5 2.3 1.5 4s-.5 3-1.5 4" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M21.5 6c1.5 1.5 2.3 3.5 2.3 6s-.8 4.5-2.3 6" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M24 4.5c2 2 3 4.5 3 7.5s-1 5.5-3 7.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                            <path d="M26.5 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9" strokeLinecap="round" strokeLinejoin="round"/>
                                         </SpeakerIcon>
                                     )}
                                 </VolumeIconButton>
