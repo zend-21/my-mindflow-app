@@ -45,24 +45,10 @@ const TimerContainer = styled.div`
         padding: 20px 15px;
     }
 
-    /* 가로 모드 대응 - 컨테이너를 90도 회전 */
-    @media (orientation: landscape) and (max-height: 500px) {
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) rotate(90deg);
-        transform-origin: center center;
-        width: 80vh;
-        max-width: 80vh;
-        height: auto;
-        max-height: 85vw;
-        padding: 30px 25px;
-    }
-
-    /* 태블릿 이상 큰 화면의 가로 모드 */
-    @media (orientation: landscape) and (min-height: 501px) {
-        padding: 40px 35px;
-        max-height: 85vh;
+    /* 가로 모드에서도 회전하지 않고 세로 방향 유지 */
+    @media (orientation: landscape) {
+        max-height: 90vh;
+        overflow-y: auto;
     }
 `;
 
@@ -76,10 +62,6 @@ const BottomControlRow = styled.div`
 
     @media (max-width: 480px) {
         gap: 22px;
-    }
-
-    @media (orientation: landscape) and (max-height: 500px) {
-        gap: 12px;
     }
 `;
 
@@ -1142,6 +1124,59 @@ const Timer = ({ onClose }) => {
         preloadAudio.load();
         preloadedAudioRef.current = preloadAudio;
 
+        // Page Visibility API - 전화/알림 등으로 백그라운드 갔다가 돌아올 때 처리
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                // 백그라운드로 갔을 때
+                console.log('📱 타이머 백그라운드로 이동');
+                // 알람이 울리는 중이면 일시정지 (전화 등)
+                if (isAlarmPlayingRef.current && audioRef.current) {
+                    audioRef.current.pause();
+                }
+            } else {
+                // 다시 포그라운드로 돌아왔을 때
+                console.log('📱 타이머 포그라운드로 복귀');
+                // Wake Lock 재요청 (브라우저가 해제했을 수 있음)
+                if (isRunning || isAlarmPlaying) {
+                    requestWakeLock();
+                }
+                // 알람이 울리는 중이었으면 재개
+                if (isAlarmPlayingRef.current && audioRef.current) {
+                    audioRef.current.play().catch(() => {
+                        console.log('알람 재개 실패');
+                    });
+                }
+            }
+        };
+
+        // 오디오 중단 이벤트 처리 (전화 수신 등)
+        const handleAudioInterruption = () => {
+            console.log('📞 오디오 중단 감지 (전화 등)');
+            if (isAlarmPlayingRef.current && audioRef.current) {
+                // 오디오가 자동으로 일시정지됨
+                audioRef.current.pause();
+            }
+        };
+
+        // 오디오 재개 이벤트 처리 (전화 종료 등)
+        const handleAudioResume = () => {
+            console.log('📞 오디오 재개 가능');
+            if (isAlarmPlayingRef.current && audioRef.current && !document.hidden) {
+                audioRef.current.play().catch(() => {
+                    console.log('알람 자동 재개 실패');
+                });
+            }
+        };
+
+        // 이벤트 리스너 등록
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        // 오디오 중단/재개 이벤트 (iOS/Android)
+        if (audioRef.current) {
+            audioRef.current.addEventListener('pause', handleAudioInterruption);
+            audioRef.current.addEventListener('play', handleAudioResume);
+        }
+
         return () => {
             handleMouseUp();
             if (intervalRef.current) {
@@ -1150,6 +1185,8 @@ const Timer = ({ onClose }) => {
             // 알람 중지
             if (audioRef.current) {
                 audioRef.current.pause();
+                audioRef.current.removeEventListener('pause', handleAudioInterruption);
+                audioRef.current.removeEventListener('play', handleAudioResume);
                 audioRef.current = null;
             }
             // 테스트 오디오 정리
@@ -1162,6 +1199,8 @@ const Timer = ({ onClose }) => {
             }
             // Wake Lock 해제
             releaseWakeLock();
+            // 이벤트 리스너 제거
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, []);
 
