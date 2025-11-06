@@ -236,7 +236,7 @@ const VolumeSlider = styled.input`
 `;
 
 const VibrationButton = styled.button`
-    background: ${props => (props.$active && props.$show) ? '#e8e6e3' : 'transparent'};
+    background: ${props => props.$active ? '#5c5c5c' : 'transparent'};
     border: none;
     cursor: pointer;
     user-select: none;
@@ -244,7 +244,7 @@ const VibrationButton = styled.button`
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    transition: none;
+    transition: transform 0.2s, background 0.2s;
     padding: 0;
     width: 24px;
     height: 24px;
@@ -253,11 +253,11 @@ const VibrationButton = styled.button`
     pointer-events: ${props => props.$show ? 'auto' : 'none'};
 
     &:hover:not(:disabled) {
-        background: ${props => (props.$active && props.$show) ? '#d8d6d3' : 'transparent'};
+        transform: scale(1.1);
     }
 
     &:active:not(:disabled) {
-        background: ${props => (props.$active && props.$show) ? '#c8c6c3' : (props.$show ? '#e8e6e3' : 'transparent')};
+        transform: scale(0.95);
     }
 
     &:disabled {
@@ -649,8 +649,8 @@ const Timer = ({ onClose }) => {
     const [isRunning, setIsRunning] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
-    // 6단계 볼륨: 0, 0.002, 0.03, 0.4, 0.6, 1.0 (실질적 음량 차이 반영)
-    const volumeLevels = [0, 0.002, 0.03, 0.4, 0.6, 1.0];
+    // 6단계 볼륨: 0(무음), 0.002(0.2%), 0.03(3%), 0.1(10%), 0.3(30%), 1.0(100%)
+    const volumeLevels = [0, 0.002, 0.03, 0.1, 0.3, 1.0];
 
     const [volume, setVolume] = useState(() => {
         const savedVolume = localStorage.getItem('timerVolume');
@@ -1255,16 +1255,16 @@ const Timer = ({ onClose }) => {
                             <VolumeControlInner>
                                 <VolumeIconButton onClick={toggleVolume} disabled={isRunning}>
                                     <SpeakerIcon viewBox="0 0 28 24" fill="currentColor">
-                                        {/* 막대 1 (가장 낮음) */}
+                                        {/* 막대 1 (가장 낮음) - 0.002 */}
                                         <rect x="2" y="14" width="3" height="6" rx="1.5" opacity={volume === 0 ? 0.2 : 1}/>
-                                        {/* 막대 2 */}
+                                        {/* 막대 2 - 0.03 */}
                                         <rect x="7" y="11" width="3" height="9" rx="1.5" opacity={volume === 0 || volume <= 0.002 ? 0.2 : 1}/>
-                                        {/* 막대 3 (중간) */}
+                                        {/* 막대 3 (중간) - 0.1 */}
                                         <rect x="12" y="8" width="3" height="12" rx="1.5" opacity={volume === 0 || volume <= 0.03 ? 0.2 : 1}/>
-                                        {/* 막대 4 */}
-                                        <rect x="17" y="5" width="3" height="15" rx="1.5" opacity={volume === 0 || volume <= 0.4 ? 0.2 : 1}/>
-                                        {/* 막대 5 (가장 높음) */}
-                                        <rect x="22" y="2" width="3" height="18" rx="1.5" opacity={volume === 0 || volume <= 0.6 ? 0.2 : 1}/>
+                                        {/* 막대 4 - 0.3 */}
+                                        <rect x="17" y="5" width="3" height="15" rx="1.5" opacity={volume === 0 || volume <= 0.1 ? 0.2 : 1}/>
+                                        {/* 막대 5 (가장 높음) - 1.0 */}
+                                        <rect x="22" y="2" width="3" height="18" rx="1.5" opacity={volume === 0 || volume <= 0.3 ? 0.2 : 1}/>
                                     </SpeakerIcon>
                                 </VolumeIconButton>
                                 <VolumeSlider
@@ -1284,17 +1284,17 @@ const Timer = ({ onClose }) => {
                                     onClick={toggleVibrationMode}
                                     disabled={isRunning}
                                 >
-                                    <VibrationIcon viewBox="0 0 24 24" fill="none" stroke={vibrationMode ? "#4a4a4a" : "#5c5c5c"} strokeWidth="1.5">
+                                    <VibrationIcon viewBox="0 0 24 24" fill="none" stroke={vibrationMode ? "white" : "#5c5c5c"} strokeWidth="1.5">
                                         {/* 휴대폰 본체 */}
-                                        <rect x="7" y="3" width="10" height="18" rx="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                        <rect x="7" y="3" width="10" height="18" rx="1.5" strokeLinecap="round" strokeLinejoin="round" fill={vibrationMode ? "#5c5c5c" : "none"}/>
                                         {/* 상단 영역 (스피커 부분) */}
-                                        <rect x="7" y="3" width="10" height="2.5" rx="1.5" fill={vibrationMode ? "#4a4a4a" : "#5c5c5c"} stroke="none"/>
+                                        <rect x="7" y="3" width="10" height="2.5" rx="1.5" fill={vibrationMode ? "white" : "#5c5c5c"} stroke="none"/>
                                         {/* 스피커 (가늘고 짧은 선) */}
-                                        <line x1="10" y1="4.2" x2="14" y2="4.2" stroke="white" strokeWidth="0.8" strokeLinecap="round"/>
+                                        <line x1="10" y1="4.2" x2="14" y2="4.2" stroke={vibrationMode ? "#5c5c5c" : "white"} strokeWidth="0.8" strokeLinecap="round"/>
                                         {/* 하단 영역 (홈버튼 부분) */}
-                                        <rect x="7" y="18.5" width="10" height="2.5" rx="1.5" fill={vibrationMode ? "#4a4a4a" : "#5c5c5c"} stroke="none"/>
+                                        <rect x="7" y="18.5" width="10" height="2.5" rx="1.5" fill={vibrationMode ? "white" : "#5c5c5c"} stroke="none"/>
                                         {/* 홈버튼 (작은 원) */}
-                                        <circle cx="12" cy="19.7" r="0.7" fill="white"/>
+                                        <circle cx="12" cy="19.7" r="0.7" fill={vibrationMode ? "#5c5c5c" : "white"}/>
                                         {/* 좌측 진동 물결 (꼬불꼬불) */}
                                         <path d="M4.5 8 Q3.5 9 4.5 10 Q5.5 11 4.5 12 Q3.5 13 4.5 14 Q5.5 15 4.5 16" strokeLinecap="round"/>
                                         {/* 우측 진동 물결 (꼬불꼬불) */}
