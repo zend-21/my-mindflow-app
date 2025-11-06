@@ -244,7 +244,7 @@ const VibrationButton = styled.button`
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    transition: all 0.2s;
+    transition: none;
     padding: 0;
     width: 24px;
     height: 24px;
@@ -649,8 +649,8 @@ const Timer = ({ onClose }) => {
     const [isRunning, setIsRunning] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [isAlarmPlaying, setIsAlarmPlaying] = useState(false);
-    // 7단계 볼륨: 0, 0.005, 0.01, 0.03, 0.15, 0.45, 1.0 (실질적 음량 차이 반영)
-    const volumeLevels = [0, 0.005, 0.01, 0.03, 0.15, 0.45, 1.0];
+    // 7단계 볼륨: 0, 0.002, 0.03, 0.1, 0.4, 0.6, 1.0 (실질적 음량 차이 반영)
+    const volumeLevels = [0, 0.002, 0.03, 0.1, 0.4, 0.6, 1.0];
 
     const [volume, setVolume] = useState(() => {
         const savedVolume = localStorage.getItem('timerVolume');
