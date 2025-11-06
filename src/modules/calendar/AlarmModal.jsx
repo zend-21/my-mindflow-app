@@ -615,7 +615,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   // Calculate actual alarm time from event time and offset
   const calculateAlarmTime = (eventTimeStr, offsetConfig) => {
-    if (!scheduleData?.date) return null;
+    if (!scheduleData?.date) {
+      console.error('❌ calculateAlarmTime: scheduleData.date가 없습니다', { scheduleData });
+      return null;
+    }
 
     const [eventHour, eventMinute] = eventTimeStr.split(':').map(Number);
     let eventDateTime = new Date(scheduleData.date);
@@ -627,6 +630,14 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       alarmTime = subDays(alarmTime, days);
       alarmTime = subHours(alarmTime, hours);
       alarmTime = subMinutes(alarmTime, minutes);
+
+      console.log('⏰ 알람 시간 계산 완료:', {
+        eventTime: eventTimeStr,
+        eventDateTime,
+        offset: { days, hours, minutes },
+        calculatedAlarmTime: alarmTime
+      });
+
       return alarmTime;
     } else if (offsetConfig.type === 'absolute') {
       return new Date(offsetConfig.dateTime);
