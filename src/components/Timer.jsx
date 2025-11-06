@@ -688,6 +688,8 @@ const Timer = ({ onClose }) => {
     const vibrationIntervalRef = useRef(null);
     const testAudioRef = useRef(null);
     const testAudioTimeoutRef = useRef(null);
+    const notificationPermissionGranted = useRef(false);
+    const notificationSentAt10s = useRef(false);
 
     // 음량 변경 핸들러 (슬라이더 드래그 시 - 테스트 소리 없음)
     const handleVolumeChange = (e) => {
@@ -885,6 +887,54 @@ const Timer = ({ onClose }) => {
         }
     };
 
+    // 알림 권한 요청
+    const requestNotificationPermission = async () => {
+        if (!('Notification' in window)) {
+            console.log('이 브라우저는 알림을 지원하지 않습니다.');
+            return false;
+        }
+
+        if (Notification.permission === 'granted') {
+            notificationPermissionGranted.current = true;
+            return true;
+        }
+
+        if (Notification.permission !== 'denied') {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                notificationPermissionGranted.current = true;
+                return true;
+            }
+        }
+
+        return false;
+    };
+
+    // 타이머 알림 전송
+    const sendTimerNotification = (title, body) => {
+        if (!notificationPermissionGranted.current) {
+            return;
+        }
+
+        try {
+            const notification = new Notification(title, {
+                body: body,
+                icon: '/favicon.ico',
+                badge: '/favicon.ico',
+                tag: 'timer-notification',
+                requireInteraction: false
+            });
+
+            // 알림 클릭 시 타이머 창으로 포커스
+            notification.onclick = () => {
+                window.focus();
+                notification.close();
+            };
+        } catch (err) {
+            console.log('알림 전송 실패:', err);
+        }
+    };
+
     // 전체화면 API 제거 - 모바일에서 화면 요동 방지
     // CSS Overlay(z-index: 20000)로 충분히 몰입형 UI 제공
 
@@ -1025,6 +1075,7 @@ const Timer = ({ onClose }) => {
             setIsRunning(false);
             setSeconds(0); // 타이머를 완전히 리셋
             releaseWakeLock();
+            notificationSentAt10s.current = false;
             return;
         }
 
@@ -1033,6 +1084,8 @@ const Timer = ({ onClose }) => {
         // 타이머 시작 시
         if (!isRunning) {
             requestWakeLock();
+            requestNotificationPermission(); // 알림 권한 요청
+            notificationSentAt10s.current = false; // 10초 알림 플래그 초기화
         } else {
             // 타이머 일시정지 시
             releaseWakeLock();
@@ -1054,6 +1107,8 @@ const Timer = ({ onClose }) => {
         }
         // Wake Lock 해제
         releaseWakeLock();
+        // 10초 알림 플래그 초기화
+        notificationSentAt10s.current = false;
     };
 
     // 타이머 카운트다운
@@ -1061,7 +1116,15 @@ const Timer = ({ onClose }) => {
         if (isRunning && seconds > 0) {
             intervalRef.current = setInterval(() => {
                 setSeconds(prev => {
+                    // 10초 남았을 때 알림 전송 (한 번만)
+                    if (prev === 10 && !notificationSentAt10s.current) {
+                        sendTimerNotification('타이머 곧 종료', '10초 남았습니다');
+                        notificationSentAt10s.current = true;
+                    }
+
                     if (prev <= 1) {
+                        // 타이머 종료 알림 전송
+                        sendTimerNotification('타이머 종료!', '설정한 시간이 종료되었습니다');
                         // 타이머는 멈추지만 isRunning은 true로 유지
                         playAlarm();
                         return 0;
