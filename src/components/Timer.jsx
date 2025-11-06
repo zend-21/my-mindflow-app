@@ -773,6 +773,44 @@ const Timer = ({ onClose }) => {
         }
     };
 
+    // 볼륨 증가 버튼 길게 누르기 시작
+    const handleIncreaseVolumeStart = () => {
+        // 즉시 한 번 실행
+        increaseVolume();
+
+        // 300ms 후부터 연속 실행 시작
+        longPressTimerRef.current = setTimeout(() => {
+            longPressIntervalRef.current = setInterval(() => {
+                increaseVolume();
+            }, 200); // 200ms마다 반복
+        }, 300);
+    };
+
+    // 볼륨 감소 버튼 길게 누르기 시작
+    const handleDecreaseVolumeStart = () => {
+        // 즉시 한 번 실행
+        decreaseVolume();
+
+        // 300ms 후부터 연속 실행 시작
+        longPressTimerRef.current = setTimeout(() => {
+            longPressIntervalRef.current = setInterval(() => {
+                decreaseVolume();
+            }, 200); // 200ms마다 반복
+        }, 300);
+    };
+
+    // 볼륨 버튼 길게 누르기 종료
+    const handleVolumeButtonEnd = () => {
+        if (longPressTimerRef.current) {
+            clearTimeout(longPressTimerRef.current);
+            longPressTimerRef.current = null;
+        }
+        if (longPressIntervalRef.current) {
+            clearInterval(longPressIntervalRef.current);
+            longPressIntervalRef.current = null;
+        }
+    };
+
     // 진동 모드 토글
     const toggleVibrationMode = () => {
         const newVibrationMode = !vibrationMode;
@@ -1290,13 +1328,21 @@ const Timer = ({ onClose }) => {
                             </VolumeControlInner>
                             <VolumeButtonRow>
                                 <VolumeButton
-                                    onClick={decreaseVolume}
+                                    onMouseDown={handleDecreaseVolumeStart}
+                                    onMouseUp={handleVolumeButtonEnd}
+                                    onMouseLeave={handleVolumeButtonEnd}
+                                    onTouchStart={handleDecreaseVolumeStart}
+                                    onTouchEnd={handleVolumeButtonEnd}
                                     disabled={isRunning || volume === 0}
                                 >
                                     −
                                 </VolumeButton>
                                 <VolumeButton
-                                    onClick={increaseVolume}
+                                    onMouseDown={handleIncreaseVolumeStart}
+                                    onMouseUp={handleVolumeButtonEnd}
+                                    onMouseLeave={handleVolumeButtonEnd}
+                                    onTouchStart={handleIncreaseVolumeStart}
+                                    onTouchEnd={handleVolumeButtonEnd}
                                     disabled={isRunning || volume === 1.0}
                                 >
                                     +
