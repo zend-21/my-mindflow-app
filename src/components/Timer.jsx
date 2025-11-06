@@ -688,7 +688,7 @@ const Timer = ({ onClose }) => {
     const testAudioRef = useRef(null);
     const testAudioTimeoutRef = useRef(null);
 
-    // 음량 변경 핸들러 (실시간 재생)
+    // 음량 변경 핸들러 (슬라이더 드래그 시 - 테스트 소리 없음)
     const handleVolumeChange = (e) => {
         const newIndex = parseInt(e.target.value);
         setVolumeLevelIndex(newIndex);
@@ -706,9 +706,6 @@ const Timer = ({ onClose }) => {
             setVibrationMode(false);
             localStorage.setItem('timerVibration', 'false');
         }
-
-        // 슬라이더 움직이는 동안 계속 테스트 사운드 재생
-        playTestSound(newVolume);
     };
 
     // 스피커 아이콘 클릭 - 음소거/최대 볼륨 토글
@@ -818,36 +815,6 @@ const Timer = ({ onClose }) => {
             return vibrateInterval;
         }
         return null;
-    };
-
-    // 테스트 사운드 재생 (슬라이더용 - 실시간 재생)
-    const playTestSound = (volumeLevel) => {
-        // 진동 모드이거나 볼륨이 0이면 테스트 사운드 중지
-        if (volumeLevel === 0 || vibrationMode) {
-            if (testAudioRef.current) {
-                testAudioRef.current.pause();
-                testAudioRef.current.currentTime = 0;
-                testAudioRef.current = null;
-            }
-            return;
-        }
-
-        // 이미 재생 중이면 볼륨만 업데이트
-        if (testAudioRef.current) {
-            testAudioRef.current.volume = volumeLevel;
-            return;
-        }
-
-        // 새 테스트 오디오 생성 및 반복 재생
-        const testAudio = new Audio('/sound/Timer_alarm/01.mp3');
-        testAudio.volume = volumeLevel;
-        testAudio.loop = true;
-        testAudioRef.current = testAudio;
-
-        // 재생 시작
-        testAudio.play().catch(err => {
-            console.log('Test audio play failed:', err);
-        });
     };
 
     // 테스트 사운드 재생 (버튼용 - 1초 제한)
