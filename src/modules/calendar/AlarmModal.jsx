@@ -176,6 +176,10 @@ const Input = styled.input`
   font-size: 14px;
   background: white;
 
+  &::placeholder {
+    color: #adb5bd;
+  }
+
   &:focus {
     outline: 2px solid #4a90e2;
     border-color: transparent;
@@ -1722,29 +1726,30 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 알람 타이틀<span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
               </SectionTitle>
               <div style={{ position: 'relative' }}>
-                <Input
-                  type="text"
-                  placeholder="예: 최애 식당 재방문 체크"
-                  value={alarmTitle}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    const byteLength = Array.from(value).reduce((acc, char) => {
-                      return acc + (char.charCodeAt(0) > 127 ? 2 : 1);
-                    }, 0);
-                    if (byteLength <= 20) {
-                      setAlarmTitle(value);
-                    }
-                  }}
-                  disabled={isDisabled}
-                />
-                <div style={{
-                  position: 'absolute',
-                  right: '12px',
-                  bottom: '-20px',
-                  fontSize: '11px',
-                  color: '#999'
-                }}>
-                  {Array.from(alarmTitle).reduce((acc, char) => acc + (char.charCodeAt(0) > 127 ? 2 : 1), 0)}/25
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Input
+                    type="text"
+                    placeholder="예: 최애 식당 재방문 체크"
+                    value={alarmTitle}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      const byteLength = Array.from(value).reduce((acc, char) => {
+                        return acc + (char.charCodeAt(0) > 127 ? 2 : 1);
+                      }, 0);
+                      if (byteLength <= 20) {
+                        setAlarmTitle(value);
+                      }
+                    }}
+                    disabled={isDisabled}
+                    style={{ flex: 1 }}
+                  />
+                  <div style={{
+                    fontSize: '11px',
+                    color: '#999',
+                    whiteSpace: 'nowrap'
+                  }}>
+                    {Array.from(alarmTitle).reduce((acc, char) => acc + (char.charCodeAt(0) > 127 ? 2 : 1), 0)}/20
+                  </div>
                 </div>
               </div>
             </Section>
@@ -2411,29 +2416,30 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   알람 타이틀<span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
                 </SectionTitle>
                 <div style={{ position: 'relative' }}>
-                  <Input
-                    type="text"
-                    placeholder="예: 최애 식당 재방문 체크"
-                    value={editTitle}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      const byteLength = Array.from(value).reduce((acc, char) => {
-                        return acc + (char.charCodeAt(0) > 127 ? 2 : 1);
-                      }, 0);
-                      if (byteLength <= 20) {
-                        setEditTitle(value);
-                      }
-                    }}
-                    autoFocus
-                  />
-                  <div style={{
-                    position: 'absolute',
-                    right: '12px',
-                    bottom: '-20px',
-                    fontSize: '11px',
-                    color: '#999'
-                  }}>
-                    {Array.from(editTitle).reduce((acc, char) => acc + (char.charCodeAt(0) > 127 ? 2 : 1), 0)}/25
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Input
+                      type="text"
+                      placeholder="예: 최애 식당 재방문 체크"
+                      value={editTitle}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        const byteLength = Array.from(value).reduce((acc, char) => {
+                          return acc + (char.charCodeAt(0) > 127 ? 2 : 1);
+                        }, 0);
+                        if (byteLength <= 20) {
+                          setEditTitle(value);
+                        }
+                      }}
+                      autoFocus
+                      style={{ flex: 1 }}
+                    />
+                    <div style={{
+                      fontSize: '11px',
+                      color: '#999',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {Array.from(editTitle).reduce((acc, char) => acc + (char.charCodeAt(0) > 127 ? 2 : 1), 0)}/20
+                    </div>
                   </div>
                 </div>
               </Section>
