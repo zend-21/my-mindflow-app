@@ -754,11 +754,12 @@ function App() {
             return updatedSchedules;
         });
 
-        // 4. 사용자에게 피드백을 주고 모달을 닫습니다.
+        // 4. 사용자에게 피드백을 줍니다 (모달은 닫지 않음)
         const hasAlarms = alarmSettings.registeredAlarms && alarmSettings.registeredAlarms.length > 0;
         showToast(hasAlarms ? '알람이 설정되었습니다. 🔔' : '이벤트 시간이 저장되었습니다.');
-        setIsAlarmModalOpen(false);
-        setScheduleForAlarm(null);
+        // 모달은 사용자가 직접 닫기 버튼을 누를 때만 닫히도록 변경
+        // setIsAlarmModalOpen(false);
+        // setScheduleForAlarm(null);
     };
 
     const requestCalendarDelete = (date) => {

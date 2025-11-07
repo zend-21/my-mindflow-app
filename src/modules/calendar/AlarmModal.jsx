@@ -733,16 +733,32 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [directDate, setDirectDate] = useState('');
   const [directTime, setDirectTime] = useState('09:00');
 
-  // Notification settings
-  const [notificationType, setNotificationType] = useState('both');
-
-  // Snooze settings
-  const [snoozeMinutes, setSnoozeMinutes] = useState(5);
+  // Sorting
+  const [sortBy, setSortBy] = useState('time'); // 'time' or 'registration'
+  const [sortDirection, setSortDirection] = useState('asc'); // 'asc' or 'desc'
 
   // Sound settings
   const [soundFile, setSoundFile] = useState('default');
   const [customSoundName, setCustomSoundName] = useState('');
   const [volume, setVolume] = useState(80);
+  const [notificationType, setNotificationType] = useState('sound'); // 기본값: 소리만
+  const [snoozeEnabled, setSnoozeEnabled] = useState(false); // 기본값: 사용 안함
+  const [snoozeMinutes, setSnoozeMinutes] = useState(0); // 기본값: 0분
+
+  // 기본 알람옵션 자동 저장
+  useEffect(() => {
+    const alarmSettings = {
+      soundFile,
+      customSoundName,
+      volume,
+      notificationType,
+      snoozeEnabled,
+      snoozeMinutes,
+      sortBy,
+      sortDirection
+    };
+    localStorage.setItem('alarmSettings', JSON.stringify(alarmSettings));
+  }, [soundFile, customSoundName, volume, notificationType, snoozeEnabled, snoozeMinutes, sortBy, sortDirection]);
 
   // Anniversary settings
   const [isAnniversary, setIsAnniversary] = useState(false);
@@ -750,10 +766,6 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [anniversaryRepeat, setAnniversaryRepeat] = useState(''); // 초기값 없음
   const [anniversaryTiming, setAnniversaryTiming] = useState(''); // 초기값 없음 - 'today' or 'before'
   const [anniversaryDaysBefore, setAnniversaryDaysBefore] = useState(1); // N일 전
-
-  // Sorting
-  const [sortBy, setSortBy] = useState('time'); // 'time' or 'registration'
-  const [sortDirection, setSortDirection] = useState('asc'); // 'asc' or 'desc'
 
   // Editing pending alarm
   const [editingPendingId, setEditingPendingId] = useState(null);
@@ -772,6 +784,15 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [editEventTime, setEditEventTime] = useState('09:00');
   const [editOffset, setEditOffset] = useState({ days: 0, hours: 0, minutes: 0 });
   const [hasEditChanges, setHasEditChanges] = useState(false);
+
+  // 개별 알람옵션 상태
+  const [showCustomOptions, setShowCustomOptions] = useState(false);
+  const [editCustomSound, setEditCustomSound] = useState(null);
+  const [editCustomSoundName, setEditCustomSoundName] = useState('');
+  const [editCustomVolume, setEditCustomVolume] = useState(null);
+  const [editCustomNotificationType, setEditCustomNotificationType] = useState(null);
+  const [editCustomSnoozeEnabled, setEditCustomSnoozeEnabled] = useState(null);
+  const [editCustomSnoozeMinutes, setEditCustomSnoozeMinutes] = useState(null);
 
   // Options collapse state
   const [showOptions, setShowOptions] = useState(false);
@@ -828,14 +849,28 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     const anniversaryTimingChanged = editAnniversaryTiming !== (editingAlarm.anniversaryTiming || 'today');
     const anniversaryDaysBeforeChanged = editAnniversaryDaysBefore !== (editingAlarm.anniversaryDaysBefore || 1);
 
+    // 개별 알람옵션 변경 감지
+    const customSoundChanged = editCustomSound !== (editingAlarm.customSound || null);
+    const customVolumeChanged = editCustomVolume !== (editingAlarm.customVolume || null);
+    const customNotificationTypeChanged = editCustomNotificationType !== (editingAlarm.customNotificationType || null);
+    const customSnoozeEnabledChanged = editCustomSnoozeEnabled !== (editingAlarm.customSnoozeEnabled || null);
+    const customSnoozeMinutesChanged = editCustomSnoozeMinutes !== (editingAlarm.customSnoozeMinutes || null);
+
     const hasChanges = titleChanged || offsetChanged || anniversaryChanged ||
-                       anniversaryRepeatChanged || anniversaryTimingChanged || anniversaryDaysBeforeChanged;
+                       anniversaryRepeatChanged || anniversaryTimingChanged || anniversaryDaysBeforeChanged ||
+                       customSoundChanged || customVolumeChanged || customNotificationTypeChanged ||
+                       customSnoozeEnabledChanged || customSnoozeMinutesChanged;
 
     setHasEditChanges(hasChanges);
-  }, [editTitle, editOffset, editIsAnniversary, editAnniversaryRepeat, editAnniversaryTiming, editAnniversaryDaysBefore, editingAlarm]);
+  }, [editTitle, editOffset, editIsAnniversary, editAnniversaryRepeat, editAnniversaryTiming, editAnniversaryDaysBefore,
+      editCustomSound, editCustomVolume, editCustomNotificationType, editCustomSnoozeEnabled, editCustomSnoozeMinutes, editingAlarm]);
 
   // Audio preview
   const audioRef = useRef(null);
+
+  // Snooze input refs
+  const snoozeInputRef = useRef(null);
+  const editSnoozeInputRef = useRef(null);
 
   // Initialize state when modal opens
   useEffect(() => {
@@ -865,11 +900,12 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         setMinuteInput('');
         setRegisteredAlarms(scheduleData.alarm.registeredAlarms || []);
         setPendingAlarms(loadedPendingAlarms); // 로컬스토리지에서 로드
-        setNotificationType(scheduleData.alarm.notificationType || 'both');
-        setSnoozeMinutes(lastSettings.snoozeMinutes || scheduleData.alarm.snoozeMinutes || 5);
-        setSoundFile(scheduleData.alarm.soundFile || 'default');
-        setCustomSoundName(scheduleData.alarm.customSoundName || '');
-        setVolume(scheduleData.alarm.volume ?? 80);
+        setNotificationType(lastSettings.notificationType || 'sound');
+        setSnoozeEnabled(lastSettings.snoozeEnabled ?? false);
+        setSnoozeMinutes(lastSettings.snoozeMinutes || 0);
+        setSoundFile(lastSettings.soundFile || 'default');
+        setCustomSoundName(lastSettings.customSoundName || '');
+        setVolume(lastSettings.volume ?? 80);
         setIsAnniversary(scheduleData.alarm.isAnniversary || false);
         setAnniversaryName(scheduleData.alarm.anniversaryName || '');
         setAnniversaryRepeat(''); // 초기화 시 선택 안됨
@@ -885,11 +921,12 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         setMinuteInput('');
         setRegisteredAlarms([]);
         setPendingAlarms(loadedPendingAlarms); // 로컬스토리지에서 로드
-        setNotificationType('both');
-        setSnoozeMinutes(lastSettings.snoozeMinutes || 5);
-        setSoundFile('default');
-        setCustomSoundName('');
-        setVolume(80);
+        setNotificationType(lastSettings.notificationType || 'sound');
+        setSnoozeEnabled(lastSettings.snoozeEnabled ?? false);
+        setSnoozeMinutes(lastSettings.snoozeMinutes || 0);
+        setSoundFile(lastSettings.soundFile || 'default');
+        setCustomSoundName(lastSettings.customSoundName || '');
+        setVolume(lastSettings.volume ?? 80);
         setIsAnniversary(false);
         setAnniversaryName('');
         setAnniversaryRepeat(''); // 초기화 시 선택 안됨
@@ -997,7 +1034,13 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       anniversaryName: isAnniversary ? alarmTitle : '', // 알람 타이틀을 기념일 이름으로 사용
       anniversaryRepeat: isAnniversary ? anniversaryRepeat : '',
       anniversaryTiming: isAnniversary ? anniversaryTiming : 'today',
-      anniversaryDaysBefore: isAnniversary ? anniversaryDaysBefore : 1
+      anniversaryDaysBefore: isAnniversary ? anniversaryDaysBefore : 1,
+      // 개별 알람옵션 (선택사항 - 없으면 기본 설정 사용)
+      customSound: null,
+      customVolume: null,
+      customNotificationType: null,
+      customSnoozeEnabled: null,
+      customSnoozeMinutes: null
     };
 
     // 가등록 목록에 추가
@@ -1068,7 +1111,13 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       anniversaryName: isAnniversary ? alarmTitle : '', // 알람 타이틀을 기념일 이름으로 사용
       anniversaryRepeat: isAnniversary ? anniversaryRepeat : '',
       anniversaryTiming: isAnniversary ? anniversaryTiming : 'today',
-      anniversaryDaysBefore: isAnniversary ? anniversaryDaysBefore : 1
+      anniversaryDaysBefore: isAnniversary ? anniversaryDaysBefore : 1,
+      // 개별 알람옵션 (선택사항 - 없으면 기본 설정 사용)
+      customSound: null,
+      customVolume: null,
+      customNotificationType: null,
+      customSnoozeEnabled: null,
+      customSnoozeMinutes: null
     };
 
     const updatedPendingAlarms = [...pendingAlarms, newAlarm];
@@ -1129,7 +1178,13 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       anniversaryName: isAnniversary ? alarmTitle : '', // 알람 타이틀을 기념일 이름으로 사용
       anniversaryRepeat: isAnniversary ? anniversaryRepeat : '',
       anniversaryTiming: isAnniversary ? anniversaryTiming : 'today',
-      anniversaryDaysBefore: isAnniversary ? anniversaryDaysBefore : 1
+      anniversaryDaysBefore: isAnniversary ? anniversaryDaysBefore : 1,
+      // 개별 알람옵션 (선택사항 - 없으면 기본 설정 사용)
+      customSound: null,
+      customVolume: null,
+      customNotificationType: null,
+      customSnoozeEnabled: null,
+      customSnoozeMinutes: null
     };
 
     const updatedPendingAlarms = [...pendingAlarms, newAlarm];
@@ -1233,15 +1288,45 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       localStorage.removeItem(pendingKey);
     }
 
-    // 등록 버튼은 상태만 변경하고 모달을 닫지 않음
-    // 저장 버튼을 눌렀을 때 확정 알람이 저장됨
+    // 즉시 저장 - 등록된 알람을 실제로 저장하되 모달은 닫지 않음
+    const alarmSettings = {
+      eventTime,
+      registeredAlarms: updatedRegisteredAlarms,
+      notificationType,
+      snoozeMinutes,
+      soundFile,
+      customSoundName,
+      volume,
+      isAnniversary,
+      anniversaryName: isAnniversary ? alarmTitle : '',
+      anniversaryRepeat
+    };
+
+    onSave(alarmSettings);
   };
 
   // Toggle alarm enabled/disabled
   const handleToggleAlarm = (id) => {
-    setRegisteredAlarms(registeredAlarms.map(alarm =>
+    const updatedAlarms = registeredAlarms.map(alarm =>
       alarm.id === id ? { ...alarm, enabled: !alarm.enabled } : alarm
-    ));
+    );
+    setRegisteredAlarms(updatedAlarms);
+
+    // 즉시 저장
+    const alarmSettings = {
+      eventTime,
+      registeredAlarms: updatedAlarms,
+      notificationType,
+      snoozeMinutes,
+      soundFile,
+      customSoundName,
+      volume,
+      isAnniversary,
+      anniversaryName: isAnniversary ? alarmTitle : '',
+      anniversaryRepeat
+    };
+
+    onSave(alarmSettings);
   };
 
   // Edit alarm - opens modal
@@ -1278,6 +1363,15 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       setEditOffset({ days: 0, hours: 0, minutes: 0 });
     }
 
+    // Load custom alarm options (개별 알람옵션)
+    setEditCustomSound(alarm.customSound ?? null);
+    setEditCustomSoundName(alarm.customSoundName || '');
+    setEditCustomVolume(alarm.customVolume ?? null);
+    setEditCustomNotificationType(alarm.customNotificationType ?? null);
+    setEditCustomSnoozeEnabled(alarm.customSnoozeEnabled ?? null);
+    setEditCustomSnoozeMinutes(alarm.customSnoozeMinutes ?? null);
+    setShowCustomOptions(false); // 기본적으로 접혀있음
+
     setShowEditModal(true);
   };
 
@@ -1285,6 +1379,16 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const handleSaveEdit = () => {
     if (!editTitle.trim()) {
       setValidationMessage('필수항목이 입력되지 않았습니다.');
+      setShowValidationModal(true);
+      return;
+    }
+
+    // 개별 알람옵션에서 스누즈 직접입력이 선택되었는데 값이 없는 경우 검사
+    const snoozeEnabledValue = editCustomSnoozeEnabled !== null ? editCustomSnoozeEnabled : snoozeEnabled;
+    const snoozeMinutesValue = editCustomSnoozeMinutes !== null ? editCustomSnoozeMinutes : snoozeMinutes;
+
+    if (snoozeEnabledValue && (!snoozeMinutesValue || snoozeMinutesValue === 0)) {
+      setValidationMessage('스누즈(재알림) 시간을 입력하세요.');
       setShowValidationModal(true);
       return;
     }
@@ -1326,7 +1430,14 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       anniversaryName: editIsAnniversary ? editTitle : '', // 편집된 타이틀을 기념일 이름으로 사용
       anniversaryRepeat: editIsAnniversary ? editAnniversaryRepeat : '',
       anniversaryTiming: editIsAnniversary ? editAnniversaryTiming : 'today',
-      anniversaryDaysBefore: editIsAnniversary ? editAnniversaryDaysBefore : 1
+      anniversaryDaysBefore: editIsAnniversary ? editAnniversaryDaysBefore : 1,
+      // 개별 알람옵션 저장
+      customSound: editCustomSound,
+      customSoundName: editCustomSoundName,
+      customVolume: editCustomVolume,
+      customNotificationType: editCustomNotificationType,
+      customSnoozeEnabled: editCustomSnoozeEnabled,
+      customSnoozeMinutes: editCustomSnoozeMinutes
     };
 
     if (editingAlarm.isPending) {
@@ -1350,6 +1461,16 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   // Cancel edit
   const handleCancelEdit = () => {
+    // 개별 알람옵션에서 스누즈 직접입력이 선택되었는데 값이 없는 경우 검사
+    const snoozeEnabledValue = editCustomSnoozeEnabled !== null ? editCustomSnoozeEnabled : snoozeEnabled;
+    const snoozeMinutesValue = editCustomSnoozeMinutes !== null ? editCustomSnoozeMinutes : snoozeMinutes;
+
+    if (snoozeEnabledValue && (!snoozeMinutesValue || snoozeMinutesValue === 0)) {
+      setValidationMessage('스누즈(재알림) 시간을 입력하세요.');
+      setShowValidationModal(true);
+      return;
+    }
+
     setShowEditModal(false);
     setEditingAlarm(null);
     setEditTitle('');
@@ -1368,11 +1489,24 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       alarm.id === id ? cleanAlarm : alarm
     );
 
-    // Update state only - do not close modal
+    // Update state
     setRegisteredAlarms(updatedRegisteredAlarms);
 
-    // 적용 버튼은 상태만 변경하고 모달을 닫지 않음
-    // 저장 버튼을 눌렀을 때 확정 알람이 저장됨
+    // 즉시 저장 - 기존 저장 버튼의 역할을 수행
+    const alarmSettings = {
+      eventTime,
+      registeredAlarms: updatedRegisteredAlarms,
+      notificationType,
+      snoozeMinutes,
+      soundFile,
+      customSoundName,
+      volume,
+      isAnniversary,
+      anniversaryName: isAnniversary ? alarmTitle : '',
+      anniversaryRepeat
+    };
+
+    onSave(alarmSettings);
   };
 
   // Set event time to current time
@@ -1386,12 +1520,22 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   // Handle close - reset anniversary settings
   const handleClose = () => {
+    // 스누즈 직접입력이 선택되었는데 값이 없는 경우 검사
+    if (snoozeEnabled && (!snoozeMinutes || snoozeMinutes === 0)) {
+      setValidationMessage('스누즈(재알림) 시간을 입력하세요.');
+      setShowValidationModal(true);
+      return;
+    }
+
     // 기념일 관련 상태 초기화
     setIsAnniversary(false);
     setAnniversaryName('');
     setAnniversaryRepeat('');
     setAnniversaryTiming('');
     setAnniversaryDaysBefore(1);
+
+    // 기본 알람옵션 접기
+    setShowOptions(false);
 
     // 모달 닫기
     onClose();
@@ -1491,6 +1635,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     setAnniversaryTiming('');
     setAnniversaryDaysBefore(1);
 
+    // 기본 알람옵션 접기
+    setShowOptions(false);
+
     onSave(alarmSettings);
   };
 
@@ -1556,7 +1703,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               <div style={{ position: 'relative' }}>
                 <Input
                   type="text"
-                  placeholder="예: 동현이 결혼식"
+                  placeholder="예: 최애 식당 재방문 체크"
                   value={alarmTitle}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -1971,17 +2118,69 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 onMouseEnter={(e) => e.currentTarget.style.background = '#e9ecef'}
                 onMouseLeave={(e) => e.currentTarget.style.background = '#f8f9fa'}
               >
-                <span>알람 옵션</span>
+                <span>기본 알람옵션</span>
                 <span style={{ transform: showOptions ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                   ▼
                 </span>
               </button>
             </Section>
 
+            {/* Alarm Options Description + Reset Button */}
+            {showOptions && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '6px 20px 8px 20px',
+                fontSize: '12px',
+                color: '#6c757d',
+                background: '#f8f9fa',
+                borderRadius: '0 0 8px 8px',
+                margin: '0 20px 8px 20px',
+                marginTop: '-4px'
+              }}>
+                <span>
+                  개별 알람옵션을 지정하지 않는 한<br />
+                  아래의 설정값이 적용됩니다.
+                </span>
+                <button
+                  onClick={() => {
+                    setSoundFile('default');
+                    setCustomSoundName('');
+                    setVolume(80);
+                    setNotificationType('sound');
+                    setSnoozeEnabled(false);
+                    setSnoozeMinutes(0);
+                  }}
+                  style={{
+                    padding: '4px 12px',
+                    fontSize: '11px',
+                    color: '#495057',
+                    background: '#f1f3f5',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    fontWeight: '500'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = '#e9ecef';
+                    e.currentTarget.style.color = '#343a40';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = '#f1f3f5';
+                    e.currentTarget.style.color = '#495057';
+                  }}
+                >
+                  초기화
+                </button>
+              </div>
+            )}
+
             {/* Alarm Sound */}
             {showOptions && (
             <>
-            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
+            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto', marginTop: '-16px' }}>
               <SectionTitle>
                 <VolumeIcon />
                 알람 소리
@@ -2084,27 +2283,59 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             </Section>
 
             {/* Snooze Settings */}
-            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
+            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto', marginBottom: '8px' }}>
               <SectionTitle>
                 <AlertIcon />
                 스누즈 (알람 후 재알림)
               </SectionTitle>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Select
-                  value={snoozeMinutes}
-                  onChange={(e) => setSnoozeMinutes(parseInt(e.target.value))}
-                  style={{ flex: 1 }}
-                >
-                  <option value={0}>사용 안함</option>
-                  <option value={5}>5분 후</option>
-                  <option value={10}>10분 후</option>
-                  <option value={15}>15분 후</option>
-                  <option value={20}>20분 후</option>
-                  <option value={30}>30분 후</option>
-                </Select>
-                <span style={{ fontSize: '13px', color: '#6c757d', minWidth: '100px' }}>
-                  {snoozeMinutes > 0 ? `${snoozeMinutes}분 후 재알림` : '스누즈 꺼짐'}
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="snoozeOption"
+                    checked={!snoozeEnabled}
+                    onChange={() => {
+                      setSnoozeEnabled(false);
+                      setSnoozeMinutes(0);
+                    }}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#343a40' }}>사용 안함</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                  <input
+                    type="radio"
+                    name="snoozeOption"
+                    checked={snoozeEnabled}
+                    onChange={() => {
+                      setSnoozeEnabled(true);
+                      setTimeout(() => snoozeInputRef.current?.focus(), 0);
+                    }}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  <TimeInput
+                    ref={snoozeInputRef}
+                    type="number"
+                    min="1"
+                    max="60"
+                    placeholder="1-60"
+                    value={snoozeEnabled && snoozeMinutes ? snoozeMinutes : ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 60)) {
+                        setSnoozeEnabled(true);
+                        setSnoozeMinutes(val === '' ? '' : parseInt(val));
+                      }
+                    }}
+                    onFocus={(e) => {
+                      setSnoozeEnabled(true);
+                      if (!snoozeMinutes) setSnoozeMinutes('');
+                      e.target.select();
+                    }}
+                    style={{ width: '60px', padding: '6px', fontSize: '14px' }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#343a40' }}>분 후 재알림</span>
+                </label>
               </div>
             </Section>
             </>
@@ -2112,8 +2343,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
           </FormArea>
 
           <Footer>
-            <CancelButton onClick={handleClose}>취소</CancelButton>
-            <SaveButton onClick={handleSave}>저장</SaveButton>
+            <SaveButton onClick={handleClose} style={{ width: '100%' }}>닫기</SaveButton>
           </Footer>
 
           {/* Hidden audio element for sound preview */}
@@ -2162,7 +2392,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 <div style={{ position: 'relative' }}>
                   <Input
                     type="text"
-                    placeholder="예: 동현이 결혼식"
+                    placeholder="예: 최애 식당 재방문 체크"
                     value={editTitle}
                     onChange={(e) => {
                       const value = e.target.value;
@@ -2345,6 +2575,241 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   <span style={{ fontSize: '16px', color: '#495057' }}>분</span>
                 </div>
               </Section>
+
+              {/* 개별 알람옵션 접기/펼치기 */}
+              <Section>
+                <button
+                  onClick={() => setShowCustomOptions(!showCustomOptions)}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: '#f8f9fa',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#495057',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#e9ecef'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                >
+                  <span>개별 알람옵션</span>
+                  <span style={{ transform: showCustomOptions ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    ▼
+                  </span>
+                </button>
+              </Section>
+
+              {showCustomOptions && (
+                <>
+                  {/* 개별 알람옵션 설명 및 초기화 버튼 */}
+                  <div style={{
+                    padding: '6px 20px 8px 20px',
+                    fontSize: '12px',
+                    color: '#6c757d',
+                    background: '#f8f9fa',
+                    borderRadius: '0 0 8px 8px',
+                    margin: '0 20px 8px 20px',
+                    marginTop: '-4px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <span>이 알람에만 적용되는 설정입니다.</span>
+                    <button
+                      onClick={() => {
+                        setEditCustomSound(null);
+                        setEditCustomSoundName('');
+                        setEditCustomVolume(null);
+                        setEditCustomNotificationType(null);
+                        setEditCustomSnoozeEnabled(null);
+                        setEditCustomSnoozeMinutes(null);
+                      }}
+                      style={{
+                        padding: '4px 12px',
+                        fontSize: '11px',
+                        color: '#495057',
+                        background: '#f1f3f5',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        fontWeight: '500'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = '#e9ecef';
+                        e.currentTarget.style.color = '#343a40';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = '#f1f3f5';
+                        e.currentTarget.style.color = '#495057';
+                      }}
+                    >
+                      초기화
+                    </button>
+                  </div>
+
+                  {/* 개별 알람 소리 */}
+                  <Section style={{ marginTop: '-16px' }}>
+                    <SectionTitle>
+                      <VolumeIcon />
+                      알람 소리
+                    </SectionTitle>
+                    <Select
+                      value={editCustomSound === null ? soundFile : (editCustomSound === 'default' ? 'default' : 'custom')}
+                      onChange={(e) => {
+                        if (e.target.value === soundFile) {
+                          setEditCustomSound(null); // null = 기본 설정 사용
+                          setEditCustomSoundName('');
+                        } else if (e.target.value === 'default') {
+                          setEditCustomSound('default');
+                          setEditCustomSoundName('');
+                        } else {
+                          setEditCustomSound('custom');
+                        }
+                      }}
+                    >
+                      <option value={soundFile}>기본 설정 사용 ({soundFile === 'default' ? '기본 알림음' : customSoundName || '사용자 지정'})</option>
+                      <option value="default">기본 알림음</option>
+                      <option value="custom">사용자 지정 소리</option>
+                    </Select>
+                    {editCustomSound !== null && editCustomSound !== 'default' && (
+                      <div style={{ marginTop: '8px', fontSize: '12px', color: '#6c757d' }}>
+                        사용자 지정 소리 파일 업로드 기능은 추후 추가 예정
+                      </div>
+                    )}
+                    {(editCustomSound === null ? soundFile : editCustomSound) !== 'custom' && (
+                      <SoundPreview>
+                        <PlayButton onClick={handlePlaySound}>▶</PlayButton>
+                        <span style={{ fontSize: '13px', color: '#495057' }}>
+                          미리듣기
+                        </span>
+                      </SoundPreview>
+                    )}
+                  </Section>
+
+                  {/* 개별 알람 볼륨 */}
+                  <Section>
+                    <SectionTitle>
+                      <VolumeIcon />
+                      알람 볼륨
+                    </SectionTitle>
+                    <VolumeContainer>
+                      <VolumeSlider
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={editCustomVolume !== null ? editCustomVolume : volume}
+                        onChange={(e) => setEditCustomVolume(parseInt(e.target.value))}
+                      />
+                      <VolumeLabel>{editCustomVolume !== null ? editCustomVolume : volume}%</VolumeLabel>
+                    </VolumeContainer>
+                  </Section>
+
+                  {/* 개별 알림 유형 */}
+                  <Section>
+                    <SectionTitle>
+                      <VibrateIcon />
+                      알림 유형
+                    </SectionTitle>
+                    <RadioGroup>
+                      <RadioOption $checked={(editCustomNotificationType !== null ? editCustomNotificationType : notificationType) === 'sound'}>
+                        <input
+                          type="radio"
+                          name="editNotificationType"
+                          value="sound"
+                          checked={(editCustomNotificationType !== null ? editCustomNotificationType : notificationType) === 'sound'}
+                          onChange={(e) => setEditCustomNotificationType(e.target.value)}
+                        />
+                        <span>소리만</span>
+                      </RadioOption>
+                      <RadioOption $checked={(editCustomNotificationType !== null ? editCustomNotificationType : notificationType) === 'vibration'}>
+                        <input
+                          type="radio"
+                          name="editNotificationType"
+                          value="vibration"
+                          checked={(editCustomNotificationType !== null ? editCustomNotificationType : notificationType) === 'vibration'}
+                          onChange={(e) => setEditCustomNotificationType(e.target.value)}
+                        />
+                        <span>진동만</span>
+                      </RadioOption>
+                      <RadioOption $checked={(editCustomNotificationType !== null ? editCustomNotificationType : notificationType) === 'both'}>
+                        <input
+                          type="radio"
+                          name="editNotificationType"
+                          value="both"
+                          checked={(editCustomNotificationType !== null ? editCustomNotificationType : notificationType) === 'both'}
+                          onChange={(e) => setEditCustomNotificationType(e.target.value)}
+                        />
+                        <span>소리 + 진동</span>
+                      </RadioOption>
+                    </RadioGroup>
+                  </Section>
+
+                  {/* 개별 스누즈 설정 */}
+                  <Section style={{ marginBottom: '8px' }}>
+                    <SectionTitle>
+                      <AlertIcon />
+                      스누즈 (알람 후 재알림)
+                    </SectionTitle>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="editSnoozeOption"
+                          checked={editCustomSnoozeEnabled !== null ? !editCustomSnoozeEnabled : !snoozeEnabled}
+                          onChange={() => {
+                            setEditCustomSnoozeEnabled(false);
+                            setEditCustomSnoozeMinutes(0);
+                          }}
+                          style={{ width: '16px', height: '16px' }}
+                        />
+                        <span style={{ fontSize: '14px', color: '#343a40' }}>사용 안함</span>
+                      </label>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                        <input
+                          type="radio"
+                          name="editSnoozeOption"
+                          checked={editCustomSnoozeEnabled !== null ? editCustomSnoozeEnabled : snoozeEnabled}
+                          onChange={() => {
+                            setEditCustomSnoozeEnabled(true);
+                            setTimeout(() => editSnoozeInputRef.current?.focus(), 0);
+                          }}
+                          style={{ width: '16px', height: '16px' }}
+                        />
+                        <TimeInput
+                          ref={editSnoozeInputRef}
+                          type="number"
+                          min="1"
+                          max="60"
+                          placeholder="1-60"
+                          value={(editCustomSnoozeEnabled !== null ? editCustomSnoozeEnabled : snoozeEnabled) ? ((editCustomSnoozeMinutes !== null ? editCustomSnoozeMinutes : snoozeMinutes) || '') : ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 60)) {
+                              setEditCustomSnoozeEnabled(true);
+                              setEditCustomSnoozeMinutes(val === '' ? '' : parseInt(val));
+                            }
+                          }}
+                          onFocus={(e) => {
+                            setEditCustomSnoozeEnabled(true);
+                            const currentValue = editCustomSnoozeMinutes !== null ? editCustomSnoozeMinutes : snoozeMinutes;
+                            if (!currentValue) setEditCustomSnoozeMinutes('');
+                            e.target.select();
+                          }}
+                          style={{ width: '60px', padding: '6px', fontSize: '14px' }}
+                        />
+                        <span style={{ fontSize: '14px', color: '#343a40' }}>분 후 재알림</span>
+                      </label>
+                    </div>
+                  </Section>
+                </>
+              )}
             </FormArea>
 
             <Footer>
