@@ -579,23 +579,27 @@ const ToggleSwitch = styled.label`
 
 const SortButtonGroup = styled.div`
   display: flex;
-  gap: 8px;
+  gap: 0;
   margin-bottom: 12px;
+  border-bottom: 2px solid #e9ecef;
 `;
 
 const SortButton = styled.button`
   flex: 1;
-  padding: 8px 12px;
-  background: ${props => props.$active ? '#4a90e2' : '#f8f9fa'};
-  color: ${props => props.$active ? 'white' : '#495057'};
-  border: 1px solid ${props => props.$active ? '#4a90e2' : '#dee2e6'};
-  border-radius: 6px;
-  font-size: 13px;
+  padding: 10px 16px;
+  background: ${props => props.$active ? '#f1f3f5' : 'transparent'};
+  color: ${props => props.$active ? '#212529' : '#6c757d'};
+  border: none;
+  border-bottom: 2px solid ${props => props.$active ? '#495057' : 'transparent'};
+  margin-bottom: -2px;
+  font-size: 14px;
+  font-weight: ${props => props.$active ? '600' : '400'};
   cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
-    background: ${props => props.$active ? '#357abd' : '#e9ecef'};
+    background: #f8f9fa;
+    color: #212529;
   }
 `;
 
@@ -603,6 +607,14 @@ const AlarmActions = styled.div`
   display: flex;
   gap: 8px;
   align-items: center;
+`;
+
+const AlarmBox = styled.div`
+  padding: 16px;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  margin-top: 12px;
 `;
 
 const EditButton = styled.button`
@@ -685,6 +697,18 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   // Editing pending alarm
   const [editingPendingId, setEditingPendingId] = useState(null);
+
+  // Editing registered alarm
+  const [editingRegisteredId, setEditingRegisteredId] = useState(null);
+
+  // Edit modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingAlarm, setEditingAlarm] = useState(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editIsAnniversary, setEditIsAnniversary] = useState(false);
+  const [editAnniversaryRepeat, setEditAnniversaryRepeat] = useState('yearly');
+  const [editEventTime, setEditEventTime] = useState('09:00');
+  const [editOffset, setEditOffset] = useState({ days: 0, hours: 0, minutes: 0 });
 
   // Audio preview
   const audioRef = useRef(null);
@@ -782,6 +806,18 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     const alarmTime = calculateAlarmTime(eventTime, offsetConfig);
     if (!alarmTime) return;
 
+    // 중복 시간 체크
+    const alarmTimeStr = format(alarmTime, 'yyyy-MM-dd HH:mm');
+    const isDuplicate = [...pendingAlarms, ...registeredAlarms].some(alarm => {
+      const existingTimeStr = format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm');
+      return existingTimeStr === alarmTimeStr;
+    });
+
+    if (isDuplicate) {
+      alert('설정한 시각은 이미 다른 알람이 등록(가등록) 되어 있어 알람 등록이 불가합니다.');
+      return;
+    }
+
     const newAlarm = {
       id: Date.now(),
       type: 'preset',
@@ -876,42 +912,84 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     ));
   };
 
-  // Edit pending alarm
-  const handleEditPendingAlarm = (alarm) => {
-    setAlarmTitle(alarm.title);
+  // Edit alarm - opens modal
+  const handleEditAlarm = (alarm, isPending) => {
+    setEditingAlarm({ ...alarm, isPending });
+    setEditTitle(alarm.title);
+    setEditIsAnniversary(isAnniversary); // Load current anniversary status
+    setEditAnniversaryRepeat(anniversaryRepeat);
+
+    // Load alarm time from calculatedTime
+    const alarmDate = new Date(alarm.calculatedTime);
+    setEditEventTime(format(alarmDate, 'HH:mm'));
+
+    // Load offset if available
     if (alarm.offset) {
-      setCustomDays(alarm.offset.days || 0);
-      setCustomHours(alarm.offset.hours || 0);
-      setCustomMinutes(alarm.offset.minutes || 0);
+      setEditOffset(alarm.offset);
+    } else {
+      setEditOffset({ days: 0, hours: 0, minutes: 0 });
     }
-    setEditingPendingId(alarm.id);
+
+    setShowEditModal(true);
   };
 
-  // Update pending alarm
-  const handleUpdatePendingAlarm = () => {
-    if (!alarmTitle.trim()) {
+  // Save edited alarm
+  const handleSaveEdit = () => {
+    if (!editTitle.trim()) {
       alert('알람 타이틀을 입력해주세요.');
       return;
     }
 
-    setPendingAlarms(pendingAlarms.map(alarm => {
-      if (alarm.id === editingPendingId) {
-        return {
-          ...alarm,
-          title: alarmTitle
-        };
-      }
-      return alarm;
-    }));
+    // Recalculate alarm time with new offset and event time
+    const offsetConfig = {
+      type: editingAlarm.type || 'preset',
+      days: editOffset.days,
+      hours: editOffset.hours,
+      minutes: editOffset.minutes
+    };
 
-    setAlarmTitle('');
-    setEditingPendingId(null);
+    const newAlarmTime = calculateAlarmTime(editEventTime, offsetConfig);
+    if (!newAlarmTime) {
+      alert('알람 시간을 계산할 수 없습니다.');
+      return;
+    }
+
+    const updatedAlarm = {
+      ...editingAlarm,
+      title: editTitle,
+      offset: editOffset,
+      calculatedTime: newAlarmTime,
+      displayText: `${editOffset.days}일 ${editOffset.hours}시간 ${editOffset.minutes}분 전`
+        .replace(/0일 /g, '')
+        .replace(/0시간 /g, '')
+        .replace(/0분 /g, '')
+        .trim() + (editOffset.days === 0 && editOffset.hours === 0 && editOffset.minutes === 0 ? '정각' : '')
+    };
+
+    if (editingAlarm.isPending) {
+      setPendingAlarms(pendingAlarms.map(alarm =>
+        alarm.id === editingAlarm.id ? updatedAlarm : alarm
+      ));
+    } else {
+      setRegisteredAlarms(registeredAlarms.map(alarm =>
+        alarm.id === editingAlarm.id ? updatedAlarm : alarm
+      ));
+    }
+
+    // Update main anniversary settings if changed in edit modal
+    setIsAnniversary(editIsAnniversary);
+    setAnniversaryRepeat(editAnniversaryRepeat);
+
+    setShowEditModal(false);
+    setEditingAlarm(null);
+    setEditTitle('');
   };
 
-  // Cancel editing pending alarm
-  const handleCancelEditPending = () => {
-    setAlarmTitle('');
-    setEditingPendingId(null);
+  // Cancel edit
+  const handleCancelEdit = () => {
+    setShowEditModal(false);
+    setEditingAlarm(null);
+    setEditTitle('');
   };
 
   // Set event time to current time
@@ -1007,7 +1085,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       customSoundName,
       volume,
       isAnniversary,
-      anniversaryName,
+      anniversaryName: isAnniversary ? alarmTitle : '',
       anniversaryRepeat
     };
 
@@ -1029,8 +1107,13 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   const hasSchedule = scheduleData?.content || scheduleData?.text;
 
-  // 일정이 없어도 알람 설정 가능하도록 제약 제거
-  // (이전에는 일정이 없으면 알람 설정 불가 메시지만 표시)
+  // 과거 날짜 체크
+  const isPastDate = scheduleData?.date
+    ? new Date(scheduleData.date).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)
+    : false;
+
+  // 과거 날짜인 경우 기념일 체크해야만 입력 가능
+  const isDisabled = isPastDate && !isAnniversary;
 
   // Generate hour and minute options
   const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
@@ -1039,16 +1122,38 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   return (
     <Portal>
       <Overlay onClick={onClose}>
-        <ModalContent onClick={(e) => e.stopPropagation()}>
+        <ModalContent
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            opacity: showEditModal ? 0.3 : 1,
+            pointerEvents: showEditModal ? 'none' : 'auto',
+            transition: 'opacity 0.2s'
+          }}
+        >
           <Header>
             <div style={{ width: '32px' }}></div>
             <HeaderTitle>{scheduleDateStr} 알람 설정</HeaderTitle>
             <CloseButton onClick={onClose}>×</CloseButton>
           </Header>
 
+          {/* 과거 날짜 경고 메시지 */}
+          {isPastDate && (
+            <div style={{
+              padding: '12px 20px',
+              backgroundColor: '#fff9c4',
+              borderBottom: '2px solid #fbc02d',
+              color: '#f57f17',
+              fontSize: '14px',
+              fontWeight: '600',
+              textAlign: 'center'
+            }}>
+              ⚠️ 오늘 이전의 날에는 기념일만 등록할 수 있습니다.
+            </div>
+          )}
+
           <FormArea>
             {/* Alarm Title */}
-            <Section>
+            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
               <SectionTitle>
                 <TitleIcon />
                 알람 타이틀<span className="required">*</span>
@@ -1058,19 +1163,69 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 placeholder="예: 동현이 결혼식"
                 value={alarmTitle}
                 onChange={(e) => setAlarmTitle(e.target.value)}
+                disabled={isDisabled}
               />
-              {editingPendingId && (
-                <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                  <AddButton onClick={handleUpdatePendingAlarm}>수정 완료</AddButton>
-                  <Button onClick={handleCancelEditPending} style={{ background: '#6c757d' }}>
-                    취소
-                  </Button>
+            </Section>
+
+            {/* Anniversary Settings */}
+            <Section style={{ marginTop: '-8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: isAnniversary ? '16px' : '0' }}>
+                <input
+                  type="checkbox"
+                  checked={isAnniversary}
+                  onChange={(e) => setIsAnniversary(e.target.checked)}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '14px', color: '#343a40', cursor: 'pointer' }} onClick={() => setIsAnniversary(!isAnniversary)}>
+                  기념일로 등록
+                </span>
+              </div>
+
+              {isAnniversary && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* 알림주기 */}
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#495057', marginBottom: '8px' }}>
+                      알림주기
+                    </div>
+                    <RadioGroup style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                      <RadioOption $checked={anniversaryRepeat === 'daily'} onClick={() => setAnniversaryRepeat('daily')}>
+                        <input type="radio" name="anniversaryRepeat" value="daily" checked={anniversaryRepeat === 'daily'} onChange={() => {}} />
+                        <span>매일</span>
+                      </RadioOption>
+                      <RadioOption $checked={anniversaryRepeat === 'weekly'} onClick={() => setAnniversaryRepeat('weekly')}>
+                        <input type="radio" name="anniversaryRepeat" value="weekly" checked={anniversaryRepeat === 'weekly'} onChange={() => {}} />
+                        <span>매주</span>
+                      </RadioOption>
+                      <RadioOption $checked={anniversaryRepeat === 'monthly'} onClick={() => setAnniversaryRepeat('monthly')}>
+                        <input type="radio" name="anniversaryRepeat" value="monthly" checked={anniversaryRepeat === 'monthly'} onChange={() => {}} />
+                        <span>매달</span>
+                      </RadioOption>
+                      <RadioOption $checked={anniversaryRepeat === 'yearly'} onClick={() => setAnniversaryRepeat('yearly')}>
+                        <input type="radio" name="anniversaryRepeat" value="yearly" checked={anniversaryRepeat === 'yearly'} onChange={() => {}} />
+                        <span>매년</span>
+                      </RadioOption>
+                    </RadioGroup>
+                  </div>
+
+                  {/* 알림시기 */}
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#495057', marginBottom: '8px' }}>
+                      알림시기
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                      <Select style={{ flex: 1 }}>
+                        <option value="0">당일</option>
+                        <option value="custom">직접입력</option>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
               )}
             </Section>
 
             {/* Event Time */}
-            <Section>
+            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
               <SectionTitle>
                 <ClockIcon />
                 알람 시간<span className="required">*</span>
@@ -1079,56 +1234,73 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 <TimeSelect
                   value={eventTime.split(':')[0]}
                   onChange={(e) => setEventTime(`${e.target.value}:${eventTime.split(':')[1]}`)}
+                  disabled={isDisabled}
                 >
                   {hours.map(h => <option key={h} value={h}>{h}시</option>)}
                 </TimeSelect>
                 <TimeSelect
                   value={eventTime.split(':')[1]}
                   onChange={(e) => setEventTime(`${eventTime.split(':')[0]}:${e.target.value}`)}
+                  disabled={isDisabled}
                 >
                   {minutes.map(m => <option key={m} value={m}>{m}분</option>)}
                 </TimeSelect>
-                <SetCurrentTimeButton onClick={handleSetCurrentTime}>
+                <SetCurrentTimeButton onClick={handleSetCurrentTime} disabled={isDisabled}>
                   현재 시간
                 </SetCurrentTimeButton>
-                {!editingPendingId && (
-                  <AddButton onClick={() => handleAddPresetAlarm(0, 0, 0)}>
-                    가등록
-                  </AddButton>
-                )}
+                <AddButton onClick={() => handleAddPresetAlarm(0, 0, 0)} disabled={isDisabled}>
+                  가등록
+                </AddButton>
               </TimeInputRow>
+              <p style={{ fontSize: '12px', color: '#6c757d', margin: '8px 0 0 0', textAlign: 'center' }}>
+                💡 창 하단의 저장버튼까지 눌러야 저장됩니다.
+              </p>
             </Section>
 
             {/* Registered Alarms */}
-            <Section>
+            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
               <SectionTitle>
                 <BellIcon />
                 등록된 알람 ({pendingAlarms.length + registeredAlarms.length}개)
               </SectionTitle>
-
-              {(pendingAlarms.length > 0 || registeredAlarms.length > 0) && (
-                <SortButtonGroup>
-                  <SortButton
-                    $active={sortBy === 'registration'}
-                    onClick={() => setSortBy('registration')}
-                  >
-                    등록순
-                  </SortButton>
-                  <SortButton
-                    $active={sortBy === 'time'}
-                    onClick={() => setSortBy('time')}
-                  >
-                    시간순
-                  </SortButton>
-                </SortButtonGroup>
-              )}
 
               {pendingAlarms.length === 0 && registeredAlarms.length === 0 ? (
                 <p style={{ color: '#6c757d', fontSize: '14px', margin: 0 }}>
                   등록된 알람이 없습니다.
                 </p>
               ) : (
-                <AlarmList>
+                <AlarmBox>
+                  {(pendingAlarms.length > 0 || registeredAlarms.length > 0) && (
+                    <SortButtonGroup>
+                      <SortButton
+                        $active={sortBy === 'registration'}
+                        onClick={() => setSortBy('registration')}
+                      >
+                        등록순
+                      </SortButton>
+                      <SortButton
+                        $active={sortBy === 'time'}
+                        onClick={() => setSortBy('time')}
+                      >
+                        시간순
+                      </SortButton>
+                    </SortButtonGroup>
+                  )}
+
+                  {/* 기념일 안내 문구 */}
+                  {isAnniversary && (
+                    <p style={{
+                      fontSize: '12px',
+                      color: '#4a90e2',
+                      marginTop: '0',
+                      marginBottom: '12px',
+                      textAlign: 'center'
+                    }}>
+                      🎉 기념일이 등록되어 있습니다.
+                    </p>
+                  )}
+
+                  <AlarmList>
                   {/* 가등록 알람 - 항상 최상단 */}
                   {pendingAlarms.length > 0 && (
                     <>
@@ -1138,7 +1310,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                       {pendingAlarms.map((alarm) => (
                         <AlarmItem key={alarm.id} $isPending={true}>
                           <AlarmInfo>
-                            <div style={{ fontWeight: 'bold', fontSize: '15px', marginBottom: '4px', color: '#333' }}>
+                            <div style={{ fontSize: '15px', marginBottom: '4px', color: isAnniversary ? '#4a90e2' : '#333' }}>
                               {alarm.title || '제목 없음'}
                             </div>
                             <AlarmTimeDisplay>
@@ -1147,7 +1319,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             <AlarmRelativeTime>{alarm.displayText}</AlarmRelativeTime>
                           </AlarmInfo>
                           <AlarmActions>
-                            <EditButton onClick={() => handleEditPendingAlarm(alarm)}>
+                            <EditButton onClick={() => handleEditAlarm(alarm, true)}>
                               수정
                             </EditButton>
                             <DeleteButton onClick={() => handleDeletePendingAlarm(alarm.id)}>
@@ -1179,7 +1351,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 />
                                 <span className="slider"></span>
                               </ToggleSwitch>
-                              <span style={{ fontWeight: 'bold', fontSize: '15px', color: '#333' }}>
+                              <span style={{ fontSize: '15px', color: isAnniversary ? '#4a90e2' : '#333' }}>
                                 {alarm.title || '제목 없음'}
                               </span>
                             </div>
@@ -1188,93 +1360,25 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             </AlarmTimeDisplay>
                             <AlarmRelativeTime>{alarm.displayText}</AlarmRelativeTime>
                           </AlarmInfo>
-                          <DeleteButton onClick={() => handleDeleteAlarm(alarm.id)}>
-                            삭제
-                          </DeleteButton>
+                          <AlarmActions>
+                            <EditButton onClick={() => handleEditAlarm(alarm, false)}>
+                              수정
+                            </EditButton>
+                            <DeleteButton onClick={() => handleDeleteAlarm(alarm.id)}>
+                              삭제
+                            </DeleteButton>
+                          </AlarmActions>
                         </AlarmItem>
                       ))}
                     </>
                   )}
-                </AlarmList>
+                  </AlarmList>
+                </AlarmBox>
               )}
             </Section>
 
-            {/* Add New Alarm */}
-            <Section>
-              <SectionTitle>
-                <BellIcon />
-                알람 추가
-              </SectionTitle>
-              <AddAlarmSection>
-                {/* Quick Presets */}
-                <div>
-                  <Label style={{ marginBottom: '8px', display: 'block' }}>빠른 선택</Label>
-                  <PresetButtonGrid>
-                    <PresetButton onClick={() => handleAddPresetAlarm(3, 0, 0)}>3일 전</PresetButton>
-                    <PresetButton onClick={() => handleAddPresetAlarm(1, 0, 0)}>1일 전</PresetButton>
-                    <PresetButton onClick={() => handleAddPresetAlarm(0, 12, 0)}>12시간 전</PresetButton>
-                    <PresetButton onClick={() => handleAddPresetAlarm(0, 3, 0)}>3시간 전</PresetButton>
-                    <PresetButton onClick={() => handleAddPresetAlarm(0, 1, 0)}>1시간 전</PresetButton>
-                    <PresetButton onClick={() => handleAddPresetAlarm(0, 0, 30)}>30분 전</PresetButton>
-                    <PresetButton onClick={() => handleAddPresetAlarm(0, 0, 10)}>10분 전</PresetButton>
-                  </PresetButtonGrid>
-                </div>
-
-                {/* Custom Precise Input */}
-                <CustomInputSection>
-                  <Label>정확한 시간 입력</Label>
-                  <CustomInputRow>
-                    <SmallInput
-                      type="number"
-                      min="0"
-                      value={customDays}
-                      onChange={(e) => setCustomDays(parseInt(e.target.value) || 0)}
-                    />
-                    <Label>일</Label>
-                    <SmallInput
-                      type="number"
-                      min="0"
-                      max="23"
-                      value={customHours}
-                      onChange={(e) => setCustomHours(parseInt(e.target.value) || 0)}
-                    />
-                    <Label>시간</Label>
-                    <SmallInput
-                      type="number"
-                      min="0"
-                      max="59"
-                      value={customMinutes}
-                      onChange={(e) => setCustomMinutes(parseInt(e.target.value) || 0)}
-                    />
-                    <Label>분 전</Label>
-                  </CustomInputRow>
-                  <AddButton onClick={handleAddCustomAlarm}>정확한 시간으로 추가</AddButton>
-                </CustomInputSection>
-
-                {/* Direct Time Specification */}
-                <CustomInputSection>
-                  <Label>직접 시간 지정</Label>
-                  <CustomInputRow>
-                    <Input
-                      type="date"
-                      value={directDate}
-                      onChange={(e) => setDirectDate(e.target.value)}
-                      style={{ flex: 1 }}
-                    />
-                    <Input
-                      type="time"
-                      value={directTime}
-                      onChange={(e) => setDirectTime(e.target.value)}
-                      style={{ flex: 1 }}
-                    />
-                  </CustomInputRow>
-                  <AddButton onClick={handleAddDirectAlarm}>직접 시간으로 추가</AddButton>
-                </CustomInputSection>
-              </AddAlarmSection>
-            </Section>
-
             {/* Alarm Sound */}
-            <Section>
+            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
               <SectionTitle>
                 <VolumeIcon />
                 알람 소리
@@ -1319,7 +1423,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             </Section>
 
             {/* Volume Control */}
-            <Section>
+            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
               <SectionTitle>
                 <VolumeIcon />
                 알람 볼륨
@@ -1337,7 +1441,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             </Section>
 
             {/* Notification Type */}
-            <Section>
+            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
               <SectionTitle>
                 <VibrateIcon />
                 알림 유형
@@ -1377,7 +1481,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             </Section>
 
             {/* Snooze Settings */}
-            <Section>
+            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
               <SectionTitle>
                 <AlertIcon />
                 스누즈 (알람 후 재알림)
@@ -1400,45 +1504,6 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 </span>
               </div>
             </Section>
-
-            {/* Anniversary Settings */}
-            <Section>
-              <SectionTitle>
-                <RepeatIcon />
-                기념일 등록
-              </SectionTitle>
-              <CheckboxContainer $checked={isAnniversary}>
-                <input
-                  type="checkbox"
-                  checked={isAnniversary}
-                  onChange={(e) => setIsAnniversary(e.target.checked)}
-                />
-                <span>기념일로 등록하기</span>
-              </CheckboxContainer>
-
-              {isAnniversary && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-                  <Input
-                    type="text"
-                    placeholder="기념일 명칭 (예: 결혼기념일)"
-                    value={anniversaryName}
-                    onChange={(e) => setAnniversaryName(e.target.value)}
-                  />
-                  <Select
-                    value={anniversaryRepeat}
-                    onChange={(e) => setAnniversaryRepeat(e.target.value)}
-                  >
-                    <option value="daily">매일</option>
-                    <option value="weekly">매주</option>
-                    <option value="monthly">매월</option>
-                    <option value="yearly">매년</option>
-                  </Select>
-                  <p style={{ fontSize: '12px', color: '#6c757d', margin: 0 }}>
-                    💡 기념일로 등록하면 선택한 주기마다 자동으로 알람이 울립니다.
-                  </p>
-                </div>
-              )}
-            </Section>
           </FormArea>
 
           <Footer>
@@ -1449,6 +1514,150 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
           {/* Hidden audio element for sound preview */}
           <audio ref={audioRef} />
         </ModalContent>
+
+        {/* Edit Modal */}
+        {showEditModal && (
+          <ModalContent
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 10001,
+              maxWidth: '400px',
+              width: '90%',
+              animation: 'none'
+            }}
+          >
+            <Header>
+              <div style={{ width: '32px' }}></div>
+              <HeaderTitle>알람 수정</HeaderTitle>
+              <CloseButton onClick={handleCancelEdit}>×</CloseButton>
+            </Header>
+
+            <FormArea>
+              {/* Alarm Title */}
+              <Section>
+                <SectionTitle>
+                  <TitleIcon />
+                  알람 타이틀<span className="required">*</span>
+                </SectionTitle>
+                <Input
+                  type="text"
+                  placeholder="예: 동현이 결혼식"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  autoFocus
+                />
+              </Section>
+
+              {/* Anniversary Settings */}
+              <Section style={{ marginTop: '-8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: editIsAnniversary ? '16px' : '0' }}>
+                  <input
+                    type="checkbox"
+                    checked={editIsAnniversary}
+                    onChange={(e) => setEditIsAnniversary(e.target.checked)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#343a40', cursor: 'pointer' }} onClick={() => setEditIsAnniversary(!editIsAnniversary)}>
+                    기념일로 등록
+                  </span>
+                </div>
+
+                {editIsAnniversary && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    {/* 알림주기 */}
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '600', color: '#495057', marginBottom: '8px' }}>
+                        알림주기
+                      </div>
+                      <RadioGroup style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                        <RadioOption $checked={editAnniversaryRepeat === 'daily'} onClick={() => setEditAnniversaryRepeat('daily')}>
+                          <input type="radio" name="editAnniversaryRepeat" value="daily" checked={editAnniversaryRepeat === 'daily'} onChange={() => {}} />
+                          <span>매일</span>
+                        </RadioOption>
+                        <RadioOption $checked={editAnniversaryRepeat === 'weekly'} onClick={() => setEditAnniversaryRepeat('weekly')}>
+                          <input type="radio" name="editAnniversaryRepeat" value="weekly" checked={editAnniversaryRepeat === 'weekly'} onChange={() => {}} />
+                          <span>매주</span>
+                        </RadioOption>
+                        <RadioOption $checked={editAnniversaryRepeat === 'monthly'} onClick={() => setEditAnniversaryRepeat('monthly')}>
+                          <input type="radio" name="editAnniversaryRepeat" value="monthly" checked={editAnniversaryRepeat === 'monthly'} onChange={() => {}} />
+                          <span>매달</span>
+                        </RadioOption>
+                        <RadioOption $checked={editAnniversaryRepeat === 'yearly'} onClick={() => setEditAnniversaryRepeat('yearly')}>
+                          <input type="radio" name="editAnniversaryRepeat" value="yearly" checked={editAnniversaryRepeat === 'yearly'} onChange={() => {}} />
+                          <span>매년</span>
+                        </RadioOption>
+                      </RadioGroup>
+                    </div>
+                  </div>
+                )}
+              </Section>
+
+              {/* Alarm Time */}
+              <Section>
+                <SectionTitle>
+                  <ClockIcon />
+                  알람 시간<span className="required">*</span>
+                </SectionTitle>
+                <TimeInputRow>
+                  <TimeSelect
+                    value={editEventTime.split(':')[0]}
+                    onChange={(e) => setEditEventTime(`${e.target.value}:${editEventTime.split(':')[1]}`)}
+                  >
+                    {hours.map(h => <option key={h} value={h}>{h}시</option>)}
+                  </TimeSelect>
+                  <TimeSelect
+                    value={editEventTime.split(':')[1]}
+                    onChange={(e) => setEditEventTime(`${editEventTime.split(':')[0]}:${e.target.value}`)}
+                  >
+                    {minutes.map(m => <option key={m} value={m}>{m}분</option>)}
+                  </TimeSelect>
+                </TimeInputRow>
+              </Section>
+
+              {/* Alarm Timing (Offset) */}
+              <Section>
+                <SectionTitle>
+                  <AlertIcon />
+                  알림시기
+                </SectionTitle>
+                <CustomInputRow>
+                  <SmallInput
+                    type="number"
+                    min="0"
+                    value={editOffset.days}
+                    onChange={(e) => setEditOffset({ ...editOffset, days: parseInt(e.target.value) || 0 })}
+                  />
+                  <Label>일</Label>
+                  <SmallInput
+                    type="number"
+                    min="0"
+                    max="23"
+                    value={editOffset.hours}
+                    onChange={(e) => setEditOffset({ ...editOffset, hours: parseInt(e.target.value) || 0 })}
+                  />
+                  <Label>시간</Label>
+                  <SmallInput
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={editOffset.minutes}
+                    onChange={(e) => setEditOffset({ ...editOffset, minutes: parseInt(e.target.value) || 0 })}
+                  />
+                  <Label>분 전</Label>
+                </CustomInputRow>
+              </Section>
+            </FormArea>
+
+            <Footer>
+              <CancelButton onClick={handleCancelEdit}>취소</CancelButton>
+              <SaveButton onClick={handleSaveEdit}>수정 완료</SaveButton>
+            </Footer>
+          </ModalContent>
+        )}
       </Overlay>
     </Portal>
   );

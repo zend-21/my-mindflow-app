@@ -1768,8 +1768,17 @@ const Calendar = ({
                             />
                         ) : (
                         <div className="content-wrapper" onDoubleClick={() => onOpenEditor?.(selectedDate, scheduleText)}>
-                            {specialEvents.length > 0 && (
-                                <div className="special-event-note">
+                            {/* 기념일과 특일을 같은 줄에 표시 */}
+                            {(currentEntry?.alarm?.isAnniversary || specialEvents.length > 0) && (
+                                <div className="special-event-note" style={{ marginBottom: '4px' }}>
+                                    {currentEntry?.alarm?.isAnniversary && currentEntry.alarm.anniversaryName && (
+                                        <>
+                                            <span style={{ color: '#4a90e2' }}>
+                                                {currentEntry.alarm.anniversaryName}
+                                            </span>
+                                            {specialEvents.length > 0 && <span> · </span>}
+                                        </>
+                                    )}
                                     {specialEvents.map((event, index) => (
                                         <span key={index} style={{ color: event.color }}>
                                             {event.text}{index < specialEvents.length - 1 ? ' · ' : ''}
@@ -1778,36 +1787,30 @@ const Calendar = ({
                                 </div>
                             )}
 
+                            {/* 알람 목록 - 간결하게 표시 */}
                             {currentEntry?.alarm && currentEntry.alarm.registeredAlarms && currentEntry.alarm.registeredAlarms.length > 0 && (
                                 <div style={{
                                     display: 'flex',
                                     flexDirection: 'column',
-                                    gap: '8px',
-                                    padding: '12px',
-                                    backgroundColor: '#fff5f5',
-                                    borderRadius: '8px',
-                                    border: '1px solid #ffebeb',
-                                    marginBottom: '12px'
+                                    gap: '2px',
+                                    marginBottom: '8px',
+                                    paddingLeft: '3px'
                                 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', color: '#d63031' }}>
-                                        <AlarmClock size={18} color="#d63031" />
-                                        <span>등록된 알람 ({currentEntry.alarm.registeredAlarms.length}개)</span>
-                                    </div>
                                     {currentEntry.alarm.registeredAlarms.map((alarm, index) => (
                                         <div key={alarm.id || index} style={{
-                                            padding: '8px',
-                                            backgroundColor: '#ffffff',
-                                            borderRadius: '6px',
-                                            border: '1px solid #ffe0e0'
+                                            display: 'flex',
+                                            alignItems: 'flex-start',
+                                            gap: '6px',
+                                            lineHeight: '1.3'
                                         }}>
-                                            <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#333', marginBottom: '4px' }}>
-                                                {alarm.title || '제목 없음'}
-                                            </div>
-                                            <div style={{ fontSize: '12px', color: '#666' }}>
-                                                {format(new Date(alarm.calculatedTime), 'yyyy-MM-dd HH:mm')}
-                                            </div>
-                                            <div style={{ fontSize: '11px', color: '#999' }}>
-                                                {alarm.displayText}
+                                            <AlarmClock size={14} color="#d63031" style={{ marginTop: '2px', flexShrink: 0 }} />
+                                            <div style={{ flex: 1 }}>
+                                                <span style={{ fontSize: '13px', color: '#333' }}>
+                                                    {alarm.title || '제목 없음'}
+                                                </span>
+                                                <div style={{ fontSize: '11px', color: '#999' }}>
+                                                    {format(new Date(alarm.calculatedTime), 'yyyy-MM-dd HH:mm')}
+                                                </div>
                                             </div>
                                         </div>
                                     ))}

@@ -4,7 +4,6 @@ import styled, { keyframes } from "styled-components";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import Portal from '../../components/Portal';
-import { AlarmClock } from "lucide-react";
 
 /* 애니메이션 */
 const fadeIn = keyframes`
@@ -494,42 +493,6 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
               </RightWrapper>
             </ButtonRow>
           </Header>
-
-          {data?.alarm && data.alarm.registeredAlarms && data.alarm.registeredAlarms.length > 0 && (
-              <div style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
-                  padding: '12px',
-                  backgroundColor: '#fff5f5',
-                  borderRadius: '8px',
-                  border: '1px solid #ffebeb',
-                  marginBottom: '16px'
-              }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', color: '#d63031', borderBottom: '2px solid #ffebeb', paddingBottom: '8px' }}>
-                      <AlarmClock size={18} color="#d63031" />
-                      <span>등록된 알람 ({data.alarm.registeredAlarms.length}개)</span>
-                  </div>
-                  {data.alarm.registeredAlarms.map((alarm, index) => (
-                      <div key={alarm.id || index} style={{
-                          padding: '10px',
-                          backgroundColor: '#ffffff',
-                          borderRadius: '6px',
-                          border: '1px solid #ffe0e0'
-                      }}>
-                          <div style={{ fontWeight: 'bold', fontSize: '14px', color: '#333', marginBottom: '4px' }}>
-                              {alarm.title || '제목 없음'}
-                          </div>
-                          <div style={{ fontSize: '12px', color: '#666' }}>
-                              {format(new Date(alarm.calculatedTime), 'yyyy-MM-dd HH:mm')}
-                          </div>
-                          <div style={{ fontSize: '11px', color: '#999' }}>
-                              {alarm.displayText}
-                          </div>
-                      </div>
-                  ))}
-              </div>
-          )}
 
           {data?.createdAt && (
               <SmallNote>
