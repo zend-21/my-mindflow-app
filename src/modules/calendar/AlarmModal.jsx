@@ -2374,6 +2374,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
           <>
             {/* Edit Modal Backdrop */}
             <div
+              onClick={(e) => e.stopPropagation()}
               style={{
                 position: 'fixed',
                 inset: 0,
@@ -2390,8 +2391,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 left: '50%',
                 transform: 'translate(-50%, -50%)',
                 zIndex: 10001,
-                maxWidth: '400px',
-                width: '90%',
+                maxWidth: '480px',
+                width: '94%',
                 animation: 'none'
               }}
             >
