@@ -1530,7 +1530,7 @@ const Calendar = ({
     };
 
     const handleDeleteAlarmOnly = () => {
-        // 알람만 삭제, 일정 텍스트는 보존
+        // 일반 알람만 삭제, 기념일 알람과 일정 텍스트는 보존
         if (!currentEntry || !currentEntry.alarm) return;
 
         const key = format(selectedDate, 'yyyy-MM-dd');
@@ -1538,19 +1538,36 @@ const Calendar = ({
         setSchedules((prevSchedules) => {
             const updatedSchedules = { ...prevSchedules };
 
-            if (updatedSchedules[key]) {
-                // alarm 필드 제거
-                const { alarm, ...restOfEntry } = updatedSchedules[key];
-                updatedSchedules[key] = {
-                    ...restOfEntry,
-                    updatedAt: Date.now()
-                };
+            if (updatedSchedules[key] && updatedSchedules[key].alarm) {
+                // 기념일 알람만 필터링하여 남김
+                const anniversaryAlarms = updatedSchedules[key].alarm.registeredAlarms?.filter(alarm =>
+                    alarm.isAnniversary
+                ) || [];
+
+                if (anniversaryAlarms.length > 0) {
+                    // 기념일 알람이 있으면 기념일 알람만 보존
+                    updatedSchedules[key] = {
+                        ...updatedSchedules[key],
+                        alarm: {
+                            ...updatedSchedules[key].alarm,
+                            registeredAlarms: anniversaryAlarms
+                        },
+                        updatedAt: Date.now()
+                    };
+                } else {
+                    // 기념일 알람이 없으면 alarm 필드 완전히 제거
+                    const { alarm, ...restOfEntry } = updatedSchedules[key];
+                    updatedSchedules[key] = {
+                        ...restOfEntry,
+                        updatedAt: Date.now()
+                    };
+                }
             }
 
             return updatedSchedules;
         });
 
-        showToast('알람이 삭제되었습니다.');
+        showToast('일반 알람이 삭제되었습니다.');
     };
     
     const handleAlarmClick = () => {
@@ -1769,53 +1786,76 @@ const Calendar = ({
                         ) : (
                         <div className="content-wrapper" onDoubleClick={() => onOpenEditor?.(selectedDate, scheduleText)}>
                             {/* 기념일과 특일을 같은 줄에 표시 */}
-                            {(currentEntry?.alarm?.isAnniversary || specialEvents.length > 0) && (
-                                <div className="special-event-note" style={{ marginBottom: '4px' }}>
-                                    {currentEntry?.alarm?.isAnniversary && currentEntry.alarm.anniversaryName && (
-                                        <>
-                                            <span style={{ color: '#4a90e2' }}>
-                                                {currentEntry.alarm.anniversaryName}
-                                            </span>
-                                            {specialEvents.length > 0 && <span> · </span>}
-                                        </>
-                                    )}
-                                    {specialEvents.map((event, index) => (
-                                        <span key={index} style={{ color: event.color }}>
-                                            {event.text}{index < specialEvents.length - 1 ? ' · ' : ''}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
+                            {(() => {
+                                // 등록된 알람 중에서 기념일 알람들을 추출
+                                const anniversaryAlarms = currentEntry?.alarm?.registeredAlarms?.filter(alarm =>
+                                    alarm.isAnniversary && (alarm.anniversaryName || alarm.title)
+                                ) || [];
 
-                            {/* 알람 목록 - 간결하게 표시 */}
-                            {currentEntry?.alarm && currentEntry.alarm.registeredAlarms && currentEntry.alarm.registeredAlarms.length > 0 && (
-                                <div style={{
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    gap: '2px',
-                                    marginBottom: '8px',
-                                    paddingLeft: '3px'
-                                }}>
-                                    {currentEntry.alarm.registeredAlarms.map((alarm, index) => (
-                                        <div key={alarm.id || index} style={{
-                                            display: 'flex',
-                                            alignItems: 'flex-start',
-                                            gap: '6px',
-                                            lineHeight: '1.3'
-                                        }}>
-                                            <AlarmClock size={14} color="#d63031" style={{ marginTop: '2px', flexShrink: 0 }} />
-                                            <div style={{ flex: 1 }}>
-                                                <span style={{ fontSize: '13px', color: '#333' }}>
-                                                    {alarm.title || '제목 없음'}
+                                const hasAnniversaries = anniversaryAlarms.length > 0;
+                                const hasSpecialEvents = specialEvents.length > 0;
+
+                                if (!hasAnniversaries && !hasSpecialEvents) return null;
+
+                                return (
+                                    <div className="special-event-note" style={{ marginBottom: '4px' }}>
+                                        {/* 기념일들을 먼저 표시 (파란색) */}
+                                        {anniversaryAlarms.map((alarm, index) => (
+                                            <span key={`anniversary-${alarm.id || index}`}>
+                                                <span style={{ color: '#4a90e2' }}>
+                                                    {alarm.anniversaryName || alarm.title}
                                                 </span>
-                                                <div style={{ fontSize: '11px', color: '#999' }}>
-                                                    {format(new Date(alarm.calculatedTime), 'yyyy-MM-dd HH:mm')}
+                                                {(index < anniversaryAlarms.length - 1 || hasSpecialEvents) && <span> · </span>}
+                                            </span>
+                                        ))}
+                                        {/* 특일들을 나중에 표시 */}
+                                        {specialEvents.map((event, index) => (
+                                            <span key={`special-${index}`} style={{ color: event.color }}>
+                                                {event.text}{index < specialEvents.length - 1 ? ' · ' : ''}
+                                            </span>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
+
+                            {/* 알람 목록 - 간결하게 표시 (기념일 알람은 제외) */}
+                            {(() => {
+                                // 기념일이 아닌 일반 알람들만 필터링
+                                const regularAlarms = currentEntry?.alarm?.registeredAlarms?.filter(alarm =>
+                                    !alarm.isAnniversary
+                                ) || [];
+
+                                if (regularAlarms.length === 0) return null;
+
+                                return (
+                                    <div style={{
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '2px',
+                                        marginBottom: '8px',
+                                        paddingLeft: '3px'
+                                    }}>
+                                        {regularAlarms.map((alarm, index) => (
+                                            <div key={alarm.id || index} style={{
+                                                display: 'flex',
+                                                alignItems: 'flex-start',
+                                                gap: '6px',
+                                                lineHeight: '1.3'
+                                            }}>
+                                                <AlarmClock size={14} color="#d63031" style={{ marginTop: '2px', flexShrink: 0 }} />
+                                                <div style={{ flex: 1 }}>
+                                                    <span style={{ fontSize: '13px', color: '#333' }}>
+                                                        {alarm.title || '제목 없음'}
+                                                    </span>
+                                                    <div style={{ fontSize: '11px', color: '#999' }}>
+                                                        {format(new Date(alarm.calculatedTime), 'yyyy-MM-dd HH:mm')}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                                        ))}
+                                    </div>
+                                );
+                            })()}
 
                             {scheduleText ? (
                                 <span style={{
@@ -1846,8 +1886,13 @@ const Calendar = ({
                                     일정 삭제
                                 </DeleteButton>
                             )}
-                            {/* 알람이 있으면 알람 삭제 버튼 표시 */}
-                            {currentEntry.alarm && currentEntry.alarm.registeredAlarms && currentEntry.alarm.registeredAlarms.length > 0 && (
+                            {/* 일반 알람이 있으면 알람 삭제 버튼 표시 (기념일 알람 제외) */}
+                            {(() => {
+                                const regularAlarms = currentEntry?.alarm?.registeredAlarms?.filter(alarm =>
+                                    !alarm.isAnniversary
+                                ) || [];
+                                return regularAlarms.length > 0;
+                            })() && (
                                 <DeleteButton onClick={handleDeleteAlarmOnly} style={{ backgroundColor: '#ff6b6b' }}>
                                     알람 삭제
                                 </DeleteButton>
