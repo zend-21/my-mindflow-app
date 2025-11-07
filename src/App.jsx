@@ -13,6 +13,7 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { exportData, importData } from './utils/dataManager';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import useAlarmManager from './hooks/useAlarmManager';
 // 하위 컴포넌트들
 import Header from './components/Header.jsx';
 import StatsGrid from './components/StatsGrid.jsx';
@@ -30,6 +31,7 @@ import ConfirmModal from './components/ConfirmModal.jsx';
 import Calendar from './modules/calendar/Calendar.jsx';
 import CalendarEditorModal from './modules/calendar/CalendarEditorModal.jsx';
 import AlarmModal from './modules/calendar/AlarmModal.jsx';
+import AlarmNotification from './modules/calendar/AlarmNotification.jsx';
 import DateSelectorModal from './modules/calendar/DateSelectorModal.jsx';
 import LoginModal from './components/LoginModal.jsx';
 import FortuneFlow from './components/FortuneFlow.jsx';
@@ -708,6 +710,9 @@ function App() {
     const [isAlarmModalOpen, setIsAlarmModalOpen] = useState(false);
     const [scheduleForAlarm, setScheduleForAlarm] = useState(null);
     const [isDateSelectorOpen, setIsDateSelectorOpen] = useState(false);
+
+    // 알람 매니저 훅 사용
+    const { currentAlarm, dismissAlarm, snoozeAlarm } = useAlarmManager(calendarSchedules);
 
     const handleOpenAlarmModal = (scheduleData) => {
         console.log('✅ handleOpenAlarmModal 호출됨:', scheduleData);
@@ -1884,6 +1889,18 @@ if (isLoading) {
                     calendarSchedules={calendarSchedules}
                     showToast={showToast}
                     onClose={() => setActiveTab('home')}
+                />
+            )}
+
+            {/* ⏰ 알람 알림 */}
+            {currentAlarm && (
+                <AlarmNotification
+                    isVisible={true}
+                    scheduleData={currentAlarm.scheduleData}
+                    onDismiss={dismissAlarm}
+                    onSnooze={snoozeAlarm}
+                    currentSnoozeCount={currentAlarm.snoozeCount || 0}
+                    maxSnoozeCount={3}
                 />
             )}
             </AppContent>

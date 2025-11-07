@@ -1898,8 +1898,13 @@ const Calendar = ({
                                 </DeleteButton>
                             )}
                         </ButtonGroup>
-                        · 처음 작성일: {formatTs(currentEntry?.createdAt)} <br />
-                        · 마지막 수정일: {formatTs(currentEntry?.updatedAt)}
+                        {/* 일정 텍스트가 있을 때만 작성일/수정일 표시 */}
+                        {currentEntry.text && currentEntry.text.trim() && (
+                            <>
+                            · 처음 작성일: {formatTs(currentEntry?.createdAt)} <br />
+                            · 마지막 수정일: {formatTs(currentEntry?.updatedAt)}
+                            </>
+                        )}
                         </>
                     ) : (
                         <>· 해당 날짜에는 스케줄이 없습니다.</>

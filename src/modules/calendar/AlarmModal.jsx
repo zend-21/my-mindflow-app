@@ -1484,6 +1484,13 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     };
     localStorage.setItem('alarmSettings', JSON.stringify(settingsToSave));
 
+    // 기념일 관련 상태 초기화
+    setIsAnniversary(false);
+    setAnniversaryName('');
+    setAnniversaryRepeat('');
+    setAnniversaryTiming('');
+    setAnniversaryDaysBefore(1);
+
     onSave(alarmSettings);
   };
 
