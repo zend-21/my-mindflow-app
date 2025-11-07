@@ -382,7 +382,7 @@ const RadioOption = styled.label`
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
+  padding: 10px 10px;
   background: ${props => props.$checked ? '#e7f3ff' : '#f8f9fa'};
   border: 2px solid ${props => props.$checked ? '#4a90e2' : '#dee2e6'};
   border-radius: 8px;
@@ -765,7 +765,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [anniversaryName, setAnniversaryName] = useState('');
   const [anniversaryRepeat, setAnniversaryRepeat] = useState(''); // 초기값 없음
   const [anniversaryTiming, setAnniversaryTiming] = useState(''); // 초기값 없음 - 'today' or 'before'
-  const [anniversaryDaysBefore, setAnniversaryDaysBefore] = useState(1); // N일 전
+  const [anniversaryDaysBefore, setAnniversaryDaysBefore] = useState(''); // N일 전
 
   // Editing pending alarm
   const [editingPendingId, setEditingPendingId] = useState(null);
@@ -780,7 +780,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [editIsAnniversary, setEditIsAnniversary] = useState(false);
   const [editAnniversaryRepeat, setEditAnniversaryRepeat] = useState(''); // 초기값 없음
   const [editAnniversaryTiming, setEditAnniversaryTiming] = useState('today');
-  const [editAnniversaryDaysBefore, setEditAnniversaryDaysBefore] = useState(1);
+  const [editAnniversaryDaysBefore, setEditAnniversaryDaysBefore] = useState('');
   const [editEventTime, setEditEventTime] = useState('09:00');
   const [editOffset, setEditOffset] = useState({ days: 0, hours: 0, minutes: 0 });
   const [hasEditChanges, setHasEditChanges] = useState(false);
@@ -847,7 +847,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     const anniversaryChanged = editIsAnniversary !== editingAlarm.isAnniversary;
     const anniversaryRepeatChanged = editAnniversaryRepeat !== (editingAlarm.anniversaryRepeat || '');
     const anniversaryTimingChanged = editAnniversaryTiming !== (editingAlarm.anniversaryTiming || 'today');
-    const anniversaryDaysBeforeChanged = editAnniversaryDaysBefore !== (editingAlarm.anniversaryDaysBefore || 1);
+    const anniversaryDaysBeforeChanged = editAnniversaryDaysBefore !== (editingAlarm.anniversaryDaysBefore || '');
 
     // 개별 알람옵션 변경 감지
     const customSoundChanged = editCustomSound !== (editingAlarm.customSound || null);
@@ -871,6 +871,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   // Snooze input refs
   const snoozeInputRef = useRef(null);
   const editSnoozeInputRef = useRef(null);
+
+  // Anniversary days before input refs
+  const anniversaryDaysInputRef = useRef(null);
+  const editAnniversaryDaysInputRef = useRef(null);
 
   // Initialize state when modal opens
   useEffect(() => {
@@ -910,7 +914,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         setAnniversaryName(scheduleData.alarm.anniversaryName || '');
         setAnniversaryRepeat(''); // 초기화 시 선택 안됨
         setAnniversaryTiming(''); // 초기화 시 선택 안됨
-        setAnniversaryDaysBefore(1);
+        setAnniversaryDaysBefore('');
         setSortBy(lastSettings.sortBy || 'time');
       } else {
         // Reset to defaults (알람이 없거나 registeredAlarms가 비어있으면 초기화)
@@ -931,7 +935,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         setAnniversaryName('');
         setAnniversaryRepeat(''); // 초기화 시 선택 안됨
         setAnniversaryTiming(''); // 초기화 시 선택 안됨
-        setAnniversaryDaysBefore(1);
+        setAnniversaryDaysBefore('');
         setSortBy(lastSettings.sortBy || 'time');
       }
 
@@ -1034,7 +1038,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       anniversaryName: isAnniversary ? alarmTitle : '', // 알람 타이틀을 기념일 이름으로 사용
       anniversaryRepeat: isAnniversary ? anniversaryRepeat : '',
       anniversaryTiming: isAnniversary ? anniversaryTiming : 'today',
-      anniversaryDaysBefore: isAnniversary ? anniversaryDaysBefore : 1,
+      anniversaryDaysBefore: isAnniversary ? (anniversaryDaysBefore || 1) : 1,
       // 개별 알람옵션 (선택사항 - 없으면 기본 설정 사용)
       customSound: null,
       customVolume: null,
@@ -1076,6 +1080,11 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       }
       if (!anniversaryTiming) {
         setValidationMessage('알림시기를 선택하세요.');
+        setShowValidationModal(true);
+        return;
+      }
+      if (anniversaryTiming === 'before' && (!anniversaryDaysBefore || anniversaryDaysBefore === 0)) {
+        setValidationMessage('알림시기 일수를 입력하세요.');
         setShowValidationModal(true);
         return;
       }
@@ -1149,6 +1158,11 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       }
       if (!anniversaryTiming) {
         setValidationMessage('알림시기를 선택하세요.');
+        setShowValidationModal(true);
+        return;
+      }
+      if (anniversaryTiming === 'before' && (!anniversaryDaysBefore || anniversaryDaysBefore === 0)) {
+        setValidationMessage('알림시기 일수를 입력하세요.');
         setShowValidationModal(true);
         return;
       }
@@ -1339,11 +1353,11 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     if (alarm.isAnniversary) {
       setEditAnniversaryRepeat(alarm.anniversaryRepeat || '');
       setEditAnniversaryTiming(alarm.anniversaryTiming || 'today');
-      setEditAnniversaryDaysBefore(alarm.anniversaryDaysBefore || 1);
+      setEditAnniversaryDaysBefore('');
     } else {
       setEditAnniversaryRepeat('');
       setEditAnniversaryTiming('today');
-      setEditAnniversaryDaysBefore(1);
+      setEditAnniversaryDaysBefore('');
     }
 
     // Load alarm time from calculatedTime
@@ -1393,6 +1407,13 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       return;
     }
 
+    // 기념일 알림시기 검사
+    if (editIsAnniversary && editAnniversaryTiming === 'before' && (!editAnniversaryDaysBefore || editAnniversaryDaysBefore === 0)) {
+      setValidationMessage('알림시기 일수를 입력하세요.');
+      setShowValidationModal(true);
+      return;
+    }
+
     // If no changes, just close modal (this should not happen as button is disabled)
     if (!hasEditChanges) {
       setShowEditModal(false);
@@ -1430,7 +1451,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       anniversaryName: editIsAnniversary ? editTitle : '', // 편집된 타이틀을 기념일 이름으로 사용
       anniversaryRepeat: editIsAnniversary ? editAnniversaryRepeat : '',
       anniversaryTiming: editIsAnniversary ? editAnniversaryTiming : 'today',
-      anniversaryDaysBefore: editIsAnniversary ? editAnniversaryDaysBefore : 1,
+      anniversaryDaysBefore: editIsAnniversary ? (editAnniversaryDaysBefore || 1) : 1,
       // 개별 알람옵션 저장
       customSound: editCustomSound,
       customSoundName: editCustomSoundName,
@@ -1532,7 +1553,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     setAnniversaryName('');
     setAnniversaryRepeat('');
     setAnniversaryTiming('');
-    setAnniversaryDaysBefore(1);
+    setAnniversaryDaysBefore('');
 
     // 기본 알람옵션 접기
     setShowOptions(false);
@@ -1633,7 +1654,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     setAnniversaryName('');
     setAnniversaryRepeat('');
     setAnniversaryTiming('');
-    setAnniversaryDaysBefore(1);
+    setAnniversaryDaysBefore('');
 
     // 기본 알람옵션 접기
     setShowOptions(false);
@@ -1796,31 +1817,29 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                           name="anniversaryTiming"
                           value="before"
                           checked={anniversaryTiming === 'before'}
-                          onChange={() => setAnniversaryTiming('before')}
+                          onChange={() => {
+                            setAnniversaryTiming('before');
+                            setTimeout(() => anniversaryDaysInputRef.current?.focus(), 0);
+                          }}
                           style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                         />
                         <label htmlFor="timing-before" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#495057', cursor: 'pointer' }}>
                           <TimeInput
+                            ref={anniversaryDaysInputRef}
                             type="number"
                             min="1"
                             max="30"
-                            value={anniversaryTiming === 'before' ? anniversaryDaysBefore : ''}
+                            value={anniversaryDaysBefore || ''}
                             placeholder="1-30"
                             onChange={(e) => {
                               const val = e.target.value;
                               if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 30)) {
+                                setAnniversaryTiming('before');
                                 setAnniversaryDaysBefore(val === '' ? '' : parseInt(val));
                               }
                             }}
-                            onBlur={() => {
-                              if (anniversaryDaysBefore === '' || anniversaryDaysBefore < 1) {
-                                setAnniversaryDaysBefore(1);
-                              }
-                            }}
-                            onFocus={(e) => {
+                            onFocus={() => {
                               setAnniversaryTiming('before');
-                              setAnniversaryDaysBefore('');
-                              e.target.select();
                             }}
                             style={{
                               width: '60px',
@@ -2485,31 +2504,29 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             name="editAnniversaryTiming"
                             value="before"
                             checked={editAnniversaryTiming === 'before'}
-                            onChange={() => setEditAnniversaryTiming('before')}
+                            onChange={() => {
+                              setEditAnniversaryTiming('before');
+                              setTimeout(() => editAnniversaryDaysInputRef.current?.focus(), 0);
+                            }}
                             style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                           />
                           <label htmlFor="edit-timing-before" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#495057', cursor: 'pointer' }}>
                             <TimeInput
+                              ref={editAnniversaryDaysInputRef}
                               type="number"
                               min="1"
                               max="30"
-                              value={editAnniversaryTiming === 'before' ? editAnniversaryDaysBefore : ''}
+                              value={editAnniversaryDaysBefore || ''}
                               placeholder="1-30"
                               onChange={(e) => {
                                 const val = e.target.value;
                                 if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 30)) {
+                                  setEditAnniversaryTiming('before');
                                   setEditAnniversaryDaysBefore(val === '' ? '' : parseInt(val));
                                 }
                               }}
-                              onBlur={() => {
-                                if (editAnniversaryDaysBefore === '' || editAnniversaryDaysBefore < 1) {
-                                  setEditAnniversaryDaysBefore(1);
-                                }
-                              }}
-                              onFocus={(e) => {
+                              onFocus={() => {
                                 setEditAnniversaryTiming('before');
-                                setEditAnniversaryDaysBefore('');
-                                e.target.select();
                               }}
                               style={{
                                 width: '60px',
