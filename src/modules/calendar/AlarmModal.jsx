@@ -205,8 +205,8 @@ const TimeSelect = styled(Select)`
 `;
 
 const TimeInput = styled.input`
-  width: 70px;
-  padding: 14px 12px;
+  width: 65px;
+  padding: 14px 10px;
   border-radius: 8px;
   border: 1px solid #dee2e6;
   font-size: 16px;
