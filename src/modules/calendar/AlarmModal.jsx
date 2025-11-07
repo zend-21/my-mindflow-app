@@ -1731,7 +1731,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     const byteLength = Array.from(value).reduce((acc, char) => {
                       return acc + (char.charCodeAt(0) > 127 ? 2 : 1);
                     }, 0);
-                    if (byteLength <= 25) {
+                    if (byteLength <= 20) {
                       setAlarmTitle(value);
                     }
                   }}
@@ -1990,11 +1990,12 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 가등록
                               </span>
                               <span style={{
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap',
                                 flex: 1,
-                                color: alarm.isAnniversary ? '#4a90e2' : '#999'
+                                color: alarm.isAnniversary ? '#4a90e2' : '#999',
+                                wordBreak: 'break-all',
+                                lineHeight: '1.3',
+                                maxWidth: '6em',
+                                display: 'inline-block'
                               }}>
                                 {alarm.title || '제목 없음'}
                               </span>
@@ -2050,7 +2051,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 opacity: alarm.enabled !== false ? 1 : 0.5,
                                 wordBreak: 'break-all',
                                 lineHeight: '1.3',
-                                maxWidth: '7em',
+                                maxWidth: '5em',
                                 display: 'inline-block'
                               }}>
                                 {alarm.title || '제목 없음'}
@@ -2419,7 +2420,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                       const byteLength = Array.from(value).reduce((acc, char) => {
                         return acc + (char.charCodeAt(0) > 127 ? 2 : 1);
                       }, 0);
-                      if (byteLength <= 25) {
+                      if (byteLength <= 20) {
                         setEditTitle(value);
                       }
                     }}
