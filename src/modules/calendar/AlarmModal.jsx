@@ -356,7 +356,7 @@ const AddButton = styled.button`
   color: white;
   border: none;
   border-radius: 8px;
-  padding: 10px;
+  padding: 10px 12px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -563,7 +563,7 @@ const SetCurrentTimeButton = styled.button`
   color: white;
   border: none;
   border-radius: 6px;
-  padding: 8px 12px;
+  padding: 8px 10px;
   font-size: 13px;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -1909,7 +1909,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     <span style={{ fontSize: '16px', color: '#495057' }}>분</span>
                   </div>
                   <SetCurrentTimeButton onClick={handleSetCurrentTime} disabled={isDisabled}>
-                    현재 시간
+                    현재시간
                   </SetCurrentTimeButton>
                   <AddButton onClick={() => handleAddPresetAlarm(0, 0, 0)} disabled={isDisabled} style={{ marginLeft: 'auto' }}>
                     가등록
