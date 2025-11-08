@@ -811,6 +811,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [deleteTargetAlarm, setDeleteTargetAlarm] = useState(null);
   const [deleteTargetType, setDeleteTargetType] = useState(''); // 'pending', 'registered', 'anniversary'
 
+  // Edit save confirmation modal state
+  const [showEditSaveConfirmModal, setShowEditSaveConfirmModal] = useState(false);
+
   // Time input values
   const [hourInput, setHourInput] = useState('');
   const [minuteInput, setMinuteInput] = useState('');
@@ -1357,7 +1360,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     if (alarm.isAnniversary) {
       setEditAnniversaryRepeat(alarm.anniversaryRepeat || '');
       setEditAnniversaryTiming(alarm.anniversaryTiming || 'today');
-      setEditAnniversaryDaysBefore('');
+      setEditAnniversaryDaysBefore(alarm.anniversaryDaysBefore || '');
     } else {
       setEditAnniversaryRepeat('');
       setEditAnniversaryTiming('today');
@@ -1426,6 +1429,14 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       return;
     }
 
+    // 변경사항이 있으면 확인 모달 표시
+    setShowEditSaveConfirmModal(true);
+  };
+
+  // 실제 저장 실행
+  const confirmEditSave = () => {
+    setShowEditSaveConfirmModal(false);
+
     // Recalculate alarm time with new offset and event time
     const offsetConfig = {
       type: editingAlarm.type || 'preset',
@@ -1465,14 +1476,34 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       customSnoozeMinutes: editCustomSnoozeMinutes
     };
 
+    let updatedRegisteredAlarms;
     if (editingAlarm.isPending) {
       setPendingAlarms(pendingAlarms.map(alarm =>
         alarm.id === editingAlarm.id ? { ...updatedAlarm, isModified: true } : alarm
       ));
+      updatedRegisteredAlarms = registeredAlarms;
     } else {
-      setRegisteredAlarms(registeredAlarms.map(alarm =>
-        alarm.id === editingAlarm.id ? { ...updatedAlarm, isModified: true } : alarm
-      ));
+      updatedRegisteredAlarms = registeredAlarms.map(alarm =>
+        alarm.id === editingAlarm.id ? { ...updatedAlarm, isModified: false } : alarm
+      );
+      setRegisteredAlarms(updatedRegisteredAlarms);
+    }
+
+    // 즉시 저장 - 수정 완료 후 바로 적용
+    if (!editingAlarm.isPending) {
+      const alarmSettings = {
+        eventTime,
+        registeredAlarms: updatedRegisteredAlarms,
+        notificationType,
+        snoozeMinutes,
+        soundFile,
+        customSoundName,
+        volume,
+        isAnniversary,
+        anniversaryName: isAnniversary ? alarmTitle : '',
+        anniversaryRepeat
+      };
+      onSave(alarmSettings);
     }
 
     // Reset main form to default state (do NOT sync with edited alarm)
@@ -2056,7 +2087,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 opacity: alarm.enabled !== false ? 1 : 0.5,
                                 wordBreak: 'break-all',
                                 lineHeight: '1.3',
-                                maxWidth: '5em',
+                                maxWidth: '10em',
                                 display: 'inline-block'
                               }}>
                                 {alarm.title || '제목 없음'}
@@ -2082,7 +2113,11 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               변경사항 미적용
                             </div>
                           )}
-                          <AlarmActions>
+                          <AlarmActions style={{
+                            flexDirection: 'column',
+                            alignItems: 'flex-end',
+                            gap: '6px'
+                          }}>
                             {alarm.enabled !== false ? (
                               <>
                                 {alarm.isModified ? (
@@ -2905,6 +2940,54 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         )}
 
         {/* Delete Confirmation Modal */}
+        {showEditSaveConfirmModal && (
+          <>
+            {/* Edit Save Confirmation Modal Backdrop */}
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                background: 'rgba(0, 0, 0, 0.8)',
+                zIndex: 11000,
+                animation: 'none'
+              }}
+              onClick={() => setShowEditSaveConfirmModal(false)}
+            />
+            <ModalContent
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: 'fixed',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                zIndex: 11001,
+                maxWidth: '350px',
+                width: '90%',
+                animation: 'none'
+              }}
+            >
+              <Header>
+                <div style={{ width: '32px' }}></div>
+                <HeaderTitle>저장 확인</HeaderTitle>
+                <CloseButton onClick={() => setShowEditSaveConfirmModal(false)}>×</CloseButton>
+              </Header>
+
+              <FormArea style={{ padding: '30px 20px', textAlign: 'center' }}>
+                <p style={{ fontSize: '15px', color: '#343a40', margin: 0 }}>
+                  변경내용으로 저장하시겠습니까?
+                </p>
+              </FormArea>
+
+              <Footer>
+                <CancelButton onClick={() => setShowEditSaveConfirmModal(false)}>취소</CancelButton>
+                <SaveButton onClick={confirmEditSave}>
+                  확인
+                </SaveButton>
+              </Footer>
+            </ModalContent>
+          </>
+        )}
+
         {showDeleteConfirmModal && (
           <>
             {/* Delete Confirmation Modal Backdrop */}
