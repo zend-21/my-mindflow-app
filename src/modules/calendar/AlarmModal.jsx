@@ -2086,7 +2086,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             <div style={{
               height: '1px',
               background: '#e9ecef',
-              margin: '20px 0'
+              margin: '10px 0'
             }} />
 
             {/* Registered Alarms */}
