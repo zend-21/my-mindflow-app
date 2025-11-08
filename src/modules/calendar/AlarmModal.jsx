@@ -5,6 +5,7 @@ import styled, { keyframes } from 'styled-components';
 import { format, addDays, addHours, addMinutes, subDays, subHours, subMinutes } from 'date-fns';
 import { AlarmClock } from 'lucide-react';
 import Portal from '../../components/Portal';
+import { saveAudioFile, loadAudioFile } from '../../utils/audioStorage';
 
 // ==================== ANIMATIONS ====================
 const fadeIn = keyframes`
@@ -752,7 +753,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   // 기본 알람옵션 자동 저장
   useEffect(() => {
     const alarmSettings = {
-      soundFile,
+      soundFile: soundFile === 'default' ? 'default' : 'custom', // base64 데이터 제외, 타입만 저장
       customSoundName,
       volume,
       notificationType,
@@ -913,6 +914,22 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       // Load last used settings from localStorage
       const savedSettings = localStorage.getItem('alarmSettings');
       const lastSettings = savedSettings ? JSON.parse(savedSettings) : {};
+
+      // IndexedDB에서 커스텀 사운드 불러오기
+      const loadCustomSound = async () => {
+        if (lastSettings.soundFile === 'custom') {
+          const audioData = await loadAudioFile('alarm_sound_main');
+          if (audioData) {
+            setSoundFile('custom');
+            console.log('✅ IndexedDB에서 알람 소리 로드 완료');
+          } else {
+            setSoundFile('default');
+            setCustomSoundName('');
+            console.log('⚠️ 저장된 커스텀 사운드를 찾을 수 없습니다.');
+          }
+        }
+      };
+      loadCustomSound();
 
       // alarm 객체가 있고 registeredAlarms에 실제 알람이 있는 경우에만 기존 데이터 로드
       const hasActiveAlarms = scheduleData.alarm &&
@@ -1731,25 +1748,50 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   };
 
   // Handle sound file upload
-  const handleSoundUpload = (e) => {
+  const handleSoundUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
+      // 파일 크기 체크 (5MB 제한)
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        alert('파일 크기는 5MB 이하여야 합니다.');
+        return;
+      }
+
       setCustomSoundName(file.name);
       const reader = new FileReader();
-      reader.onload = (event) => {
-        setSoundFile(event.target.result);
+      reader.onload = async (event) => {
+        const audioData = event.target.result;
+
+        // IndexedDB에 저장
+        try {
+          await saveAudioFile('alarm_sound_main', audioData);
+          setSoundFile('custom');
+          console.log('✅ 알람 소리 저장 완료:', file.name);
+        } catch (error) {
+          console.error('❌ 알람 소리 저장 실패:', error);
+          alert('알람 소리 저장에 실패했습니다.');
+        }
       };
       reader.readAsDataURL(file);
     }
   };
 
   // Play sound preview with volume
-  const handlePlaySound = () => {
+  const handlePlaySound = async () => {
     if (audioRef.current) {
       if (soundFile === 'default') {
         audioRef.current.src = '/sound/Schedule_alarm/default.mp3';
-      } else {
-        audioRef.current.src = soundFile;
+      } else if (soundFile === 'custom') {
+        // IndexedDB에서 커스텀 사운드 불러오기
+        const audioData = await loadAudioFile('alarm_sound_main');
+        if (audioData) {
+          audioRef.current.src = audioData;
+        } else {
+          console.error('❌ 커스텀 사운드를 찾을 수 없습니다.');
+          alert('저장된 알람 소리를 찾을 수 없습니다.');
+          return;
+        }
       }
       audioRef.current.volume = volume / 100;
       audioRef.current.play();
@@ -2913,13 +2955,31 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                       ref={editSoundFileInputRef}
                       type="file"
                       accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/m4a,audio/aac,.mp3,.wav,.ogg,.m4a,.aac"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files[0];
                         if (file) {
+                          // 파일 크기 체크 (5MB 제한)
+                          const maxSize = 5 * 1024 * 1024; // 5MB
+                          if (file.size > maxSize) {
+                            alert('파일 크기는 5MB 이하여야 합니다.');
+                            return;
+                          }
+
                           setEditCustomSoundName(file.name);
                           const reader = new FileReader();
-                          reader.onload = (event) => {
-                            setEditCustomSound(event.target.result);
+                          reader.onload = async (event) => {
+                            const audioData = event.target.result;
+
+                            // IndexedDB에 저장 (개별 알람용 키 사용)
+                            try {
+                              const alarmKey = `alarm_sound_individual_${editingAlarm?.id || Date.now()}`;
+                              await saveAudioFile(alarmKey, audioData);
+                              setEditCustomSound(alarmKey); // 키를 저장
+                              console.log('✅ 개별 알람 소리 저장 완료:', file.name);
+                            } catch (error) {
+                              console.error('❌ 알람 소리 저장 실패:', error);
+                              alert('알람 소리 저장에 실패했습니다.');
+                            }
                           };
                           reader.readAsDataURL(file);
                         }
