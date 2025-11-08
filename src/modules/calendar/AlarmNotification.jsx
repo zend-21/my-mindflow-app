@@ -234,39 +234,51 @@ const AlarmNotification = ({
 }) => {
   const [showSnoozeOptions, setShowSnoozeOptions] = useState(false);
   const [smartSnoozeEnabled, setSmartSnoozeEnabled] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [countdown, setCountdown] = useState(10); // 10초 카운트다운
   const [soundStopped, setSoundStopped] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
   const [bannerCount, setBannerCount] = useState(0); // 배너 표시 횟수
+  const [bannersCompleted, setBannersCompleted] = useState(false); // 배너 완료 여부
   const audioRef = useRef(null);
   const messageTimerRef = useRef(null); // 10초 메시지 타이머
   const bannerIntervalRef = useRef(null); // 1분 간격 배너 타이머
 
-  // 현재 시간 업데이트
+  // 카운트다운 타이머 (10초 → 0초)
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+    if (isVisible && !soundStopped) {
+      const timer = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
 
-    return () => clearInterval(timer);
-  }, []);
+      return () => clearInterval(timer);
+    }
+  }, [isVisible, soundStopped]);
 
   // 알람 소리 재생 및 배너 알림 스케줄링
   useEffect(() => {
     if (isVisible && scheduleData) {
       // 초기화
+      setCountdown(10);
       setSoundStopped(false);
       setShowBanner(false);
       setBannerCount(0);
+      setBannersCompleted(false);
 
       // 알람 소리 재생 (한 번만)
       playAlarmSound();
 
-      // 10초 후 메시지 숨기고 배너 알림 시작
+      // 10초 후 알람창 닫고 배너 알림 시작
       messageTimerRef.current = setTimeout(() => {
         setSoundStopped(true);
+        onDismiss(); // 알람창 닫기
         startBannerNotifications();
-      }, 10000); // 10초 메시지 표시
+      }, 10000); // 10초 후 자동 닫기
     } else {
       // 정리
       stopAlarmSound();
@@ -357,6 +369,8 @@ const AlarmNotification = ({
 
   // 1분 간격으로 배너 알림 시작 (최대 5회)
   const startBannerNotifications = () => {
+    if (bannersCompleted) return; // 이미 완료되었으면 시작 안 함
+
     // 첫 번째 배너 즉시 표시
     showNotificationBanner();
     setBannerCount(1);
@@ -366,7 +380,7 @@ const AlarmNotification = ({
       setBannerCount(prev => {
         const newCount = prev + 1;
 
-        if (newCount <= 5) {
+        if (newCount <= 5 && !bannersCompleted) {
           showNotificationBanner();
         }
 
@@ -374,16 +388,19 @@ const AlarmNotification = ({
           // 5회 완료 시 알람 자동 종료
           clearInterval(bannerIntervalRef.current);
           bannerIntervalRef.current = null;
-
-          // 마지막 배너가 사라진 후 알람 종료
-          setTimeout(() => {
-            onDismiss();
-          }, 3000);
+          setBannersCompleted(true);
         }
 
         return newCount;
       });
     }, 60000); // 1분 = 60000ms
+  };
+
+  // 배너 탭 시 모든 배너 알림 중지
+  const handleBannerClick = () => {
+    clearAllTimers();
+    setShowBanner(false);
+    setBannersCompleted(true);
   };
 
   const showNotificationBanner = () => {
@@ -450,18 +467,19 @@ const AlarmNotification = ({
 
   return (
     <Portal>
-      {/* 배너 표시 (10초 후 소리가 멈춘 경우) */}
+      {/* 배너 표시 (10초 후 알람창 닫힌 후) */}
       {showBanner && (
-        <NotificationBanner>
+        <NotificationBanner onClick={handleBannerClick} style={{ cursor: 'pointer' }}>
           🔔 {alarmTitle}
         </NotificationBanner>
       )}
 
-      <Overlay>
-        <AlarmCard $isUrgent={isUrgent}>
-          <TimeDisplay>
-            {format(currentTime, 'HH:mm:ss')}
-          </TimeDisplay>
+      {!soundStopped && (
+        <Overlay>
+          <AlarmCard $isUrgent={isUrgent}>
+            <TimeDisplay>
+              {countdown}초
+            </TimeDisplay>
           
           <ScheduleTitle>
             📅 {format(new Date(scheduleData.date), 'yyyy년 M월 d일')} 일정
@@ -523,6 +541,7 @@ const AlarmNotification = ({
           </ButtonContainer>
         </AlarmCard>
       </Overlay>
+      )}
     </Portal>
   );
 };

@@ -1844,22 +1844,40 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   // Sort alarms
   const getSortedAlarms = (alarms) => {
-    const sorted = [...alarms];
+    // 기념일과 일반 알람 분리
+    const anniversaryAlarms = alarms.filter(alarm => alarm.isAnniversary);
+    const regularAlarms = alarms.filter(alarm => !alarm.isAnniversary);
+
+    // 기념일 알람은 시간순으로 정렬 (항상 오름차순)
+    anniversaryAlarms.sort((a, b) => {
+      const timeA = new Date(a.calculatedTime).getTime();
+      const timeB = new Date(b.calculatedTime).getTime();
+      return timeA - timeB;
+    });
+
+    // 일반 알람은 사용자가 선택한 정렬 기준으로 정렬
+    let sortedRegular = [...regularAlarms];
     if (sortBy === 'time') {
-      sorted.sort((a, b) => {
+      sortedRegular.sort((a, b) => {
         const timeA = new Date(a.calculatedTime).getTime();
         const timeB = new Date(b.calculatedTime).getTime();
         return timeA - timeB;
       });
     } else {
-      sorted.sort((a, b) => {
+      sortedRegular.sort((a, b) => {
         const orderA = Number(a.registrationOrder) || 0;
         const orderB = Number(b.registrationOrder) || 0;
         return orderA - orderB;
       });
     }
-    // Apply sort direction
-    return sortDirection === 'desc' ? sorted.reverse() : sorted;
+
+    // 일반 알람에만 정렬 방향 적용
+    if (sortDirection === 'desc') {
+      sortedRegular.reverse();
+    }
+
+    // 기념일을 최상단에, 일반 알람을 그 아래에 배치
+    return [...anniversaryAlarms, ...sortedRegular];
   };
 
   // Save alarm settings
