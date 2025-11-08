@@ -2551,7 +2551,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               </RadioGroup>
             </Section>
 
-            {/* Snooze Settings */}
+            {/* Snooze Settings - 주석처리: AlarmNotification 자체 스누즈 기능 사용 */}
+            {/*
             <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto', marginBottom: '8px' }}>
               <SectionTitle>
                 <AlertIcon />
@@ -2607,6 +2608,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 </label>
               </div>
             </Section>
+            */}
             </>
             )}
           </FormArea>
@@ -3062,7 +3064,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     </RadioGroup>
                   </Section>
 
-                  {/* 개별 스누즈 설정 */}
+                  {/* 개별 스누즈 설정 - 주석처리: AlarmNotification 자체 스누즈 기능 사용 */}
+                  {/*
                   <Section style={{ marginBottom: '8px' }}>
                     <SectionTitle>
                       <AlertIcon />
@@ -3119,6 +3122,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                       </label>
                     </div>
                   </Section>
+                  */}
                 </>
               )}
             </FormArea>
