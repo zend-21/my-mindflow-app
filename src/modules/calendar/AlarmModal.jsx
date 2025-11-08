@@ -857,19 +857,36 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     const anniversaryDaysBeforeChanged = editAnniversaryDaysBefore !== (editingAlarm.anniversaryDaysBefore || '');
 
     // 개별 알람옵션 변경 감지
-    const customSoundChanged = editCustomSound !== (editingAlarm.customSound || null);
-    const customVolumeChanged = editCustomVolume !== (editingAlarm.customVolume || null);
-    const customNotificationTypeChanged = editCustomNotificationType !== (editingAlarm.customNotificationType || null);
-    const customSnoozeEnabledChanged = editCustomSnoozeEnabled !== (editingAlarm.customSnoozeEnabled || null);
-    const customSnoozeMinutesChanged = editCustomSnoozeMinutes !== (editingAlarm.customSnoozeMinutes || null);
+    const customSoundChanged = editCustomSound !== (editingAlarm.customSound ?? null);
+    const customVolumeChanged = editCustomVolume !== (editingAlarm.customVolume ?? null);
+    const customNotificationTypeChanged = editCustomNotificationType !== (editingAlarm.customNotificationType ?? null);
+    const customSnoozeEnabledChanged = editCustomSnoozeEnabled !== (editingAlarm.customSnoozeEnabled ?? null);
+    const customSnoozeMinutesChanged = editCustomSnoozeMinutes !== (editingAlarm.customSnoozeMinutes ?? null);
 
     const hasChanges = titleChanged || offsetChanged || anniversaryChanged ||
                        anniversaryRepeatChanged || anniversaryTimingChanged || anniversaryDaysBeforeChanged ||
                        customSoundChanged || customVolumeChanged || customNotificationTypeChanged ||
                        customSnoozeEnabledChanged || customSnoozeMinutesChanged;
 
+    // 디버깅 로그 - 변경사항이 감지될 때만
+    if (hasChanges) {
+      console.log('🔍 수정 모달 변경 감지:', {
+        title: { edit: editTitle, original: editingAlarm.title, changed: titleChanged },
+        offset: { edit: editOffset, original: editingAlarm.offset, changed: offsetChanged },
+        anniversary: { edit: editIsAnniversary, original: editingAlarm.isAnniversary, changed: anniversaryChanged },
+        anniversaryRepeat: { edit: editAnniversaryRepeat, original: editingAlarm.anniversaryRepeat, changed: anniversaryRepeatChanged },
+        anniversaryTiming: { edit: editAnniversaryTiming, original: editingAlarm.anniversaryTiming, changed: anniversaryTimingChanged },
+        anniversaryDaysBefore: { edit: editAnniversaryDaysBefore, original: editingAlarm.anniversaryDaysBefore, changed: anniversaryDaysBeforeChanged },
+        customSound: { edit: editCustomSound, original: editingAlarm.customSound, changed: customSoundChanged },
+        customVolume: { edit: editCustomVolume, original: editingAlarm.customVolume, changed: customVolumeChanged },
+        customNotificationType: { edit: editCustomNotificationType, original: editingAlarm.customNotificationType, changed: customNotificationTypeChanged },
+        customSnoozeEnabled: { edit: editCustomSnoozeEnabled, original: editingAlarm.customSnoozeEnabled, changed: customSnoozeEnabledChanged },
+        customSnoozeMinutes: { edit: editCustomSnoozeMinutes, original: editingAlarm.customSnoozeMinutes, changed: customSnoozeMinutesChanged }
+      });
+    }
+
     setHasEditChanges(hasChanges);
-  }, [editTitle, editOffset, editIsAnniversary, editAnniversaryRepeat, editAnniversaryTiming, editAnniversaryDaysBefore,
+  }, [editTitle, editOffset.days, editOffset.hours, editOffset.minutes, editIsAnniversary, editAnniversaryRepeat, editAnniversaryTiming, editAnniversaryDaysBefore,
       editCustomSound, editCustomVolume, editCustomNotificationType, editCustomSnoozeEnabled, editCustomSnoozeMinutes, editingAlarm]);
 
   // Audio preview
@@ -1352,6 +1369,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   // Edit alarm - opens modal
   const handleEditAlarm = (alarm, isPending) => {
+    console.log('📝 수정 모달 열기 - 원본 알람 데이터:', alarm);
+
     setEditingAlarm({ ...alarm, isPending });
     setEditTitle(alarm.title);
     setEditIsAnniversary(alarm.isAnniversary || false); // Load alarm's own anniversary status
@@ -1385,12 +1404,26 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     }
 
     // Load custom alarm options (개별 알람옵션)
-    setEditCustomSound(alarm.customSound ?? null);
+    const loadedCustomSound = alarm.customSound ?? null;
+    const loadedCustomVolume = alarm.customVolume ?? null;
+    const loadedCustomNotificationType = alarm.customNotificationType ?? null;
+    const loadedCustomSnoozeEnabled = alarm.customSnoozeEnabled ?? null;
+    const loadedCustomSnoozeMinutes = alarm.customSnoozeMinutes ?? null;
+
+    console.log('📝 로드한 개별 알람옵션:', {
+      customSound: loadedCustomSound,
+      customVolume: loadedCustomVolume,
+      customNotificationType: loadedCustomNotificationType,
+      customSnoozeEnabled: loadedCustomSnoozeEnabled,
+      customSnoozeMinutes: loadedCustomSnoozeMinutes
+    });
+
+    setEditCustomSound(loadedCustomSound);
     setEditCustomSoundName(alarm.customSoundName || '');
-    setEditCustomVolume(alarm.customVolume ?? null);
-    setEditCustomNotificationType(alarm.customNotificationType ?? null);
-    setEditCustomSnoozeEnabled(alarm.customSnoozeEnabled ?? null);
-    setEditCustomSnoozeMinutes(alarm.customSnoozeMinutes ?? null);
+    setEditCustomVolume(loadedCustomVolume);
+    setEditCustomNotificationType(loadedCustomNotificationType);
+    setEditCustomSnoozeEnabled(loadedCustomSnoozeEnabled);
+    setEditCustomSnoozeMinutes(loadedCustomSnoozeMinutes);
     setShowCustomOptions(false); // 기본적으로 접혀있음
 
     setShowEditModal(true);
