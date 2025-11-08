@@ -6,6 +6,7 @@ import { Copy, Bell, AlarmClock } from "lucide-react";
 import { format, isBefore, startOfDay, addDays, subMonths, addMonths, subDays, isSameDay } from 'date-fns';
 import { motion, AnimatePresence } from "framer-motion";
 import { useSwipeable } from 'react-swipeable';
+import { useTrashContext } from '../../contexts/TrashContext';
 
 // 개인 기념일
 const PERSONAL_EVENTS = {};
@@ -1029,6 +1030,9 @@ const Calendar = ({
   onOpenEditor,
   onOpenDateSelector,
 }) => {
+    // 휴지통 컨텍스트
+    const { moveToTrash } = useTrashContext();
+
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [isDateSelectorModalOpen, setIsDateSelectorModalOpen] = useState(false);
@@ -1608,16 +1612,31 @@ const Calendar = ({
 
     // 일정 삭제 실행 함수 (내부)
     const executeDeleteScheduleOnly = () => {
-        // 일정 텍스트만 삭제, 알람은 보존
+        // 일정 텍스트만 삭제, 알람은 보존 (휴지통으로 이동)
         if (!currentEntry) return;
 
         const key = format(selectedDate, 'yyyy-MM-dd');
+        const hasAlarms = currentEntry.alarm && currentEntry.alarm.registeredAlarms && currentEntry.alarm.registeredAlarms.length > 0;
+
+        // 휴지통으로 이동
+        moveToTrash(
+            key, // ID로 날짜 키 사용
+            'schedule', // 타입
+            currentEntry.text || '내용 없음', // 미리보기 내용
+            {
+                date: selectedDate.toISOString(),
+                text: currentEntry.text,
+                createdAt: currentEntry.createdAt,
+                updatedAt: currentEntry.updatedAt,
+                // 알람은 원본 데이터에 포함하지 않음 (알람은 유지되므로)
+            }
+        );
 
         setSchedules((prevSchedules) => {
             const updatedSchedules = { ...prevSchedules };
 
             if (updatedSchedules[key]) {
-                if (updatedSchedules[key].alarm && updatedSchedules[key].alarm.registeredAlarms && updatedSchedules[key].alarm.registeredAlarms.length > 0) {
+                if (hasAlarms) {
                     // 알람이 있으면 텍스트만 빈 문자열로
                     updatedSchedules[key] = {
                         ...updatedSchedules[key],
@@ -1635,7 +1654,7 @@ const Calendar = ({
 
         setScheduleText('');
         setIsEditing(false);
-        showToast('일정이 삭제되었습니다.');
+        showToast('일정이 휴지통으로 이동되었습니다.');
     };
 
     // 일정 삭제 버튼 클릭 핸들러 (확인 모달 표시)
