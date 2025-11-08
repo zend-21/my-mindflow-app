@@ -2064,7 +2064,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                       {getSortedAlarms(registeredAlarms).map((alarm) => (
                         <AlarmItem key={alarm.id} $isPending={false} $enabled={alarm.enabled} $isModified={alarm.isModified}>
                           <AlarmInfo>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
                               <ToggleSwitch style={{ opacity: 1 }}>
                                 <input
                                   type="checkbox"
@@ -2078,20 +2078,23 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 color="#d63031"
                                 style={{
                                   flexShrink: 0,
-                                  opacity: alarm.enabled !== false ? 1 : 0.5
+                                  opacity: alarm.enabled !== false ? 1 : 0.5,
+                                  marginTop: '4px'
                                 }}
                               />
-                              <span style={{
+                              <div style={{
                                 fontSize: '15px',
                                 color: alarm.isAnniversary ? '#4a90e2' : '#333',
                                 opacity: alarm.enabled !== false ? 1 : 0.5,
                                 wordBreak: 'break-all',
                                 lineHeight: '1.3',
-                                maxWidth: '8em',
-                                display: 'inline-block'
+                                maxWidth: '10em',
+                                display: 'inline-block',
+                                minHeight: 'calc(1.3em * 2)',
+                                marginTop: '2px'
                               }}>
                                 {alarm.title || '제목 없음'}
-                              </span>
+                              </div>
                             </div>
                             <div style={{
                               fontSize: '12px',
