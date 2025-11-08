@@ -775,6 +775,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [anniversaryTiming, setAnniversaryTiming] = useState(''); // 초기값 없음 - 'today' or 'before'
   const [anniversaryDaysBefore, setAnniversaryDaysBefore] = useState(''); // N일 전
 
+  // 과거 날짜 개별 알람옵션 표시 상태
+  const [showIndividualOptions, setShowIndividualOptions] = useState(false);
+
   // Editing pending alarm
   const [editingPendingId, setEditingPendingId] = useState(null);
 
@@ -1936,6 +1939,14 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               </div>
             )}
 
+            {/* 등록된 알람 표시 - 항상 맨 위에 표시 */}
+            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
+              <SectionTitle>
+                <BellIcon />
+                등록된 알람 ({pendingAlarms.length + registeredAlarms.length}개)
+              </SectionTitle>
+            </Section>
+
             {/* 새 알람 등록 UI - 과거 날짜에서는 기념일만 허용 */}
             {(!isPastDate || (isPastDate && isAnniversary)) && (
               <>
@@ -1980,13 +1991,32 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 <input
                   type="checkbox"
                   checked={isAnniversary}
-                  onChange={(e) => !isPastDate && setIsAnniversary(e.target.checked)}
-                  disabled={isPastDate}
-                  style={{ width: '18px', height: '18px', cursor: isPastDate ? 'not-allowed' : 'pointer', opacity: isPastDate ? 0.6 : 1 }}
+                  onChange={(e) => {
+                    if (isPastDate) {
+                      // 과거 날짜에서는 체크 해제 불가
+                      if (!e.target.checked) {
+                        e.preventDefault();
+                        return;
+                      }
+                    }
+                    setIsAnniversary(e.target.checked);
+                  }}
+                  onClick={(e) => {
+                    if (isPastDate && !isAnniversary) {
+                      e.preventDefault();
+                    }
+                  }}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                 />
                 <span
-                  style={{ fontSize: '14px', color: '#343a40', cursor: isPastDate ? 'not-allowed' : 'pointer', opacity: isPastDate ? 0.6 : 1 }}
-                  onClick={() => !isPastDate && setIsAnniversary(!isAnniversary)}
+                  style={{ fontSize: '14px', color: '#343a40', cursor: 'pointer' }}
+                  onClick={() => {
+                    if (isPastDate && isAnniversary) {
+                      // 과거 날짜에서는 체크 해제 불가
+                      return;
+                    }
+                    setIsAnniversary(!isAnniversary);
+                  }}
                 >
                   기념일로 등록
                 </span>
@@ -2082,6 +2112,131 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     </div>
                   </div>
                 </div>
+              )}
+
+              {/* 과거 날짜에서 기념일 등록 시 개별 알람옵션 표시 */}
+              {isPastDate && isAnniversary && (
+                <>
+                  <button
+                    onClick={() => setShowIndividualOptions(!showIndividualOptions)}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      background: '#f8f9fa',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      color: '#495057',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      transition: 'all 0.2s',
+                      marginTop: '16px'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#e9ecef'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                  >
+                    <span>개별 알람옵션</span>
+                    <span style={{ transform: showIndividualOptions ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                      ▼
+                    </span>
+                  </button>
+
+                  {showIndividualOptions && (
+                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                      {/* 알람 소리 */}
+                      <div>
+                        <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px', fontWeight: '500' }}>
+                          <VolumeIcon style={{ width: '16px', height: '16px', marginRight: '4px', verticalAlign: 'middle' }} />
+                          알람 소리
+                        </div>
+                        <Select
+                          value={soundFile === 'default' ? 'default' : 'custom'}
+                          onChange={(e) => {
+                            if (e.target.value === 'default') {
+                              setSoundFile('default');
+                              setCustomSoundName('');
+                            } else if (e.target.value === 'custom') {
+                              setSoundFile('custom');
+                              setTimeout(() => {
+                                soundFileInputRef.current?.click();
+                              }, 50);
+                            }
+                          }}
+                        >
+                          <option value="default">기본 알림음</option>
+                          <option value="custom">사용자 지정</option>
+                        </Select>
+                        {soundFile !== 'default' && customSoundName && (
+                          <div style={{ fontSize: '12px', color: '#6c757d', marginTop: '4px' }}>
+                            선택된 파일: {customSoundName}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 알람 볼륨 */}
+                      <div>
+                        <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px', fontWeight: '500' }}>
+                          <VolumeIcon style={{ width: '16px', height: '16px', marginRight: '4px', verticalAlign: 'middle' }} />
+                          알람 볼륨
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={volume}
+                            onChange={(e) => setVolume(parseInt(e.target.value))}
+                            style={{ flex: 1 }}
+                          />
+                          <span style={{ fontSize: '14px', color: '#495057', minWidth: '45px' }}>{volume}%</span>
+                        </div>
+                      </div>
+
+                      {/* 알림 유형 */}
+                      <div>
+                        <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px', fontWeight: '500' }}>
+                          <VibrateIcon style={{ width: '16px', height: '16px', marginRight: '4px', verticalAlign: 'middle' }} />
+                          알림 유형
+                        </div>
+                        <RadioGroup>
+                          <RadioOption $checked={notificationType === 'sound'}>
+                            <input
+                              type="radio"
+                              name="notificationType"
+                              value="sound"
+                              checked={notificationType === 'sound'}
+                              onChange={(e) => setNotificationType(e.target.value)}
+                            />
+                            <span>소리만</span>
+                          </RadioOption>
+                          <RadioOption $checked={notificationType === 'vibration'}>
+                            <input
+                              type="radio"
+                              name="notificationType"
+                              value="vibration"
+                              checked={notificationType === 'vibration'}
+                              onChange={(e) => setNotificationType(e.target.value)}
+                            />
+                            <span>진동만</span>
+                          </RadioOption>
+                          <RadioOption $checked={notificationType === 'both'}>
+                            <input
+                              type="radio"
+                              name="notificationType"
+                              value="both"
+                              checked={notificationType === 'both'}
+                              onChange={(e) => setNotificationType(e.target.value)}
+                            />
+                            <span>소리 + 진동</span>
+                          </RadioOption>
+                        </RadioGroup>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </Section>
 
