@@ -2157,7 +2157,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                     </DeleteButton>
                                     <div style={{
                                       fontSize: '11px',
-                                      color: 'rgba(220, 53, 69, 0.6)',
+                                      color: 'rgba(220, 53, 69, 0.85)',
                                       textAlign: 'center',
                                       lineHeight: '1.2'
                                     }}>
@@ -2189,7 +2189,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                   </DeleteButton>
                                   <div style={{
                                     fontSize: '11px',
-                                    color: 'rgba(220, 53, 69, 0.6)',
+                                    color: 'rgba(220, 53, 69, 0.85)',
                                     textAlign: 'center',
                                     lineHeight: '1.2'
                                   }}>
