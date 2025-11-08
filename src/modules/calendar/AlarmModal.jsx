@@ -783,7 +783,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [editTitle, setEditTitle] = useState('');
   const [editIsAnniversary, setEditIsAnniversary] = useState(false);
   const [editAnniversaryRepeat, setEditAnniversaryRepeat] = useState(''); // 초기값 없음
-  const [editAnniversaryTiming, setEditAnniversaryTiming] = useState('today');
+  const [editAnniversaryTiming, setEditAnniversaryTiming] = useState(''); // 초기값 없음 - 사용자가 직접 선택해야 함
   const [editAnniversaryDaysBefore, setEditAnniversaryDaysBefore] = useState('');
   const [editEventTime, setEditEventTime] = useState('09:00');
   const [editOffset, setEditOffset] = useState({ days: 0, hours: 0, minutes: 0 });
@@ -852,9 +852,11 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                          editOffset.hours !== editingAlarm.offset?.hours ||
                          editOffset.minutes !== editingAlarm.offset?.minutes;
     const anniversaryChanged = editIsAnniversary !== editingAlarm.isAnniversary;
-    const anniversaryRepeatChanged = editAnniversaryRepeat !== (editingAlarm.anniversaryRepeat || '');
-    const anniversaryTimingChanged = editAnniversaryTiming !== (editingAlarm.anniversaryTiming || 'today');
-    const anniversaryDaysBeforeChanged = editAnniversaryDaysBefore !== (editingAlarm.anniversaryDaysBefore || '');
+
+    // 기념일 관련 변경은 기념일이 활성화되어 있을 때만 체크
+    const anniversaryRepeatChanged = editIsAnniversary && editAnniversaryRepeat !== (editingAlarm.anniversaryRepeat || '');
+    const anniversaryTimingChanged = editIsAnniversary && editAnniversaryTiming !== (editingAlarm.anniversaryTiming || 'today');
+    const anniversaryDaysBeforeChanged = editIsAnniversary && editAnniversaryDaysBefore !== (editingAlarm.anniversaryDaysBefore || '');
 
     // 개별 알람옵션 변경 감지
     const customSoundChanged = editCustomSound !== (editingAlarm.customSound ?? null);
@@ -1378,11 +1380,11 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     // Load anniversary settings if it's an anniversary alarm
     if (alarm.isAnniversary) {
       setEditAnniversaryRepeat(alarm.anniversaryRepeat || '');
-      setEditAnniversaryTiming(alarm.anniversaryTiming || 'today');
+      setEditAnniversaryTiming(alarm.anniversaryTiming || '');
       setEditAnniversaryDaysBefore(alarm.anniversaryDaysBefore || '');
     } else {
       setEditAnniversaryRepeat('');
-      setEditAnniversaryTiming('today');
+      setEditAnniversaryTiming('');
       setEditAnniversaryDaysBefore('');
     }
 
