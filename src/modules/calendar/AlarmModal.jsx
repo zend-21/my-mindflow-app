@@ -2085,7 +2085,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             {/* 구분선 */}
             <div style={{
               height: '1px',
-              background: '#e9ecef',
+              background: '#dee2e6',
               margin: '10px 0'
             }} />
 
