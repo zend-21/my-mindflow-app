@@ -2082,15 +2082,13 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               </div>
             </Section>
 
-            {/* 구분선 */}
-            <div style={{
-              height: '2px',
-              background: '#adb5bd',
-              margin: '0 -20px'
-            }} />
-
             {/* Registered Alarms */}
             <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
+              <div style={{
+                height: '1px',
+                background: '#dee2e6',
+                margin: '0 0 16px 0'
+              }} />
               <SectionTitle>
                 <BellIcon />
                 등록된 알람 ({pendingAlarms.length + registeredAlarms.length}개)
