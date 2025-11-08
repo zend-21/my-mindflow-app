@@ -964,7 +964,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         setSoundFile(lastSettings.soundFile || 'default');
         setCustomSoundName(lastSettings.customSoundName || '');
         setVolume(lastSettings.volume ?? 80);
-        setIsAnniversary(isPastDate ? true : (scheduleData.alarm.isAnniversary || false)); // 과거 날짜면 기념일로 자동 체크
+        setIsAnniversary(false); // 항상 해제 상태로 초기화
         setAnniversaryName(scheduleData.alarm.anniversaryName || '');
         setAnniversaryRepeat(''); // 초기화 시 선택 안됨
         setAnniversaryTiming(''); // 초기화 시 선택 안됨
@@ -985,7 +985,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         setSoundFile(lastSettings.soundFile || 'default');
         setCustomSoundName(lastSettings.customSoundName || '');
         setVolume(lastSettings.volume ?? 80);
-        setIsAnniversary(isPastDate ? true : false); // 과거 날짜면 기념일로 자동 체크
+        setIsAnniversary(false); // 항상 해제 상태로 초기화
         setAnniversaryName('');
         setAnniversaryRepeat(''); // 초기화 시 선택 안됨
         setAnniversaryTiming(''); // 초기화 시 선택 안됨
@@ -2015,7 +2015,30 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                   />
                                   <span className="slider"></span>
                                 </ToggleSwitch>
-                                {alarm.isAnniversary ? (
+                                {/* 과거 날짜 + 스위치 off일 때 정지 아이콘 표시 */}
+                                {isPastDate && alarm.enabled === false ? (
+                                  <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '2px',
+                                    fontSize: '9px',
+                                    color: '#999',
+                                    lineHeight: '1.2',
+                                    marginTop: '2px',
+                                    flexShrink: 0
+                                  }}>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                      <circle cx="12" cy="12" r="10" />
+                                      <line x1="10" y1="15" x2="10" y2="9" />
+                                      <line x1="14" y1="15" x2="14" y2="9" />
+                                    </svg>
+                                    <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
+                                      <div>알람</div>
+                                      <div>일시중지</div>
+                                    </div>
+                                  </div>
+                                ) : alarm.isAnniversary ? (
                                   <div style={{
                                     width: '14px',
                                     height: '14px',
@@ -2028,7 +2051,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                     fontSize: '9px',
                                     fontWeight: 'bold',
                                     flexShrink: 0,
-                                    opacity: alarm.enabled !== false ? 1 : 0.5,
+                                    opacity: 1,
                                     marginTop: '4px'
                                   }}>
                                     기
@@ -2047,7 +2070,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 <div style={{
                                   fontSize: '15px',
                                   color: alarm.isAnniversary ? '#4a90e2' : '#333',
-                                  opacity: alarm.enabled !== false ? 1 : 0.5,
+                                  opacity: (alarm.isAnniversary || alarm.enabled !== false) ? 1 : 0.5,
                                   wordBreak: 'break-all',
                                   lineHeight: '1.3',
                                   maxWidth: '8em',
@@ -2061,7 +2084,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               <div style={{
                                 fontSize: '12px',
                                 color: '#6c757d',
-                                opacity: alarm.enabled !== false ? 1 : 0.5
+                                opacity: (alarm.isAnniversary || alarm.enabled !== false) ? 1 : 0.5
                               }}>
                                 {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
                                 {alarm.enabled === false && isPastDate && (
