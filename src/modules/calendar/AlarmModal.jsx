@@ -2245,10 +2245,11 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                         <AlarmItem key={alarm.id} $isPending={false} $enabled={alarm.enabled} $isModified={alarm.isModified}>
                           <AlarmInfo>
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
-                              <ToggleSwitch style={{ opacity: 1 }}>
+                              <ToggleSwitch style={{ opacity: alarm.disabledAt ? 0.5 : 1 }}>
                                 <input
                                   type="checkbox"
                                   checked={alarm.enabled !== false}
+                                  disabled={!!alarm.disabledAt}
                                   onChange={() => handleToggleAlarm(alarm.id)}
                                 />
                                 <span className="slider"></span>
@@ -2335,25 +2336,49 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 </DeleteButton>
                               </>
                             ) : (
-                              <div style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '13px',
-                                color: '#999',
-                                padding: '4px 0'
-                              }}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <rect x="1" y="1" width="22" height="22" rx="3" stroke="#4a90e2" strokeWidth="2"/>
-                                  <rect x="8" y="7" width="2.5" height="10" fill="#4a90e2"/>
-                                  <rect x="13.5" y="7" width="2.5" height="10" fill="#4a90e2"/>
-                                </svg>
-                                <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
-                                  <div>알람</div>
-                                  <div>일시중지</div>
+                              alarm.disabledAt ? (
+                                // 비활성화된 알람 (시간 경과): 삭제 버튼만 표시
+                                <div style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '8px'
+                                }}>
+                                  <DeleteButton onClick={() => handleDeleteAlarm(alarm.id)}>
+                                    삭제
+                                  </DeleteButton>
+                                  <div style={{
+                                    fontSize: '11px',
+                                    color: '#ff6b6b',
+                                    textAlign: 'center',
+                                    lineHeight: '1.3',
+                                    fontWeight: '600'
+                                  }}>
+                                    알람종료
+                                  </div>
                                 </div>
-                              </div>
+                              ) : (
+                                // 수동으로 일시중지한 알람: 기존 일시중지 아이콘
+                                <div style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '13px',
+                                  color: '#999',
+                                  padding: '4px 0'
+                                }}>
+                                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <rect x="1" y="1" width="22" height="22" rx="3" stroke="#4a90e2" strokeWidth="2"/>
+                                    <rect x="8" y="7" width="2.5" height="10" fill="#4a90e2"/>
+                                    <rect x="13.5" y="7" width="2.5" height="10" fill="#4a90e2"/>
+                                  </svg>
+                                  <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
+                                    <div>알람</div>
+                                    <div>일시중지</div>
+                                  </div>
+                                </div>
+                              )
                             )}
                           </AlarmActions>
                         </AlarmItem>

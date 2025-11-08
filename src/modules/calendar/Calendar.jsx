@@ -714,11 +714,25 @@ const DateCell = styled.div`
         const hasSchedule = props.$hasSchedule;
         const hasAlarm = props.$hasAlarm;
         const isCurrentMonth = props.$isCurrentMonth;
+        const isPastDate = props.$isPastDate;
 
         // 일정 점: 파란색 (dodgerblue)
-        const scheduleColor = isCurrentMonth ? 'dodgerblue' : 'rgba(30, 144, 255, 0.4)';
+        // - 지나간 일정: 흐린 파란색 (시간 지나도 유지, 삭제 안 됨)
+        let scheduleColor;
+        if (isPastDate) {
+            scheduleColor = 'rgba(30, 144, 255, 0.3)'; // 지나간 일정: 흐린 파란색
+        } else {
+            scheduleColor = isCurrentMonth ? 'dodgerblue' : 'rgba(30, 144, 255, 0.4)';
+        }
+
         // 알람 점: 빨간색 (tomato)
-        const alarmColor = isCurrentMonth ? 'tomato' : 'rgba(255, 99, 71, 0.4)';
+        // - 지나간 알람: 흐린 빨간색 (자동삭제 대상)
+        let alarmColor;
+        if (isPastDate) {
+            alarmColor = 'rgba(255, 99, 71, 0.3)'; // 지나간 알람: 흐린 빨간색
+        } else {
+            alarmColor = isCurrentMonth ? 'tomato' : 'rgba(255, 99, 71, 0.4)';
+        }
 
         if (hasSchedule && hasAlarm) {
             // 둘 다 있을 때: 상단에 나란히 5px 간격으로 배치 (등록 순서 무관, 항상 일정→알람 순서)
@@ -1460,7 +1474,9 @@ const Calendar = ({
     const hasAlarm = (date) => {
         const key = format(date, 'yyyy-MM-dd');
         const entry = schedules[key];
-        const result = entry && entry.alarm && entry.alarm.registeredAlarms && entry.alarm.registeredAlarms.length > 0;
+        // 활성화된 알람이 있는 경우만 true (비활성화된 알람 제외)
+        const result = entry && entry.alarm && entry.alarm.registeredAlarms &&
+                      entry.alarm.registeredAlarms.some(alarm => alarm.enabled !== false);
         return result;
     };
 
