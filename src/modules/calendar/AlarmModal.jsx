@@ -2085,6 +2085,20 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               opacity: alarm.enabled !== false ? 1 : 0.5
                             }}>
                               {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
+                              {/* 과거 날짜의 일반 알람 자동삭제 표시 */}
+                              {isPastDate && !alarm.isAnniversary && alarm.enabled !== false && (() => {
+                                const now = new Date();
+                                const alarmTime = new Date(alarm.calculatedTime);
+                                const diffTime = now - alarmTime;
+                                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                                const daysRemaining = 7 - diffDays;
+                                if (daysRemaining >= 0 && daysRemaining <= 7) {
+                                  return <span style={{ marginLeft: '8px', color: '#dc3545', fontWeight: '600' }}>
+                                    {daysRemaining}일 후 자동삭제
+                                  </span>;
+                                }
+                                return null;
+                              })()}
                             </div>
                           </AlarmInfo>
                           {alarm.isModified && (
@@ -2102,10 +2116,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                           <AlarmActions style={{
                             flexDirection: 'column',
                             alignItems: 'flex-end',
-                            gap: '12px',
-                            // 과거 날짜에서 일반 알람은 버튼 비활성화
-                            opacity: (isPastDate && !alarm.isAnniversary && alarm.enabled !== false) ? 0.5 : 1,
-                            pointerEvents: (isPastDate && !alarm.isAnniversary && alarm.enabled !== false) ? 'none' : 'auto'
+                            gap: '12px'
                           }}>
                             {alarm.enabled !== false ? (
                               <>
@@ -2114,41 +2125,52 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                     적용
                                   </ApplyButton>
                                 ) : (
-                                  <EditButton
-                                    onClick={() => handleEditAlarm(alarm, false)}
-                                    disabled={isPastDate && !alarm.isAnniversary}
-                                  >
-                                    수정
-                                  </EditButton>
+                                  // 과거 날짜의 일반 알람은 수정 버튼 숨김
+                                  !(isPastDate && !alarm.isAnniversary) && (
+                                    <EditButton
+                                      onClick={() => handleEditAlarm(alarm, false)}
+                                    >
+                                      수정
+                                    </EditButton>
+                                  )
                                 )}
                                 <DeleteButton
                                   onClick={() => handleDeleteAlarm(alarm.id)}
-                                  disabled={isPastDate && !alarm.isAnniversary}
                                 >
                                   삭제
                                 </DeleteButton>
                               </>
                             ) : (
-                              // 일시중지 상태 - 라운드 사각형 SVG와 일반 폰트
-                              <div style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '13px',
-                                color: '#999',
-                                padding: '4px 0'
-                              }}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <rect x="1" y="1" width="22" height="22" rx="3" stroke="#4a90e2" strokeWidth="2"/>
-                                  <rect x="8" y="7" width="2.5" height="10" fill="#4a90e2"/>
-                                  <rect x="13.5" y="7" width="2.5" height="10" fill="#4a90e2"/>
-                                </svg>
-                                <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
-                                  <div>알람</div>
-                                  <div>일시중지</div>
+                              // 일시중지 상태
+                              // 과거 날짜의 일반 알람은 삭제 버튼만 표시
+                              isPastDate && !alarm.isAnniversary ? (
+                                <DeleteButton
+                                  onClick={() => handleDeleteAlarm(alarm.id)}
+                                >
+                                  삭제
+                                </DeleteButton>
+                              ) : (
+                                // 기타: 알람 일시중지 표시
+                                <div style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '13px',
+                                  color: '#999',
+                                  padding: '4px 0'
+                                }}>
+                                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <rect x="1" y="1" width="22" height="22" rx="3" stroke="#4a90e2" strokeWidth="2"/>
+                                    <rect x="8" y="7" width="2.5" height="10" fill="#4a90e2"/>
+                                    <rect x="13.5" y="7" width="2.5" height="10" fill="#4a90e2"/>
+                                  </svg>
+                                  <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
+                                    <div>알람</div>
+                                    <div>일시중지</div>
+                                  </div>
                                 </div>
-                              </div>
+                              )
                             )}
                           </AlarmActions>
                         </AlarmItem>
@@ -2220,6 +2242,101 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 </div>
               </div>
             </Section>
+
+            {/* Anniversary Settings - 과거 날짜는 isAnniversary 체크시 표시, 일반 날짜는 체크박스 표시 */}
+            {isPastDate && isAnniversary && (
+              <Section style={{ marginTop: '-8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* 알림주기 */}
+                  <div>
+                    <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px' }}>
+                      알림주기 <span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                    </div>
+                    <RadioGroup style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                      <RadioOption $checked={anniversaryRepeat === 'daily'} onClick={() => setAnniversaryRepeat('daily')}>
+                        <input type="radio" name="anniversaryRepeat-past" value="daily" checked={anniversaryRepeat === 'daily'} onChange={() => {}} />
+                        <span>매일</span>
+                      </RadioOption>
+                      <RadioOption $checked={anniversaryRepeat === 'weekly'} onClick={() => setAnniversaryRepeat('weekly')}>
+                        <input type="radio" name="anniversaryRepeat-past" value="weekly" checked={anniversaryRepeat === 'weekly'} onChange={() => {}} />
+                        <span>매주</span>
+                      </RadioOption>
+                      <RadioOption $checked={anniversaryRepeat === 'monthly'} onClick={() => setAnniversaryRepeat('monthly')}>
+                        <input type="radio" name="anniversaryRepeat-past" value="monthly" checked={anniversaryRepeat === 'monthly'} onChange={() => {}} />
+                        <span>매달</span>
+                      </RadioOption>
+                      <RadioOption $checked={anniversaryRepeat === 'yearly'} onClick={() => setAnniversaryRepeat('yearly')}>
+                        <input type="radio" name="anniversaryRepeat-past" value="yearly" checked={anniversaryRepeat === 'yearly'} onChange={() => {}} />
+                        <span>매년</span>
+                      </RadioOption>
+                    </RadioGroup>
+                  </div>
+
+                  {/* 알림시기 */}
+                  <div>
+                    <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px' }}>
+                      알림시기 <span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="radio"
+                          id="timing-today-past"
+                          name="anniversaryTiming-past"
+                          value="today"
+                          checked={anniversaryTiming === 'today'}
+                          onChange={() => setAnniversaryTiming('today')}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        <label htmlFor="timing-today-past" style={{ fontSize: '14px', color: '#495057', cursor: 'pointer' }}>
+                          당일
+                        </label>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="radio"
+                          id="timing-before-past"
+                          name="anniversaryTiming-past"
+                          value="before"
+                          checked={anniversaryTiming === 'before'}
+                          onChange={() => {
+                            setAnniversaryTiming('before');
+                            setTimeout(() => anniversaryDaysInputRef.current?.focus(), 0);
+                          }}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        <label htmlFor="timing-before-past" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#495057', cursor: 'pointer' }}>
+                          <TimeInput
+                            ref={anniversaryDaysInputRef}
+                            type="number"
+                            min="1"
+                            max="30"
+                            value={anniversaryDaysBefore || ''}
+                            placeholder="1-30"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 30)) {
+                                setAnniversaryTiming('before');
+                                setAnniversaryDaysBefore(val === '' ? '' : parseInt(val));
+                              }
+                            }}
+                            onFocus={() => {
+                              setAnniversaryTiming('before');
+                            }}
+                            style={{
+                              width: '60px',
+                              padding: '6px',
+                              fontSize: '14px'
+                            }}
+                          />
+                          <span>일 전</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Section>
+            )}
 
             {/* Anniversary Settings - 일반 날짜만 체크박스 표시 */}
             {!isPastDate && (

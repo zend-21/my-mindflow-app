@@ -2128,15 +2128,7 @@ const Calendar = ({
                                     !alarm.isAnniversary
                                 ) || [];
 
-                                // 과거 날짜: 비활성화된 알람이 있을 때만 버튼 표시
-                                // 현재/미래 날짜: 일반 알람이 있으면 버튼 표시
-                                if (isPastDate) {
-                                    const hasDisabledAlarms = regularAlarms.some(alarm =>
-                                        alarm.enabled === false && alarm.disabledAt
-                                    );
-                                    return hasDisabledAlarms;
-                                }
-
+                                // 과거 날짜든 현재/미래 날짜든 일반 알람이 있으면 삭제 버튼 표시
                                 return regularAlarms.length > 0;
                             })() && (
                                 <DeleteButton onClick={handleDeleteAlarmOnly} style={{ backgroundColor: '#ff6b6b' }}>
