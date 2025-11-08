@@ -355,25 +355,6 @@ const ConfirmButtonWrapper = styled.div`
 `;
 
 const ConfirmCancelButton = styled.button`
-  background: #e2e8f0;
-  color: #4a5568;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 18px;
-  font-size: 14px;
-  cursor: pointer;
-  font-weight: 500;
-
-  &:focus {
-    outline: none;
-  }
-
-  &:focus-visible {
-    box-shadow: 0 0 0 3px rgba(150, 160, 170, 0.6);
-  }
-`;
-
-const ConfirmButton = styled.button`
   background: #4a90e2;
   color: white;
   border: none;
@@ -393,6 +374,25 @@ const ConfirmButton = styled.button`
 
   &:focus-visible {
     box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.6);
+  }
+`;
+
+const ConfirmButton = styled.button`
+  background: #e2e8f0;
+  color: #4a5568;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 500;
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible {
+    box-shadow: 0 0 0 3px rgba(150, 160, 170, 0.6);
   }
 `;
 
