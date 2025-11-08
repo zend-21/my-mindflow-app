@@ -800,6 +800,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   // Options collapse state
   const [showOptions, setShowOptions] = useState(false);
+  const optionsButtonRef = useRef(null);
 
   // Validation modal state
   const [showValidationModal, setShowValidationModal] = useState(false);
@@ -2303,7 +2304,20 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             {/* Alarm Options Toggle Button */}
             <Section>
               <button
-                onClick={() => setShowOptions(!showOptions)}
+                ref={optionsButtonRef}
+                onClick={() => {
+                  const newShowOptions = !showOptions;
+                  setShowOptions(newShowOptions);
+
+                  if (newShowOptions && optionsButtonRef.current) {
+                    setTimeout(() => {
+                      optionsButtonRef.current?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                      });
+                    }, 100);
+                  }
+                }}
                 style={{
                   width: '100%',
                   padding: '12px',
