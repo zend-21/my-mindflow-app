@@ -713,6 +713,7 @@ const DateCell = styled.div`
     ${props => {
         const hasSchedule = props.$hasSchedule;
         const hasAlarm = props.$hasAlarm;
+        const hasActiveAlarm = props.$hasActiveAlarm;
         const isCurrentMonth = props.$isCurrentMonth;
         const isPastDate = props.$isPastDate;
 
@@ -726,10 +727,11 @@ const DateCell = styled.div`
         }
 
         // 알람 점: 빨간색 (tomato)
-        // - 지나간 알람: 흐린 빨간색 (자동삭제 대상)
+        // - 활성 알람이 없으면 (모두 종료): 항상 흐린 빨간색
+        // - 활성 알람이 있으면: 현재 달은 진한 빨강, 다른 달은 중간 빨강
         let alarmColor;
-        if (isPastDate) {
-            alarmColor = 'rgba(255, 99, 71, 0.3)'; // 지나간 알람: 흐린 빨간색
+        if (!hasActiveAlarm) {
+            alarmColor = 'rgba(255, 99, 71, 0.3)'; // 종료된 알람: 흐린 빨간색
         } else {
             alarmColor = isCurrentMonth ? 'tomato' : 'rgba(255, 99, 71, 0.4)';
         }
@@ -1475,13 +1477,59 @@ const Calendar = ({
         const key = format(date, 'yyyy-MM-dd');
         const entry = schedules[key];
 
-        // 1. 해당 날짜에 직접 등록된 알람 확인 (일반 알람)
+        // 1. 해당 날짜에 직접 등록된 알람 확인 (일반 알람, 활성/비활성 모두)
         const hasDirectAlarm = entry && entry.alarm && entry.alarm.registeredAlarms &&
-                              entry.alarm.registeredAlarms.some(alarm => alarm.enabled !== false);
+                              entry.alarm.registeredAlarms.length > 0;
 
         if (hasDirectAlarm) return true;
 
         // 2. 기념일 알람 확인 - 모든 날짜의 기념일을 순회하면서 오늘이 반복 날짜인지 확인
+        for (const scheduleKey in schedules) {
+            const scheduleEntry = schedules[scheduleKey];
+            if (!scheduleEntry?.alarm?.registeredAlarms) continue;
+
+            const anniversaryAlarms = scheduleEntry.alarm.registeredAlarms.filter(
+                alarm => alarm.isAnniversary
+            );
+
+            for (const alarm of anniversaryAlarms) {
+                const alarmDate = new Date(alarm.calculatedTime);
+                const targetDate = new Date(date);
+
+                // 기념일 반복 로직 확인
+                if (alarm.anniversaryRepeat === 'daily') {
+                    return true;
+                } else if (alarm.anniversaryRepeat === 'weekly') {
+                    if (alarmDate.getDay() === targetDate.getDay()) {
+                        return true;
+                    }
+                } else if (alarm.anniversaryRepeat === 'monthly') {
+                    if (alarmDate.getDate() === targetDate.getDate()) {
+                        return true;
+                    }
+                } else if (alarm.anniversaryRepeat === 'yearly') {
+                    if (alarmDate.getMonth() === targetDate.getMonth() &&
+                        alarmDate.getDate() === targetDate.getDate()) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    };
+
+    const hasActiveAlarm = (date) => {
+        const key = format(date, 'yyyy-MM-dd');
+        const entry = schedules[key];
+
+        // 1. 해당 날짜에 직접 등록된 활성 알람 확인 (일반 알람)
+        const hasDirectActiveAlarm = entry && entry.alarm && entry.alarm.registeredAlarms &&
+                                     entry.alarm.registeredAlarms.some(alarm => alarm.enabled !== false);
+
+        if (hasDirectActiveAlarm) return true;
+
+        // 2. 기념일 알람 확인 - 활성화된 기념일만
         for (const scheduleKey in schedules) {
             const scheduleEntry = schedules[scheduleKey];
             if (!scheduleEntry?.alarm?.registeredAlarms) continue;
@@ -1496,20 +1544,16 @@ const Calendar = ({
 
                 // 기념일 반복 로직 확인
                 if (alarm.anniversaryRepeat === 'daily') {
-                    // 매일 반복
                     return true;
                 } else if (alarm.anniversaryRepeat === 'weekly') {
-                    // 매주 같은 요일
                     if (alarmDate.getDay() === targetDate.getDay()) {
                         return true;
                     }
                 } else if (alarm.anniversaryRepeat === 'monthly') {
-                    // 매월 같은 날
                     if (alarmDate.getDate() === targetDate.getDate()) {
                         return true;
                     }
                 } else if (alarm.anniversaryRepeat === 'yearly') {
-                    // 매년 같은 날 (월과 일이 같은 경우)
                     if (alarmDate.getMonth() === targetDate.getMonth() &&
                         alarmDate.getDate() === targetDate.getDate()) {
                         return true;
@@ -1958,6 +2002,7 @@ const Calendar = ({
                                 const isSelected = selectedDate && isSameDay(date, selectedDate);
                                 const isSchedule = hasSchedule(date);
                                 const isAlarm = hasAlarm(date);
+                                const isActiveAlarm = hasActiveAlarm(date);
                                 const dateKey = format(date, 'yyyy-MM-dd');
                                 const isPastDate = isBefore(startOfDay(date), startOfDay(today));
                                 const isHoliday = isNationalHoliday(date);
@@ -1970,6 +2015,7 @@ const Calendar = ({
                                         $isSelected={isSelected}
                                         $hasSchedule={isSchedule}
                                         $hasAlarm={isAlarm}
+                                        $hasActiveAlarm={isActiveAlarm}
                                         $isNationalHoliday={isHoliday}
                                         $dateDay={date.getDay()}
                                         $isPastDate={isPastDate}
@@ -2093,9 +2139,20 @@ const Calendar = ({
                                         paddingLeft: '3px'
                                     }}>
                                         {regularAlarms.map((alarm, index) => {
-                                            // 과거 날짜에서 비활성화된 알람인지 확인
-                                            const isDisabled = alarm.enabled === false && alarm.disabledAt;
-                                            const shouldFade = isPastDate && isDisabled;
+                                            // 비활성화된 알람인지 확인 (과거 날짜가 아니어도)
+                                            const isTerminated = alarm.enabled === false;
+
+                                            // 자동삭제까지 남은 일수 계산
+                                            let daysUntilDeletion = null;
+                                            if (isTerminated && alarm.disabledAt) {
+                                                const disabledDate = new Date(alarm.disabledAt);
+                                                const deletionDate = new Date(disabledDate);
+                                                deletionDate.setDate(deletionDate.getDate() + 7);
+                                                const todayStart = startOfDay(new Date());
+                                                const deletionStart = startOfDay(deletionDate);
+                                                daysUntilDeletion = Math.ceil((deletionStart - todayStart) / (1000 * 60 * 60 * 24));
+                                                if (daysUntilDeletion < 0) daysUntilDeletion = 0;
+                                            }
 
                                             return (
                                                 <div key={alarm.id || index} style={{
@@ -2106,21 +2163,25 @@ const Calendar = ({
                                                 }}>
                                                     <AlarmClock
                                                         size={14}
-                                                        color={shouldFade ? 'rgba(214, 48, 49, 0.4)' : '#d63031'}
+                                                        color={isTerminated ? 'rgba(214, 48, 49, 0.3)' : '#d63031'}
                                                         style={{ marginTop: '2px', flexShrink: 0 }}
                                                     />
                                                     <div style={{ flex: 1 }}>
                                                         <span style={{
                                                             fontSize: '13px',
-                                                            color: shouldFade ? 'rgba(51, 51, 51, 0.4)' : '#333'
+                                                            color: isTerminated ? 'rgba(51, 51, 51, 0.3)' : '#333'
                                                         }}>
                                                             {alarm.title || '제목 없음'}
+                                                            {isTerminated && <span style={{ color: 'rgba(153, 153, 153, 0.5)' }}> - 종료된 알람</span>}
                                                         </span>
                                                         <div style={{
                                                             fontSize: '11px',
-                                                            color: shouldFade ? 'rgba(153, 153, 153, 0.4)' : '#999'
+                                                            color: isTerminated ? 'rgba(153, 153, 153, 0.3)' : '#999'
                                                         }}>
-                                                            {format(new Date(alarm.calculatedTime), 'yyyy-MM-dd HH:mm')}
+                                                            {format(new Date(alarm.calculatedTime), 'HH:mm')}
+                                                            {isTerminated && daysUntilDeletion !== null && (
+                                                                <span> · {daysUntilDeletion}일후 자동삭제</span>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
