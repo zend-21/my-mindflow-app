@@ -2340,8 +2340,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 color: '#6c757d',
                 background: '#f8f9fa',
                 borderRadius: '0 0 8px 8px',
-                margin: '0 20px 8px 20px',
-                marginTop: '-4px'
+                margin: '0 20px 8px 20px'
               }}>
                 <span>
                   개별 알람옵션을 지정하지 않는 한<br />
