@@ -2082,6 +2082,13 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               </div>
             </Section>
 
+            {/* 구분선 */}
+            <div style={{
+              height: '1px',
+              background: '#e9ecef',
+              margin: '20px 0'
+            }} />
+
             {/* Registered Alarms */}
             <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
               <SectionTitle>
