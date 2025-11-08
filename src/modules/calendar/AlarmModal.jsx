@@ -1933,10 +1933,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             {/* 과거 날짜 안내 메시지 */}
             {isPastDate && (
               <div style={{
-                padding: '16px',
+                padding: '5px',
                 backgroundColor: '#fff3cd',
                 borderRadius: '8px',
-                marginBottom: '16px',
+                marginBottom: '5px',
                 textAlign: 'center',
                 border: '1px solid #ffc107'
               }}>
@@ -1949,7 +1949,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   과거 날짜
                 </div>
                 <div style={{
-                  fontSize: '12px',
+                  fontSize: '13px',
                   color: '#856404'
                 }}>
                   기념일만 등록할 수 있습니다.
@@ -1960,11 +1960,6 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             {/* Registered Alarms - 과거 날짜에서는 최상단에 표시 */}
             {isPastDate && (
               <Section>
-                <div style={{
-                  height: '1px',
-                  background: '#dee2e6',
-                  margin: '0 0 16px 0'
-                }} />
                 <SectionTitle>
                   <BellIcon />
                   등록된 알람 ({pendingAlarms.length + registeredAlarms.length}개)
@@ -2139,19 +2134,17 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 display: 'flex',
                                 flexDirection: 'column',
                                 alignItems: 'center',
-                                gap: '4px'
+                                gap: '4px',
+                                fontSize: '13px',
+                                color: '#999',
+                                padding: '4px 0'
                               }}>
-                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-                                  <rect x="3" y="3" width="18" height="18" rx="4" stroke="#4a90e2" strokeWidth="2" fill="none" />
-                                  <rect x="9" y="8" width="2" height="8" fill="#4a90e2" />
-                                  <rect x="13" y="8" width="2" height="8" fill="#4a90e2" />
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <rect x="1" y="1" width="22" height="22" rx="3" stroke="#4a90e2" strokeWidth="2"/>
+                                  <rect x="8" y="7" width="2.5" height="10" fill="#4a90e2"/>
+                                  <rect x="13.5" y="7" width="2.5" height="10" fill="#4a90e2"/>
                                 </svg>
-                                <div style={{
-                                  fontSize: '11px',
-                                  color: '#4a90e2',
-                                  textAlign: 'center',
-                                  lineHeight: '1.2'
-                                }}>
+                                <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
                                   <div>알람</div>
                                   <div>일시중지</div>
                                 </div>
