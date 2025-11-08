@@ -2429,7 +2429,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 <HiddenFileInput
                   ref={soundFileInputRef}
                   type="file"
-                  accept="audio/*,audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/m4a,audio/aac"
+                  accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/m4a,audio/aac,.mp3,.wav,.ogg,.m4a,.aac"
                   onChange={handleSoundUpload}
                   style={{ display: 'none' }}
                 />
@@ -2912,7 +2912,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     <HiddenFileInput
                       ref={editSoundFileInputRef}
                       type="file"
-                      accept="audio/*,audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/m4a,audio/aac"
+                      accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/m4a,audio/aac,.mp3,.wav,.ogg,.m4a,.aac"
                       onChange={(e) => {
                         const file = e.target.files[0];
                         if (file) {
