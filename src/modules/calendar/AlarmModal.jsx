@@ -1939,6 +1939,16 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               </div>
             )}
 
+            {/* Registered Alarms - 과거 날짜에서는 최상단에 표시 */}
+            {isPastDate && (
+              <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
+                <SectionTitle>
+                  <BellIcon />
+                  등록된 알람 ({pendingAlarms.length + registeredAlarms.length}개)
+                </SectionTitle>
+              </Section>
+            )}
+
             {/* 새 알람 등록 UI - 과거 날짜에서는 기념일만 허용 */}
             {(!isPastDate || (isPastDate && isAnniversary)) && (
               <>
@@ -2202,7 +2212,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
                 {showIndividualOptions && (
                   <>
-                    {/* 개별 알람옵션 설명 */}
+                    {/* 개별 알람옵션 설명 및 초기화 버튼 */}
                     <div style={{
                       padding: '6px 20px 8px 20px',
                       fontSize: '12px',
@@ -2210,9 +2220,41 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                       background: '#f8f9fa',
                       borderRadius: '0 0 8px 8px',
                       margin: '0 20px 8px 20px',
-                      marginTop: '-4px'
+                      marginTop: '-4px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
                     }}>
                       <span>이 알람에만 적용되는 설정입니다.</span>
+                      <button
+                        onClick={() => {
+                          setSoundFile('default');
+                          setCustomSoundName('');
+                          setVolume(80);
+                          setNotificationType('sound');
+                        }}
+                        style={{
+                          padding: '4px 12px',
+                          fontSize: '11px',
+                          color: '#495057',
+                          background: '#f1f3f5',
+                          border: '1px solid #dee2e6',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s',
+                          fontWeight: '500'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = '#e9ecef';
+                          e.currentTarget.style.color = '#343a40';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = '#f1f3f5';
+                          e.currentTarget.style.color = '#495057';
+                        }}
+                      >
+                        초기화
+                      </button>
                     </div>
 
                     {/* 개별 알람 소리 */}
@@ -2315,20 +2357,18 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               </>
             )}
 
-            {/* Registered Alarms */}
-            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
-              {/* 과거 날짜가 아닐 때만 구분선 표시 */}
-              {!isPastDate && (
+            {/* Registered Alarms - 일반 날짜에서는 하단에 표시 */}
+            {!isPastDate && (
+              <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
                 <div style={{
                   height: '1px',
                   background: '#dee2e6',
                   margin: '0 0 16px 0'
                 }} />
-              )}
-              <SectionTitle>
-                <BellIcon />
-                등록된 알람 ({pendingAlarms.length + registeredAlarms.length}개)
-              </SectionTitle>
+                <SectionTitle>
+                  <BellIcon />
+                  등록된 알람 ({pendingAlarms.length + registeredAlarms.length}개)
+                </SectionTitle>
 
               {pendingAlarms.length === 0 && registeredAlarms.length === 0 ? (
                 isPastDate ? null : (
@@ -2607,7 +2647,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   </AlarmList>
                 </AlarmBox>
               )}
-            </Section>
+              </Section>
+            )}
 
             {/* Alarm Options Toggle Button - 과거 날짜에서는 숨김 */}
             {!isPastDate && (
