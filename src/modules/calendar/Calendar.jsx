@@ -2172,7 +2172,7 @@ const Calendar = ({
                                                             color: isTerminated ? 'rgba(51, 51, 51, 0.3)' : '#333'
                                                         }}>
                                                             {alarm.title || '제목 없음'}
-                                                            {isTerminated && <span style={{ color: 'rgba(153, 153, 153, 0.5)' }}> - 종료된 알람</span>}
+                                                            {isTerminated && <span style={{ color: 'rgba(214, 48, 49, 0.6)' }}> - 종료된 알람</span>}
                                                         </span>
                                                         <div style={{
                                                             fontSize: '11px',
@@ -2180,7 +2180,11 @@ const Calendar = ({
                                                         }}>
                                                             {format(new Date(alarm.calculatedTime), 'HH:mm')}
                                                             {isTerminated && daysUntilDeletion !== null && (
-                                                                <span> · {daysUntilDeletion}일후 자동삭제</span>
+                                                                <span style={{
+                                                                    color: daysUntilDeletion === 0
+                                                                        ? 'rgba(214, 48, 49, 0.7)'
+                                                                        : 'rgba(214, 48, 49, 0.5)'
+                                                                }}> · {daysUntilDeletion}일후 자동삭제</span>
                                                             )}
                                                         </div>
                                                     </div>
