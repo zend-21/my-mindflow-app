@@ -1474,10 +1474,51 @@ const Calendar = ({
     const hasAlarm = (date) => {
         const key = format(date, 'yyyy-MM-dd');
         const entry = schedules[key];
-        // 활성화된 알람이 있는 경우만 true (비활성화된 알람 제외)
-        const result = entry && entry.alarm && entry.alarm.registeredAlarms &&
-                      entry.alarm.registeredAlarms.some(alarm => alarm.enabled !== false);
-        return result;
+
+        // 1. 해당 날짜에 직접 등록된 알람 확인 (일반 알람)
+        const hasDirectAlarm = entry && entry.alarm && entry.alarm.registeredAlarms &&
+                              entry.alarm.registeredAlarms.some(alarm => alarm.enabled !== false);
+
+        if (hasDirectAlarm) return true;
+
+        // 2. 기념일 알람 확인 - 모든 날짜의 기념일을 순회하면서 오늘이 반복 날짜인지 확인
+        for (const scheduleKey in schedules) {
+            const scheduleEntry = schedules[scheduleKey];
+            if (!scheduleEntry?.alarm?.registeredAlarms) continue;
+
+            const anniversaryAlarms = scheduleEntry.alarm.registeredAlarms.filter(
+                alarm => alarm.isAnniversary && alarm.enabled !== false
+            );
+
+            for (const alarm of anniversaryAlarms) {
+                const alarmDate = new Date(alarm.calculatedTime);
+                const targetDate = new Date(date);
+
+                // 기념일 반복 로직 확인
+                if (alarm.anniversaryRepeat === 'daily') {
+                    // 매일 반복
+                    return true;
+                } else if (alarm.anniversaryRepeat === 'weekly') {
+                    // 매주 같은 요일
+                    if (alarmDate.getDay() === targetDate.getDay()) {
+                        return true;
+                    }
+                } else if (alarm.anniversaryRepeat === 'monthly') {
+                    // 매월 같은 날
+                    if (alarmDate.getDate() === targetDate.getDate()) {
+                        return true;
+                    }
+                } else if (alarm.anniversaryRepeat === 'yearly') {
+                    // 매년 같은 날 (월과 일이 같은 경우)
+                    if (alarmDate.getMonth() === targetDate.getMonth() &&
+                        alarmDate.getDate() === targetDate.getDate()) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     };
 
     const handleGoToToday = () => {

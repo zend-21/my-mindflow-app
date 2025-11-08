@@ -2098,19 +2098,23 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                           ) : (
                             <>
                               <div style={{
-                                padding: '8px 16px',
-                                borderRadius: '8px',
-                                border: '1px solid #e0e0e0',
-                                backgroundColor: '#f5f5f5',
                                 display: 'flex',
+                                flexDirection: 'column',
                                 alignItems: 'center',
-                                gap: '6px',
-                                fontSize: '12px',
-                                color: '#666',
-                                whiteSpace: 'nowrap'
+                                gap: '4px',
+                                fontSize: '13px',
+                                color: '#999',
+                                padding: '4px 0'
                               }}>
-                                <span style={{ fontSize: '14px' }}>⏸️</span>
-                                알람 일시중지
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <rect x="1" y="1" width="22" height="22" rx="3" stroke="#4a90e2" strokeWidth="2"/>
+                                  <rect x="8" y="7" width="2.5" height="10" fill="#4a90e2"/>
+                                  <rect x="13.5" y="7" width="2.5" height="10" fill="#4a90e2"/>
+                                </svg>
+                                <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
+                                  <div>알람</div>
+                                  <div>일시중지</div>
+                                </div>
                               </div>
                               <DeleteButton
                                 onClick={() => handleDeleteAlarm(alarm.id)}
@@ -3031,28 +3035,25 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               </DeleteButton>
                             </>
                           ) : (
-                            <>
-                              <div style={{
-                                padding: '8px 16px',
-                                borderRadius: '8px',
-                                border: '1px solid #e0e0e0',
-                                backgroundColor: '#f5f5f5',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                fontSize: '12px',
-                                color: '#666',
-                                whiteSpace: 'nowrap'
-                              }}>
-                                <span style={{ fontSize: '14px' }}>⏸️</span>
-                                알람 일시중지
+                            <div style={{
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '13px',
+                              color: '#999',
+                              padding: '4px 0'
+                            }}>
+                              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <rect x="1" y="1" width="22" height="22" rx="3" stroke="#4a90e2" strokeWidth="2"/>
+                                <rect x="8" y="7" width="2.5" height="10" fill="#4a90e2"/>
+                                <rect x="13.5" y="7" width="2.5" height="10" fill="#4a90e2"/>
+                              </svg>
+                              <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
+                                <div>알람</div>
+                                <div>일시중지</div>
                               </div>
-                              <DeleteButton
-                                onClick={() => handleDeleteAlarm(alarm.id)}
-                              >
-                                삭제
-                              </DeleteButton>
-                            </>
+                            </div>
                           )}
                         </AlarmActions>
                       </AlarmItem>
