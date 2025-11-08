@@ -2409,11 +2409,14 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     if (e.target.value === 'default') {
                       setSoundFile('default');
                       setCustomSoundName('');
+                    } else if (e.target.value === 'custom') {
+                      // 파일 선택 input을 자동으로 클릭
+                      document.getElementById('sound-file-input')?.click();
                     }
                   }}
                 >
                   <option value="default">기본 알림음</option>
-                  <option value="custom">사용자 지정 소리</option>
+                  <option value="custom">사용자 지정</option>
                 </Select>
 
                 {soundFile !== 'default' && (
@@ -2421,6 +2424,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     <FileInputLabel>
                       사운드 파일 선택
                       <HiddenFileInput
+                        id="sound-file-input"
                         type="file"
                         accept="audio/*"
                         onChange={handleSoundUpload}
@@ -2886,19 +2890,41 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                         } else if (e.target.value === 'default') {
                           setEditCustomSound('default');
                           setEditCustomSoundName('');
-                        } else {
-                          setEditCustomSound('custom');
+                        } else if (e.target.value === 'custom') {
+                          // 파일 선택 input을 자동으로 클릭
+                          document.getElementById('edit-sound-file-input')?.click();
                         }
                       }}
                     >
                       <option value={soundFile}>기본 설정 사용 ({soundFile === 'default' ? '기본 알림음' : customSoundName || '사용자 지정'})</option>
                       <option value="default">기본 알림음</option>
-                      <option value="custom">사용자 지정 소리</option>
+                      <option value="custom">사용자 지정</option>
                     </Select>
                     {editCustomSound !== null && editCustomSound !== 'default' && (
-                      <div style={{ marginTop: '8px', fontSize: '12px', color: '#6c757d' }}>
-                        사용자 지정 소리 파일 업로드 기능은 추후 추가 예정
-                      </div>
+                      <>
+                        <FileInputLabel style={{ marginTop: '8px' }}>
+                          사운드 파일 선택
+                          <HiddenFileInput
+                            id="edit-sound-file-input"
+                            type="file"
+                            accept="audio/*"
+                            onChange={(e) => {
+                              const file = e.target.files[0];
+                              if (file) {
+                                setEditCustomSoundName(file.name);
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  setEditCustomSound(event.target.result);
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                          />
+                        </FileInputLabel>
+                        {editCustomSoundName && (
+                          <FileName>선택된 파일: {editCustomSoundName}</FileName>
+                        )}
+                      </>
                     )}
                     {(editCustomSound === null ? soundFile : editCustomSound) !== 'custom' && (
                       <SoundPreview>
