@@ -2311,10 +2311,35 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
                   if (newShowOptions && optionsButtonRef.current) {
                     setTimeout(() => {
-                      optionsButtonRef.current?.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                      });
+                      const element = optionsButtonRef.current;
+                      const scrollContainer = element.closest('[style*="overflow"]') || element.parentElement;
+
+                      if (scrollContainer) {
+                        const targetPosition = element.offsetTop - 20;
+                        const startPosition = scrollContainer.scrollTop;
+                        const distance = targetPosition - startPosition;
+                        const duration = 600; // 600ms로 느리게
+                        let start = null;
+
+                        const animation = (currentTime) => {
+                          if (start === null) start = currentTime;
+                          const timeElapsed = currentTime - start;
+                          const progress = Math.min(timeElapsed / duration, 1);
+
+                          // easeInOutCubic for smooth animation
+                          const ease = progress < 0.5
+                            ? 4 * progress * progress * progress
+                            : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+
+                          scrollContainer.scrollTop = startPosition + distance * ease;
+
+                          if (timeElapsed < duration) {
+                            requestAnimationFrame(animation);
+                          }
+                        };
+
+                        requestAnimationFrame(animation);
+                      }
                     }, 100);
                   }
                 }}
