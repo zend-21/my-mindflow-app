@@ -1347,8 +1347,12 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   // Toggle alarm enabled/disabled
   const handleToggleAlarm = (id) => {
+    // 현재 알람의 enabled 상태 확인
+    const currentAlarm = registeredAlarms.find(alarm => alarm.id === id);
+    const newEnabledState = !currentAlarm.enabled;
+
     const updatedAlarms = registeredAlarms.map(alarm =>
-      alarm.id === id ? { ...alarm, enabled: !alarm.enabled } : alarm
+      alarm.id === id ? { ...alarm, enabled: newEnabledState } : alarm
     );
     setRegisteredAlarms(updatedAlarms);
 
@@ -1366,7 +1370,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       anniversaryRepeat
     };
 
-    onSave(alarmSettings, 'toggle'); // 알람 토글
+    // 새로운 상태를 전달
+    onSave(alarmSettings, newEnabledState ? 'toggle_on' : 'toggle_off');
   };
 
   // Edit alarm - opens modal
