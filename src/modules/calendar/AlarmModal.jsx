@@ -1999,7 +1999,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 color: alarm.isAnniversary ? '#4a90e2' : '#999',
                                 wordBreak: 'break-all',
                                 lineHeight: '1.3',
-                                maxWidth: '6em',
+                                maxWidth: '7em',
                                 display: 'inline-block'
                               }}>
                                 {alarm.title || '제목 없음'}
