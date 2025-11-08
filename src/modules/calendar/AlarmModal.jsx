@@ -209,7 +209,7 @@ const TimeSelect = styled(Select)`
 `;
 
 const TimeInput = styled.input`
-  width: 62px;
+  width: 60px;
   padding: 14px 10px;
   border-radius: 8px;
   border: 1px solid #dee2e6;
