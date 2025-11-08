@@ -1038,6 +1038,22 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     const alarmTime = calculateAlarmTime(eventTime, offsetConfig);
     if (!alarmTime) return;
 
+    // 과거 시간 체크 (오늘 날짜인 경우에만)
+    const scheduleDate = new Date(scheduleData.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    scheduleDate.setHours(0, 0, 0, 0);
+
+    if (scheduleDate.getTime() === today.getTime()) {
+      // 오늘 날짜이면 현재 시간과 비교
+      const now = new Date();
+      if (alarmTime <= now) {
+        setValidationMessage('알람 시간은 과거의 시간으로 설정할 수 없습니다.');
+        setShowValidationModal(true);
+        return;
+      }
+    }
+
     // 중복 시간 체크
     const alarmTimeStr = format(alarmTime, 'yyyy-MM-dd HH:mm');
     const isDuplicate = [...pendingAlarms, ...registeredAlarms].some(alarm => {
@@ -1133,6 +1149,22 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     const alarmTime = calculateAlarmTime(eventTime, offsetConfig);
     if (!alarmTime) return;
 
+    // 과거 시간 체크 (오늘 날짜인 경우에만)
+    const scheduleDate = new Date(scheduleData.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    scheduleDate.setHours(0, 0, 0, 0);
+
+    if (scheduleDate.getTime() === today.getTime()) {
+      // 오늘 날짜이면 현재 시간과 비교
+      const now = new Date();
+      if (alarmTime <= now) {
+        setValidationMessage('알람 시간은 과거의 시간으로 설정할 수 없습니다.');
+        setShowValidationModal(true);
+        return;
+      }
+    }
+
     const newAlarm = {
       id: Date.now(),
       type: 'custom',
@@ -1204,6 +1236,14 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     const [hour, minute] = directTime.split(':').map(Number);
     const dateTime = new Date(directDate);
     dateTime.setHours(hour, minute, 0, 0);
+
+    // 과거 시간 체크
+    const now = new Date();
+    if (dateTime <= now) {
+      setValidationMessage('알람 시간은 과거의 시간으로 설정할 수 없습니다.');
+      setShowValidationModal(true);
+      return;
+    }
 
     const newAlarm = {
       id: Date.now(),
@@ -1490,6 +1530,22 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       setValidationMessage('알람 시간을 계산할 수 없습니다.');
       setShowValidationModal(true);
       return;
+    }
+
+    // 과거 시간 체크 (오늘 날짜인 경우에만)
+    const scheduleDate = new Date(scheduleData.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    scheduleDate.setHours(0, 0, 0, 0);
+
+    if (scheduleDate.getTime() === today.getTime()) {
+      // 오늘 날짜이면 현재 시간과 비교
+      const now = new Date();
+      if (newAlarmTime <= now) {
+        setValidationMessage('알람 시간은 과거의 시간으로 설정할 수 없습니다.');
+        setShowValidationModal(true);
+        return;
+      }
     }
 
     const updatedAlarm = {
