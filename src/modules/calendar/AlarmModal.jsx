@@ -1844,40 +1844,38 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   // Sort alarms
   const getSortedAlarms = (alarms) => {
-    // 기념일과 일반 알람 분리
-    const anniversaryAlarms = alarms.filter(alarm => alarm.isAnniversary);
-    const regularAlarms = alarms.filter(alarm => !alarm.isAnniversary);
+    let sorted = [...alarms];
 
-    // 기념일 알람은 시간순으로 정렬 (항상 오름차순)
-    anniversaryAlarms.sort((a, b) => {
-      const timeA = new Date(a.calculatedTime).getTime();
-      const timeB = new Date(b.calculatedTime).getTime();
-      return timeA - timeB;
-    });
-
-    // 일반 알람은 사용자가 선택한 정렬 기준으로 정렬
-    let sortedRegular = [...regularAlarms];
-    if (sortBy === 'time') {
-      sortedRegular.sort((a, b) => {
+    // 기념일인 경우 항상 시간순으로 정렬 (오름차순)
+    if (alarms.length > 0 && alarms[0].isAnniversary) {
+      sorted.sort((a, b) => {
         const timeA = new Date(a.calculatedTime).getTime();
         const timeB = new Date(b.calculatedTime).getTime();
         return timeA - timeB;
       });
     } else {
-      sortedRegular.sort((a, b) => {
-        const orderA = Number(a.registrationOrder) || 0;
-        const orderB = Number(b.registrationOrder) || 0;
-        return orderA - orderB;
-      });
+      // 일반 알람은 사용자가 선택한 정렬 기준으로 정렬
+      if (sortBy === 'time') {
+        sorted.sort((a, b) => {
+          const timeA = new Date(a.calculatedTime).getTime();
+          const timeB = new Date(b.calculatedTime).getTime();
+          return timeA - timeB;
+        });
+      } else {
+        sorted.sort((a, b) => {
+          const orderA = Number(a.registrationOrder) || 0;
+          const orderB = Number(b.registrationOrder) || 0;
+          return orderA - orderB;
+        });
+      }
+
+      // 일반 알람에만 정렬 방향 적용
+      if (sortDirection === 'desc') {
+        sorted.reverse();
+      }
     }
 
-    // 일반 알람에만 정렬 방향 적용
-    if (sortDirection === 'desc') {
-      sortedRegular.reverse();
-    }
-
-    // 기념일을 최상단에, 일반 알람을 그 아래에 배치
-    return [...anniversaryAlarms, ...sortedRegular];
+    return sorted;
   };
 
   // Save alarm settings
@@ -1978,21 +1976,172 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               </div>
             )}
 
-            {/* Registered Alarms - 과거 날짜에서는 최상단에 표시 */}
+            {/* Registered Anniversaries - 과거 날짜에서 기념일 별도 표시 */}
+            {isPastDate && registeredAlarms.filter(alarm => alarm.isAnniversary).length > 0 && (
+              <Section>
+                <SectionTitle>
+                  <div style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    backgroundColor: '#4a90e2',
+                    color: '#fff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    marginRight: '8px'
+                  }}>
+                    기
+                  </div>
+                  등록된 기념일 ({registeredAlarms.filter(alarm => alarm.isAnniversary).length}개)
+                </SectionTitle>
+
+                <AlarmBox>
+                  <AlarmList>
+                    {getSortedAlarms(registeredAlarms.filter(alarm => alarm.isAnniversary)).map((alarm) => (
+                      <AlarmItem
+                        key={alarm.id}
+                        $isPending={false}
+                        $enabled={alarm.enabled}
+                        $isModified={alarm.isModified}
+                      >
+                        <AlarmInfo>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
+                            <ToggleSwitch style={{
+                              opacity: alarm.disabledAt ? 0.5 : 1
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={alarm.enabled !== false}
+                                disabled={!!alarm.disabledAt}
+                                onChange={() => handleToggleAlarm(alarm.id)}
+                              />
+                              <span className="slider"></span>
+                            </ToggleSwitch>
+                            <div style={{
+                              width: '14px',
+                              height: '14px',
+                              borderRadius: '50%',
+                              backgroundColor: '#4a90e2',
+                              color: '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '9px',
+                              fontWeight: 'bold',
+                              flexShrink: 0,
+                              opacity: alarm.enabled !== false ? 1 : 0.5,
+                              marginTop: '4px'
+                            }}>
+                              기
+                            </div>
+                            <div style={{
+                              fontSize: '15px',
+                              color: '#4a90e2',
+                              opacity: alarm.enabled !== false ? 1 : 0.5,
+                              wordBreak: 'break-all',
+                              lineHeight: '1.3',
+                              maxWidth: '8em',
+                              display: 'inline-block',
+                              minHeight: 'calc(1.3em * 2)',
+                              marginTop: '2px'
+                            }}>
+                              {alarm.title || '제목 없음'}
+                            </div>
+                          </div>
+                          <div style={{
+                            fontSize: '12px',
+                            color: '#6c757d',
+                            opacity: alarm.enabled !== false ? 1 : 0.5
+                          }}>
+                            {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
+                          </div>
+                        </AlarmInfo>
+                        {alarm.isModified && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '12px',
+                            right: '12px',
+                            fontSize: '11px',
+                            color: '#dc3545',
+                            fontWeight: '600'
+                          }}>
+                            변경사항 미적용
+                          </div>
+                        )}
+                        <AlarmActions style={{
+                          flexDirection: 'column',
+                          alignItems: 'flex-end',
+                          gap: '12px'
+                        }}>
+                          {alarm.enabled !== false ? (
+                            <>
+                              {alarm.isModified ? (
+                                <ApplyButton onClick={() => handleApplyChanges(alarm.id)}>
+                                  적용
+                                </ApplyButton>
+                              ) : (
+                                <EditButton
+                                  onClick={() => handleEditAlarm(alarm, false)}
+                                >
+                                  수정
+                                </EditButton>
+                              )}
+                              <DeleteButton
+                                onClick={() => handleDeleteAlarm(alarm.id)}
+                              >
+                                삭제
+                              </DeleteButton>
+                            </>
+                          ) : (
+                            <>
+                              <div style={{
+                                padding: '8px 16px',
+                                borderRadius: '8px',
+                                border: '1px solid #e0e0e0',
+                                backgroundColor: '#f5f5f5',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontSize: '12px',
+                                color: '#666',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                <span style={{ fontSize: '14px' }}>⏸️</span>
+                                알람 일시중지
+                              </div>
+                              <DeleteButton
+                                onClick={() => handleDeleteAlarm(alarm.id)}
+                              >
+                                삭제
+                              </DeleteButton>
+                            </>
+                          )}
+                        </AlarmActions>
+                      </AlarmItem>
+                    ))}
+                  </AlarmList>
+                </AlarmBox>
+              </Section>
+            )}
+
+            {/* Registered Alarms - 과거 날짜에서는 일반 알람만 표시 */}
             {isPastDate && (
               <Section>
                 <SectionTitle>
                   <BellIcon />
-                  등록된 알람 ({pendingAlarms.length + registeredAlarms.length}개)
+                  등록된 알람 ({pendingAlarms.length + registeredAlarms.filter(alarm => !alarm.isAnniversary).length}개)
                 </SectionTitle>
 
-              {pendingAlarms.length === 0 && registeredAlarms.length === 0 ? (
+              {pendingAlarms.length === 0 && registeredAlarms.filter(alarm => !alarm.isAnniversary).length === 0 ? (
                 <p style={{ color: '#6c757d', fontSize: '14px', margin: 0 }}>
                   등록된 알람이 없습니다.
                 </p>
               ) : (
                 <AlarmBox>
-                  {(pendingAlarms.length > 0 || registeredAlarms.length > 0) && (
+                  {(pendingAlarms.length > 0 || registeredAlarms.filter(alarm => !alarm.isAnniversary).length > 0) && (
                     <SortButtonGroup>
                       <SortButton
                         $active={sortBy === 'registration'}
@@ -2028,10 +2177,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   )}
 
                   <AlarmList>
-                  {/* 확정 알람 - 정렬 적용 */}
-                  {registeredAlarms.length > 0 && (
+                  {/* 확정 알람 - 정렬 적용 (일반 알람만) */}
+                  {registeredAlarms.filter(alarm => !alarm.isAnniversary).length > 0 && (
                     <>
-                      {getSortedAlarms(registeredAlarms).map((alarm) => (
+                      {getSortedAlarms(registeredAlarms.filter(alarm => !alarm.isAnniversary)).map((alarm) => (
                         <AlarmItem
                           key={alarm.id}
                           $isPending={false}
@@ -2757,7 +2906,163 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               </>
             )}
 
-            {/* Registered Alarms - 일반 날짜에서는 하단에 표시 */}
+            {/* Registered Anniversaries - 일반 날짜에서 기념일 별도 표시 */}
+            {!isPastDate && registeredAlarms.filter(alarm => alarm.isAnniversary).length > 0 && (
+              <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
+                <div style={{
+                  height: '1px',
+                  background: '#dee2e6',
+                  margin: '0 0 16px 0'
+                }} />
+                <SectionTitle>
+                  <div style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    backgroundColor: '#4a90e2',
+                    color: '#fff',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    marginRight: '8px'
+                  }}>
+                    기
+                  </div>
+                  등록된 기념일 ({registeredAlarms.filter(alarm => alarm.isAnniversary).length}개)
+                </SectionTitle>
+
+                <AlarmBox>
+                  <AlarmList>
+                    {getSortedAlarms(registeredAlarms.filter(alarm => alarm.isAnniversary)).map((alarm) => (
+                      <AlarmItem
+                        key={alarm.id}
+                        $isPending={false}
+                        $enabled={alarm.enabled}
+                        $isModified={alarm.isModified}
+                      >
+                        <AlarmInfo>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
+                            <ToggleSwitch style={{
+                              opacity: alarm.disabledAt ? 0.5 : 1
+                            }}>
+                              <input
+                                type="checkbox"
+                                checked={alarm.enabled !== false}
+                                disabled={!!alarm.disabledAt}
+                                onChange={() => handleToggleAlarm(alarm.id)}
+                              />
+                              <span className="slider"></span>
+                            </ToggleSwitch>
+                            <div style={{
+                              width: '14px',
+                              height: '14px',
+                              borderRadius: '50%',
+                              backgroundColor: '#4a90e2',
+                              color: '#fff',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '9px',
+                              fontWeight: 'bold',
+                              flexShrink: 0,
+                              opacity: alarm.enabled !== false ? 1 : 0.5,
+                              marginTop: '4px'
+                            }}>
+                              기
+                            </div>
+                            <div style={{
+                              fontSize: '15px',
+                              color: '#4a90e2',
+                              opacity: alarm.enabled !== false ? 1 : 0.5,
+                              wordBreak: 'break-all',
+                              lineHeight: '1.3',
+                              maxWidth: '8em',
+                              display: 'inline-block',
+                              minHeight: 'calc(1.3em * 2)',
+                              marginTop: '2px'
+                            }}>
+                              {alarm.title || '제목 없음'}
+                            </div>
+                          </div>
+                          <div style={{
+                            fontSize: '12px',
+                            color: '#6c757d',
+                            opacity: alarm.enabled !== false ? 1 : 0.5
+                          }}>
+                            {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
+                          </div>
+                        </AlarmInfo>
+                        {alarm.isModified && (
+                          <div style={{
+                            position: 'absolute',
+                            bottom: '12px',
+                            right: '12px',
+                            fontSize: '11px',
+                            color: '#dc3545',
+                            fontWeight: '600'
+                          }}>
+                            변경사항 미적용
+                          </div>
+                        )}
+                        <AlarmActions style={{
+                          flexDirection: 'column',
+                          alignItems: 'flex-end',
+                          gap: '12px'
+                        }}>
+                          {alarm.enabled !== false ? (
+                            <>
+                              {alarm.isModified ? (
+                                <ApplyButton onClick={() => handleApplyChanges(alarm.id)}>
+                                  적용
+                                </ApplyButton>
+                              ) : (
+                                <EditButton
+                                  onClick={() => handleEditAlarm(alarm, false)}
+                                >
+                                  수정
+                                </EditButton>
+                              )}
+                              <DeleteButton
+                                onClick={() => handleDeleteAlarm(alarm.id)}
+                              >
+                                삭제
+                              </DeleteButton>
+                            </>
+                          ) : (
+                            <>
+                              <div style={{
+                                padding: '8px 16px',
+                                borderRadius: '8px',
+                                border: '1px solid #e0e0e0',
+                                backgroundColor: '#f5f5f5',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                fontSize: '12px',
+                                color: '#666',
+                                whiteSpace: 'nowrap'
+                              }}>
+                                <span style={{ fontSize: '14px' }}>⏸️</span>
+                                알람 일시중지
+                              </div>
+                              <DeleteButton
+                                onClick={() => handleDeleteAlarm(alarm.id)}
+                              >
+                                삭제
+                              </DeleteButton>
+                            </>
+                          )}
+                        </AlarmActions>
+                      </AlarmItem>
+                    ))}
+                  </AlarmList>
+                </AlarmBox>
+              </Section>
+            )}
+
+            {/* Registered Alarms - 일반 날짜에서는 일반 알람만 표시 */}
             {!isPastDate && (
               <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
                 <div style={{
@@ -2767,18 +3072,16 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 }} />
                 <SectionTitle>
                   <BellIcon />
-                  등록된 알람 ({pendingAlarms.length + registeredAlarms.length}개)
+                  등록된 알람 ({pendingAlarms.length + registeredAlarms.filter(alarm => !alarm.isAnniversary).length}개)
                 </SectionTitle>
 
-              {pendingAlarms.length === 0 && registeredAlarms.length === 0 ? (
-                isPastDate ? null : (
-                  <p style={{ color: '#6c757d', fontSize: '14px', margin: 0 }}>
-                    등록된 알람이 없습니다.
-                  </p>
-                )
+              {pendingAlarms.length === 0 && registeredAlarms.filter(alarm => !alarm.isAnniversary).length === 0 ? (
+                <p style={{ color: '#6c757d', fontSize: '14px', margin: 0 }}>
+                  등록된 알람이 없습니다.
+                </p>
               ) : (
                 <AlarmBox>
-                  {(pendingAlarms.length > 0 || registeredAlarms.length > 0) && (
+                  {(pendingAlarms.length > 0 || registeredAlarms.filter(alarm => !alarm.isAnniversary).length > 0) && (
                     <SortButtonGroup>
                       <SortButton
                         $active={sortBy === 'registration'}
@@ -2864,15 +3167,15 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     </>
                   )}
 
-                  {/* 확정 알람 - 정렬 적용 */}
-                  {registeredAlarms.length > 0 && (
+                  {/* 확정 알람 - 정렬 적용 (일반 알람만) */}
+                  {registeredAlarms.filter(alarm => !alarm.isAnniversary).length > 0 && (
                     <>
                       {pendingAlarms.length > 0 && (
                         <div style={{ fontSize: '12px', color: '#6c757d', margin: '16px 0 4px 0', fontWeight: '600' }}>
-                          확정된 알람 ({registeredAlarms.length}개)
+                          확정된 알람 ({registeredAlarms.filter(alarm => !alarm.isAnniversary).length}개)
                         </div>
                       )}
-                      {getSortedAlarms(registeredAlarms).map((alarm) => (
+                      {getSortedAlarms(registeredAlarms.filter(alarm => !alarm.isAnniversary)).map((alarm) => (
                         <AlarmItem
                           key={alarm.id}
                           $isPending={false}
