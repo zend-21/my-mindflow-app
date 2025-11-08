@@ -1883,11 +1883,6 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
   const hasSchedule = scheduleData?.content || scheduleData?.text;
 
-  // 과거 날짜 체크
-  const isPastDate = scheduleData?.date
-    ? new Date(scheduleData.date).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)
-    : false;
-
   // 과거 날짜인 경우 기념일 체크해야만 입력 가능
   const isDisabled = isPastDate && !isAnniversary;
 
