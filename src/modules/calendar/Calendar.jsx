@@ -1749,15 +1749,11 @@ const Calendar = ({
         const today = startOfDay(new Date());
         const selectedDay = startOfDay(selectedDate);
 
-        if (isBefore(selectedDay, today)) {
-            showToast('과거 날짜에는 알람을 설정할 수 없습니다.');
-            return;
-        }
-
-        // 일정이 없어도 알람 설정 가능
+        // 과거 날짜에도 알람창 열기 (단, 모달에서 isPastDate를 전달하여 처리)
         if (onOpenAlarm) {
             const entryData = currentEntry || { text: '', createdAt: Date.now(), updatedAt: Date.now() };
-            const dataToPass = { ...entryData, date: selectedDate };
+            const isPastDate = isBefore(selectedDay, today);
+            const dataToPass = { ...entryData, date: selectedDate, isPastDate };
             onOpenAlarm(dataToPass);
         }
     };

@@ -89,7 +89,7 @@ const Overlay = styled.div`
 `;
 
 const ModalContent = styled.div`
-  background: #ffffff;
+  background: ${props => props.$isPastDate ? '#e0e0e0' : '#ffffff'};
   border-radius: 16px;
   width: 95vw;
   max-width: 500px;
@@ -723,6 +723,9 @@ const CheckboxContainer = styled.label`
 
 // ==================== COMPONENT ====================
 const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
+  // 과거 날짜 여부 확인
+  const isPastDate = scheduleData?.isPastDate || false;
+
   // Core alarm data
   const [alarmTitle, setAlarmTitle] = useState('');
   const [eventTime, setEventTime] = useState('09:00');
@@ -1896,6 +1899,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     <Portal>
       <Overlay>
         <ModalContent
+          $isPastDate={isPastDate}
           onClick={(e) => e.stopPropagation()}
           style={{
             opacity: showEditModal ? 0.3 : 1,
@@ -1909,22 +1913,36 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             <CloseButton onClick={handleClose}>×</CloseButton>
           </Header>
 
-          {/* 과거 날짜 경고 메시지 */}
-          {isPastDate && (
-            <div style={{
-              padding: '12px 20px',
-              backgroundColor: '#fff9c4',
-              borderBottom: '2px solid #fbc02d',
-              color: '#f57f17',
-              fontSize: '14px',
-              fontWeight: '600',
-              textAlign: 'center'
-            }}>
-              ⚠️ 오늘 이전의 날에는 기념일만 등록할 수 있습니다.
-            </div>
-          )}
-
           <FormArea>
+            {/* 과거 날짜 안내 메시지 */}
+            {isPastDate && (
+              <div style={{
+                padding: '16px',
+                backgroundColor: '#f8f9fa',
+                borderRadius: '8px',
+                marginBottom: '16px',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: '14px',
+                  color: '#495057',
+                  fontWeight: '600',
+                  marginBottom: '4px'
+                }}>
+                  과거 날짜
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  color: '#6c757d'
+                }}>
+                  {registeredAlarms.length === 0 ? '등록된 알람이 없습니다.' : '등록된 알람만 표시됩니다.'}
+                </div>
+              </div>
+            )}
+
+            {/* 새 알람 등록 UI - 과거 날짜에서는 숨김 */}
+            {!isPastDate && (
+              <>
             {/* Alarm Title */}
             <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
               <SectionTitle>
@@ -2128,23 +2146,30 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 </div>
               </div>
             </Section>
+              </>
+            )}
 
             {/* Registered Alarms */}
             <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
-              <div style={{
-                height: '1px',
-                background: '#dee2e6',
-                margin: '0 0 16px 0'
-              }} />
+              {/* 과거 날짜가 아닐 때만 구분선 표시 */}
+              {!isPastDate && (
+                <div style={{
+                  height: '1px',
+                  background: '#dee2e6',
+                  margin: '0 0 16px 0'
+                }} />
+              )}
               <SectionTitle>
                 <BellIcon />
                 등록된 알람 ({pendingAlarms.length + registeredAlarms.length}개)
               </SectionTitle>
 
               {pendingAlarms.length === 0 && registeredAlarms.length === 0 ? (
-                <p style={{ color: '#6c757d', fontSize: '14px', margin: 0 }}>
-                  등록된 알람이 없습니다.
-                </p>
+                isPastDate ? null : (
+                  <p style={{ color: '#6c757d', fontSize: '14px', margin: 0 }}>
+                    등록된 알람이 없습니다.
+                  </p>
+                )
               ) : (
                 <AlarmBox>
                   {(pendingAlarms.length > 0 || registeredAlarms.length > 0) && (
@@ -2242,14 +2267,27 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                         </div>
                       )}
                       {getSortedAlarms(registeredAlarms).map((alarm) => (
-                        <AlarmItem key={alarm.id} $isPending={false} $enabled={alarm.enabled} $isModified={alarm.isModified}>
+                        <AlarmItem
+                          key={alarm.id}
+                          $isPending={false}
+                          $enabled={alarm.enabled}
+                          $isModified={alarm.isModified}
+                          style={{
+                            // 과거 날짜에서 기념일은 환하게 표시
+                            backgroundColor: isPastDate && alarm.isAnniversary ? '#ffffff' : undefined
+                          }}
+                        >
                           <AlarmInfo>
                             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
-                              <ToggleSwitch style={{ opacity: alarm.disabledAt ? 0.5 : 1 }}>
+                              <ToggleSwitch style={{
+                                opacity: alarm.disabledAt ? 0.5 : 1,
+                                // 과거 날짜에서 일반 알람은 비활성화
+                                pointerEvents: (isPastDate && !alarm.isAnniversary) ? 'none' : 'auto'
+                              }}>
                                 <input
                                   type="checkbox"
                                   checked={alarm.enabled !== false}
-                                  disabled={!!alarm.disabledAt}
+                                  disabled={!!alarm.disabledAt || (isPastDate && !alarm.isAnniversary)}
                                   onChange={() => handleToggleAlarm(alarm.id)}
                                 />
                                 <span className="slider"></span>
@@ -2318,7 +2356,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                           <AlarmActions style={{
                             flexDirection: 'column',
                             alignItems: 'flex-end',
-                            gap: '12px'
+                            gap: '12px',
+                            // 과거 날짜에서 일반 알람은 버튼 비활성화
+                            opacity: (isPastDate && !alarm.isAnniversary && alarm.enabled !== false) ? 0.5 : 1,
+                            pointerEvents: (isPastDate && !alarm.isAnniversary && alarm.enabled !== false) ? 'none' : 'auto'
                           }}>
                             {alarm.enabled !== false ? (
                               <>
@@ -2327,11 +2368,17 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                     적용
                                   </ApplyButton>
                                 ) : (
-                                  <EditButton onClick={() => handleEditAlarm(alarm, false)}>
+                                  <EditButton
+                                    onClick={() => handleEditAlarm(alarm, false)}
+                                    disabled={isPastDate && !alarm.isAnniversary}
+                                  >
                                     수정
                                   </EditButton>
                                 )}
-                                <DeleteButton onClick={() => handleDeleteAlarm(alarm.id)}>
+                                <DeleteButton
+                                  onClick={() => handleDeleteAlarm(alarm.id)}
+                                  disabled={isPastDate && !alarm.isAnniversary}
+                                >
                                   삭제
                                 </DeleteButton>
                               </>
@@ -2344,7 +2391,13 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                   alignItems: 'center',
                                   gap: '8px'
                                 }}>
-                                  <DeleteButton onClick={() => handleDeleteAlarm(alarm.id)}>
+                                  <DeleteButton
+                                    onClick={() => handleDeleteAlarm(alarm.id)}
+                                    style={{
+                                      backgroundColor: '#ff9999',
+                                      color: 'white'
+                                    }}
+                                  >
                                     삭제
                                   </DeleteButton>
                                   <div style={{
