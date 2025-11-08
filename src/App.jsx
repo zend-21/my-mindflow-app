@@ -720,7 +720,7 @@ function App() {
         setIsAlarmModalOpen(true);
     };
 
-    const handleSaveAlarm = (alarmSettings) => {
+    const handleSaveAlarm = (alarmSettings, actionType) => {
         // 1. 알람을 설정할 대상 스케줄의 날짜 키(key)를 찾습니다.
         if (!scheduleForAlarm?.date) {
             console.error("알람을 저장할 스케줄 정보가 없습니다.");
@@ -756,7 +756,21 @@ function App() {
 
         // 4. 사용자에게 피드백을 줍니다 (모달은 닫지 않음)
         const hasAlarms = alarmSettings.registeredAlarms && alarmSettings.registeredAlarms.length > 0;
-        showToast(hasAlarms ? '알람이 설정되었습니다. 🔔' : '이벤트 시간이 저장되었습니다.');
+
+        // 동작 타입에 따라 다른 메시지 표시
+        let message = '이벤트 시간이 저장되었습니다.';
+        if (hasAlarms) {
+            if (actionType === 'register') {
+                message = '새로운 알람이 등록되었습니다. 🔔';
+            } else if (actionType === 'edit') {
+                message = '알람이 수정되었습니다.';
+            } else {
+                // toggle, apply, save 등은 기존 메시지 유지
+                message = '알람이 설정되었습니다. 🔔';
+            }
+        }
+
+        showToast(message);
         // 모달은 사용자가 직접 닫기 버튼을 누를 때만 닫히도록 변경
         // setIsAlarmModalOpen(false);
         // setScheduleForAlarm(null);

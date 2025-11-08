@@ -1342,7 +1342,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       anniversaryRepeat
     };
 
-    onSave(alarmSettings);
+    onSave(alarmSettings, 'register'); // 새 알람 등록
   };
 
   // Toggle alarm enabled/disabled
@@ -1366,7 +1366,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       anniversaryRepeat
     };
 
-    onSave(alarmSettings);
+    onSave(alarmSettings, 'toggle'); // 알람 토글
   };
 
   // Edit alarm - opens modal
@@ -1538,7 +1538,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         anniversaryName: isAnniversary ? alarmTitle : '',
         anniversaryRepeat
       };
-      onSave(alarmSettings);
+      onSave(alarmSettings, 'edit'); // 알람 수정
     }
 
     // Reset main form to default state (do NOT sync with edited alarm)
@@ -1597,7 +1597,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       anniversaryRepeat
     };
 
-    onSave(alarmSettings);
+    onSave(alarmSettings, 'apply'); // 변경사항 적용
   };
 
   // Set event time to current time
@@ -1729,7 +1729,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     // 기본 알람옵션 접기
     setShowOptions(false);
 
-    onSave(alarmSettings);
+    onSave(alarmSettings, 'save'); // 알람 설정 저장
   };
 
   if (!isOpen) return null;
