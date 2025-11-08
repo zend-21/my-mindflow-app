@@ -296,6 +296,106 @@ const ButtonGroup = styled.div`
   margin-top: 10px;
 `;
 
+// 확인 모달 스타일
+const ConfirmOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 11000;
+  animation: fadeIn 0.2s ease-out;
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+`;
+
+const ConfirmModalBox = styled.div`
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px 30px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+  width: 90vw;
+  max-width: 350px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: slideUp 0.2s cubic-bezier(0.2, 0, 0, 1);
+
+  @keyframes slideUp {
+    from { transform: translateY(20px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+`;
+
+const ConfirmMessage = styled.p`
+  font-size: 16px;
+  color: #333;
+  margin: 0;
+  line-height: 1.5;
+  text-align: center;
+  word-break: keep-all;
+`;
+
+const ConfirmButtonWrapper = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+
+  & > button {
+    flex: 1;
+  }
+`;
+
+const ConfirmCancelButton = styled.button`
+  background: #e2e8f0;
+  color: #4a5568;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 500;
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible {
+    box-shadow: 0 0 0 3px rgba(150, 160, 170, 0.6);
+  }
+`;
+
+const ConfirmButton = styled.button`
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  cursor: pointer;
+  font-weight: 500;
+
+  &:hover {
+    background: #3b78c4;
+  }
+
+  &:focus {
+    outline: none;
+  }
+
+  &:focus-visible {
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.6);
+  }
+`;
+
 const CalendarWrapper = styled.div`
     width: 100%;
     max-width: 100%;
@@ -947,6 +1047,14 @@ const Calendar = ({
     const [specialDates, setSpecialDates] = useState({});
     const [cacheStatus, setCacheStatus] = useState({ loading: false, error: null });
 
+    // 삭제 확인 모달 상태
+    const [deleteConfirmModal, setDeleteConfirmModal] = useState({
+        isOpen: false,
+        type: null, // 'schedule' 또는 'alarm'
+        message: '',
+        onConfirm: null
+    });
+
     const swipeHandlers = useSwipeable({
         onSwipedLeft: () => {
             setCurrentMonth(prev => addMonths(prev, 1));
@@ -1498,7 +1606,8 @@ const Calendar = ({
         }
     };
 
-    const handleDeleteScheduleOnly = () => {
+    // 일정 삭제 실행 함수 (내부)
+    const executeDeleteScheduleOnly = () => {
         // 일정 텍스트만 삭제, 알람은 보존
         if (!currentEntry) return;
 
@@ -1529,7 +1638,23 @@ const Calendar = ({
         showToast('일정이 삭제되었습니다.');
     };
 
-    const handleDeleteAlarmOnly = () => {
+    // 일정 삭제 버튼 클릭 핸들러 (확인 모달 표시)
+    const handleDeleteScheduleOnly = () => {
+        if (!currentEntry) return;
+
+        setDeleteConfirmModal({
+            isOpen: true,
+            type: 'schedule',
+            message: '해당 날짜의 일정을 삭제할까요?',
+            onConfirm: () => {
+                executeDeleteScheduleOnly();
+                setDeleteConfirmModal({ isOpen: false, type: null, message: '', onConfirm: null });
+            }
+        });
+    };
+
+    // 알람 삭제 실행 함수 (내부)
+    const executeDeleteAlarmOnly = () => {
         // 일반 알람만 삭제, 기념일 알람과 일정 텍스트는 보존
         if (!currentEntry || !currentEntry.alarm) return;
 
@@ -1568,6 +1693,21 @@ const Calendar = ({
         });
 
         showToast('일반 알람이 삭제되었습니다.');
+    };
+
+    // 알람 삭제 버튼 클릭 핸들러 (확인 모달 표시)
+    const handleDeleteAlarmOnly = () => {
+        if (!currentEntry || !currentEntry.alarm) return;
+
+        setDeleteConfirmModal({
+            isOpen: true,
+            type: 'alarm',
+            message: '해당 날짜의 모든 알람을 삭제할까요?',
+            onConfirm: () => {
+                executeDeleteAlarmOnly();
+                setDeleteConfirmModal({ isOpen: false, type: null, message: '', onConfirm: null });
+            }
+        });
     };
     
     const handleAlarmClick = () => {
@@ -1918,7 +2058,24 @@ const Calendar = ({
                 onSelect={handleDateSelect}
                 initialYear={currentMonth.getFullYear()}
                 initialMonth={currentMonth.getMonth()}
-            />            
+            />
+
+            {/* 삭제 확인 모달 */}
+            {deleteConfirmModal.isOpen && (
+                <ConfirmOverlay onClick={() => setDeleteConfirmModal({ isOpen: false, type: null, message: '', onConfirm: null })}>
+                    <ConfirmModalBox onClick={e => e.stopPropagation()}>
+                        <ConfirmMessage>{deleteConfirmModal.message}</ConfirmMessage>
+                        <ConfirmButtonWrapper>
+                            <ConfirmCancelButton onClick={() => setDeleteConfirmModal({ isOpen: false, type: null, message: '', onConfirm: null })}>
+                                아니요
+                            </ConfirmCancelButton>
+                            <ConfirmButton onClick={deleteConfirmModal.onConfirm}>
+                                예
+                            </ConfirmButton>
+                        </ConfirmButtonWrapper>
+                    </ConfirmModalBox>
+                </ConfirmOverlay>
+            )}
         </CalendarWrapper>
     );
 };
