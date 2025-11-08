@@ -1946,6 +1946,120 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   <BellIcon />
                   등록된 알람 ({pendingAlarms.length + registeredAlarms.length}개)
                 </SectionTitle>
+
+                {pendingAlarms.length === 0 && registeredAlarms.length === 0 ? (
+                  <p style={{ color: '#6c757d', fontSize: '14px', margin: 0 }}>
+                    등록된 알람이 없습니다.
+                  </p>
+                ) : (
+                  <AlarmBox>
+                    {(pendingAlarms.length > 0 || registeredAlarms.length > 0) && (
+                      <SortButtonGroup>
+                        <SortButton
+                          $active={sortBy === 'registration'}
+                          onClick={() => {
+                            if (sortBy === 'registration') {
+                              setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setSortBy('registration');
+                              setSortDirection('asc');
+                            }
+                          }}
+                        >
+                          등록순{sortBy === 'registration' ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''}
+                        </SortButton>
+                        <SortButton
+                          $active={sortBy === 'time'}
+                          onClick={() => {
+                            if (sortBy === 'time') {
+                              setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+                            } else {
+                              setSortBy('time');
+                              setSortDirection('asc');
+                            }
+                          }}
+                        >
+                          시간순{sortBy === 'time' ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''}
+                        </SortButton>
+                      </SortButtonGroup>
+                    )}
+
+                    <AlarmList>
+                      {/* 확정 알람만 표시 (과거 날짜에서는 가등록 없음) */}
+                      {registeredAlarms.length > 0 && (() => {
+                        const sortedAlarms = [...registeredAlarms].sort((a, b) => {
+                          if (sortBy === 'registration') {
+                            return sortDirection === 'asc'
+                              ? (a.registrationOrder || 0) - (b.registrationOrder || 0)
+                              : (b.registrationOrder || 0) - (a.registrationOrder || 0);
+                          } else {
+                            const timeA = new Date(a.calculatedTime).getTime();
+                            const timeB = new Date(b.calculatedTime).getTime();
+                            return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
+                          }
+                        });
+
+                        return sortedAlarms.map((alarm) => (
+                          <AlarmItem key={alarm.id}>
+                            <AlarmInfo>
+                              <div style={{ fontSize: '15px', marginBottom: '4px', color: alarm.enabled === false ? 'rgba(153, 153, 153, 0.5)' : '#333', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {alarm.isAnniversary && (
+                                  <span style={{
+                                    fontSize: '10px',
+                                    fontWeight: 'normal',
+                                    color: '#fff',
+                                    backgroundColor: alarm.enabled === false ? 'rgba(74, 144, 226, 0.5)' : '#4a90e2',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    letterSpacing: '-0.5px',
+                                    flexShrink: 0
+                                  }}>
+                                    기념일
+                                  </span>
+                                )}
+                                {alarm.enabled === false && (
+                                  <span style={{
+                                    fontSize: '10px',
+                                    fontWeight: 'normal',
+                                    color: '#fff',
+                                    backgroundColor: 'rgba(214, 48, 49, 0.5)',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    letterSpacing: '-0.5px',
+                                    flexShrink: 0
+                                  }}>
+                                    종료됨
+                                  </span>
+                                )}
+                                <span style={{
+                                  flex: 1,
+                                  color: alarm.isAnniversary ? (alarm.enabled === false ? 'rgba(74, 144, 226, 0.5)' : '#4a90e2') : (alarm.enabled === false ? 'rgba(153, 153, 153, 0.5)' : '#333'),
+                                  wordBreak: 'break-all',
+                                  lineHeight: '1.3',
+                                  maxWidth: '7em',
+                                  display: 'inline-block'
+                                }}>
+                                  {alarm.isAnniversary ? (alarm.anniversaryName || alarm.title || '제목 없음') : (alarm.title || '제목 없음')}
+                                </span>
+                              </div>
+                              <div style={{ fontSize: '12px', color: alarm.enabled === false ? 'rgba(108, 117, 125, 0.5)' : '#6c757d' }}>
+                                {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
+                              </div>
+                            </AlarmInfo>
+                            <AlarmActions>
+                              <EditButton onClick={() => handleEditRegisteredAlarm(alarm)}>
+                                수정
+                              </EditButton>
+                              <DeleteButton onClick={() => handleDeleteRegisteredAlarm(alarm)}>
+                                삭제
+                              </DeleteButton>
+                            </AlarmActions>
+                          </AlarmItem>
+                        ));
+                      })()}
+                    </AlarmList>
+                  </AlarmBox>
+                )}
               </Section>
             )}
 
