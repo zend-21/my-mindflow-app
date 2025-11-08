@@ -1089,14 +1089,24 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       customSnoozeMinutes: null
     };
 
-    // 가등록 목록에 추가
-    const updatedPendingAlarms = [...pendingAlarms, newAlarm];
-    setPendingAlarms(updatedPendingAlarms);
+    // 바로 등록 목록에 추가
+    const updatedRegisteredAlarms = [...registeredAlarms, newAlarm];
+    setRegisteredAlarms(updatedRegisteredAlarms);
 
-    // 로컬스토리지에 저장 (모달을 닫지 않고 가등록 상태 유지)
-    const scheduleKey = format(new Date(scheduleData.date), 'yyyy-MM-dd');
-    const pendingKey = `pendingAlarms_${scheduleKey}`;
-    localStorage.setItem(pendingKey, JSON.stringify(updatedPendingAlarms));
+    // 즉시 저장
+    const alarmSettings = {
+      eventTime,
+      registeredAlarms: updatedRegisteredAlarms,
+      notificationType,
+      snoozeMinutes,
+      soundFile,
+      customSoundName,
+      volume,
+      isAnniversary,
+      anniversaryName: isAnniversary ? alarmTitle : '',
+      anniversaryRepeat
+    };
+    onSave(alarmSettings, 'register');
 
     // 알람 추가 후 타이틀과 시간 입력 비우기
     setAlarmTitle('');
@@ -1187,18 +1197,29 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       customSnoozeMinutes: null
     };
 
-    const updatedPendingAlarms = [...pendingAlarms, newAlarm];
-    setPendingAlarms(updatedPendingAlarms);
+    // 바로 등록 목록에 추가
+    const updatedRegisteredAlarms = [...registeredAlarms, newAlarm];
+    setRegisteredAlarms(updatedRegisteredAlarms);
 
-    // 로컬스토리지에 저장 (모달을 닫지 않고 가등록 상태 유지)
-    const scheduleKey = format(new Date(scheduleData.date), 'yyyy-MM-dd');
-    const pendingKey = `pendingAlarms_${scheduleKey}`;
-    localStorage.setItem(pendingKey, JSON.stringify(updatedPendingAlarms));
+    // 즉시 저장
+    const alarmSettings = {
+      eventTime,
+      registeredAlarms: updatedRegisteredAlarms,
+      notificationType,
+      snoozeMinutes,
+      soundFile,
+      customSoundName,
+      volume,
+      isAnniversary,
+      anniversaryName: isAnniversary ? alarmTitle : '',
+      anniversaryRepeat
+    };
+    onSave(alarmSettings, 'register');
 
     setAlarmTitle('');
   };
 
-  // Add direct time alarm (가등록)
+  // Add direct time alarm (즉시 등록)
   const handleAddDirectAlarm = () => {
     // 1. 알람 타이틀 검사
     if (!alarmTitle.trim()) {
@@ -1267,13 +1288,24 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       customSnoozeMinutes: null
     };
 
-    const updatedPendingAlarms = [...pendingAlarms, newAlarm];
-    setPendingAlarms(updatedPendingAlarms);
+    // 바로 등록 목록에 추가
+    const updatedRegisteredAlarms = [...registeredAlarms, newAlarm];
+    setRegisteredAlarms(updatedRegisteredAlarms);
 
-    // 로컬스토리지에 저장 (모달을 닫지 않고 가등록 상태 유지)
-    const scheduleKey = format(new Date(scheduleData.date), 'yyyy-MM-dd');
-    const pendingKey = `pendingAlarms_${scheduleKey}`;
-    localStorage.setItem(pendingKey, JSON.stringify(updatedPendingAlarms));
+    // 즉시 저장
+    const alarmSettings = {
+      eventTime,
+      registeredAlarms: updatedRegisteredAlarms,
+      notificationType,
+      snoozeMinutes,
+      soundFile,
+      customSoundName,
+      volume,
+      isAnniversary,
+      anniversaryName: isAnniversary ? alarmTitle : '',
+      anniversaryRepeat
+    };
+    onSave(alarmSettings, 'register');
 
     setAlarmTitle('');
   };
@@ -2044,7 +2076,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     현재시간
                   </SetCurrentTimeButton>
                   <AddButton onClick={() => handleAddPresetAlarm(0, 0, 0)} disabled={isDisabled} style={{ marginLeft: 'auto' }}>
-                    가등록
+                    알람등록
                   </AddButton>
                 </div>
               </div>
