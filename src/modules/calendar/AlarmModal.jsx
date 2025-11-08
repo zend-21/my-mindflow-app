@@ -802,6 +802,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [showOptions, setShowOptions] = useState(false);
   const optionsButtonRef = useRef(null);
 
+  // File input refs
+  const soundFileInputRef = useRef(null);
+  const editSoundFileInputRef = useRef(null);
+
   // Validation modal state
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [validationMessage, setValidationMessage] = useState('');
@@ -2410,11 +2414,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                       setSoundFile('default');
                       setCustomSoundName('');
                     } else if (e.target.value === 'custom') {
-                      // 먼저 상태를 변경하고, 렌더링 후 파일 선택 input을 클릭
                       setSoundFile('custom');
                       setTimeout(() => {
-                        document.getElementById('sound-file-input')?.click();
-                      }, 100);
+                        soundFileInputRef.current?.click();
+                      }, 50);
                     }
                   }}
                 >
@@ -2422,15 +2425,19 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   <option value="custom">사용자 지정</option>
                 </Select>
 
-                <FileInputLabel style={{ display: soundFile !== 'default' ? 'block' : 'none' }}>
-                  사운드 파일 선택
-                  <HiddenFileInput
-                    id="sound-file-input"
-                    type="file"
-                    accept="audio/*"
-                    onChange={handleSoundUpload}
-                  />
-                </FileInputLabel>
+                {/* 항상 렌더링하되, 필요할 때만 보이도록 */}
+                <HiddenFileInput
+                  ref={soundFileInputRef}
+                  type="file"
+                  accept="audio/*"
+                  onChange={handleSoundUpload}
+                  style={{ display: 'none' }}
+                />
+                {soundFile !== 'default' && (
+                  <FileInputLabel onClick={() => soundFileInputRef.current?.click()}>
+                    사운드 파일 선택
+                  </FileInputLabel>
+                )}
                 {soundFile !== 'default' && customSoundName && (
                   <FileName>선택된 파일: {customSoundName}</FileName>
                 )}
@@ -2890,11 +2897,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                           setEditCustomSound('default');
                           setEditCustomSoundName('');
                         } else if (e.target.value === 'custom') {
-                          // 먼저 상태를 변경하고, 렌더링 후 파일 선택 input을 클릭
                           setEditCustomSound('custom');
                           setTimeout(() => {
-                            document.getElementById('edit-sound-file-input')?.click();
-                          }, 100);
+                            editSoundFileInputRef.current?.click();
+                          }, 50);
                         }
                       }}
                     >
@@ -2902,25 +2908,29 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                       <option value="default">기본 알림음</option>
                       <option value="custom">사용자 지정</option>
                     </Select>
-                    <FileInputLabel style={{ display: editCustomSound !== null && editCustomSound !== 'default' ? 'block' : 'none', marginTop: '8px' }}>
-                      사운드 파일 선택
-                      <HiddenFileInput
-                        id="edit-sound-file-input"
-                        type="file"
-                        accept="audio/*"
-                        onChange={(e) => {
-                          const file = e.target.files[0];
-                          if (file) {
-                            setEditCustomSoundName(file.name);
-                            const reader = new FileReader();
-                            reader.onload = (event) => {
-                              setEditCustomSound(event.target.result);
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }}
-                      />
-                    </FileInputLabel>
+                    {/* 항상 렌더링하되, 필요할 때만 보이도록 */}
+                    <HiddenFileInput
+                      ref={editSoundFileInputRef}
+                      type="file"
+                      accept="audio/*"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          setEditCustomSoundName(file.name);
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            setEditCustomSound(event.target.result);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      style={{ display: 'none' }}
+                    />
+                    {editCustomSound !== null && editCustomSound !== 'default' && (
+                      <FileInputLabel onClick={() => editSoundFileInputRef.current?.click()} style={{ marginTop: '8px' }}>
+                        사운드 파일 선택
+                      </FileInputLabel>
+                    )}
                     {editCustomSound !== null && editCustomSound !== 'default' && editCustomSoundName && (
                       <FileName>선택된 파일: {editCustomSoundName}</FileName>
                     )}
