@@ -2172,7 +2172,7 @@ const Calendar = ({
                                                             color: isTerminated ? 'rgba(51, 51, 51, 0.3)' : '#333'
                                                         }}>
                                                             {alarm.title || '제목 없음'}
-                                                            {isTerminated && <span style={{ color: 'rgba(214, 48, 49, 0.6)' }}> - 종료된 알람</span>}
+                                                            {isTerminated && <span style={{ fontSize: '11px', color: 'rgba(214, 48, 49, 0.6)' }}> - 종료된 알람</span>}
                                                         </span>
                                                         <div style={{
                                                             fontSize: '11px',
