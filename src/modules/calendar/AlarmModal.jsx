@@ -2087,7 +2087,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 opacity: alarm.enabled !== false ? 1 : 0.5,
                                 wordBreak: 'break-all',
                                 lineHeight: '1.3',
-                                maxWidth: '10em',
+                                maxWidth: '9em',
                                 display: 'inline-block'
                               }}>
                                 {alarm.title || '제목 없음'}
