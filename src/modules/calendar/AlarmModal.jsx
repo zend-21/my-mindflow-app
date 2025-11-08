@@ -1904,7 +1904,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         >
           <Header>
             <div style={{ width: '32px' }}></div>
-            <HeaderTitle>{scheduleDateStr} 알람 설정</HeaderTitle>
+            <HeaderTitle>{scheduleDateStr} {isPastDate ? '알람 기록' : '알람 설정'}</HeaderTitle>
             <CloseButton onClick={handleClose}>×</CloseButton>
           </Header>
 
@@ -2330,7 +2330,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                     deleteDate.setDate(deleteDate.getDate() + AUTO_DELETE_DAYS);
                                     const now = new Date();
                                     const daysLeft = Math.ceil((deleteDate - now) / (1000 * 60 * 60 * 24));
-                                    return daysLeft > 0 ? `${daysLeft}일 후 삭제` : '곧 삭제됨';
+                                    return daysLeft > 0 ? `${daysLeft}일 후 자동 삭제` : '곧 삭제됨';
                                   })()}
                                 </span>
                               )}
@@ -2438,47 +2438,49 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               )}
             </Section>
 
-            {/* Alarm Options Toggle Button */}
-            <Section>
-              <button
-                ref={optionsButtonRef}
-                onClick={() => {
-                  const newShowOptions = !showOptions;
-                  setShowOptions(newShowOptions);
+            {/* Alarm Options Toggle Button - 과거 날짜에서는 숨김 */}
+            {!isPastDate && (
+              <Section>
+                <button
+                  ref={optionsButtonRef}
+                  onClick={() => {
+                    const newShowOptions = !showOptions;
+                    setShowOptions(newShowOptions);
 
-                  if (newShowOptions && optionsButtonRef.current) {
-                    setTimeout(() => {
-                      optionsButtonRef.current?.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'start'
-                      });
-                    }, 100);
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  background: '#f8f9fa',
-                  border: '1px solid #dee2e6',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  color: '#495057',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  transition: 'all 0.2s'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.background = '#e9ecef'}
-                onMouseLeave={(e) => e.currentTarget.style.background = '#f8f9fa'}
-              >
-                <span>기본 알람옵션</span>
-                <span style={{ transform: showOptions ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
-                  ▼
-                </span>
-              </button>
-            </Section>
+                    if (newShowOptions && optionsButtonRef.current) {
+                      setTimeout(() => {
+                        optionsButtonRef.current?.scrollIntoView({
+                          behavior: 'smooth',
+                          block: 'start'
+                        });
+                      }, 100);
+                    }
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: '#f8f9fa',
+                    border: '1px solid #dee2e6',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: '#495057',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = '#e9ecef'}
+                  onMouseLeave={(e) => e.currentTarget.style.background = '#f8f9fa'}
+                >
+                  <span>기본 알람옵션</span>
+                  <span style={{ transform: showOptions ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                    ▼
+                  </span>
+                </button>
+              </Section>
+            )}
 
             {/* Alarm Options Description + Reset Button */}
             {showOptions && (

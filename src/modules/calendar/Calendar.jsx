@@ -1730,16 +1730,57 @@ const Calendar = ({
         showToast('일반 알람이 삭제되었습니다.');
     };
 
+    // 비활성화된 알람만 삭제 (과거 날짜용)
+    const executeDeleteDisabledAlarmsOnly = () => {
+        const key = format(selectedDate, 'yyyy-MM-dd');
+        const currentSchedule = schedules[key];
+
+        if (!currentSchedule || !currentSchedule.alarm) return;
+
+        // 기념일 알람과 활성화된 알람만 유지
+        const remainingAlarms = currentSchedule.alarm.registeredAlarms?.filter(alarm =>
+            alarm.isAnniversary || alarm.enabled !== false
+        ) || [];
+
+        if (remainingAlarms.length === currentSchedule.alarm.registeredAlarms.length) {
+            showToast('삭제할 종료된 알람이 없습니다.');
+            return;
+        }
+
+        onSave(key, {
+            ...currentSchedule,
+            alarm: {
+                ...currentSchedule.alarm,
+                registeredAlarms: remainingAlarms
+            }
+        });
+
+        showToast('종료된 알람이 삭제되었습니다.');
+    };
+
     // 알람 삭제 버튼 클릭 핸들러 (확인 모달 표시)
     const handleDeleteAlarmOnly = () => {
         if (!currentEntry || !currentEntry.alarm) return;
 
+        const today = startOfDay(new Date());
+        const selectedDay = startOfDay(selectedDate);
+        const isPastDate = isBefore(selectedDay, today);
+
+        // 과거 날짜인 경우 종료된 알람만 삭제, 아니면 모든 알람 삭제
+        const message = isPastDate
+            ? '종료된 알람을 모두 삭제 할까요?'
+            : '해당 날짜의 모든 알람을 삭제할까요?';
+
         setDeleteConfirmModal({
             isOpen: true,
             type: 'alarm',
-            message: '해당 날짜의 모든 알람을 삭제할까요?',
+            message: message,
             onConfirm: () => {
-                executeDeleteAlarmOnly();
+                if (isPastDate) {
+                    executeDeleteDisabledAlarmsOnly();
+                } else {
+                    executeDeleteAlarmOnly();
+                }
                 setDeleteConfirmModal({ isOpen: false, type: null, message: '', onConfirm: null });
             }
         });
@@ -1998,6 +2039,10 @@ const Calendar = ({
 
                                 if (regularAlarms.length === 0) return null;
 
+                                const today = startOfDay(new Date());
+                                const selectedDay = startOfDay(selectedDate);
+                                const isPastDate = isBefore(selectedDay, today);
+
                                 return (
                                     <div style={{
                                         display: 'flex',
@@ -2006,24 +2051,40 @@ const Calendar = ({
                                         marginBottom: '8px',
                                         paddingLeft: '3px'
                                     }}>
-                                        {regularAlarms.map((alarm, index) => (
-                                            <div key={alarm.id || index} style={{
-                                                display: 'flex',
-                                                alignItems: 'flex-start',
-                                                gap: '6px',
-                                                lineHeight: '1.3'
-                                            }}>
-                                                <AlarmClock size={14} color="#d63031" style={{ marginTop: '2px', flexShrink: 0 }} />
-                                                <div style={{ flex: 1 }}>
-                                                    <span style={{ fontSize: '13px', color: '#333' }}>
-                                                        {alarm.title || '제목 없음'}
-                                                    </span>
-                                                    <div style={{ fontSize: '11px', color: '#999' }}>
-                                                        {format(new Date(alarm.calculatedTime), 'yyyy-MM-dd HH:mm')}
+                                        {regularAlarms.map((alarm, index) => {
+                                            // 과거 날짜에서 비활성화된 알람인지 확인
+                                            const isDisabled = alarm.enabled === false && alarm.disabledAt;
+                                            const shouldFade = isPastDate && isDisabled;
+
+                                            return (
+                                                <div key={alarm.id || index} style={{
+                                                    display: 'flex',
+                                                    alignItems: 'flex-start',
+                                                    gap: '6px',
+                                                    lineHeight: '1.3'
+                                                }}>
+                                                    <AlarmClock
+                                                        size={14}
+                                                        color={shouldFade ? 'rgba(214, 48, 49, 0.4)' : '#d63031'}
+                                                        style={{ marginTop: '2px', flexShrink: 0 }}
+                                                    />
+                                                    <div style={{ flex: 1 }}>
+                                                        <span style={{
+                                                            fontSize: '13px',
+                                                            color: shouldFade ? 'rgba(51, 51, 51, 0.4)' : '#333'
+                                                        }}>
+                                                            {alarm.title || '제목 없음'}
+                                                        </span>
+                                                        <div style={{
+                                                            fontSize: '11px',
+                                                            color: shouldFade ? 'rgba(153, 153, 153, 0.4)' : '#999'
+                                                        }}>
+                                                            {format(new Date(alarm.calculatedTime), 'yyyy-MM-dd HH:mm')}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 );
                             })()}
@@ -2059,9 +2120,23 @@ const Calendar = ({
                             )}
                             {/* 일반 알람이 있으면 알람 삭제 버튼 표시 (기념일 알람 제외) */}
                             {(() => {
+                                const today = startOfDay(new Date());
+                                const selectedDay = startOfDay(selectedDate);
+                                const isPastDate = isBefore(selectedDay, today);
+
                                 const regularAlarms = currentEntry?.alarm?.registeredAlarms?.filter(alarm =>
                                     !alarm.isAnniversary
                                 ) || [];
+
+                                // 과거 날짜: 비활성화된 알람이 있을 때만 버튼 표시
+                                // 현재/미래 날짜: 일반 알람이 있으면 버튼 표시
+                                if (isPastDate) {
+                                    const hasDisabledAlarms = regularAlarms.some(alarm =>
+                                        alarm.enabled === false && alarm.disabledAt
+                                    );
+                                    return hasDisabledAlarms;
+                                }
+
                                 return regularAlarms.length > 0;
                             })() && (
                                 <DeleteButton onClick={handleDeleteAlarmOnly} style={{ backgroundColor: '#ff6b6b' }}>
