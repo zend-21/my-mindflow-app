@@ -2148,7 +2148,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                   <rect x="8" y="7" width="2.5" height="10" fill="#4a90e2"/>
                                   <rect x="13.5" y="7" width="2.5" height="10" fill="#4a90e2"/>
                                 </svg>
-                                <span>알람 일시중지</span>
+                                <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
+                                  <div>알람</div>
+                                  <div>일시중지</div>
+                                </div>
                               </div>
                             )}
                           </AlarmActions>
