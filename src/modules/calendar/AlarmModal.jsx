@@ -1347,6 +1347,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       setDeleteConfirmMessage('해당 가등록 알람을 삭제할까요?');
     } else if (alarm.isAnniversary) {
       setDeleteConfirmMessage('정말 해당 기념일을 삭제하시겠습니까?');
+    } else if (isPastDate && !alarm.isAnniversary) {
+      // 과거 날짜의 일반 알람 (종료된 알람)
+      setDeleteConfirmMessage('종료된 알람을 삭제할까요?');
     } else {
       setDeleteConfirmMessage('해당 알람을 삭제할까요?');
     }
