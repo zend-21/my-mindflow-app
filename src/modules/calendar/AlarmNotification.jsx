@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { format } from 'date-fns';
 import Portal from '../../components/Portal';
+import { loadAudioFile } from '../../utils/audioStorage';
 
 // --- 애니메이션 ---
 const slideDown = keyframes`
@@ -240,29 +241,38 @@ const AlarmNotification = ({
     };
   }, [isVisible, scheduleData]);
 
-  const playAlarmSound = () => {
-    const soundFile = getSoundFile(scheduleData?.alarm?.sound || 'default');
-    
-    if (soundFile) {
-      audioRef.current = new Audio(soundFile);
-      audioRef.current.loop = true;
-      
-      // 점진적 볼륨 증가 적용
-      if (scheduleData?.alarm?.gradualVolume) {
-        audioRef.current.volume = 0.1;
-        audioRef.current.play().then(() => {
-          const volumeInterval = setInterval(() => {
-            if (audioRef.current && audioRef.current.volume < 0.7) {
-              audioRef.current.volume = Math.min(audioRef.current.volume + 0.1, 0.7);
-            } else {
-              clearInterval(volumeInterval);
-            }
-          }, 1000);
-        });
+  const playAlarmSound = async () => {
+    try {
+      const soundFile = scheduleData?.alarm?.soundFile || 'default';
+      const volume = (scheduleData?.alarm?.volume || 80) / 100;
+
+      let audioSrc = null;
+
+      // 커스텀 사운드인 경우 IndexedDB에서 불러오기
+      if (soundFile === 'custom') {
+        const audioData = await loadAudioFile('alarm_sound_main');
+        if (audioData) {
+          audioSrc = audioData;
+          console.log('✅ IndexedDB에서 알람 소리 로드');
+        } else {
+          console.warn('⚠️ 커스텀 사운드를 찾을 수 없어 기본 소리 사용');
+          audioSrc = '/sound/Schedule_alarm/default.mp3';
+        }
       } else {
-        audioRef.current.volume = 0.7;
-        audioRef.current.play();
+        // 기본 사운드
+        audioSrc = '/sound/Schedule_alarm/default.mp3';
       }
+
+      if (audioSrc) {
+        audioRef.current = new Audio(audioSrc);
+        audioRef.current.loop = true;
+        audioRef.current.volume = volume;
+
+        await audioRef.current.play();
+        console.log('🔔 알람 소리 재생 시작');
+      }
+    } catch (error) {
+      console.error('❌ 알람 소리 재생 실패:', error);
     }
   };
 
@@ -272,17 +282,6 @@ const AlarmNotification = ({
       audioRef.current.currentTime = 0;
       audioRef.current = null;
     }
-  };
-
-  const getSoundFile = (soundType) => {
-    const soundFiles = {
-      default: '/sounds/default-alarm.mp3',
-      message: '/sounds/message-sound.mp3',
-      chime: '/sounds/chime-bell.mp3',
-      gentle: '/sounds/gentle-wake.mp3',
-      nature: '/sounds/nature-sound.mp3',
-    };
-    return soundFiles[soundType];
   };
 
   const handleDismiss = () => {
