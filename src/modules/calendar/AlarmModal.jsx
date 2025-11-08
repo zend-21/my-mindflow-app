@@ -2017,8 +2017,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                           $enabled={alarm.enabled}
                           $isModified={alarm.isModified}
                           style={{
-                            // 과거 날짜에서 종료된 일반 알람만 반투명 처리
-                            opacity: (isPastDate && !alarm.isAnniversary && alarm.enabled === false) ? 0.5 : 1
+                            // 과거 날짜의 모든 일반 알람은 반투명 처리 (기념일은 선명하게)
+                            opacity: (isPastDate && !alarm.isAnniversary) ? 0.5 : 1
                           }}
                         >
                           <AlarmInfo>
@@ -2085,15 +2085,20 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               opacity: alarm.enabled !== false ? 1 : 0.5
                             }}>
                               {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
-                              {/* 과거 날짜의 일반 알람 자동삭제 표시 */}
-                              {isPastDate && !alarm.isAnniversary && alarm.enabled !== false && (() => {
+                              {/* 과거 날짜의 일반 알람 자동삭제 표시 (스위치 ON/OFF 상관없이) */}
+                              {isPastDate && !alarm.isAnniversary && (() => {
                                 const now = new Date();
                                 const alarmTime = new Date(alarm.calculatedTime);
                                 const diffTime = now - alarmTime;
                                 const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                                 const daysRemaining = 7 - diffDays;
                                 if (daysRemaining >= 0 && daysRemaining <= 7) {
-                                  return <span style={{ marginLeft: '8px', color: '#dc3545', fontWeight: '600' }}>
+                                  return <span style={{
+                                    marginLeft: '8px',
+                                    color: '#dc3545',
+                                    fontWeight: '600',
+                                    opacity: alarm.enabled !== false ? 1 : 0.5
+                                  }}>
                                     {daysRemaining}일 후 자동삭제
                                   </span>;
                                 }
@@ -2134,21 +2139,60 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                     </EditButton>
                                   )
                                 )}
-                                <DeleteButton
-                                  onClick={() => handleDeleteAlarm(alarm.id)}
-                                >
-                                  삭제
-                                </DeleteButton>
+                                {/* 과거 날짜의 일반 알람은 삭제 버튼과 "종료된 알람" 표시를 중앙 정렬 */}
+                                {isPastDate && !alarm.isAnniversary ? (
+                                  <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}>
+                                    <DeleteButton
+                                      onClick={() => handleDeleteAlarm(alarm.id)}
+                                    >
+                                      삭제
+                                    </DeleteButton>
+                                    <div style={{
+                                      fontSize: '11px',
+                                      color: 'rgba(220, 53, 69, 0.6)',
+                                      textAlign: 'center',
+                                      lineHeight: '1.2'
+                                    }}>
+                                      알람종료
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <DeleteButton
+                                    onClick={() => handleDeleteAlarm(alarm.id)}
+                                  >
+                                    삭제
+                                  </DeleteButton>
+                                )}
                               </>
                             ) : (
                               // 일시중지 상태
-                              // 과거 날짜의 일반 알람은 삭제 버튼만 표시
+                              // 과거 날짜의 일반 알람은 삭제 버튼과 "종료된 알람" 표시를 중앙 정렬
                               isPastDate && !alarm.isAnniversary ? (
-                                <DeleteButton
-                                  onClick={() => handleDeleteAlarm(alarm.id)}
-                                >
-                                  삭제
-                                </DeleteButton>
+                                <div style={{
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}>
+                                  <DeleteButton
+                                    onClick={() => handleDeleteAlarm(alarm.id)}
+                                  >
+                                    삭제
+                                  </DeleteButton>
+                                  <div style={{
+                                    fontSize: '11px',
+                                    color: 'rgba(220, 53, 69, 0.6)',
+                                    textAlign: 'center',
+                                    lineHeight: '1.2'
+                                  }}>
+                                    알람종료
+                                  </div>
+                                </div>
                               ) : (
                                 // 기타: 알람 일시중지 표시
                                 <div style={{
