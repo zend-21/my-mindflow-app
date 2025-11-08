@@ -2282,6 +2282,24 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               opacity: alarm.enabled !== false ? 1 : 0.5
                             }}>
                               {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
+                              {alarm.enabled === false && alarm.disabledAt && !alarm.isAnniversary && (
+                                <span style={{
+                                  marginLeft: '8px',
+                                  color: '#ff6b6b',
+                                  fontSize: '11px',
+                                  fontWeight: '600'
+                                }}>
+                                  {(() => {
+                                    const AUTO_DELETE_DAYS = 7;
+                                    const disabledDate = new Date(alarm.disabledAt);
+                                    const deleteDate = new Date(disabledDate);
+                                    deleteDate.setDate(deleteDate.getDate() + AUTO_DELETE_DAYS);
+                                    const now = new Date();
+                                    const daysLeft = Math.ceil((deleteDate - now) / (1000 * 60 * 60 * 24));
+                                    return daysLeft > 0 ? `${daysLeft}일 후 삭제` : '곧 삭제됨';
+                                  })()}
+                                </span>
+                              )}
                             </div>
                           </AlarmInfo>
                           {alarm.isModified && (

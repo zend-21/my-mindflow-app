@@ -167,9 +167,15 @@ const useAlarmManager = (schedules) => {
   }, [checkAlarms]);
 
   // 알람 닫기
-  const dismissAlarm = useCallback(() => {
+  const dismissAlarm = useCallback((onAlarmDismissed) => {
+    if (currentAlarm && !currentAlarm.isAnniversary) {
+      // 일반 알람(기념일 아님)은 비활성화 처리
+      if (onAlarmDismissed) {
+        onAlarmDismissed(currentAlarm);
+      }
+    }
     setCurrentAlarm(null);
-  }, []);
+  }, [currentAlarm]);
 
   // 스누즈 처리
   const snoozeAlarm = useCallback((minutes) => {
