@@ -1954,14 +1954,14 @@ const Calendar = ({
                         }}
                     >
                         <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                            <button 
-                                onClick={() => onOpenEditor?.(selectedDate, scheduleText)} 
+                            <button
+                                onClick={() => onOpenEditor?.(selectedDate, scheduleText)}
                                 style={{ background: "none", border: "none", cursor: "pointer" }}
                                 title="편집창 열기"
                             >
                                 <Copy size={24} color="dodgerblue" style={{ filter: "drop-shadow(1px 1px 2px rgba(0,0,0,0.4))" }} />
                             </button>
-                            <span style={{ fontSize: "12px", color: "#888" }}>편집</span>
+                            <span style={{ fontSize: "12px", color: "#888" }}>일정</span>
                         </div>
 
                         <div style={{ textAlign: "center" }}>
@@ -2102,7 +2102,7 @@ const Calendar = ({
                                 </span>
                             ) : (
                                 <div className="placeholder-note">
-                                    스케줄을 입력하거나 수정하려면 좌상단의 '편집' 버튼을 터치하거나 여기를 '더블탭' 하세요
+                                    스케줄을 입력하거나 수정하려면 좌상단의 '일정' 버튼을 터치하거나 여기를 '더블탭' 하세요
                                 </div>
                             )}
                         </div>

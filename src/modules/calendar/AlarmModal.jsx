@@ -961,7 +961,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         setSoundFile(lastSettings.soundFile || 'default');
         setCustomSoundName(lastSettings.customSoundName || '');
         setVolume(lastSettings.volume ?? 80);
-        setIsAnniversary(scheduleData.alarm.isAnniversary || false);
+        setIsAnniversary(isPastDate ? true : (scheduleData.alarm.isAnniversary || false)); // 과거 날짜면 기념일로 자동 체크
         setAnniversaryName(scheduleData.alarm.anniversaryName || '');
         setAnniversaryRepeat(''); // 초기화 시 선택 안됨
         setAnniversaryTiming(''); // 초기화 시 선택 안됨
@@ -982,7 +982,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         setSoundFile(lastSettings.soundFile || 'default');
         setCustomSoundName(lastSettings.customSoundName || '');
         setVolume(lastSettings.volume ?? 80);
-        setIsAnniversary(false);
+        setIsAnniversary(isPastDate ? true : false); // 과거 날짜면 기념일로 자동 체크
         setAnniversaryName('');
         setAnniversaryRepeat(''); // 초기화 시 선택 안됨
         setAnniversaryTiming(''); // 초기화 시 선택 안됨
@@ -996,7 +996,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         setDirectDate(format(dateObj, 'yyyy-MM-dd'));
       }
     }
-  }, [isOpen, scheduleData]);
+  }, [isOpen, scheduleData, isPastDate]);
 
   // Calculate actual alarm time from event time and offset
   const calculateAlarmTime = (eventTimeStr, offsetConfig) => {
@@ -1913,14 +1913,15 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             {isPastDate && (
               <div style={{
                 padding: '16px',
-                backgroundColor: '#f8f9fa',
+                backgroundColor: '#fff3cd',
                 borderRadius: '8px',
                 marginBottom: '16px',
-                textAlign: 'center'
+                textAlign: 'center',
+                border: '1px solid #ffc107'
               }}>
                 <div style={{
                   fontSize: '14px',
-                  color: '#495057',
+                  color: '#856404',
                   fontWeight: '600',
                   marginBottom: '4px'
                 }}>
@@ -1928,15 +1929,15 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 </div>
                 <div style={{
                   fontSize: '12px',
-                  color: '#6c757d'
+                  color: '#856404'
                 }}>
-                  {registeredAlarms.length === 0 ? '등록된 알람이 없습니다.' : '등록된 알람만 표시됩니다.'}
+                  기념일만 등록할 수 있습니다.
                 </div>
               </div>
             )}
 
-            {/* 새 알람 등록 UI - 과거 날짜에서는 숨김 */}
-            {!isPastDate && (
+            {/* 새 알람 등록 UI - 과거 날짜에서는 기념일만 허용 */}
+            {(!isPastDate || (isPastDate && isAnniversary)) && (
               <>
             {/* Alarm Title */}
             <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
@@ -1979,10 +1980,14 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 <input
                   type="checkbox"
                   checked={isAnniversary}
-                  onChange={(e) => setIsAnniversary(e.target.checked)}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  onChange={(e) => !isPastDate && setIsAnniversary(e.target.checked)}
+                  disabled={isPastDate}
+                  style={{ width: '18px', height: '18px', cursor: isPastDate ? 'not-allowed' : 'pointer', opacity: isPastDate ? 0.6 : 1 }}
                 />
-                <span style={{ fontSize: '14px', color: '#343a40', cursor: 'pointer' }} onClick={() => setIsAnniversary(!isAnniversary)}>
+                <span
+                  style={{ fontSize: '14px', color: '#343a40', cursor: isPastDate ? 'not-allowed' : 'pointer', opacity: isPastDate ? 0.6 : 1 }}
+                  onClick={() => !isPastDate && setIsAnniversary(!isAnniversary)}
+                >
                   기념일로 등록
                 </span>
               </div>
