@@ -2002,48 +2002,86 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                         return sortedAlarms.map((alarm) => (
                           <AlarmItem key={alarm.id}>
                             <AlarmInfo>
-                              <div style={{ fontSize: '15px', marginBottom: '4px', color: alarm.enabled === false ? 'rgba(153, 153, 153, 0.5)' : '#333', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                {alarm.isAnniversary && (
-                                  <span style={{
-                                    fontSize: '10px',
-                                    fontWeight: 'normal',
+                              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
+                                <ToggleSwitch style={{
+                                  opacity: alarm.disabledAt ? 0.5 : 1,
+                                  pointerEvents: (isPastDate && !alarm.isAnniversary) ? 'none' : 'auto'
+                                }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={alarm.enabled !== false}
+                                    disabled={!!alarm.disabledAt || (isPastDate && !alarm.isAnniversary)}
+                                    onChange={() => handleToggleAlarm(alarm.id)}
+                                  />
+                                  <span className="slider"></span>
+                                </ToggleSwitch>
+                                {alarm.isAnniversary ? (
+                                  <div style={{
+                                    width: '14px',
+                                    height: '14px',
+                                    borderRadius: '50%',
+                                    backgroundColor: '#4a90e2',
                                     color: '#fff',
-                                    backgroundColor: alarm.enabled === false ? 'rgba(74, 144, 226, 0.5)' : '#4a90e2',
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    letterSpacing: '-0.5px',
-                                    flexShrink: 0
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: '9px',
+                                    fontWeight: 'bold',
+                                    flexShrink: 0,
+                                    opacity: alarm.enabled !== false ? 1 : 0.5,
+                                    marginTop: '4px'
                                   }}>
-                                    기념일
-                                  </span>
+                                    기
+                                  </div>
+                                ) : (
+                                  <AlarmClock
+                                    size={14}
+                                    color="#d63031"
+                                    style={{
+                                      flexShrink: 0,
+                                      opacity: alarm.enabled !== false ? 1 : 0.5,
+                                      marginTop: '4px'
+                                    }}
+                                  />
                                 )}
-                                {alarm.enabled === false && (
-                                  <span style={{
-                                    fontSize: '10px',
-                                    fontWeight: 'normal',
-                                    color: '#fff',
-                                    backgroundColor: 'rgba(214, 48, 49, 0.5)',
-                                    padding: '2px 6px',
-                                    borderRadius: '4px',
-                                    letterSpacing: '-0.5px',
-                                    flexShrink: 0
-                                  }}>
-                                    종료됨
-                                  </span>
-                                )}
-                                <span style={{
-                                  flex: 1,
-                                  color: alarm.isAnniversary ? (alarm.enabled === false ? 'rgba(74, 144, 226, 0.5)' : '#4a90e2') : (alarm.enabled === false ? 'rgba(153, 153, 153, 0.5)' : '#333'),
+                                <div style={{
+                                  fontSize: '15px',
+                                  color: alarm.isAnniversary ? '#4a90e2' : '#333',
+                                  opacity: alarm.enabled !== false ? 1 : 0.5,
                                   wordBreak: 'break-all',
                                   lineHeight: '1.3',
-                                  maxWidth: '7em',
-                                  display: 'inline-block'
+                                  maxWidth: '8em',
+                                  display: 'inline-block',
+                                  minHeight: 'calc(1.3em * 2)',
+                                  marginTop: '2px'
                                 }}>
-                                  {alarm.isAnniversary ? (alarm.anniversaryName || alarm.title || '제목 없음') : (alarm.title || '제목 없음')}
-                                </span>
+                                  {alarm.title || '제목 없음'}
+                                </div>
                               </div>
-                              <div style={{ fontSize: '12px', color: alarm.enabled === false ? 'rgba(108, 117, 125, 0.5)' : '#6c757d' }}>
+                              <div style={{
+                                fontSize: '12px',
+                                color: '#6c757d',
+                                opacity: alarm.enabled !== false ? 1 : 0.5
+                              }}>
                                 {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
+                                {alarm.enabled === false && alarm.disabledAt && !alarm.isAnniversary && (
+                                  <span style={{
+                                    marginLeft: '8px',
+                                    color: '#ff6b6b',
+                                    fontSize: '11px',
+                                    fontWeight: '600'
+                                  }}>
+                                    {(() => {
+                                      const AUTO_DELETE_DAYS = 7;
+                                      const disabledDate = new Date(alarm.disabledAt);
+                                      const deleteDate = new Date(disabledDate);
+                                      deleteDate.setDate(deleteDate.getDate() + AUTO_DELETE_DAYS);
+                                      const now = new Date();
+                                      const daysLeft = Math.ceil((deleteDate - now) / (1000 * 60 * 60 * 24));
+                                      return daysLeft > 0 ? `${daysLeft}일 후 자동 삭제` : '곧 삭제됨';
+                                    })()}
+                                  </span>
+                                )}
                               </div>
                             </AlarmInfo>
                             <AlarmActions>
@@ -2612,15 +2650,35 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 />
                                 <span className="slider"></span>
                               </ToggleSwitch>
-                              <AlarmClock
-                                size={14}
-                                color="#d63031"
-                                style={{
+                              {alarm.isAnniversary ? (
+                                <div style={{
+                                  width: '14px',
+                                  height: '14px',
+                                  borderRadius: '50%',
+                                  backgroundColor: '#4a90e2',
+                                  color: '#fff',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '9px',
+                                  fontWeight: 'bold',
                                   flexShrink: 0,
                                   opacity: alarm.enabled !== false ? 1 : 0.5,
                                   marginTop: '4px'
-                                }}
-                              />
+                                }}>
+                                  기
+                                </div>
+                              ) : (
+                                <AlarmClock
+                                  size={14}
+                                  color="#d63031"
+                                  style={{
+                                    flexShrink: 0,
+                                    opacity: alarm.enabled !== false ? 1 : 0.5,
+                                    marginTop: '4px'
+                                  }}
+                                />
+                              )}
                               <div style={{
                                 fontSize: '15px',
                                 color: alarm.isAnniversary ? '#4a90e2' : '#333',
