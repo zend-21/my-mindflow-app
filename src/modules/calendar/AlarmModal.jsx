@@ -2064,21 +2064,24 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 opacity: alarm.enabled !== false ? 1 : 0.5
                               }}>
                                 {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
-                                {alarm.enabled === false && alarm.disabledAt && !alarm.isAnniversary && (
+                                {alarm.enabled === false && isPastDate && (
                                   <span style={{
                                     marginLeft: '8px',
                                     color: '#ff6b6b',
                                     fontSize: '11px',
                                     fontWeight: '600'
                                   }}>
-                                    {(() => {
-                                      const AUTO_DELETE_DAYS = 7;
-                                      const disabledDate = new Date(alarm.disabledAt);
-                                      const deleteDate = new Date(disabledDate);
-                                      deleteDate.setDate(deleteDate.getDate() + AUTO_DELETE_DAYS);
-                                      const now = new Date();
-                                      const daysLeft = Math.ceil((deleteDate - now) / (1000 * 60 * 60 * 24));
-                                      return daysLeft > 0 ? `${daysLeft}일 후 자동 삭제` : '곧 삭제됨';
+                                    {alarm.isAnniversary ? '알람 일시중지' : (() => {
+                                      if (alarm.disabledAt) {
+                                        const AUTO_DELETE_DAYS = 7;
+                                        const disabledDate = new Date(alarm.disabledAt);
+                                        const deleteDate = new Date(disabledDate);
+                                        deleteDate.setDate(deleteDate.getDate() + AUTO_DELETE_DAYS);
+                                        const now = new Date();
+                                        const daysLeft = Math.ceil((deleteDate - now) / (1000 * 60 * 60 * 24));
+                                        return daysLeft > 0 ? `${daysLeft}일 후 자동 삭제` : '곧 삭제됨';
+                                      }
+                                      return '알람 일시중지';
                                     })()}
                                   </span>
                                 )}
@@ -2101,8 +2104,30 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               </Section>
             )}
 
-            {/* 새 알람 등록 UI - 과거 날짜에서는 기념일만 허용 */}
-            {(!isPastDate || (isPastDate && isAnniversary)) && (
+            {/* 새 알람 등록 UI */}
+            {/* 과거 날짜: 기념일 체크박스만 보이고 체크시 폼 표시 */}
+            {isPastDate && (
+              <Section style={{ marginTop: '-8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0' }}>
+                  <input
+                    type="checkbox"
+                    checked={isAnniversary}
+                    onChange={(e) => setIsAnniversary(e.target.checked)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <span
+                    style={{ fontSize: '14px', color: '#343a40', cursor: 'pointer' }}
+                    onClick={() => setIsAnniversary(!isAnniversary)}
+                  >
+                    기념일 등록
+                  </span>
+                </div>
+              </Section>
+            )}
+
+            {/* 과거 날짜: isAnniversary가 체크되어야만 폼 표시 */}
+            {/* 일반 날짜: 항상 폼 표시 */}
+            {((!isPastDate) || (isPastDate && isAnniversary)) && (
               <>
             {/* Alarm Title */}
             <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
@@ -2139,42 +2164,23 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               </div>
             </Section>
 
-            {/* Anniversary Settings */}
-            <Section style={{ marginTop: '-8px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: isAnniversary ? '16px' : '0' }}>
-                <input
-                  type="checkbox"
-                  checked={isAnniversary}
-                  onChange={(e) => {
-                    if (isPastDate) {
-                      // 과거 날짜에서는 체크 해제 불가
-                      if (!e.target.checked) {
-                        e.preventDefault();
-                        return;
-                      }
-                    }
-                    setIsAnniversary(e.target.checked);
-                  }}
-                  onClick={(e) => {
-                    if (isPastDate && !isAnniversary) {
-                      e.preventDefault();
-                    }
-                  }}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                />
-                <span
-                  style={{ fontSize: '14px', color: '#343a40', cursor: 'pointer' }}
-                  onClick={() => {
-                    if (isPastDate && isAnniversary) {
-                      // 과거 날짜에서는 체크 해제 불가
-                      return;
-                    }
-                    setIsAnniversary(!isAnniversary);
-                  }}
-                >
-                  기념일로 등록
-                </span>
-              </div>
+            {/* Anniversary Settings - 일반 날짜만 체크박스 표시 */}
+            {!isPastDate && (
+              <Section style={{ marginTop: '-8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: isAnniversary ? '16px' : '0' }}>
+                  <input
+                    type="checkbox"
+                    checked={isAnniversary}
+                    onChange={(e) => setIsAnniversary(e.target.checked)}
+                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  />
+                  <span
+                    style={{ fontSize: '14px', color: '#343a40', cursor: 'pointer' }}
+                    onClick={() => setIsAnniversary(!isAnniversary)}
+                  >
+                    기념일로 등록
+                  </span>
+                </div>
 
               {isAnniversary && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -2267,7 +2273,103 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   </div>
                 </div>
               )}
-            </Section>
+              </Section>
+            )}
+
+            {/* Anniversary Settings - 과거 날짜에서는 별도 섹션 */}
+            {isPastDate && isAnniversary && (
+              <Section style={{ marginTop: '-8px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* 알림주기 */}
+                  <div>
+                    <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px' }}>
+                      알림주기 <span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                    </div>
+                    <RadioGroup style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+                      <RadioOption $checked={anniversaryRepeat === 'daily'} onClick={() => setAnniversaryRepeat('daily')}>
+                        <input type="radio" name="anniversaryRepeat" value="daily" checked={anniversaryRepeat === 'daily'} onChange={() => {}} />
+                        <span>매일</span>
+                      </RadioOption>
+                      <RadioOption $checked={anniversaryRepeat === 'weekly'} onClick={() => setAnniversaryRepeat('weekly')}>
+                        <input type="radio" name="anniversaryRepeat" value="weekly" checked={anniversaryRepeat === 'weekly'} onChange={() => {}} />
+                        <span>매주</span>
+                      </RadioOption>
+                      <RadioOption $checked={anniversaryRepeat === 'monthly'} onClick={() => setAnniversaryRepeat('monthly')}>
+                        <input type="radio" name="anniversaryRepeat" value="monthly" checked={anniversaryRepeat === 'monthly'} onChange={() => {}} />
+                        <span>매달</span>
+                      </RadioOption>
+                      <RadioOption $checked={anniversaryRepeat === 'yearly'} onClick={() => setAnniversaryRepeat('yearly')}>
+                        <input type="radio" name="anniversaryRepeat" value="yearly" checked={anniversaryRepeat === 'yearly'} onChange={() => {}} />
+                        <span>매년</span>
+                      </RadioOption>
+                    </RadioGroup>
+                  </div>
+
+                  {/* 알림시기 */}
+                  <div>
+                    <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px' }}>
+                      알림시기 <span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="radio"
+                          id="timing-today-past"
+                          name="anniversaryTiming"
+                          value="today"
+                          checked={anniversaryTiming === 'today'}
+                          onChange={() => setAnniversaryTiming('today')}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        <label htmlFor="timing-today-past" style={{ fontSize: '14px', color: '#495057', cursor: 'pointer' }}>
+                          당일
+                        </label>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="radio"
+                          id="timing-before-past"
+                          name="anniversaryTiming"
+                          value="before"
+                          checked={anniversaryTiming === 'before'}
+                          onChange={() => {
+                            setAnniversaryTiming('before');
+                            setTimeout(() => anniversaryDaysInputRef.current?.focus(), 0);
+                          }}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        <label htmlFor="timing-before-past" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#495057', cursor: 'pointer' }}>
+                          <TimeInput
+                            ref={anniversaryDaysInputRef}
+                            type="number"
+                            min="1"
+                            max="30"
+                            value={anniversaryDaysBefore || ''}
+                            placeholder="1-30"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 30)) {
+                                setAnniversaryTiming('before');
+                                setAnniversaryDaysBefore(val === '' ? '' : parseInt(val));
+                              }
+                            }}
+                            onFocus={() => {
+                              setAnniversaryTiming('before');
+                            }}
+                            style={{
+                              width: '60px',
+                              padding: '6px',
+                              fontSize: '14px'
+                            }}
+                          />
+                          <span>일 전</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </Section>
+            )}
 
             {/* Event Time */}
             <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
