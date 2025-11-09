@@ -2174,25 +2174,13 @@ const Calendar = ({
                                                         style={{ marginTop: '2px', flexShrink: 0 }}
                                                     />
                                                     <div style={{ flex: 1 }}>
-                                                        <div>
-                                                            <span style={{
-                                                                fontSize: '13px',
-                                                                color: isTerminated ? 'rgba(51, 51, 51, 0.3)' : '#333',
-                                                                lineHeight: '1.3',
-                                                                verticalAlign: 'middle'
-                                                            }}>
-                                                                {alarm.title || '제목 없음'}
-                                                            </span>
-                                                            {isTerminated && (
-                                                                <span style={{
-                                                                    fontSize: '11px',
-                                                                    color: 'rgba(214, 48, 49, 0.6)',
-                                                                    lineHeight: '1.3',
-                                                                    verticalAlign: 'middle',
-                                                                    marginLeft: '4px'
-                                                                }}>- 종료된 알람</span>
-                                                            )}
-                                                        </div>
+                                                        <span style={{
+                                                            fontSize: '13px',
+                                                            color: isTerminated ? 'rgba(51, 51, 51, 0.3)' : '#333'
+                                                        }}>
+                                                            {alarm.title || '제목 없음'}
+                                                            {isTerminated && <span style={{ fontSize: '13px', color: 'rgba(214, 48, 49, 0.6)' }}> - 종료된 알람</span>}
+                                                        </span>
                                                         <div style={{
                                                             fontSize: '11px',
                                                             color: isTerminated ? 'rgba(153, 153, 153, 0.5)' : '#999'
