@@ -727,11 +727,11 @@ const DateCell = styled.div`
         }
 
         // 알람 점: 빨간색 (tomato)
-        // - 활성 알람이 없으면 (모두 종료): 항상 흐린 빨간색
-        // - 활성 알람이 있으면: 현재 달은 진한 빨강, 다른 달은 중간 빨강
+        // - 과거 날짜이거나 활성 알람이 없으면 (모두 종료): 흐린 빨간색
+        // - 활성 알람이 있고 미래/오늘 날짜: 현재 달은 진한 빨강, 다른 달은 중간 빨강
         let alarmColor;
-        if (!hasActiveAlarm) {
-            alarmColor = 'rgba(255, 99, 71, 0.3)'; // 종료된 알람: 흐린 빨간색
+        if (isPastDate || !hasActiveAlarm) {
+            alarmColor = 'rgba(255, 99, 71, 0.3)'; // 과거 날짜 또는 종료된 알람: 흐린 빨간색
         } else {
             alarmColor = isCurrentMonth ? 'tomato' : 'rgba(255, 99, 71, 0.4)';
         }
