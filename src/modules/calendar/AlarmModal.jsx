@@ -6,9 +6,10 @@ import { format, addDays, addHours, addMinutes, subDays, subHours, subMinutes } 
 import { AlarmClock } from 'lucide-react';
 import Portal from '../../components/Portal';
 import { saveAudioFile, loadAudioFile } from '../../utils/audioStorage';
+import { AUTO_DELETE_DAYS } from './constants';
 
-// ==================== CONSTANTS ====================
-export const AUTO_DELETE_DAYS = 3; // 종료된 알람 자동삭제 일수
+// AUTO_DELETE_DAYS를 다른 파일에서도 import 할 수 있도록 re-export
+export { AUTO_DELETE_DAYS } from './constants';
 
 // ==================== ANIMATIONS ====================
 const fadeIn = keyframes`
