@@ -6,7 +6,7 @@ import { format, addDays, addHours, addMinutes, subDays, subHours, subMinutes } 
 import { AlarmClock } from 'lucide-react';
 import Portal from '../../components/Portal';
 import { saveAudioFile, loadAudioFile } from '../../utils/audioStorage';
-import { AUTO_DELETE_DAYS } from './constants';
+import { AUTO_DELETE_DAYS, ALARM_MESSAGES, ALARM_COLORS } from './constants';
 
 // AUTO_DELETE_DAYS를 다른 파일에서도 import 할 수 있도록 re-export
 export { AUTO_DELETE_DAYS } from './constants';
@@ -125,7 +125,7 @@ const CloseButton = styled.button`
   background: none;
   border: none;
   font-size: 24px;
-  color: #6c757d;
+  color: ${ALARM_COLORS.muted};
   cursor: pointer;
   padding: 0;
   width: 32px;
@@ -165,11 +165,11 @@ const SectionTitle = styled.h3`
   gap: 8px;
 
   svg {
-    color: #4a90e2;
+    color: ${ALARM_COLORS.primary};
   }
 
   .required {
-    color: #dc3545;
+    color: ${ALARM_COLORS.danger};
     margin-left: 4px;
   }
 `;
@@ -186,7 +186,7 @@ const Input = styled.input`
   }
 
   &:focus {
-    outline: 2px solid #4a90e2;
+    outline: 2px solid ${ALARM_COLORS.primary};
     border-color: transparent;
   }
 `;
@@ -199,7 +199,7 @@ const Select = styled.select`
   background: white;
 
   &:focus {
-    outline: 2px solid #4a90e2;
+    outline: 2px solid ${ALARM_COLORS.primary};
   }
 `;
 
@@ -227,7 +227,7 @@ const TimeInput = styled.input`
   }
 
   &:focus {
-    outline: 2px solid #4a90e2;
+    outline: 2px solid ${ALARM_COLORS.primary};
     border-color: transparent;
   }
 `;
@@ -247,7 +247,7 @@ const AlarmItem = styled.div`
     return '#f8f9fa';
   }};
   border: ${props => {
-    if (props.$isModified) return '2px dashed #dc3545';
+    if (props.$isModified) return '2px dashed ${ALARM_COLORS.danger}';
     if (props.$isPending) return '2px dashed #adb5bd';
     return '1px solid #ced4da';
   }};
@@ -272,11 +272,11 @@ const AlarmTimeDisplay = styled.span`
 
 const AlarmRelativeTime = styled.span`
   font-size: 12px;
-  color: #6c757d;
+  color: ${ALARM_COLORS.muted};
 `;
 
 const DeleteButton = styled.button`
-  background: #dc3545;
+  background: ${ALARM_COLORS.danger};
   color: white;
   border: none;
   border-radius: 6px;
@@ -331,9 +331,9 @@ const PresetButton = styled.button`
   transition: all 0.2s;
 
   &:hover {
-    background: #4a90e2;
+    background: ${ALARM_COLORS.primary};
     color: white;
-    border-color: #4a90e2;
+    border-color: ${ALARM_COLORS.primary};
   }
 `;
 
@@ -361,7 +361,7 @@ const Label = styled.label`
 `;
 
 const AddButton = styled.button`
-  background: #4a90e2;
+  background: ${ALARM_COLORS.primary};
   color: white;
   border: none;
   border-radius: 8px;
@@ -393,13 +393,13 @@ const RadioOption = styled.label`
   gap: 8px;
   padding: 10px 10px;
   background: ${props => props.$checked ? '#e7f3ff' : '#f8f9fa'};
-  border: 2px solid ${props => props.$checked ? '#4a90e2' : '#dee2e6'};
+  border: 2px solid ${props => props.$checked ? '${ALARM_COLORS.primary}' : '#dee2e6'};
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
-    border-color: #4a90e2;
+    border-color: ${ALARM_COLORS.primary};
   }
 
   input {
@@ -440,7 +440,7 @@ const VolumeSlider = styled.input`
   height: 6px;
   border-radius: 3px;
   outline: none;
-  background: linear-gradient(to right, #4a90e2 0%, #4a90e2 ${props => props.value}%, #dee2e6 ${props => props.value}%, #dee2e6 100%);
+  background: linear-gradient(to right, ${ALARM_COLORS.primary} 0%, ${ALARM_COLORS.primary} ${props => props.value}%, #dee2e6 ${props => props.value}%, #dee2e6 100%);
 
   &::-webkit-slider-thumb {
     -webkit-appearance: none;
@@ -448,7 +448,7 @@ const VolumeSlider = styled.input`
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: #4a90e2;
+    background: ${ALARM_COLORS.primary};
     cursor: pointer;
   }
 
@@ -456,7 +456,7 @@ const VolumeSlider = styled.input`
     width: 18px;
     height: 18px;
     border-radius: 50%;
-    background: #4a90e2;
+    background: ${ALARM_COLORS.primary};
     cursor: pointer;
     border: none;
   }
@@ -499,7 +499,7 @@ const HiddenFileInput = styled.input`
 
 const FileName = styled.span`
   font-size: 13px;
-  color: #6c757d;
+  color: ${ALARM_COLORS.muted};
   font-style: italic;
 `;
 
@@ -513,7 +513,7 @@ const SoundPreview = styled.div`
 `;
 
 const PlayButton = styled.button`
-  background: #4a90e2;
+  background: ${ALARM_COLORS.primary};
   color: white;
   border: none;
   border-radius: 50%;
@@ -550,7 +550,7 @@ const Button = styled.button`
 `;
 
 const SaveButton = styled(Button)`
-  background-color: #4a90e2;
+  background-color: ${ALARM_COLORS.primary};
   color: white;
 
   &:hover {
@@ -568,7 +568,7 @@ const CancelButton = styled(Button)`
 `;
 
 const SetCurrentTimeButton = styled.button`
-  background: #6c757d;
+  background: ${ALARM_COLORS.muted};
   color: white;
   border: none;
   border-radius: 6px;
@@ -620,7 +620,7 @@ const ToggleSwitch = styled.label`
   }
 
   input:checked + .slider {
-    background-color: #4a90e2;
+    background-color: ${ALARM_COLORS.primary};
   }
 
   input:checked + .slider:before {
@@ -639,7 +639,7 @@ const SortButton = styled.button`
   flex: 1;
   padding: 10px 16px;
   background: ${props => props.$active ? '#f1f3f5' : 'transparent'};
-  color: ${props => props.$active ? '#212529' : '#6c757d'};
+  color: ${props => props.$active ? '#212529' : '${ALARM_COLORS.muted}'};
   border: none;
   border-bottom: 2px solid ${props => props.$active ? '#495057' : 'transparent'};
   margin-bottom: -2px;
@@ -704,13 +704,13 @@ const CheckboxContainer = styled.label`
   gap: 8px;
   padding: 10px 12px;
   background: #f8f9fa;
-  border: 2px solid ${props => props.$checked ? '#4a90e2' : '#dee2e6'};
+  border: 2px solid ${props => props.$checked ? '${ALARM_COLORS.primary}' : '#dee2e6'};
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
-    border-color: #4a90e2;
+    border-color: ${ALARM_COLORS.primary};
   }
 
   input {
@@ -734,7 +734,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [alarmTitle, setAlarmTitle] = useState('');
   const [eventTime, setEventTime] = useState('09:00');
   const [registeredAlarms, setRegisteredAlarms] = useState([]);
-  const [pendingAlarms, setPendingAlarms] = useState([]); // 가등록 알람
+  const [pendingAlarms, setPendingAlarms] = useState([]); // 가등록 알람 (리팩토링 후 삭제 예정)
 
   // Custom alarm input
   const [customDays, setCustomDays] = useState(0);
@@ -1351,7 +1351,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     setDeleteTargetType(type);
 
     if (type === 'pending') {
-      setDeleteConfirmMessage('해당 가등록 알람을 삭제할까요?');
+      setDeleteConfirmMessage(ALARM_MESSAGES.delete.pending);
     } else if (alarm.isAnniversary) {
       // 기념일 알람: 등록일과 현재 보는 날짜 비교
       const alarmDateStr = format(alarm.calculatedTime, 'yyyy-MM-dd');
@@ -1361,16 +1361,16 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
       if (hasRepeat && !isRegisteredToday) {
         // 주기로 인해 표시된 기념일 (등록일이 아닌 다른 날)
-        setDeleteConfirmMessage('해당 기념일은 완전히 삭제됩니다. 진행할까요?');
+        setDeleteConfirmMessage(ALARM_MESSAGES.delete.anniversary.repeated);
       } else {
         // 등록일 당일의 기념일
-        setDeleteConfirmMessage('정말 해당 기념일을 삭제하시겠습니까?');
+        setDeleteConfirmMessage(ALARM_MESSAGES.delete.anniversary.sameDay);
       }
     } else if (isPastDate && !alarm.isAnniversary) {
       // 과거 날짜의 일반 알람 (종료된 알람)
-      setDeleteConfirmMessage('종료된 알람을 삭제할까요?');
+      setDeleteConfirmMessage(ALARM_MESSAGES.delete.terminated);
     } else {
-      setDeleteConfirmMessage('해당 알람을 삭제할까요?');
+      setDeleteConfirmMessage(ALARM_MESSAGES.delete.normal);
     }
 
     setShowDeleteConfirmModal(true);
@@ -2004,7 +2004,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     width: '18px',
                     height: '18px',
                     borderRadius: '50%',
-                    backgroundColor: '#4a90e2',
+                    backgroundColor: '${ALARM_COLORS.primary}',
                     color: '#fff',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -2044,7 +2044,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               width: '14px',
                               height: '14px',
                               borderRadius: '50%',
-                              backgroundColor: '#4a90e2',
+                              backgroundColor: '${ALARM_COLORS.primary}',
                               color: '#fff',
                               display: 'flex',
                               alignItems: 'center',
@@ -2059,7 +2059,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             </div>
                             <div style={{
                               fontSize: '15px',
-                              color: '#4a90e2',
+                              color: '${ALARM_COLORS.primary}',
                               opacity: alarm.enabled !== false ? 1 : 0.5,
                               wordBreak: 'break-all',
                               lineHeight: '1.3',
@@ -2086,7 +2086,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                           </div>
                           <div style={{
                             fontSize: '12px',
-                            color: '#6c757d',
+                            color: '${ALARM_COLORS.muted}',
                             opacity: alarm.enabled !== false ? 1 : 0.5
                           }}>
                             {(() => {
@@ -2116,7 +2116,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                         style={{
                                           marginLeft: '6px',
                                           fontSize: '10px',
-                                          color: '#4a90e2',
+                                          color: '${ALARM_COLORS.primary}',
                                           background: 'none',
                                           border: 'none',
                                           cursor: 'pointer',
@@ -2140,7 +2140,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             bottom: '12px',
                             right: '12px',
                             fontSize: '11px',
-                            color: '#dc3545',
+                            color: '${ALARM_COLORS.danger}',
                             fontWeight: '600'
                           }}>
                             변경사항 미적용
@@ -2182,9 +2182,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 padding: '4px 0'
                               }}>
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <rect x="1" y="1" width="22" height="22" rx="3" stroke="#4a90e2" strokeWidth="2"/>
-                                  <rect x="8" y="7" width="2.5" height="10" fill="#4a90e2"/>
-                                  <rect x="13.5" y="7" width="2.5" height="10" fill="#4a90e2"/>
+                                  <rect x="1" y="1" width="22" height="22" rx="3" stroke="${ALARM_COLORS.primary}" strokeWidth="2"/>
+                                  <rect x="8" y="7" width="2.5" height="10" fill="${ALARM_COLORS.primary}"/>
+                                  <rect x="13.5" y="7" width="2.5" height="10" fill="${ALARM_COLORS.primary}"/>
                                 </svg>
                                 <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
                                   <div>알람</div>
@@ -2215,7 +2215,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 </SectionTitle>
 
               {pendingAlarms.length === 0 && registeredAlarms.filter(alarm => !alarm.isAnniversary).length === 0 ? (
-                <p style={{ color: '#6c757d', fontSize: '14px', margin: 0 }}>
+                <p style={{ color: '${ALARM_COLORS.muted}', fontSize: '14px', margin: 0 }}>
                   등록된 알람이 없습니다.
                 </p>
               ) : (
@@ -2290,7 +2290,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                   width: '14px',
                                   height: '14px',
                                   borderRadius: '50%',
-                                  backgroundColor: '#4a90e2',
+                                  backgroundColor: '${ALARM_COLORS.primary}',
                                   color: '#fff',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -2316,7 +2316,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               )}
                               <div style={{
                                 fontSize: '15px',
-                                color: alarm.isAnniversary ? '#4a90e2' : '#333',
+                                color: alarm.isAnniversary ? '${ALARM_COLORS.primary}' : '#333',
                                 opacity: alarm.enabled !== false ? 1 : 0.5,
                                 wordBreak: 'break-all',
                                 lineHeight: '1.3',
@@ -2330,7 +2330,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             </div>
                             <div style={{
                               fontSize: '12px',
-                              color: '#6c757d',
+                              color: '${ALARM_COLORS.muted}',
                               opacity: alarm.enabled !== false ? 1 : 0.5
                             }}>
                               {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
@@ -2344,7 +2344,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 if (daysRemaining >= 0 && daysRemaining <= AUTO_DELETE_DAYS) {
                                   return <span style={{
                                     marginLeft: '8px',
-                                    color: '#dc3545',
+                                    color: '${ALARM_COLORS.danger}',
                                     fontWeight: '600',
                                     opacity: alarm.enabled !== false ? 1 : 0.5
                                   }}>
@@ -2361,7 +2361,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               bottom: '12px',
                               right: '12px',
                               fontSize: '11px',
-                              color: '#dc3545',
+                              color: '${ALARM_COLORS.danger}',
                               fontWeight: '600'
                             }}>
                               변경사항 미적용
@@ -2403,7 +2403,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                     </DeleteButton>
                                     <div style={{
                                       fontSize: '11px',
-                                      color: '#dc3545',
+                                      color: '${ALARM_COLORS.danger}',
                                       textAlign: 'center',
                                       lineHeight: '1.2'
                                     }}>
@@ -2435,7 +2435,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                   </DeleteButton>
                                   <div style={{
                                     fontSize: '11px',
-                                    color: '#dc3545',
+                                    color: '${ALARM_COLORS.danger}',
                                     textAlign: 'center',
                                     lineHeight: '1.2'
                                   }}>
@@ -2454,9 +2454,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                   padding: '4px 0'
                                 }}>
                                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <rect x="1" y="1" width="22" height="22" rx="3" stroke="#4a90e2" strokeWidth="2"/>
-                                    <rect x="8" y="7" width="2.5" height="10" fill="#4a90e2"/>
-                                    <rect x="13.5" y="7" width="2.5" height="10" fill="#4a90e2"/>
+                                    <rect x="1" y="1" width="22" height="22" rx="3" stroke="${ALARM_COLORS.primary}" strokeWidth="2"/>
+                                    <rect x="8" y="7" width="2.5" height="10" fill="${ALARM_COLORS.primary}"/>
+                                    <rect x="13.5" y="7" width="2.5" height="10" fill="${ALARM_COLORS.primary}"/>
                                   </svg>
                                   <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
                                     <div>알람</div>
@@ -2505,7 +2505,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
               <SectionTitle>
                 <TitleIcon />
-                알람 타이틀<span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                알람 타이틀<span style={{ color: '${ALARM_COLORS.danger}', fontWeight: 'normal' }}>(필수항목)</span>
               </SectionTitle>
               <div style={{ position: 'relative' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2543,7 +2543,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   {/* 알림주기 */}
                   <div>
                     <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px' }}>
-                      알림주기 <span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                      알림주기 <span style={{ color: '${ALARM_COLORS.danger}', fontWeight: 'normal' }}>(필수항목)</span>
                     </div>
                     <RadioGroup style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                       <RadioOption $checked={anniversaryRepeat === 'daily'} onClick={() => setAnniversaryRepeat('daily')}>
@@ -2568,7 +2568,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   {/* 알림시기 */}
                   <div>
                     <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px' }}>
-                      알림시기 <span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                      알림시기 <span style={{ color: '${ALARM_COLORS.danger}', fontWeight: 'normal' }}>(필수항목)</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2654,7 +2654,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   {/* 알림주기 */}
                   <div>
                     <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px' }}>
-                      알림주기 <span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                      알림주기 <span style={{ color: '${ALARM_COLORS.danger}', fontWeight: 'normal' }}>(필수항목)</span>
                     </div>
                     <RadioGroup style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                       <RadioOption $checked={anniversaryRepeat === 'daily'} onClick={() => setAnniversaryRepeat('daily')}>
@@ -2679,7 +2679,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   {/* 알림시기 */}
                   <div>
                     <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px' }}>
-                      알림시기 <span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                      알림시기 <span style={{ color: '${ALARM_COLORS.danger}', fontWeight: 'normal' }}>(필수항목)</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -2748,7 +2748,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
               <SectionTitle>
                 <ClockIcon />
-                알람 시간<span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                알람 시간<span style={{ color: '${ALARM_COLORS.danger}', fontWeight: 'normal' }}>(필수항목)</span>
               </SectionTitle>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -2844,7 +2844,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     <div style={{
                       padding: '6px 20px 8px 20px',
                       fontSize: '12px',
-                      color: '#6c757d',
+                      color: '${ALARM_COLORS.muted}',
                       background: '#f8f9fa',
                       borderRadius: '0 0 8px 8px',
                       margin: '0 20px 8px 20px',
@@ -2998,7 +2998,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     width: '18px',
                     height: '18px',
                     borderRadius: '50%',
-                    backgroundColor: '#4a90e2',
+                    backgroundColor: '${ALARM_COLORS.primary}',
                     color: '#fff',
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -3038,7 +3038,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               width: '14px',
                               height: '14px',
                               borderRadius: '50%',
-                              backgroundColor: '#4a90e2',
+                              backgroundColor: '${ALARM_COLORS.primary}',
                               color: '#fff',
                               display: 'flex',
                               alignItems: 'center',
@@ -3053,7 +3053,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             </div>
                             <div style={{
                               fontSize: '15px',
-                              color: '#4a90e2',
+                              color: '${ALARM_COLORS.primary}',
                               opacity: alarm.enabled !== false ? 1 : 0.5,
                               wordBreak: 'break-all',
                               lineHeight: '1.3',
@@ -3080,7 +3080,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                           </div>
                           <div style={{
                             fontSize: '12px',
-                            color: '#6c757d',
+                            color: '${ALARM_COLORS.muted}',
                             opacity: alarm.enabled !== false ? 1 : 0.5
                           }}>
                             {(() => {
@@ -3110,7 +3110,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                         style={{
                                           marginLeft: '6px',
                                           fontSize: '10px',
-                                          color: '#4a90e2',
+                                          color: '${ALARM_COLORS.primary}',
                                           background: 'none',
                                           border: 'none',
                                           cursor: 'pointer',
@@ -3134,7 +3134,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             bottom: '12px',
                             right: '12px',
                             fontSize: '11px',
-                            color: '#dc3545',
+                            color: '${ALARM_COLORS.danger}',
                             fontWeight: '600'
                           }}>
                             변경사항 미적용
@@ -3175,9 +3175,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               padding: '4px 0'
                             }}>
                               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <rect x="1" y="1" width="22" height="22" rx="3" stroke="#4a90e2" strokeWidth="2"/>
-                                <rect x="8" y="7" width="2.5" height="10" fill="#4a90e2"/>
-                                <rect x="13.5" y="7" width="2.5" height="10" fill="#4a90e2"/>
+                                <rect x="1" y="1" width="22" height="22" rx="3" stroke="${ALARM_COLORS.primary}" strokeWidth="2"/>
+                                <rect x="8" y="7" width="2.5" height="10" fill="${ALARM_COLORS.primary}"/>
+                                <rect x="13.5" y="7" width="2.5" height="10" fill="${ALARM_COLORS.primary}"/>
                               </svg>
                               <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
                                 <div>알람</div>
@@ -3207,7 +3207,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 </SectionTitle>
 
               {pendingAlarms.length === 0 && registeredAlarms.filter(alarm => !alarm.isAnniversary).length === 0 ? (
-                <p style={{ color: '#6c757d', fontSize: '14px', margin: 0 }}>
+                <p style={{ color: '${ALARM_COLORS.muted}', fontSize: '14px', margin: 0 }}>
                   등록된 알람이 없습니다.
                 </p>
               ) : (
@@ -3251,7 +3251,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   {/* 가등록 알람 - 항상 최상단 */}
                   {pendingAlarms.length > 0 && (
                     <>
-                      <div style={{ fontSize: '12px', color: '#6c757d', marginBottom: '4px', fontWeight: '600' }}>
+                      <div style={{ fontSize: '12px', color: '${ALARM_COLORS.muted}', marginBottom: '4px', fontWeight: '600' }}>
                         가등록 ({pendingAlarms.length}개) - 각 알람의 등록 버튼을 눌러 확정하세요
                       </div>
                       {pendingAlarms.map((alarm) => (
@@ -3272,7 +3272,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               </span>
                               <span style={{
                                 flex: 1,
-                                color: alarm.isAnniversary ? '#4a90e2' : '#999',
+                                color: alarm.isAnniversary ? '${ALARM_COLORS.primary}' : '#999',
                                 wordBreak: 'break-all',
                                 lineHeight: '1.3',
                                 maxWidth: '7em',
@@ -3281,7 +3281,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 {alarm.title || '제목 없음'}
                               </span>
                             </div>
-                            <div style={{ fontSize: '12px', color: '#6c757d' }}>
+                            <div style={{ fontSize: '12px', color: '${ALARM_COLORS.muted}' }}>
                               {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
                             </div>
                           </AlarmInfo>
@@ -3302,7 +3302,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   {registeredAlarms.filter(alarm => !alarm.isAnniversary).length > 0 && (
                     <>
                       {pendingAlarms.length > 0 && (
-                        <div style={{ fontSize: '12px', color: '#6c757d', margin: '16px 0 4px 0', fontWeight: '600' }}>
+                        <div style={{ fontSize: '12px', color: '${ALARM_COLORS.muted}', margin: '16px 0 4px 0', fontWeight: '600' }}>
                           확정된 알람 ({registeredAlarms.filter(alarm => !alarm.isAnniversary).length}개)
                         </div>
                       )}
@@ -3337,7 +3337,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                   width: '14px',
                                   height: '14px',
                                   borderRadius: '50%',
-                                  backgroundColor: '#4a90e2',
+                                  backgroundColor: '${ALARM_COLORS.primary}',
                                   color: '#fff',
                                   display: 'flex',
                                   alignItems: 'center',
@@ -3363,7 +3363,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               )}
                               <div style={{
                                 fontSize: '15px',
-                                color: alarm.isAnniversary ? '#4a90e2' : '#333',
+                                color: alarm.isAnniversary ? '${ALARM_COLORS.primary}' : '#333',
                                 opacity: alarm.enabled !== false ? 1 : 0.5,
                                 wordBreak: 'break-all',
                                 lineHeight: '1.3',
@@ -3377,7 +3377,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             </div>
                             <div style={{
                               fontSize: '12px',
-                              color: '#6c757d',
+                              color: '${ALARM_COLORS.muted}',
                               opacity: alarm.enabled !== false ? 1 : 0.5
                             }}>
                               {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
@@ -3406,7 +3406,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               bottom: '12px',
                               right: '12px',
                               fontSize: '11px',
-                              color: '#dc3545',
+                              color: '${ALARM_COLORS.danger}',
                               fontWeight: '600'
                             }}>
                               변경사항 미적용
@@ -3481,9 +3481,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                   padding: '4px 0'
                                 }}>
                                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <rect x="1" y="1" width="22" height="22" rx="3" stroke="#4a90e2" strokeWidth="2"/>
-                                    <rect x="8" y="7" width="2.5" height="10" fill="#4a90e2"/>
-                                    <rect x="13.5" y="7" width="2.5" height="10" fill="#4a90e2"/>
+                                    <rect x="1" y="1" width="22" height="22" rx="3" stroke="${ALARM_COLORS.primary}" strokeWidth="2"/>
+                                    <rect x="8" y="7" width="2.5" height="10" fill="${ALARM_COLORS.primary}"/>
+                                    <rect x="13.5" y="7" width="2.5" height="10" fill="${ALARM_COLORS.primary}"/>
                                   </svg>
                                   <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
                                     <div>알람</div>
@@ -3555,7 +3555,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 alignItems: 'center',
                 padding: '6px 20px 8px 20px',
                 fontSize: '12px',
-                color: '#6c757d',
+                color: '${ALARM_COLORS.muted}',
                 background: '#f8f9fa',
                 borderRadius: '0 0 8px 8px',
                 margin: '0 20px 8px 20px'
@@ -3817,7 +3817,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               <Section>
                 <SectionTitle>
                   <TitleIcon />
-                  알람 타이틀<span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                  알람 타이틀<span style={{ color: '${ALARM_COLORS.danger}', fontWeight: 'normal' }}>(필수항목)</span>
                 </SectionTitle>
                 <div style={{ position: 'relative' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3870,7 +3870,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     {/* 알림주기 */}
                     <div>
                       <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px' }}>
-                        알림주기 <span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                        알림주기 <span style={{ color: '${ALARM_COLORS.danger}', fontWeight: 'normal' }}>(필수항목)</span>
                       </div>
                       <RadioGroup style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                         <RadioOption $checked={editAnniversaryRepeat === 'daily'} onClick={() => setEditAnniversaryRepeat('daily')}>
@@ -3895,7 +3895,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     {/* 알림시기 */}
                     <div>
                       <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px' }}>
-                        알림시기 <span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                        알림시기 <span style={{ color: '${ALARM_COLORS.danger}', fontWeight: 'normal' }}>(필수항목)</span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -3962,7 +3962,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               <Section>
                 <SectionTitle>
                   <ClockIcon />
-                  알람 시간<span style={{ color: '#dc3545', fontWeight: 'normal' }}>(필수항목)</span>
+                  알람 시간<span style={{ color: '${ALARM_COLORS.danger}', fontWeight: 'normal' }}>(필수항목)</span>
                 </SectionTitle>
                 <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                   <TimeInput
@@ -4045,7 +4045,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   <div style={{
                     padding: '6px 20px 8px 20px',
                     fontSize: '12px',
-                    color: '#6c757d',
+                    color: '${ALARM_COLORS.muted}',
                     background: '#f8f9fa',
                     borderRadius: '0 0 8px 8px',
                     margin: '0 20px 8px 20px',
@@ -4446,7 +4446,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
               <Footer>
                 <CancelButton onClick={cancelDeleteAlarm}>취소</CancelButton>
-                <SaveButton onClick={confirmDeleteAlarm} style={{ backgroundColor: '#dc3545' }}>
+                <SaveButton onClick={confirmDeleteAlarm} style={{ backgroundColor: '${ALARM_COLORS.danger}' }}>
                   삭제
                 </SaveButton>
               </Footer>

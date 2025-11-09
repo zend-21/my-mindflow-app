@@ -7,7 +7,7 @@ import { format, isBefore, startOfDay, addDays, subMonths, addMonths, subDays, i
 import { motion, AnimatePresence } from "framer-motion";
 import { useSwipeable } from 'react-swipeable';
 import { useTrashContext } from '../../contexts/TrashContext';
-import { AUTO_DELETE_DAYS } from './AlarmModal';
+import { AUTO_DELETE_DAYS, ALARM_COLORS } from './constants';
 
 // 개인 기념일
 const PERSONAL_EVENTS = {};
