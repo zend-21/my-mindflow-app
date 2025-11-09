@@ -2059,7 +2059,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             )}
 
             {/* Registered Anniversaries - 과거 날짜에서 기념일 별도 표시 */}
-            {isPastDate && registeredAlarms.filter(alarm => alarm.isAnniversary).length > 0 && (
+            {isPastDate && (registeredAlarms.filter(alarm => alarm.isAnniversary).length > 0 || repeatedAnniversaries.length > 0) && (
               <Section>
                 <SectionTitle>
                   <div style={{
@@ -3083,7 +3083,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             )}
 
             {/* Registered Anniversaries - 일반 날짜에서 기념일 별도 표시 */}
-            {!isPastDate && registeredAlarms.filter(alarm => alarm.isAnniversary).length > 0 && (
+            {!isPastDate && (registeredAlarms.filter(alarm => alarm.isAnniversary).length > 0 || repeatedAnniversaries.length > 0) && (
               <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
                 <div style={{
                   height: '1px',
