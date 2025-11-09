@@ -2,9 +2,12 @@ import { format, startOfDay, addYears } from 'date-fns';
 import { AUTO_DELETE_DAYS } from '../constants';
 
 /**
- * 알람이 자동삭제되었는지 확인
+ * 알람이 자동삭제되었는지 확인 (기념일은 자동삭제 안 함)
  */
 export const isAutoDeleted = (alarm) => {
+  // 기념일은 자동삭제 대상이 아님
+  if (alarm.isAnniversary) return false;
+
   if (!alarm.disabledAt) return false;
   const disabledDate = new Date(alarm.disabledAt);
   const deletionDate = new Date(disabledDate);
@@ -13,9 +16,12 @@ export const isAutoDeleted = (alarm) => {
 };
 
 /**
- * 자동삭제까지 남은 일수 계산
+ * 자동삭제까지 남은 일수 계산 (기념일은 자동삭제 안 함)
  */
 export const getDaysUntilAutoDelete = (alarm) => {
+  // 기념일은 자동삭제 대상이 아님
+  if (alarm.isAnniversary) return null;
+
   if (!alarm.disabledAt) return null;
   const disabledDate = new Date(alarm.disabledAt);
   const deletionDate = new Date(disabledDate);
