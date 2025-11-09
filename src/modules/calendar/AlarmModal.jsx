@@ -1090,19 +1090,21 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     const alarmTime = calculateAlarmTime(eventTime, offsetConfig);
     if (!alarmTime) return;
 
-    // 과거 시간 체크 (오늘 날짜인 경우에만)
-    const scheduleDate = new Date(scheduleData.date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    scheduleDate.setHours(0, 0, 0, 0);
+    // 과거 시간 체크 (오늘 날짜인 경우에만, 기념일은 제외)
+    if (!isAnniversary) {
+      const scheduleDate = new Date(scheduleData.date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      scheduleDate.setHours(0, 0, 0, 0);
 
-    if (scheduleDate.getTime() === today.getTime()) {
-      // 오늘 날짜이면 현재 시간과 비교
-      const now = new Date();
-      if (alarmTime <= now) {
-        setValidationMessage('알람 시간은 과거의 시간으로 설정할 수 없습니다.');
-        setShowValidationModal(true);
-        return;
+      if (scheduleDate.getTime() === today.getTime()) {
+        // 오늘 날짜이면 현재 시간과 비교
+        const now = new Date();
+        if (alarmTime <= now) {
+          setValidationMessage('알람 시간은 과거의 시간으로 설정할 수 없습니다.');
+          setShowValidationModal(true);
+          return;
+        }
       }
     }
 
@@ -1211,19 +1213,21 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     const alarmTime = calculateAlarmTime(eventTime, offsetConfig);
     if (!alarmTime) return;
 
-    // 과거 시간 체크 (오늘 날짜인 경우에만)
-    const scheduleDate = new Date(scheduleData.date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    scheduleDate.setHours(0, 0, 0, 0);
+    // 과거 시간 체크 (오늘 날짜인 경우에만, 기념일은 제외)
+    if (!isAnniversary) {
+      const scheduleDate = new Date(scheduleData.date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      scheduleDate.setHours(0, 0, 0, 0);
 
-    if (scheduleDate.getTime() === today.getTime()) {
-      // 오늘 날짜이면 현재 시간과 비교
-      const now = new Date();
-      if (alarmTime <= now) {
-        setValidationMessage('알람 시간은 과거의 시간으로 설정할 수 없습니다.');
-        setShowValidationModal(true);
-        return;
+      if (scheduleDate.getTime() === today.getTime()) {
+        // 오늘 날짜이면 현재 시간과 비교
+        const now = new Date();
+        if (alarmTime <= now) {
+          setValidationMessage('알람 시간은 과거의 시간으로 설정할 수 없습니다.');
+          setShowValidationModal(true);
+          return;
+        }
       }
     }
 
@@ -1688,19 +1692,21 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       return;
     }
 
-    // 과거 시간 체크 (오늘 날짜인 경우에만)
-    const scheduleDate = new Date(scheduleData.date);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    scheduleDate.setHours(0, 0, 0, 0);
+    // 과거 시간 체크 (오늘 날짜인 경우에만, 기념일은 제외)
+    if (!editIsAnniversary) {
+      const scheduleDate = new Date(scheduleData.date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      scheduleDate.setHours(0, 0, 0, 0);
 
-    if (scheduleDate.getTime() === today.getTime()) {
-      // 오늘 날짜이면 현재 시간과 비교
-      const now = new Date();
-      if (newAlarmTime <= now) {
-        setValidationMessage('알람 시간은 과거의 시간으로 설정할 수 없습니다.');
-        setShowValidationModal(true);
-        return;
+      if (scheduleDate.getTime() === today.getTime()) {
+        // 오늘 날짜이면 현재 시간과 비교
+        const now = new Date();
+        if (newAlarmTime <= now) {
+          setValidationMessage('알람 시간은 과거의 시간으로 설정할 수 없습니다.');
+          setShowValidationModal(true);
+          return;
+        }
       }
     }
 
@@ -2047,7 +2053,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   fontSize: '13px',
                   color: '#856404'
                 }}>
-                  기념일만 등록할 수 있습니다.
+                  기념일 알람은 과거 시간으로도 설정 가능합니다.
                 </div>
               </div>
             )}

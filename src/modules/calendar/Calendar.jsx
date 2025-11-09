@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSwipeable } from 'react-swipeable';
 import { useTrashContext } from '../../contexts/TrashContext';
 import { AUTO_DELETE_DAYS, ALARM_COLORS } from './constants';
-import { hasAlarm, hasActiveAlarm, isAutoDeleted } from './utils';
+import { hasAlarm, hasActiveAlarm, isAutoDeleted, getRepeatedAnniversaries } from './utils';
 
 // 개인 기념일
 const PERSONAL_EVENTS = {};
@@ -909,13 +909,25 @@ const ScheduleInput = styled.div`
         padding-bottom: 5px;
         text-align: center;
         width: 100%;
-        
+        word-break: keep-all;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        white-space: normal;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0;
+
+        span {
+            display: inline-block;
+        }
+
         @media (min-width: 768px) {
             font-size: 16px;
             margin-bottom: 8px;
             padding-bottom: 8px;
         }
-        
+
         @media (min-width: 1024px) {
             font-size: 18px;
             margin-bottom: 10px;
@@ -2074,9 +2086,29 @@ const Calendar = ({
                                 };
 
                                 // 등록된 알람 중에서 기념일 알람들을 추출 (자동삭제된 것 제외)
-                                const anniversaryAlarms = currentEntry?.alarm?.registeredAlarms?.filter(alarm =>
+                                const directAnniversaryAlarms = currentEntry?.alarm?.registeredAlarms?.filter(alarm =>
                                     alarm.isAnniversary && (alarm.anniversaryName || alarm.title) && !isAutoDeleted(alarm)
                                 ) || [];
+
+                                // 반복 기념일 알람들을 추출
+                                const repeatedAnniversaryAlarms = (() => {
+                                    if (!selectedDate) return [];
+                                    try {
+                                        const allSchedulesStr = localStorage.getItem('calendarSchedules_shared');
+                                        if (!allSchedulesStr) return [];
+                                        const allSchedules = JSON.parse(allSchedulesStr);
+
+                                        return getRepeatedAnniversaries(selectedDate, allSchedules).filter(alarm =>
+                                            !isAutoDeleted(alarm)
+                                        );
+                                    } catch (error) {
+                                        console.error('반복 기념일 로드 오류:', error);
+                                        return [];
+                                    }
+                                })();
+
+                                // 직접 등록된 기념일과 반복 기념일 합치기
+                                const anniversaryAlarms = [...directAnniversaryAlarms, ...repeatedAnniversaryAlarms];
 
                                 const hasAnniversaries = anniversaryAlarms.length > 0;
                                 const hasSpecialEvents = specialEvents.length > 0;
