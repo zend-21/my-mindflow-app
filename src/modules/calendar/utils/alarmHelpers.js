@@ -1,4 +1,4 @@
-import { format, startOfDay } from 'date-fns';
+import { format, startOfDay, addYears } from 'date-fns';
 import { AUTO_DELETE_DAYS } from '../constants';
 
 /**
@@ -40,6 +40,14 @@ export const hasAlarm = (date, schedules) => {
   if (hasDirectAlarm) return true;
 
   // 2. 기념일 알람 확인 - 모든 날짜의 기념일을 순회하면서 오늘이 반복 날짜인지 확인
+  const twoYearsFromNow = addYears(new Date(), 2);
+  const targetDate = new Date(date);
+
+  // 2년 후를 넘어가는 날짜는 처리하지 않음
+  if (targetDate > twoYearsFromNow) {
+    return false;
+  }
+
   for (const scheduleKey in schedules) {
     const scheduleEntry = schedules[scheduleKey];
     if (!scheduleEntry?.alarm?.registeredAlarms) continue;
@@ -50,7 +58,6 @@ export const hasAlarm = (date, schedules) => {
 
     for (const alarm of anniversaryAlarms) {
       const alarmDate = new Date(alarm.calculatedTime);
-      const targetDate = new Date(date);
 
       // 과거 날짜는 반복 적용 안 함 (등록일 포함 미래만)
       if (targetDate < startOfDay(alarmDate)) {
@@ -96,6 +103,14 @@ export const hasActiveAlarm = (date, schedules) => {
   if (hasDirectActiveAlarm) return true;
 
   // 2. 기념일 활성 알람 확인
+  const twoYearsFromNow = addYears(new Date(), 2);
+  const targetDate = new Date(date);
+
+  // 2년 후를 넘어가는 날짜는 처리하지 않음
+  if (targetDate > twoYearsFromNow) {
+    return false;
+  }
+
   for (const scheduleKey in schedules) {
     const scheduleEntry = schedules[scheduleKey];
     if (!scheduleEntry?.alarm?.registeredAlarms) continue;
@@ -106,10 +121,16 @@ export const hasActiveAlarm = (date, schedules) => {
 
     for (const alarm of activeAnniversaryAlarms) {
       const alarmDate = new Date(alarm.calculatedTime);
-      const targetDate = new Date(date);
 
       // 과거 날짜는 반복 적용 안 함
       if (targetDate < startOfDay(alarmDate)) {
+        continue;
+      }
+
+      // disabledDates에 해당 날짜가 포함되어 있으면 비활성
+      const targetDateStr = format(targetDate, 'yyyy-MM-dd');
+      const disabledDates = alarm.disabledDates || [];
+      if (disabledDates.includes(targetDateStr)) {
         continue;
       }
 

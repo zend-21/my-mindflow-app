@@ -1502,32 +1502,71 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   };
 
   // Toggle alarm enabled/disabled
-  const handleToggleAlarm = (id) => {
+  const handleToggleAlarm = (id, isRepeated = false) => {
     // 현재 알람의 enabled 상태 확인
     const currentAlarm = registeredAlarms.find(alarm => alarm.id === id);
-    const newEnabledState = !currentAlarm.enabled;
 
-    const updatedAlarms = registeredAlarms.map(alarm =>
-      alarm.id === id ? { ...alarm, enabled: newEnabledState } : alarm
-    );
-    setRegisteredAlarms(updatedAlarms);
+    if (isRepeated) {
+      // 반복 기념일의 경우: 해당 날짜만 비활성화/활성화
+      const currentDateStr = format(scheduleData.date, 'yyyy-MM-dd');
+      const disabledDates = currentAlarm.disabledDates || [];
+      const isCurrentlyDisabled = disabledDates.includes(currentDateStr);
 
-    // 즉시 저장
-    const alarmSettings = {
-      eventTime,
-      registeredAlarms: updatedAlarms,
-      notificationType,
-      snoozeMinutes,
-      soundFile,
-      customSoundName,
-      volume,
-      isAnniversary,
-      anniversaryName: isAnniversary ? alarmTitle : '',
-      anniversaryRepeat
-    };
+      let updatedDisabledDates;
+      if (isCurrentlyDisabled) {
+        // 현재 비활성화되어 있으면 활성화 (배열에서 제거)
+        updatedDisabledDates = disabledDates.filter(date => date !== currentDateStr);
+      } else {
+        // 현재 활성화되어 있으면 비활성화 (배열에 추가)
+        updatedDisabledDates = [...disabledDates, currentDateStr];
+      }
 
-    // 새로운 상태를 전달
-    onSave(alarmSettings, newEnabledState ? 'toggle_on' : 'toggle_off');
+      const updatedAlarms = registeredAlarms.map(alarm =>
+        alarm.id === id ? { ...alarm, disabledDates: updatedDisabledDates } : alarm
+      );
+      setRegisteredAlarms(updatedAlarms);
+
+      // 즉시 저장
+      const alarmSettings = {
+        eventTime,
+        registeredAlarms: updatedAlarms,
+        notificationType,
+        snoozeMinutes,
+        soundFile,
+        customSoundName,
+        volume,
+        isAnniversary,
+        anniversaryName: isAnniversary ? alarmTitle : '',
+        anniversaryRepeat
+      };
+
+      onSave(alarmSettings, isCurrentlyDisabled ? 'toggle_on' : 'toggle_off');
+    } else {
+      // 일반 알람 또는 등록일의 기념일: 전체 enabled 상태 변경
+      const newEnabledState = !currentAlarm.enabled;
+
+      const updatedAlarms = registeredAlarms.map(alarm =>
+        alarm.id === id ? { ...alarm, enabled: newEnabledState } : alarm
+      );
+      setRegisteredAlarms(updatedAlarms);
+
+      // 즉시 저장
+      const alarmSettings = {
+        eventTime,
+        registeredAlarms: updatedAlarms,
+        notificationType,
+        snoozeMinutes,
+        soundFile,
+        customSoundName,
+        volume,
+        isAnniversary,
+        anniversaryName: isAnniversary ? alarmTitle : '',
+        anniversaryRepeat
+      };
+
+      // 새로운 상태를 전달
+      onSave(alarmSettings, newEnabledState ? 'toggle_on' : 'toggle_off');
+    }
   };
 
   // Edit alarm - opens modal
@@ -2049,34 +2088,69 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                       >
                         <AlarmInfo>
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
-                            <ToggleSwitch style={{
-                              opacity: alarm.disabledAt ? 0.5 : 1
-                            }}>
-                              <input
-                                type="checkbox"
-                                checked={alarm.enabled !== false}
-                                disabled={!!alarm.disabledAt}
-                                onChange={() => handleToggleAlarm(alarm.id)}
-                              />
-                              <span className="slider"></span>
-                            </ToggleSwitch>
-                            <div style={{
-                              width: '14px',
-                              height: '14px',
-                              borderRadius: '50%',
-                              backgroundColor: ALARM_COLORS.primary,
-                              color: '#fff',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '9px',
-                              fontWeight: 'bold',
-                              flexShrink: 0,
-                              opacity: alarm.enabled !== false ? 1 : 0.5,
-                              marginTop: '4px'
-                            }}>
-                              기
-                            </div>
+                            {(() => {
+                              // 등록일과 현재 보는 날짜 비교
+                              const alarmDateStr = format(alarm.calculatedTime, 'yyyy-MM-dd');
+                              const currentDateStr = format(scheduleData.date, 'yyyy-MM-dd');
+                              const isRegisteredToday = alarmDateStr === currentDateStr;
+                              const hasRepeat = alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none';
+
+                              return (
+                                <ToggleSwitch style={{
+                                  opacity: alarm.disabledAt ? 0.5 : 1
+                                }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={alarm.enabled !== false}
+                                    disabled={!!alarm.disabledAt}
+                                    onChange={() => handleToggleAlarm(alarm.id, alarm.isRepeated && !isRegisteredToday)}
+                                  />
+                                  <span className="slider"></span>
+                                </ToggleSwitch>
+                              );
+                            })()}
+                            {(() => {
+                              // 등록일과 현재 보는 날짜 비교
+                              const alarmDateStr = format(alarm.calculatedTime, 'yyyy-MM-dd');
+                              const currentDateStr = format(scheduleData.date, 'yyyy-MM-dd');
+                              const isRegisteredToday = alarmDateStr === currentDateStr;
+                              const hasRepeat = alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none';
+
+                              return (
+                                <>
+                                  {hasRepeat && !isRegisteredToday ? (
+                                    // 반복 기념일 주기일: 🔄 아이콘 표시
+                                    <div style={{
+                                      fontSize: '14px',
+                                      flexShrink: 0,
+                                      opacity: alarm.enabled !== false ? 1 : 0.5,
+                                      marginTop: '4px'
+                                    }}>
+                                      🔄
+                                    </div>
+                                  ) : (
+                                    // 등록일: '기' 뱃지 표시
+                                    <div style={{
+                                      width: '14px',
+                                      height: '14px',
+                                      borderRadius: '50%',
+                                      backgroundColor: ALARM_COLORS.primary,
+                                      color: '#fff',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '9px',
+                                      fontWeight: 'bold',
+                                      flexShrink: 0,
+                                      opacity: alarm.enabled !== false ? 1 : 0.5,
+                                      marginTop: '4px'
+                                    }}>
+                                      기
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                             <div style={{
                               fontSize: '15px',
                               color: ALARM_COLORS.primary,
@@ -2088,20 +2162,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               minHeight: 'calc(1.3em * 2)',
                               marginTop: '2px'
                             }}>
-                              {(() => {
-                                // 등록일과 현재 보는 날짜 비교
-                                const alarmDateStr = format(alarm.calculatedTime, 'yyyy-MM-dd');
-                                const currentDateStr = format(scheduleData.date, 'yyyy-MM-dd');
-                                const isRegisteredToday = alarmDateStr === currentDateStr;
-                                const hasRepeat = alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none';
-
-                                return (
-                                  <>
-                                    {alarm.title || '제목 없음'}
-                                    {hasRepeat && !isRegisteredToday && ' 🔄'}
-                                  </>
-                                );
-                              })()}
+                              {alarm.title || '제목 없음'}
                             </div>
                           </div>
                           <div style={{
@@ -2119,16 +2180,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
                               return (
                                 <>
-                                  {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
-                                  {hasRepeat && isRegisteredToday && (
-                                    <span style={{ fontSize: '11px', color: '#999' }}> (당일 등록)</span>
-                                  )}
-                                  {hasRepeat && !isRegisteredToday && (
+                                  {hasRepeat && !isRegisteredToday ? (
+                                    // 반복 기념일 주기일
                                     <>
-                                      <span style={{ margin: '0 4px' }}>·</span>
-                                      <span style={{ fontSize: '11px', color: '#999' }}>
-                                        {format(alarm.calculatedTime, 'yyyy년 M월 d일')}
-                                      </span>
+                                      등록일 {format(alarm.calculatedTime, 'yyyy-MM-dd')}  알람시간 {format(alarm.calculatedTime, 'HH:mm')}
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -2148,6 +2203,14 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                       >
                                         수정
                                       </button>
+                                    </>
+                                  ) : (
+                                    // 등록일
+                                    <>
+                                      {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
+                                      {hasRepeat && isRegisteredToday && (
+                                        <span style={{ fontSize: '11px', color: '#999' }}> (당일 등록)</span>
+                                      )}
                                     </>
                                   )}
                                   {daysUntilDelete !== null && (
@@ -3054,34 +3117,69 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                       >
                         <AlarmInfo>
                           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
-                            <ToggleSwitch style={{
-                              opacity: alarm.disabledAt ? 0.5 : 1
-                            }}>
-                              <input
-                                type="checkbox"
-                                checked={alarm.enabled !== false}
-                                disabled={!!alarm.disabledAt}
-                                onChange={() => handleToggleAlarm(alarm.id)}
-                              />
-                              <span className="slider"></span>
-                            </ToggleSwitch>
-                            <div style={{
-                              width: '14px',
-                              height: '14px',
-                              borderRadius: '50%',
-                              backgroundColor: ALARM_COLORS.primary,
-                              color: '#fff',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '9px',
-                              fontWeight: 'bold',
-                              flexShrink: 0,
-                              opacity: alarm.enabled !== false ? 1 : 0.5,
-                              marginTop: '4px'
-                            }}>
-                              기
-                            </div>
+                            {(() => {
+                              // 등록일과 현재 보는 날짜 비교
+                              const alarmDateStr = format(alarm.calculatedTime, 'yyyy-MM-dd');
+                              const currentDateStr = format(scheduleData.date, 'yyyy-MM-dd');
+                              const isRegisteredToday = alarmDateStr === currentDateStr;
+                              const hasRepeat = alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none';
+
+                              return (
+                                <ToggleSwitch style={{
+                                  opacity: alarm.disabledAt ? 0.5 : 1
+                                }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={alarm.enabled !== false}
+                                    disabled={!!alarm.disabledAt}
+                                    onChange={() => handleToggleAlarm(alarm.id, alarm.isRepeated && !isRegisteredToday)}
+                                  />
+                                  <span className="slider"></span>
+                                </ToggleSwitch>
+                              );
+                            })()}
+                            {(() => {
+                              // 등록일과 현재 보는 날짜 비교
+                              const alarmDateStr = format(alarm.calculatedTime, 'yyyy-MM-dd');
+                              const currentDateStr = format(scheduleData.date, 'yyyy-MM-dd');
+                              const isRegisteredToday = alarmDateStr === currentDateStr;
+                              const hasRepeat = alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none';
+
+                              return (
+                                <>
+                                  {hasRepeat && !isRegisteredToday ? (
+                                    // 반복 기념일 주기일: 🔄 아이콘 표시
+                                    <div style={{
+                                      fontSize: '14px',
+                                      flexShrink: 0,
+                                      opacity: alarm.enabled !== false ? 1 : 0.5,
+                                      marginTop: '4px'
+                                    }}>
+                                      🔄
+                                    </div>
+                                  ) : (
+                                    // 등록일: '기' 뱃지 표시
+                                    <div style={{
+                                      width: '14px',
+                                      height: '14px',
+                                      borderRadius: '50%',
+                                      backgroundColor: ALARM_COLORS.primary,
+                                      color: '#fff',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '9px',
+                                      fontWeight: 'bold',
+                                      flexShrink: 0,
+                                      opacity: alarm.enabled !== false ? 1 : 0.5,
+                                      marginTop: '4px'
+                                    }}>
+                                      기
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                             <div style={{
                               fontSize: '15px',
                               color: ALARM_COLORS.primary,
@@ -3093,20 +3191,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               minHeight: 'calc(1.3em * 2)',
                               marginTop: '2px'
                             }}>
-                              {(() => {
-                                // 등록일과 현재 보는 날짜 비교
-                                const alarmDateStr = format(alarm.calculatedTime, 'yyyy-MM-dd');
-                                const currentDateStr = format(scheduleData.date, 'yyyy-MM-dd');
-                                const isRegisteredToday = alarmDateStr === currentDateStr;
-                                const hasRepeat = alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none';
-
-                                return (
-                                  <>
-                                    {alarm.title || '제목 없음'}
-                                    {hasRepeat && !isRegisteredToday && ' 🔄'}
-                                  </>
-                                );
-                              })()}
+                              {alarm.title || '제목 없음'}
                             </div>
                           </div>
                           <div style={{
@@ -3124,16 +3209,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
 
                               return (
                                 <>
-                                  {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
-                                  {hasRepeat && isRegisteredToday && (
-                                    <span style={{ fontSize: '11px', color: '#999' }}> (당일 등록)</span>
-                                  )}
-                                  {hasRepeat && !isRegisteredToday && (
+                                  {hasRepeat && !isRegisteredToday ? (
+                                    // 반복 기념일 주기일
                                     <>
-                                      <span style={{ margin: '0 4px' }}>·</span>
-                                      <span style={{ fontSize: '11px', color: '#999' }}>
-                                        {format(alarm.calculatedTime, 'yyyy년 M월 d일')}
-                                      </span>
+                                      등록일 {format(alarm.calculatedTime, 'yyyy-MM-dd')}  알람시간 {format(alarm.calculatedTime, 'HH:mm')}
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -3153,6 +3232,14 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                       >
                                         수정
                                       </button>
+                                    </>
+                                  ) : (
+                                    // 등록일
+                                    <>
+                                      {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
+                                      {hasRepeat && isRegisteredToday && (
+                                        <span style={{ fontSize: '11px', color: '#999' }}> (당일 등록)</span>
+                                      )}
                                     </>
                                   )}
                                   {daysUntilDelete !== null && (

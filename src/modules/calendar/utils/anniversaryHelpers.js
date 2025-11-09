@@ -55,10 +55,16 @@ export const getRepeatedAnniversaries = (targetDate, schedules) => {
       }
 
       if (shouldRepeat) {
+        // 해당 날짜가 disabledDates에 포함되어 있는지 확인
+        const targetDateStr = format(target, 'yyyy-MM-dd');
+        const disabledDates = alarm.disabledDates || [];
+        const isDisabledOnThisDate = disabledDates.includes(targetDateStr);
+
         repeatedAlarms.push({
           ...alarm,
           isRepeated: true, // 반복 표시임을 나타내는 플래그
-          originalDate: alarmDate // 원본 등록일
+          originalDate: alarmDate, // 원본 등록일
+          enabled: !isDisabledOnThisDate // 이 날짜에서의 활성화 상태
         });
       }
     }
