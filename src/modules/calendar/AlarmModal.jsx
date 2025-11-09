@@ -1,12 +1,13 @@
 // src/modules/calendar/AlarmModal.jsx
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { format, addDays, addHours, addMinutes, subDays, subHours, subMinutes } from 'date-fns';
 import { AlarmClock } from 'lucide-react';
 import Portal from '../../components/Portal';
 import { saveAudioFile, loadAudioFile } from '../../utils/audioStorage';
 import { AUTO_DELETE_DAYS, ALARM_MESSAGES, ALARM_COLORS } from './constants';
+import { getRepeatedAnniversaries } from './utils';
 
 // AUTO_DELETE_DAYS를 다른 파일에서도 import 할 수 있도록 re-export
 export { AUTO_DELETE_DAYS } from './constants';
@@ -735,6 +736,22 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [eventTime, setEventTime] = useState('09:00');
   const [registeredAlarms, setRegisteredAlarms] = useState([]);
   const [pendingAlarms, setPendingAlarms] = useState([]); // 가등록 알람 (리팩토링 후 삭제 예정)
+
+  // 반복 기념일 계산
+  const repeatedAnniversaries = useMemo(() => {
+    if (!scheduleData?.date) return [];
+
+    try {
+      const allSchedulesStr = localStorage.getItem('calendarSchedules_shared');
+      if (!allSchedulesStr) return [];
+
+      const allSchedules = JSON.parse(allSchedulesStr);
+      return getRepeatedAnniversaries(scheduleData.date, allSchedules);
+    } catch (error) {
+      console.error('반복 기념일 로드 오류:', error);
+      return [];
+    }
+  }, [scheduleData?.date]);
 
   // Custom alarm input
   const [customDays, setCustomDays] = useState(0);
@@ -2015,12 +2032,15 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   }}>
                     기
                   </div>
-                  등록된 기념일 ({registeredAlarms.filter(alarm => alarm.isAnniversary).length}개)
+                  등록된 기념일 ({registeredAlarms.filter(alarm => alarm.isAnniversary).length + repeatedAnniversaries.length}개)
                 </SectionTitle>
 
                 <AlarmBox>
                   <AlarmList>
-                    {getSortedAlarms(registeredAlarms.filter(alarm => alarm.isAnniversary)).map((alarm) => (
+                    {getSortedAlarms([
+                      ...registeredAlarms.filter(alarm => alarm.isAnniversary),
+                      ...repeatedAnniversaries
+                    ]).map((alarm) => (
                       <AlarmItem
                         key={alarm.id}
                         $isPending={false}
@@ -2153,49 +2173,57 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                         }}>
                           {alarm.enabled !== false ? (
                             <>
-                              {alarm.isModified ? (
-                                <ApplyButton onClick={() => handleApplyChanges(alarm.id)}>
-                                  적용
-                                </ApplyButton>
-                              ) : (
-                                <EditButton
-                                  onClick={() => handleEditAlarm(alarm, false)}
-                                >
-                                  수정
-                                </EditButton>
+                              {!alarm.isRepeated && (
+                                <>
+                                  {alarm.isModified ? (
+                                    <ApplyButton onClick={() => handleApplyChanges(alarm.id)}>
+                                      적용
+                                    </ApplyButton>
+                                  ) : (
+                                    <EditButton
+                                      onClick={() => handleEditAlarm(alarm, false)}
+                                    >
+                                      수정
+                                    </EditButton>
+                                  )}
+                                  <DeleteButton
+                                    onClick={() => handleDeleteAlarm(alarm.id)}
+                                  >
+                                    삭제
+                                  </DeleteButton>
+                                </>
                               )}
-                              <DeleteButton
-                                onClick={() => handleDeleteAlarm(alarm.id)}
-                              >
-                                삭제
-                              </DeleteButton>
                             </>
                           ) : (
                             <>
-                              <div style={{
-                                display: 'flex',
-                                flexDirection: 'column',
-                                alignItems: 'center',
-                                gap: '4px',
-                                fontSize: '13px',
-                                color: '#999',
-                                padding: '4px 0'
-                              }}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                  <rect x="1" y="1" width="22" height="22" rx="3" stroke="${ALARM_COLORS.primary}" strokeWidth="2"/>
-                                  <rect x="8" y="7" width="2.5" height="10" fill="${ALARM_COLORS.primary}"/>
-                                  <rect x="13.5" y="7" width="2.5" height="10" fill="${ALARM_COLORS.primary}"/>
-                                </svg>
-                                <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
-                                  <div>알람</div>
-                                  <div>일시중지</div>
-                                </div>
-                              </div>
-                              <DeleteButton
-                                onClick={() => handleDeleteAlarm(alarm.id)}
-                              >
-                                삭제
-                              </DeleteButton>
+                              {!alarm.isRepeated && (
+                                <>
+                                  <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    gap: '4px',
+                                    fontSize: '13px',
+                                    color: '#999',
+                                    padding: '4px 0'
+                                  }}>
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                      <rect x="1" y="1" width="22" height="22" rx="3" stroke="${ALARM_COLORS.primary}" strokeWidth="2"/>
+                                      <rect x="8" y="7" width="2.5" height="10" fill="${ALARM_COLORS.primary}"/>
+                                      <rect x="13.5" y="7" width="2.5" height="10" fill="${ALARM_COLORS.primary}"/>
+                                    </svg>
+                                    <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
+                                      <div>알람</div>
+                                      <div>일시중지</div>
+                                    </div>
+                                  </div>
+                                  <DeleteButton
+                                    onClick={() => handleDeleteAlarm(alarm.id)}
+                                  >
+                                    삭제
+                                  </DeleteButton>
+                                </>
+                              )}
                             </>
                           )}
                         </AlarmActions>
@@ -3009,12 +3037,15 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   }}>
                     기
                   </div>
-                  등록된 기념일 ({registeredAlarms.filter(alarm => alarm.isAnniversary).length}개)
+                  등록된 기념일 ({registeredAlarms.filter(alarm => alarm.isAnniversary).length + repeatedAnniversaries.length}개)
                 </SectionTitle>
 
                 <AlarmBox>
                   <AlarmList>
-                    {getSortedAlarms(registeredAlarms.filter(alarm => alarm.isAnniversary)).map((alarm) => (
+                    {getSortedAlarms([
+                      ...registeredAlarms.filter(alarm => alarm.isAnniversary),
+                      ...repeatedAnniversaries
+                    ]).map((alarm) => (
                       <AlarmItem
                         key={alarm.id}
                         $isPending={false}
@@ -3147,22 +3178,26 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                         }}>
                           {alarm.enabled !== false ? (
                             <>
-                              {alarm.isModified ? (
-                                <ApplyButton onClick={() => handleApplyChanges(alarm.id)}>
-                                  적용
-                                </ApplyButton>
-                              ) : (
-                                <EditButton
-                                  onClick={() => handleEditAlarm(alarm, false)}
-                                >
-                                  수정
-                                </EditButton>
+                              {!alarm.isRepeated && (
+                                <>
+                                  {alarm.isModified ? (
+                                    <ApplyButton onClick={() => handleApplyChanges(alarm.id)}>
+                                      적용
+                                    </ApplyButton>
+                                  ) : (
+                                    <EditButton
+                                      onClick={() => handleEditAlarm(alarm, false)}
+                                    >
+                                      수정
+                                    </EditButton>
+                                  )}
+                                  <DeleteButton
+                                    onClick={() => handleDeleteAlarm(alarm.id)}
+                                  >
+                                    삭제
+                                  </DeleteButton>
+                                </>
                               )}
-                              <DeleteButton
-                                onClick={() => handleDeleteAlarm(alarm.id)}
-                              >
-                                삭제
-                              </DeleteButton>
                             </>
                           ) : (
                             <div style={{
