@@ -13,6 +13,20 @@ export const isAutoDeleted = (alarm) => {
 };
 
 /**
+ * 자동삭제까지 남은 일수 계산
+ */
+export const getDaysUntilAutoDelete = (alarm) => {
+  if (!alarm.disabledAt) return null;
+  const disabledDate = new Date(alarm.disabledAt);
+  const deletionDate = new Date(disabledDate);
+  deletionDate.setDate(deletionDate.getDate() + AUTO_DELETE_DAYS);
+  const today = new Date();
+  const diffTime = deletionDate - today;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return Math.max(0, diffDays);
+};
+
+/**
  * 특정 날짜에 알람이 있는지 확인 (활성/비활성 모두 포함)
  */
 export const hasAlarm = (date, schedules) => {
