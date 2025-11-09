@@ -2126,6 +2126,13 @@ const Calendar = ({
 
                                 if (regularAlarms.length === 0) return null;
 
+                                // 알람 시간순으로 정렬 (빠른 시간이 위로)
+                                const sortedAlarms = [...regularAlarms].sort((a, b) => {
+                                    const timeA = new Date(a.calculatedTime).getTime();
+                                    const timeB = new Date(b.calculatedTime).getTime();
+                                    return timeA - timeB;
+                                });
+
                                 const today = startOfDay(new Date());
                                 const selectedDay = startOfDay(selectedDate);
                                 const isPastDate = isBefore(selectedDay, today);
@@ -2138,7 +2145,7 @@ const Calendar = ({
                                         marginBottom: '8px',
                                         paddingLeft: '3px'
                                     }}>
-                                        {regularAlarms.map((alarm, index) => {
+                                        {sortedAlarms.map((alarm, index) => {
                                             // 비활성화된 알람인지 확인 (과거 날짜가 아니어도)
                                             const isTerminated = alarm.enabled === false;
 
@@ -2167,16 +2174,28 @@ const Calendar = ({
                                                         style={{ marginTop: '2px', flexShrink: 0 }}
                                                     />
                                                     <div style={{ flex: 1 }}>
-                                                        <span style={{
-                                                            fontSize: '13px',
-                                                            color: isTerminated ? 'rgba(51, 51, 51, 0.3)' : '#333'
-                                                        }}>
-                                                            {alarm.title || '제목 없음'}
-                                                            {isTerminated && <span style={{ fontSize: '11px', color: 'rgba(214, 48, 49, 0.6)' }}> - 종료된 알람</span>}
-                                                        </span>
+                                                        <div>
+                                                            <span style={{
+                                                                fontSize: '13px',
+                                                                color: isTerminated ? 'rgba(51, 51, 51, 0.3)' : '#333',
+                                                                lineHeight: '1.3',
+                                                                verticalAlign: 'middle'
+                                                            }}>
+                                                                {alarm.title || '제목 없음'}
+                                                            </span>
+                                                            {isTerminated && (
+                                                                <span style={{
+                                                                    fontSize: '11px',
+                                                                    color: 'rgba(214, 48, 49, 0.6)',
+                                                                    lineHeight: '1.3',
+                                                                    verticalAlign: 'middle',
+                                                                    marginLeft: '4px'
+                                                                }}>- 종료된 알람</span>
+                                                            )}
+                                                        </div>
                                                         <div style={{
                                                             fontSize: '11px',
-                                                            color: isTerminated ? 'rgba(153, 153, 153, 0.3)' : '#999'
+                                                            color: isTerminated ? 'rgba(153, 153, 153, 0.5)' : '#999'
                                                         }}>
                                                             {format(new Date(alarm.calculatedTime), 'HH:mm')}
                                                             {isTerminated && daysUntilDeletion !== null && (
