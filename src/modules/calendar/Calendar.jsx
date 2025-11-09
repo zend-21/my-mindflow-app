@@ -7,6 +7,7 @@ import { format, isBefore, startOfDay, addDays, subMonths, addMonths, subDays, i
 import { motion, AnimatePresence } from "framer-motion";
 import { useSwipeable } from 'react-swipeable';
 import { useTrashContext } from '../../contexts/TrashContext';
+import { AUTO_DELETE_DAYS } from './AlarmModal';
 
 // 개인 기념일
 const PERSONAL_EVENTS = {};
@@ -1466,6 +1467,71 @@ const Calendar = ({
         }
     }, [schedules, selectedDate]);
 
+    // 자동삭제된 알람을 실제로 제거하는 useEffect
+    useEffect(() => {
+        const cleanupExpiredAlarms = () => {
+            const now = new Date();
+            let hasChanges = false;
+            const updatedSchedules = { ...schedules };
+
+            // 모든 날짜의 알람을 순회하면서 자동삭제 기간이 지난 알람 제거
+            for (const dateKey in updatedSchedules) {
+                const entry = updatedSchedules[dateKey];
+                if (!entry?.alarm?.registeredAlarms) continue;
+
+                const filteredAlarms = entry.alarm.registeredAlarms.filter(alarm => {
+                    // 종료되지 않은 알람은 유지
+                    if (!alarm.disabledAt) return true;
+
+                    // 자동삭제 기간 계산
+                    const disabledDate = new Date(alarm.disabledAt);
+                    const deletionDate = new Date(disabledDate);
+                    deletionDate.setDate(deletionDate.getDate() + AUTO_DELETE_DAYS);
+
+                    // 삭제 기간이 지나지 않았으면 유지
+                    return now < deletionDate;
+                });
+
+                // 알람이 제거되었으면 업데이트
+                if (filteredAlarms.length !== entry.alarm.registeredAlarms.length) {
+                    hasChanges = true;
+                    updatedSchedules[dateKey] = {
+                        ...entry,
+                        alarm: {
+                            ...entry.alarm,
+                            registeredAlarms: filteredAlarms
+                        }
+                    };
+                }
+            }
+
+            // 변경사항이 있으면 저장
+            if (hasChanges) {
+                setSchedules(updatedSchedules);
+            }
+        };
+
+        // 컴포넌트 마운트 시 한 번 실행
+        cleanupExpiredAlarms();
+
+        // 매일 자정에 실행되도록 타이머 설정
+        const now = new Date();
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        const msUntilMidnight = tomorrow - now;
+
+        const midnightTimer = setTimeout(() => {
+            cleanupExpiredAlarms();
+
+            // 이후 24시간마다 반복
+            const dailyInterval = setInterval(cleanupExpiredAlarms, 24 * 60 * 60 * 1000);
+            return () => clearInterval(dailyInterval);
+        }, msUntilMidnight);
+
+        return () => clearTimeout(midnightTimer);
+    }, [schedules, setSchedules]);
+
     const hasSchedule = (date) => {
         const key = format(date, 'yyyy-MM-dd');
         const entry = schedules[key];
@@ -1477,9 +1543,18 @@ const Calendar = ({
         const key = format(date, 'yyyy-MM-dd');
         const entry = schedules[key];
 
-        // 1. 해당 날짜에 직접 등록된 알람 확인 (일반 알람, 활성/비활성 모두)
+        // 자동삭제 필터 함수
+        const isAutoDeleted = (alarm) => {
+            if (!alarm.disabledAt) return false;
+            const disabledDate = new Date(alarm.disabledAt);
+            const deletionDate = new Date(disabledDate);
+            deletionDate.setDate(deletionDate.getDate() + AUTO_DELETE_DAYS);
+            return new Date() >= deletionDate;
+        };
+
+        // 1. 해당 날짜에 직접 등록된 알람 확인 (일반 알람, 활성/비활성 모두, 기념일 제외)
         const hasDirectAlarm = entry && entry.alarm && entry.alarm.registeredAlarms &&
-                              entry.alarm.registeredAlarms.length > 0;
+                              entry.alarm.registeredAlarms.filter(alarm => !alarm.isAnniversary && !isAutoDeleted(alarm)).length > 0;
 
         if (hasDirectAlarm) return true;
 
@@ -1489,7 +1564,7 @@ const Calendar = ({
             if (!scheduleEntry?.alarm?.registeredAlarms) continue;
 
             const anniversaryAlarms = scheduleEntry.alarm.registeredAlarms.filter(
-                alarm => alarm.isAnniversary
+                alarm => alarm.isAnniversary && !isAutoDeleted(alarm)
             );
 
             for (const alarm of anniversaryAlarms) {
@@ -1523,9 +1598,18 @@ const Calendar = ({
         const key = format(date, 'yyyy-MM-dd');
         const entry = schedules[key];
 
-        // 1. 해당 날짜에 직접 등록된 활성 알람 확인 (일반 알람)
+        // 자동삭제 필터 함수
+        const isAutoDeleted = (alarm) => {
+            if (!alarm.disabledAt) return false;
+            const disabledDate = new Date(alarm.disabledAt);
+            const deletionDate = new Date(disabledDate);
+            deletionDate.setDate(deletionDate.getDate() + AUTO_DELETE_DAYS);
+            return new Date() >= deletionDate;
+        };
+
+        // 1. 해당 날짜에 직접 등록된 활성 알람 확인 (일반 알람, 기념일 제외)
         const hasDirectActiveAlarm = entry && entry.alarm && entry.alarm.registeredAlarms &&
-                                     entry.alarm.registeredAlarms.some(alarm => alarm.enabled !== false);
+                                     entry.alarm.registeredAlarms.some(alarm => !alarm.isAnniversary && alarm.enabled !== false && !isAutoDeleted(alarm));
 
         if (hasDirectActiveAlarm) return true;
 
@@ -1535,7 +1619,7 @@ const Calendar = ({
             if (!scheduleEntry?.alarm?.registeredAlarms) continue;
 
             const anniversaryAlarms = scheduleEntry.alarm.registeredAlarms.filter(
-                alarm => alarm.isAnniversary && alarm.enabled !== false
+                alarm => alarm.isAnniversary && alarm.enabled !== false && !isAutoDeleted(alarm)
             );
 
             for (const alarm of anniversaryAlarms) {
@@ -2084,11 +2168,148 @@ const Calendar = ({
                             />
                         ) : (
                         <div className="content-wrapper" onDoubleClick={() => onOpenEditor?.(selectedDate, scheduleText)}>
+                            {/* 반복 기념일 정보 (다른 날짜에서 반복된 경우) */}
+                            {(() => {
+                                // 자동삭제 필터 함수
+                                const isAutoDeleted = (alarm) => {
+                                    if (!alarm.disabledAt) return false;
+                                    const disabledDate = new Date(alarm.disabledAt);
+                                    const deletionDate = new Date(disabledDate);
+                                    deletionDate.setDate(deletionDate.getDate() + AUTO_DELETE_DAYS);
+                                    return new Date() >= deletionDate;
+                                };
+
+                                // 다른 날짜에서 반복된 기념일 알람 찾기
+                                const repeatedAnniversaries = [];
+                                const currentDateKey = format(selectedDate, 'yyyy-MM-dd');
+
+                                for (const scheduleKey in schedules) {
+                                    if (scheduleKey === currentDateKey) continue; // 현재 날짜는 제외
+
+                                    const scheduleEntry = schedules[scheduleKey];
+                                    if (!scheduleEntry?.alarm?.registeredAlarms) continue;
+
+                                    const anniversaryAlarms = scheduleEntry.alarm.registeredAlarms.filter(
+                                        alarm => alarm.isAnniversary && !isAutoDeleted(alarm)
+                                    );
+
+                                    for (const alarm of anniversaryAlarms) {
+                                        const alarmDate = new Date(alarm.calculatedTime);
+                                        const targetDate = new Date(selectedDate);
+                                        let isRepeated = false;
+
+                                        // 반복 로직 확인
+                                        if (alarm.anniversaryRepeat === 'daily') {
+                                            isRepeated = true;
+                                        } else if (alarm.anniversaryRepeat === 'weekly') {
+                                            if (alarmDate.getDay() === targetDate.getDay()) {
+                                                isRepeated = true;
+                                            }
+                                        } else if (alarm.anniversaryRepeat === 'monthly') {
+                                            if (alarmDate.getDate() === targetDate.getDate()) {
+                                                isRepeated = true;
+                                            }
+                                        } else if (alarm.anniversaryRepeat === 'yearly') {
+                                            if (alarmDate.getMonth() === targetDate.getMonth() &&
+                                                alarmDate.getDate() === targetDate.getDate()) {
+                                                isRepeated = true;
+                                            }
+                                        }
+
+                                        if (isRepeated) {
+                                            repeatedAnniversaries.push({
+                                                ...alarm,
+                                                originalDate: scheduleKey
+                                            });
+                                        }
+                                    }
+                                }
+
+                                if (repeatedAnniversaries.length === 0) return null;
+
+                                // 반복 패턴 한글 변환
+                                const getRepeatText = (repeat) => {
+                                    switch(repeat) {
+                                        case 'daily': return '매일';
+                                        case 'weekly': return '매주';
+                                        case 'monthly': return '매월';
+                                        case 'yearly': return '매년';
+                                        default: return '';
+                                    }
+                                };
+
+                                return (
+                                    <div style={{
+                                        marginBottom: '8px',
+                                        padding: '8px',
+                                        backgroundColor: 'rgba(74, 144, 226, 0.08)',
+                                        borderRadius: '6px',
+                                        borderLeft: '3px solid rgba(74, 144, 226, 0.4)'
+                                    }}>
+                                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>
+                                            🔄 반복 기념일
+                                        </div>
+                                        {repeatedAnniversaries.map((alarm, index) => {
+                                            const originalDate = new Date(alarm.originalDate);
+                                            return (
+                                                <div key={`repeated-${alarm.id || index}`} style={{
+                                                    marginBottom: index < repeatedAnniversaries.length - 1 ? '6px' : '0',
+                                                    fontSize: '12px'
+                                                }}>
+                                                    <div style={{ color: '#4a90e2', fontWeight: '500' }}>
+                                                        {alarm.anniversaryName || alarm.title}
+                                                    </div>
+                                                    <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
+                                                        {format(originalDate, 'yyyy년 M월 d일')} 등록 · {getRepeatText(alarm.anniversaryRepeat)} 반복
+                                                        <button
+                                                            onClick={() => {
+                                                                if (window.confirm(`"${alarm.anniversaryName || alarm.title}" 기념일의 정보를 수정하시겠습니까?\n\n등록일: ${format(originalDate, 'yyyy년 M월 d일')}`)) {
+                                                                    // 원본 날짜로 이동하고 알람 모달 열기
+                                                                    const originalDateObj = new Date(alarm.originalDate);
+                                                                    setSelectedDate(originalDateObj);
+                                                                    setCurrentMonth(originalDateObj);
+                                                                    // 약간의 딜레이 후 알람 모달 열기
+                                                                    setTimeout(() => {
+                                                                        onOpenAlarm?.(originalDateObj);
+                                                                    }, 100);
+                                                                }
+                                                            }}
+                                                            style={{
+                                                                marginLeft: '6px',
+                                                                fontSize: '10px',
+                                                                color: '#4a90e2',
+                                                                background: 'none',
+                                                                border: 'none',
+                                                                cursor: 'pointer',
+                                                                padding: '2px 4px',
+                                                                textDecoration: 'underline',
+                                                                opacity: 0.7
+                                                            }}
+                                                        >
+                                                            수정
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })()}
+
                             {/* 기념일과 특일을 같은 줄에 표시 */}
                             {(() => {
-                                // 등록된 알람 중에서 기념일 알람들을 추출
+                                // 자동삭제 필터 함수
+                                const isAutoDeleted = (alarm) => {
+                                    if (!alarm.disabledAt) return false;
+                                    const disabledDate = new Date(alarm.disabledAt);
+                                    const deletionDate = new Date(disabledDate);
+                                    deletionDate.setDate(deletionDate.getDate() + AUTO_DELETE_DAYS);
+                                    return new Date() >= deletionDate;
+                                };
+
+                                // 등록된 알람 중에서 기념일 알람들을 추출 (자동삭제된 것 제외)
                                 const anniversaryAlarms = currentEntry?.alarm?.registeredAlarms?.filter(alarm =>
-                                    alarm.isAnniversary && (alarm.anniversaryName || alarm.title)
+                                    alarm.isAnniversary && (alarm.anniversaryName || alarm.title) && !isAutoDeleted(alarm)
                                 ) || [];
 
                                 const hasAnniversaries = anniversaryAlarms.length > 0;
@@ -2119,9 +2340,18 @@ const Calendar = ({
 
                             {/* 알람 목록 - 간결하게 표시 (기념일 알람은 제외) */}
                             {(() => {
-                                // 기념일이 아닌 일반 알람들만 필터링
+                                // 자동삭제 필터 함수
+                                const isAutoDeleted = (alarm) => {
+                                    if (!alarm.disabledAt) return false;
+                                    const disabledDate = new Date(alarm.disabledAt);
+                                    const deletionDate = new Date(disabledDate);
+                                    deletionDate.setDate(deletionDate.getDate() + AUTO_DELETE_DAYS);
+                                    return new Date() >= deletionDate;
+                                };
+
+                                // 기념일이 아닌 일반 알람들만 필터링 (자동삭제된 것 제외)
                                 const regularAlarms = currentEntry?.alarm?.registeredAlarms?.filter(alarm =>
-                                    !alarm.isAnniversary
+                                    !alarm.isAnniversary && !isAutoDeleted(alarm)
                                 ) || [];
 
                                 if (regularAlarms.length === 0) return null;
@@ -2154,7 +2384,7 @@ const Calendar = ({
                                             if (isTerminated && alarm.disabledAt) {
                                                 const disabledDate = new Date(alarm.disabledAt);
                                                 const deletionDate = new Date(disabledDate);
-                                                deletionDate.setDate(deletionDate.getDate() + 7);
+                                                deletionDate.setDate(deletionDate.getDate() + AUTO_DELETE_DAYS);
                                                 const todayStart = startOfDay(new Date());
                                                 const deletionStart = startOfDay(deletionDate);
                                                 daysUntilDeletion = Math.ceil((deletionStart - todayStart) / (1000 * 60 * 60 * 24));

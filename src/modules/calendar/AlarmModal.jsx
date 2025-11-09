@@ -7,6 +7,9 @@ import { AlarmClock } from 'lucide-react';
 import Portal from '../../components/Portal';
 import { saveAudioFile, loadAudioFile } from '../../utils/audioStorage';
 
+// ==================== CONSTANTS ====================
+export const AUTO_DELETE_DAYS = 3; // 종료된 알람 자동삭제 일수
+
 // ==================== ANIMATIONS ====================
 const fadeIn = keyframes`
   from { opacity: 0; }
@@ -2266,8 +2269,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 const alarmTime = new Date(alarm.calculatedTime);
                                 const diffTime = now - alarmTime;
                                 const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                                const daysRemaining = 7 - diffDays;
-                                if (daysRemaining >= 0 && daysRemaining <= 7) {
+                                const daysRemaining = AUTO_DELETE_DAYS - diffDays;
+                                if (daysRemaining >= 0 && daysRemaining <= AUTO_DELETE_DAYS) {
                                   return <span style={{
                                     marginLeft: '8px',
                                     color: '#dc3545',
@@ -3260,7 +3263,6 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                   fontWeight: '600'
                                 }}>
                                   {(() => {
-                                    const AUTO_DELETE_DAYS = 7;
                                     const disabledDate = new Date(alarm.disabledAt);
                                     const deleteDate = new Date(disabledDate);
                                     deleteDate.setDate(deleteDate.getDate() + AUTO_DELETE_DAYS);
