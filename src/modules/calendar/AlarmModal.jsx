@@ -748,6 +748,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [sortBy, setSortBy] = useState('time'); // 'time' or 'registration'
   const [sortDirection, setSortDirection] = useState('asc'); // 'asc' or 'desc'
 
+  // 반복 기념일 토글
+  const [showRepeatedAnniversaries, setShowRepeatedAnniversaries] = useState(false);
+
   // Sound settings
   const [soundFile, setSoundFile] = useState('default');
   const [customSoundName, setCustomSoundName] = useState('');
@@ -2053,6 +2056,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               marginTop: '2px'
                             }}>
                               {alarm.title || '제목 없음'}
+                              {alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none' && (
+                                <span style={{ marginLeft: '4px', fontSize: '13px' }}>🔄</span>
+                              )}
                             </div>
                           </div>
                           <div style={{
@@ -2061,6 +2067,33 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             opacity: alarm.enabled !== false ? 1 : 0.5
                           }}>
                             {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
+                            {alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none' && (
+                              <>
+                                <span style={{ margin: '0 4px' }}>·</span>
+                                <span style={{ fontSize: '11px', color: '#999' }}>
+                                  등록일: {format(alarm.calculatedTime, 'yyyy년 M월 d일')}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditAlarm(alarm);
+                                  }}
+                                  style={{
+                                    marginLeft: '6px',
+                                    fontSize: '10px',
+                                    color: '#4a90e2',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: '2px 4px',
+                                    textDecoration: 'underline',
+                                    opacity: 0.6
+                                  }}
+                                >
+                                  수정
+                                </button>
+                              </>
+                            )}
                           </div>
                         </AlarmInfo>
                         {alarm.isModified && (
@@ -2992,6 +3025,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               marginTop: '2px'
                             }}>
                               {alarm.title || '제목 없음'}
+                              {alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none' && (
+                                <span style={{ marginLeft: '4px', fontSize: '13px' }}>🔄</span>
+                              )}
                             </div>
                           </div>
                           <div style={{
@@ -3000,6 +3036,33 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             opacity: alarm.enabled !== false ? 1 : 0.5
                           }}>
                             {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
+                            {alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none' && (
+                              <>
+                                <span style={{ margin: '0 4px' }}>·</span>
+                                <span style={{ fontSize: '11px', color: '#999' }}>
+                                  등록일: {format(alarm.calculatedTime, 'yyyy년 M월 d일')}
+                                </span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditAlarm(alarm);
+                                  }}
+                                  style={{
+                                    marginLeft: '6px',
+                                    fontSize: '10px',
+                                    color: '#4a90e2',
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: '2px 4px',
+                                    textDecoration: 'underline',
+                                    opacity: 0.6
+                                  }}
+                                >
+                                  수정
+                                </button>
+                              </>
+                            )}
                           </div>
                         </AlarmInfo>
                         {alarm.isModified && (

@@ -1571,6 +1571,11 @@ const Calendar = ({
                 const alarmDate = new Date(alarm.calculatedTime);
                 const targetDate = new Date(date);
 
+                // 과거 날짜는 반복 적용 안 함 (등록일 포함 미래만)
+                if (targetDate < startOfDay(alarmDate)) {
+                    continue;
+                }
+
                 // 기념일 반복 로직 확인
                 if (alarm.anniversaryRepeat === 'daily') {
                     return true;
@@ -1625,6 +1630,11 @@ const Calendar = ({
             for (const alarm of anniversaryAlarms) {
                 const alarmDate = new Date(alarm.calculatedTime);
                 const targetDate = new Date(date);
+
+                // 과거 날짜는 반복 적용 안 함 (등록일 포함 미래만)
+                if (targetDate < startOfDay(alarmDate)) {
+                    continue;
+                }
 
                 // 기념일 반복 로직 확인
                 if (alarm.anniversaryRepeat === 'daily') {
@@ -2168,134 +2178,6 @@ const Calendar = ({
                             />
                         ) : (
                         <div className="content-wrapper" onDoubleClick={() => onOpenEditor?.(selectedDate, scheduleText)}>
-                            {/* 반복 기념일 정보 (다른 날짜에서 반복된 경우) */}
-                            {(() => {
-                                // 자동삭제 필터 함수
-                                const isAutoDeleted = (alarm) => {
-                                    if (!alarm.disabledAt) return false;
-                                    const disabledDate = new Date(alarm.disabledAt);
-                                    const deletionDate = new Date(disabledDate);
-                                    deletionDate.setDate(deletionDate.getDate() + AUTO_DELETE_DAYS);
-                                    return new Date() >= deletionDate;
-                                };
-
-                                // 다른 날짜에서 반복된 기념일 알람 찾기
-                                const repeatedAnniversaries = [];
-                                const currentDateKey = format(selectedDate, 'yyyy-MM-dd');
-
-                                for (const scheduleKey in schedules) {
-                                    if (scheduleKey === currentDateKey) continue; // 현재 날짜는 제외
-
-                                    const scheduleEntry = schedules[scheduleKey];
-                                    if (!scheduleEntry?.alarm?.registeredAlarms) continue;
-
-                                    const anniversaryAlarms = scheduleEntry.alarm.registeredAlarms.filter(
-                                        alarm => alarm.isAnniversary && !isAutoDeleted(alarm)
-                                    );
-
-                                    for (const alarm of anniversaryAlarms) {
-                                        const alarmDate = new Date(alarm.calculatedTime);
-                                        const targetDate = new Date(selectedDate);
-                                        let isRepeated = false;
-
-                                        // 반복 로직 확인
-                                        if (alarm.anniversaryRepeat === 'daily') {
-                                            isRepeated = true;
-                                        } else if (alarm.anniversaryRepeat === 'weekly') {
-                                            if (alarmDate.getDay() === targetDate.getDay()) {
-                                                isRepeated = true;
-                                            }
-                                        } else if (alarm.anniversaryRepeat === 'monthly') {
-                                            if (alarmDate.getDate() === targetDate.getDate()) {
-                                                isRepeated = true;
-                                            }
-                                        } else if (alarm.anniversaryRepeat === 'yearly') {
-                                            if (alarmDate.getMonth() === targetDate.getMonth() &&
-                                                alarmDate.getDate() === targetDate.getDate()) {
-                                                isRepeated = true;
-                                            }
-                                        }
-
-                                        if (isRepeated) {
-                                            repeatedAnniversaries.push({
-                                                ...alarm,
-                                                originalDate: scheduleKey
-                                            });
-                                        }
-                                    }
-                                }
-
-                                if (repeatedAnniversaries.length === 0) return null;
-
-                                // 반복 패턴 한글 변환
-                                const getRepeatText = (repeat) => {
-                                    switch(repeat) {
-                                        case 'daily': return '매일';
-                                        case 'weekly': return '매주';
-                                        case 'monthly': return '매월';
-                                        case 'yearly': return '매년';
-                                        default: return '';
-                                    }
-                                };
-
-                                return (
-                                    <div style={{
-                                        marginBottom: '8px',
-                                        padding: '8px',
-                                        backgroundColor: 'rgba(74, 144, 226, 0.08)',
-                                        borderRadius: '6px',
-                                        borderLeft: '3px solid rgba(74, 144, 226, 0.4)'
-                                    }}>
-                                        <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>
-                                            🔄 반복 기념일
-                                        </div>
-                                        {repeatedAnniversaries.map((alarm, index) => {
-                                            const originalDate = new Date(alarm.originalDate);
-                                            return (
-                                                <div key={`repeated-${alarm.id || index}`} style={{
-                                                    marginBottom: index < repeatedAnniversaries.length - 1 ? '6px' : '0',
-                                                    fontSize: '12px'
-                                                }}>
-                                                    <div style={{ color: '#4a90e2', fontWeight: '500' }}>
-                                                        {alarm.anniversaryName || alarm.title}
-                                                    </div>
-                                                    <div style={{ fontSize: '11px', color: '#666', marginTop: '2px' }}>
-                                                        {format(originalDate, 'yyyy년 M월 d일')} 등록 · {getRepeatText(alarm.anniversaryRepeat)} 반복
-                                                        <button
-                                                            onClick={() => {
-                                                                if (window.confirm(`"${alarm.anniversaryName || alarm.title}" 기념일의 정보를 수정하시겠습니까?\n\n등록일: ${format(originalDate, 'yyyy년 M월 d일')}`)) {
-                                                                    // 원본 날짜로 이동하고 알람 모달 열기
-                                                                    const originalDateObj = new Date(alarm.originalDate);
-                                                                    setSelectedDate(originalDateObj);
-                                                                    setCurrentMonth(originalDateObj);
-                                                                    // 약간의 딜레이 후 알람 모달 열기
-                                                                    setTimeout(() => {
-                                                                        onOpenAlarm?.(originalDateObj);
-                                                                    }, 100);
-                                                                }
-                                                            }}
-                                                            style={{
-                                                                marginLeft: '6px',
-                                                                fontSize: '10px',
-                                                                color: '#4a90e2',
-                                                                background: 'none',
-                                                                border: 'none',
-                                                                cursor: 'pointer',
-                                                                padding: '2px 4px',
-                                                                textDecoration: 'underline',
-                                                                opacity: 0.7
-                                                            }}
-                                                        >
-                                                            수정
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                );
-                            })()}
-
                             {/* 기념일과 특일을 같은 줄에 표시 */}
                             {(() => {
                                 // 자동삭제 필터 함수
