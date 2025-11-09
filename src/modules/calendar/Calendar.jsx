@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSwipeable } from 'react-swipeable';
 import { useTrashContext } from '../../contexts/TrashContext';
 import { AUTO_DELETE_DAYS, ALARM_COLORS } from './constants';
+import { hasAlarm, hasActiveAlarm, isAutoDeleted } from './utils';
 
 // 개인 기념일
 const PERSONAL_EVENTS = {};
@@ -1539,125 +1540,8 @@ const Calendar = ({
         return entry && entry.text && entry.text.trim().length > 0;
     };
 
-    const hasAlarm = (date) => {
-        const key = format(date, 'yyyy-MM-dd');
-        const entry = schedules[key];
-
-        // 자동삭제 필터 함수
-        const isAutoDeleted = (alarm) => {
-            if (!alarm.disabledAt) return false;
-            const disabledDate = new Date(alarm.disabledAt);
-            const deletionDate = new Date(disabledDate);
-            deletionDate.setDate(deletionDate.getDate() + AUTO_DELETE_DAYS);
-            return new Date() >= deletionDate;
-        };
-
-        // 1. 해당 날짜에 직접 등록된 알람 확인 (일반 알람, 활성/비활성 모두, 기념일 제외)
-        const hasDirectAlarm = entry && entry.alarm && entry.alarm.registeredAlarms &&
-                              entry.alarm.registeredAlarms.filter(alarm => !alarm.isAnniversary && !isAutoDeleted(alarm)).length > 0;
-
-        if (hasDirectAlarm) return true;
-
-        // 2. 기념일 알람 확인 - 모든 날짜의 기념일을 순회하면서 오늘이 반복 날짜인지 확인
-        for (const scheduleKey in schedules) {
-            const scheduleEntry = schedules[scheduleKey];
-            if (!scheduleEntry?.alarm?.registeredAlarms) continue;
-
-            const anniversaryAlarms = scheduleEntry.alarm.registeredAlarms.filter(
-                alarm => alarm.isAnniversary && !isAutoDeleted(alarm)
-            );
-
-            for (const alarm of anniversaryAlarms) {
-                const alarmDate = new Date(alarm.calculatedTime);
-                const targetDate = new Date(date);
-
-                // 과거 날짜는 반복 적용 안 함 (등록일 포함 미래만)
-                if (targetDate < startOfDay(alarmDate)) {
-                    continue;
-                }
-
-                // 기념일 반복 로직 확인
-                if (alarm.anniversaryRepeat === 'daily') {
-                    return true;
-                } else if (alarm.anniversaryRepeat === 'weekly') {
-                    if (alarmDate.getDay() === targetDate.getDay()) {
-                        return true;
-                    }
-                } else if (alarm.anniversaryRepeat === 'monthly') {
-                    if (alarmDate.getDate() === targetDate.getDate()) {
-                        return true;
-                    }
-                } else if (alarm.anniversaryRepeat === 'yearly') {
-                    if (alarmDate.getMonth() === targetDate.getMonth() &&
-                        alarmDate.getDate() === targetDate.getDate()) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
-    };
-
-    const hasActiveAlarm = (date) => {
-        const key = format(date, 'yyyy-MM-dd');
-        const entry = schedules[key];
-
-        // 자동삭제 필터 함수
-        const isAutoDeleted = (alarm) => {
-            if (!alarm.disabledAt) return false;
-            const disabledDate = new Date(alarm.disabledAt);
-            const deletionDate = new Date(disabledDate);
-            deletionDate.setDate(deletionDate.getDate() + AUTO_DELETE_DAYS);
-            return new Date() >= deletionDate;
-        };
-
-        // 1. 해당 날짜에 직접 등록된 활성 알람 확인 (일반 알람, 기념일 제외)
-        const hasDirectActiveAlarm = entry && entry.alarm && entry.alarm.registeredAlarms &&
-                                     entry.alarm.registeredAlarms.some(alarm => !alarm.isAnniversary && alarm.enabled !== false && !isAutoDeleted(alarm));
-
-        if (hasDirectActiveAlarm) return true;
-
-        // 2. 기념일 알람 확인 - 활성화된 기념일만
-        for (const scheduleKey in schedules) {
-            const scheduleEntry = schedules[scheduleKey];
-            if (!scheduleEntry?.alarm?.registeredAlarms) continue;
-
-            const anniversaryAlarms = scheduleEntry.alarm.registeredAlarms.filter(
-                alarm => alarm.isAnniversary && alarm.enabled !== false && !isAutoDeleted(alarm)
-            );
-
-            for (const alarm of anniversaryAlarms) {
-                const alarmDate = new Date(alarm.calculatedTime);
-                const targetDate = new Date(date);
-
-                // 과거 날짜는 반복 적용 안 함 (등록일 포함 미래만)
-                if (targetDate < startOfDay(alarmDate)) {
-                    continue;
-                }
-
-                // 기념일 반복 로직 확인
-                if (alarm.anniversaryRepeat === 'daily') {
-                    return true;
-                } else if (alarm.anniversaryRepeat === 'weekly') {
-                    if (alarmDate.getDay() === targetDate.getDay()) {
-                        return true;
-                    }
-                } else if (alarm.anniversaryRepeat === 'monthly') {
-                    if (alarmDate.getDate() === targetDate.getDate()) {
-                        return true;
-                    }
-                } else if (alarm.anniversaryRepeat === 'yearly') {
-                    if (alarmDate.getMonth() === targetDate.getMonth() &&
-                        alarmDate.getDate() === targetDate.getDate()) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
-    };
+    // hasAlarm, hasActiveAlarm 함수는 utils로 이동됨
+    // 사용 시: hasAlarm(date, schedules), hasActiveAlarm(date, schedules)
 
     const handleGoToToday = () => {
         const todayDate = new Date();
@@ -2095,8 +1979,8 @@ const Calendar = ({
                                 const isToday = isSameDay(date, today);
                                 const isSelected = selectedDate && isSameDay(date, selectedDate);
                                 const isSchedule = hasSchedule(date);
-                                const isAlarm = hasAlarm(date);
-                                const isActiveAlarm = hasActiveAlarm(date);
+                                const isAlarm = hasAlarm(date, schedules);
+                                const isActiveAlarm = hasActiveAlarm(date, schedules);
                                 const dateKey = format(date, 'yyyy-MM-dd');
                                 const isPastDate = isBefore(startOfDay(date), startOfDay(today));
                                 const isHoliday = isNationalHoliday(date);
