@@ -1352,7 +1352,19 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     if (type === 'pending') {
       setDeleteConfirmMessage('해당 가등록 알람을 삭제할까요?');
     } else if (alarm.isAnniversary) {
-      setDeleteConfirmMessage('정말 해당 기념일을 삭제하시겠습니까?');
+      // 기념일 알람: 등록일과 현재 보는 날짜 비교
+      const alarmDateStr = format(alarm.calculatedTime, 'yyyy-MM-dd');
+      const currentDateStr = format(scheduleData.date, 'yyyy-MM-dd');
+      const isRegisteredToday = alarmDateStr === currentDateStr;
+      const hasRepeat = alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none';
+
+      if (hasRepeat && !isRegisteredToday) {
+        // 주기로 인해 표시된 기념일 (등록일이 아닌 다른 날)
+        setDeleteConfirmMessage('해당 기념일은 완전히 삭제됩니다. 진행할까요?');
+      } else {
+        // 등록일 당일의 기념일
+        setDeleteConfirmMessage('정말 해당 기념일을 삭제하시겠습니까?');
+      }
     } else if (isPastDate && !alarm.isAnniversary) {
       // 과거 날짜의 일반 알람 (종료된 알람)
       setDeleteConfirmMessage('종료된 알람을 삭제할까요?');
@@ -2055,10 +2067,20 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               minHeight: 'calc(1.3em * 2)',
                               marginTop: '2px'
                             }}>
-                              {alarm.title || '제목 없음'}
-                              {alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none' && (
-                                <span style={{ marginLeft: '4px', fontSize: '13px' }}>🔄</span>
-                              )}
+                              {(() => {
+                                // 등록일과 현재 보는 날짜 비교
+                                const alarmDateStr = format(alarm.calculatedTime, 'yyyy-MM-dd');
+                                const currentDateStr = format(scheduleData.date, 'yyyy-MM-dd');
+                                const isRegisteredToday = alarmDateStr === currentDateStr;
+                                const hasRepeat = alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none';
+
+                                return (
+                                  <>
+                                    {alarm.title || '제목 없음'}
+                                    {hasRepeat && !isRegisteredToday && ' 🔄'}
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                           <div style={{
@@ -2066,34 +2088,49 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             color: '#6c757d',
                             opacity: alarm.enabled !== false ? 1 : 0.5
                           }}>
-                            {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
-                            {alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none' && (
-                              <>
-                                <span style={{ margin: '0 4px' }}>·</span>
-                                <span style={{ fontSize: '11px', color: '#999' }}>
-                                  등록일: {format(alarm.calculatedTime, 'yyyy년 M월 d일')}
-                                </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditAlarm(alarm);
-                                  }}
-                                  style={{
-                                    marginLeft: '6px',
-                                    fontSize: '10px',
-                                    color: '#4a90e2',
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    padding: '2px 4px',
-                                    textDecoration: 'underline',
-                                    opacity: 0.6
-                                  }}
-                                >
-                                  수정
-                                </button>
-                              </>
-                            )}
+                            {(() => {
+                              // 등록일과 현재 보는 날짜 비교
+                              const alarmDateStr = format(alarm.calculatedTime, 'yyyy-MM-dd');
+                              const currentDateStr = format(scheduleData.date, 'yyyy-MM-dd');
+                              const isRegisteredToday = alarmDateStr === currentDateStr;
+                              const hasRepeat = alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none';
+
+                              return (
+                                <>
+                                  {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
+                                  {hasRepeat && isRegisteredToday && (
+                                    <span style={{ fontSize: '11px', color: '#999' }}> (당일 등록)</span>
+                                  )}
+                                  {hasRepeat && !isRegisteredToday && (
+                                    <>
+                                      <span style={{ margin: '0 4px' }}>·</span>
+                                      <span style={{ fontSize: '11px', color: '#999' }}>
+                                        {format(alarm.calculatedTime, 'yyyy년 M월 d일')}
+                                      </span>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEditAlarm(alarm);
+                                        }}
+                                        style={{
+                                          marginLeft: '6px',
+                                          fontSize: '10px',
+                                          color: '#4a90e2',
+                                          background: 'none',
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                          padding: '2px 4px',
+                                          textDecoration: 'underline',
+                                          opacity: 0.6
+                                        }}
+                                      >
+                                        수정
+                                      </button>
+                                    </>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         </AlarmInfo>
                         {alarm.isModified && (
@@ -3024,10 +3061,20 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                               minHeight: 'calc(1.3em * 2)',
                               marginTop: '2px'
                             }}>
-                              {alarm.title || '제목 없음'}
-                              {alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none' && (
-                                <span style={{ marginLeft: '4px', fontSize: '13px' }}>🔄</span>
-                              )}
+                              {(() => {
+                                // 등록일과 현재 보는 날짜 비교
+                                const alarmDateStr = format(alarm.calculatedTime, 'yyyy-MM-dd');
+                                const currentDateStr = format(scheduleData.date, 'yyyy-MM-dd');
+                                const isRegisteredToday = alarmDateStr === currentDateStr;
+                                const hasRepeat = alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none';
+
+                                return (
+                                  <>
+                                    {alarm.title || '제목 없음'}
+                                    {hasRepeat && !isRegisteredToday && ' 🔄'}
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
                           <div style={{
@@ -3035,34 +3082,49 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             color: '#6c757d',
                             opacity: alarm.enabled !== false ? 1 : 0.5
                           }}>
-                            {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
-                            {alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none' && (
-                              <>
-                                <span style={{ margin: '0 4px' }}>·</span>
-                                <span style={{ fontSize: '11px', color: '#999' }}>
-                                  등록일: {format(alarm.calculatedTime, 'yyyy년 M월 d일')}
-                                </span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEditAlarm(alarm);
-                                  }}
-                                  style={{
-                                    marginLeft: '6px',
-                                    fontSize: '10px',
-                                    color: '#4a90e2',
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    padding: '2px 4px',
-                                    textDecoration: 'underline',
-                                    opacity: 0.6
-                                  }}
-                                >
-                                  수정
-                                </button>
-                              </>
-                            )}
+                            {(() => {
+                              // 등록일과 현재 보는 날짜 비교
+                              const alarmDateStr = format(alarm.calculatedTime, 'yyyy-MM-dd');
+                              const currentDateStr = format(scheduleData.date, 'yyyy-MM-dd');
+                              const isRegisteredToday = alarmDateStr === currentDateStr;
+                              const hasRepeat = alarm.anniversaryRepeat && alarm.anniversaryRepeat !== 'none';
+
+                              return (
+                                <>
+                                  {format(alarm.calculatedTime, 'yyyy-MM-dd HH:mm')}
+                                  {hasRepeat && isRegisteredToday && (
+                                    <span style={{ fontSize: '11px', color: '#999' }}> (당일 등록)</span>
+                                  )}
+                                  {hasRepeat && !isRegisteredToday && (
+                                    <>
+                                      <span style={{ margin: '0 4px' }}>·</span>
+                                      <span style={{ fontSize: '11px', color: '#999' }}>
+                                        {format(alarm.calculatedTime, 'yyyy년 M월 d일')}
+                                      </span>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEditAlarm(alarm);
+                                        }}
+                                        style={{
+                                          marginLeft: '6px',
+                                          fontSize: '10px',
+                                          color: '#4a90e2',
+                                          background: 'none',
+                                          border: 'none',
+                                          cursor: 'pointer',
+                                          padding: '2px 4px',
+                                          textDecoration: 'underline',
+                                          opacity: 0.6
+                                        }}
+                                      >
+                                        수정
+                                      </button>
+                                    </>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         </AlarmInfo>
                         {alarm.isModified && (
