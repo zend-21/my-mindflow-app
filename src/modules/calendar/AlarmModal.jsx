@@ -1742,9 +1742,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     onSave(alarmSettings, 'apply'); // 변경사항 적용
   };
 
-  // Set event time to current time
+  // Set event time to current time + 1 minute
   const handleSetCurrentTime = () => {
     const now = new Date();
+    now.setMinutes(now.getMinutes() + 1); // 현재시간 + 1분
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
     setHourInput(hours);
