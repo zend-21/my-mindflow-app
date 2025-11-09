@@ -2224,13 +2224,6 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                   <div>일시중지</div>
                                 </div>
                               </div>
-                              {!alarm.isRepeated && (
-                                <DeleteButton
-                                  onClick={() => handleDeleteAlarm(alarm.id)}
-                                >
-                                  삭제
-                                </DeleteButton>
-                              )}
                             </>
                           )}
                         </AlarmActions>
@@ -2468,51 +2461,37 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 )}
                               </>
                             ) : (
-                              // 일시중지 상태
-                              // 과거 날짜의 일반 알람은 삭제 버튼과 "종료된 알람" 표시를 중앙 정렬
-                              isPastDate && !alarm.isAnniversary ? (
-                                <div style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}>
-                                  <DeleteButton
-                                    onClick={() => handleDeleteAlarm(alarm.id)}
-                                  >
-                                    삭제
-                                  </DeleteButton>
+                              // 일시중지 상태 - 중지 아이콘만 표시, 삭제 버튼 없음
+                              <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '13px',
+                                color: '#999',
+                                padding: '4px 0'
+                              }}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <rect x="1" y="1" width="22" height="22" rx="3" stroke={ALARM_COLORS.primary} strokeWidth="2"/>
+                                  <rect x="8" y="7" width="2.5" height="10" fill={ALARM_COLORS.primary}/>
+                                  <rect x="13.5" y="7" width="2.5" height="10" fill={ALARM_COLORS.primary}/>
+                                </svg>
+                                <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
+                                  <div>알람</div>
+                                  <div>일시중지</div>
+                                </div>
+                                {isPastDate && !alarm.isAnniversary && (
                                   <div style={{
                                     fontSize: '11px',
                                     color: ALARM_COLORS.danger,
                                     textAlign: 'center',
-                                    lineHeight: '1.2'
+                                    lineHeight: '1.2',
+                                    marginTop: '4px'
                                   }}>
                                     알람종료
                                   </div>
-                                </div>
-                              ) : (
-                                // 기타: 알람 일시중지 표시
-                                <div style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  fontSize: '13px',
-                                  color: '#999',
-                                  padding: '4px 0'
-                                }}>
-                                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <rect x="1" y="1" width="22" height="22" rx="3" stroke={ALARM_COLORS.primary} strokeWidth="2"/>
-                                    <rect x="8" y="7" width="2.5" height="10" fill={ALARM_COLORS.primary}/>
-                                    <rect x="13.5" y="7" width="2.5" height="10" fill={ALARM_COLORS.primary}/>
-                                  </svg>
-                                  <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
-                                    <div>알람</div>
-                                    <div>일시중지</div>
-                                  </div>
-                                </div>
-                              )
+                                )}
+                              </div>
                             )}
                           </AlarmActions>
                         </AlarmItem>
@@ -3505,55 +3484,38 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                                 </DeleteButton>
                               </>
                             ) : (
-                              alarm.disabledAt ? (
-                                // 비활성화된 알람 (시간 경과): 삭제 버튼만 표시
-                                <div style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  gap: '8px'
-                                }}>
-                                  <DeleteButton
-                                    onClick={() => handleDeleteAlarm(alarm.id)}
-                                    style={{
-                                      backgroundColor: '#ff9999',
-                                      color: 'white'
-                                    }}
-                                  >
-                                    삭제
-                                  </DeleteButton>
+                              // 일시중지 상태 - 중지 아이콘만 표시, 삭제 버튼 없음
+                              <div style={{
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                gap: '4px',
+                                fontSize: '13px',
+                                color: '#999',
+                                padding: '4px 0'
+                              }}>
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                  <rect x="1" y="1" width="22" height="22" rx="3" stroke={ALARM_COLORS.primary} strokeWidth="2"/>
+                                  <rect x="8" y="7" width="2.5" height="10" fill={ALARM_COLORS.primary}/>
+                                  <rect x="13.5" y="7" width="2.5" height="10" fill={ALARM_COLORS.primary}/>
+                                </svg>
+                                <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
+                                  <div>알람</div>
+                                  <div>일시중지</div>
+                                </div>
+                                {alarm.disabledAt && (
                                   <div style={{
                                     fontSize: '11px',
                                     color: '#ff6b6b',
                                     textAlign: 'center',
                                     lineHeight: '1.3',
-                                    fontWeight: '600'
+                                    fontWeight: '600',
+                                    marginTop: '4px'
                                   }}>
                                     알람종료
                                   </div>
-                                </div>
-                              ) : (
-                                // 수동으로 일시중지한 알람: 기존 일시중지 아이콘
-                                <div style={{
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  alignItems: 'center',
-                                  gap: '4px',
-                                  fontSize: '13px',
-                                  color: '#999',
-                                  padding: '4px 0'
-                                }}>
-                                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <rect x="1" y="1" width="22" height="22" rx="3" stroke={ALARM_COLORS.primary} strokeWidth="2"/>
-                                    <rect x="8" y="7" width="2.5" height="10" fill={ALARM_COLORS.primary}/>
-                                    <rect x="13.5" y="7" width="2.5" height="10" fill={ALARM_COLORS.primary}/>
-                                  </svg>
-                                  <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
-                                    <div>알람</div>
-                                    <div>일시중지</div>
-                                  </div>
-                                </div>
-                              )
+                                )}
+                              </div>
                             )}
                           </AlarmActions>
                         </AlarmItem>
