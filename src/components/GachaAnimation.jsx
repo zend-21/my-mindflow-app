@@ -110,7 +110,7 @@ const firework = keyframes`
     }
 `;
 
-// ✨ 새로운 배경/중앙 애니메이션
+// ✨ 배경 애니메이션
 const vortex = keyframes`
     0% {
         background-position: 0% 0%;
@@ -153,7 +153,6 @@ const celestialTrail = keyframes`
     }
 `;
 
-// 중앙 코어 회전 및 맥동 애니메이션은 그대로 유지
 const corePulse = keyframes`
     0%, 100% {
         transform: translate(-50%, -50%) scale(1);
@@ -165,12 +164,13 @@ const corePulse = keyframes`
     }
 `;
 
-const coreSwirl = keyframes`
+// ✨ 중앙 사각형을 위한 회전 애니메이션 (6초 주기)
+const innerSwirl = keyframes`
     from {
-        transform: rotate(0deg); /* 원형을 꽉 채우기 위해 translate 제거 */
+        transform: translate(-50%, -50%) rotate(45deg); /* 초기 45도 회전 */
     }
     to {
-        transform: rotate(360deg);
+        transform: translate(-50%, -50%) rotate(405deg); /* 45도 + 360도 */
     }
 `;
 
@@ -201,7 +201,7 @@ const BlackholeVortex = styled.div`
         transparent 100px,
         transparent 120px
     );
-    animation: ${vortex} 100s linear infinite;
+    animation: ${vortex} 100s linear infinite; /* 매우 느린 회전 */
     filter: blur(1px);
     top: -50%;
     left: -50%;
@@ -222,48 +222,64 @@ const CenterContainer = styled.div`
     z-index: 100;
 `;
 
-// ✨ 분석 코어 (원형을 꽉 채우는 소용돌이 효과로 수정)
+// ✨ 분석 코어 (회전하는 사각형 은하수로 수정)
 const AnalysisCore = styled.div`
     position: relative;
     width: 120px;
     height: 120px;
+    border-radius: 50%; /* 원형의 겉모습 유지 */
+    display: flex; /* 중앙 정렬을 위해 추가 */
+    justify-content: center;
+    align-items: center;
     
-    /* 1. Swirling Galaxy Effect (블러 제거, 질감 강화) */
+    /* 1. Pulsing Outer Aura (가장 바깥쪽 원형 맥동) */
     &::before {
         content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        border-radius: 50%;
-        /* 선명한 코닉 그라데이션으로 소용돌이 질감 구현 */
-        background: conic-gradient(
-            from 0deg,
-            rgba(255, 215, 0, 0.7) 0deg,      /* Sharper gold */
-            rgba(170, 218, 255, 0.5) 90deg,   /* Brighter blue */
-            rgba(25, 25, 50, 0.1) 180deg,     /* Darker transition */
-            rgba(170, 218, 255, 0.7) 270deg,  /* Brighter blue */
-            rgba(255, 215, 0, 0.7) 360deg
-        );
-        animation: ${coreSwirl} 8s linear infinite; /* 배경 회전 */
-        box-shadow: 0 0 30px rgba(170, 218, 255, 0.8);
-        /* filter: blur(2px); <-- 제거됨 */
-    }
-    
-    /* 2. Central Galaxy Symbol (은하수 심볼 복원 + 맥동 효과) */
-    &::after {
-        content: '🌌'; /* 은하수 심볼 복원 */
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        font-size: 50px; /* 사이즈 조정 */
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: radial-gradient(circle at center, rgba(170, 218, 255, 0.4) 0%, rgba(25, 25, 50, 0) 70%);
+        animation: ${corePulse} 3s ease-in-out infinite;
+        z-index: 1; 
+    }
+    
+    /* 2. Inscribed Rotating Galaxy Square (::after: 사각형 은하수) */
+    &::after { 
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        /* 사각형 크기 (원의 지름 120px에 내접하도록 설정) */
+        width: 85px; 
+        height: 85px; 
+        
+        /* 은하수 질감 */
+        background: conic-gradient(
+            from 0deg,
+            rgba(255, 215, 0, 0.7) 0deg,      
+            rgba(170, 218, 255, 0.5) 90deg,   
+            rgba(25, 25, 50, 0.1) 180deg,     
+            rgba(170, 218, 255, 0.7) 270deg,  
+            rgba(255, 215, 0, 0.7) 360deg
+        );
+        box-shadow: 0 0 15px rgba(170, 218, 255, 0.8);
+        
+        /* 고유한 회전 애니메이션 적용 (배경보다 빠름) */
+        animation: ${innerSwirl} 6s linear infinite; 
+        z-index: 5;
+    }
+    
+    /* 3. Central Pulsing Galaxy Symbol (AnalysisCore 자체의 내용) */
+    & > span {
+        font-size: 50px; 
         color: #FFD700;
         text-shadow: 0 0 15px #FFD700;
         mix-blend-mode: screen;
         
-        /* 심볼 자체에 맥동 애니메이션 적용 */
         animation: ${corePulse} 3s ease-in-out infinite; 
         z-index: 10;
     }
@@ -588,7 +604,7 @@ const GachaAnimation = ({ onComplete }) => {
     const [isExiting, setIsExiting] = useState(false);
     const [showFireworks, setShowFireworks] = useState(false);
     const [overallIndex, setOverallIndex] = useState(0); 
-    const totalSteps = 22; // 6 (사주) + 6 (타로) + 6 (별자리) + 4 (최종) = 22
+    const totalSteps = 22; 
     const progress = Math.min(100, (overallIndex / totalSteps) * 100);
     
     // 단계별 메시지 정의 (단계 번호/진행률 텍스트 제거)
@@ -741,7 +757,7 @@ const GachaAnimation = ({ onComplete }) => {
     // Fading Glyphs (점술 문양) 생성
     const fadingGlyphs = useMemo(() => {
         const glyphs = [];
-        // 🃏 (조커 카드) 문양을 추가하여 🎴를 대체함
+        // 🃏 (조커 카드) 문양을 포함하여 최종 리스트 구성
         const symbols = ['🃏', '🔮', '☯️', '☰', '☱', '☴', '♈', '♎', '★', '◇', '◎'];
         const colors = ['#FFFFFF', '#FFD700', '#AADAFF'];
 
@@ -861,8 +877,11 @@ const GachaAnimation = ({ onComplete }) => {
 
 
             <CenterContainer>
-                {/* 중앙 분석 코어 (원형을 꽉 채우는 소용돌이) */}
-                <AnalysisCore />
+                {/* 중앙 분석 코어 (회전하는 사각형 은하수) */}
+                <AnalysisCore>
+                    {/* 🌌 심볼은 AnalysisCore의 flexbox 중앙에 위치하며 맥동함 */}
+                    <span>🌌</span> 
+                </AnalysisCore>
 
                 {currentStage && (
                     <MessageContainer>
