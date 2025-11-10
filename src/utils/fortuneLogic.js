@@ -898,4 +898,4 @@ export const getUserProfile = () => {
  * 가챠 테스트 모드 플래그
  * true로 설정하면 하루 1회 제한 무시
  */
-export const IS_TESTING_MODE = true; // ⚠️ 테스트용: true, 배포 시 false로 변경
+export const IS_TESTING_MODE = false; // ⚠️ 테스트용: true, 배포 시 false로 변경
