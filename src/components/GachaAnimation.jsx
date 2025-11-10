@@ -1,619 +1,822 @@
 // src/components/GachaAnimation.jsx
 
-import React, { useEffect, useRef, useState } from 'react';
-import styled from 'styled-components';
-import { gsap } from 'gsap';
+import { useState, useEffect, useMemo } from 'react';
+import styled, { keyframes, css } from 'styled-components';
 
-/**
- * 🎰 GSAP 기반 고퀄리티 가챠 머신 애니메이션
- *
- * 특징:
- * - 물리 엔진으로 자연스러운 움직임
- * - 부드러운 트윈 애니메이션
- * - 입체감 있는 3D 효과
- */
+// 🎨 Animations
 
-const Container = styled.div`
+const fadeInScale = keyframes`
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+`;
+
+const fadeIn = keyframes`
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+`;
+
+const fadeOut = keyframes`
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+`;
+
+const shimmer = keyframes`
+    0% {
+        background-position: -1000px 0;
+    }
+    100% {
+        background-position: 1000px 0;
+    }
+`;
+
+const pulse = keyframes`
+    0%, 100% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+`;
+
+const floatUp = keyframes`
+    0% {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+        transform: translateY(-50px);
+    }
+`;
+
+const sparkle = keyframes`
+    0%, 100% {
+        opacity: 0;
+        transform: scale(0) rotate(0deg);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1) rotate(180deg);
+    }
+`;
+
+const firework = keyframes`
+    0% {
+        transform: translate(0, 0) scale(0);
+        opacity: 1;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        transform: translate(var(--tx), var(--ty)) scale(1);
+        opacity: 0;
+    }
+`;
+
+// ✨ 새로운 배경/중앙 애니메이션
+const vortex = keyframes`
+    0% {
+        background-position: 0% 0%;
+        transform: scale(1) rotate(0deg);
+    }
+    100% {
+        background-position: 100% 100%;
+        transform: scale(1.2) rotate(360deg);
+    }
+`;
+
+const glyphFade = keyframes`
+    0% {
+        opacity: 0;
+        transform: translate(0, 0) scale(0.8) rotate(0deg);
+    }
+    30% {
+        opacity: 0.2;
+    }
+    100% {
+        opacity: 0;
+        transform: translate(var(--tx), var(--ty)) scale(1.5) rotate(720deg);
+    }
+`;
+
+const celestialTrail = keyframes`
+    0% {
+        opacity: 0;
+        transform: translate(var(--sx), var(--sy)) rotate(var(--rot));
+    }
+    10% {
+        opacity: 1;
+    }
+    60% {
+        opacity: 0;
+        transform: translate(var(--ex), var(--ey)) rotate(var(--rot));
+    }
+    100% {
+        opacity: 0;
+    }
+`;
+
+const corePulse = keyframes`
+    0%, 100% {
+        transform: translate(-50%, -50%) scale(1);
+        box-shadow: 0 0 40px rgba(255, 215, 0, 0.4);
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.1);
+        box-shadow: 0 0 60px rgba(170, 218, 255, 0.8);
+    }
+`;
+
+const coreSwirl = keyframes`
+    from {
+        transform: translate(-50%, -50%) rotate(0deg);
+    }
+    to {
+        transform: translate(-50%, -50%) rotate(360deg);
+    }
+`;
+
+// 🎨 Styled Components
+
+const Overlay = styled.div`
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at center, #1a1a2e 0%, #0c0018 100%);
     overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
 `;
 
-// 배경 반짝임 효과
-const BackgroundSparkle = styled.div`
+const BlackholeVortex = styled.div`
     position: absolute;
-    width: 3px;
-    height: 3px;
-    background: white;
-    border-radius: 50%;
-    box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.8);
-    opacity: 0;
-`;
-
-// 섬광 효과
-const Flash = styled.div`
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, transparent 70%);
-    opacity: 0;
+    width: 200%;
+    height: 200%;
+    background: repeating-radial-gradient(
+        circle,
+        rgba(255, 255, 255, 0.03) 0px,
+        rgba(0, 0, 0, 0.1) 1px,
+        transparent 100px,
+        transparent 120px
+    );
+    animation: ${vortex} 100s linear infinite;
+    filter: blur(1px);
+    top: -50%;
+    left: -50%;
+    z-index: 1;
     pointer-events: none;
 `;
 
-const GachaMachine = styled.div`
-    position: relative;
-    width: 300px;
-    height: 450px;
-`;
-
-// 유리 돔 (3D 효과)
-const GlassDome = styled.div`
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 200px;
-    height: 200px;
-    background: linear-gradient(135deg,
-        rgba(255, 255, 255, 0.4) 0%,
-        rgba(255, 255, 255, 0.1) 100%
-    );
-    border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-    border: 4px solid rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(10px);
-    box-shadow:
-        inset -10px -10px 30px rgba(255, 255, 255, 0.4),
-        inset 10px 10px 30px rgba(0, 0, 0, 0.1),
-        0 20px 40px rgba(0, 0, 0, 0.3);
-    overflow: hidden;
-`;
-
-// 반짝이는 하이라이트
-const Highlight = styled.div`
-    position: absolute;
-    top: 20px;
-    left: 30px;
-    width: 50px;
-    height: 50px;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.8), transparent);
-    border-radius: 50%;
-    filter: blur(10px);
-`;
-
-// 회전 캡슐 컨테이너
-const CapsulesContainer = styled.div`
+const CenterContainer = styled.div`
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 150px;
-    height: 150px;
     transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 40px;
+    animation: ${fadeInScale} 0.6s ease-out;
+    z-index: 100;
 `;
 
-// 캡슐
-const Capsule = styled.div`
-    position: absolute;
-    width: 38px;
-    height: 55px;
-    border-radius: 22px;
-    background: ${props => props.$gradient};
-    box-shadow:
-        inset 0 -22px 0 rgba(0, 0, 0, 0.25),
-        inset 0 2px 0 rgba(255, 255, 255, 0.4),
-        0 5px 15px rgba(0, 0, 0, 0.3);
-
-    &::before {
-        content: '';
-        position: absolute;
-        top: 8px;
-        left: 10px;
-        width: 12px;
-        height: 12px;
-        background: rgba(255, 255, 255, 0.7);
-        border-radius: 50%;
-        box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
-    }
-`;
-
-// 황금 캡슐 (떨어지는 것)
-const GoldenCapsule = styled.div`
-    position: absolute;
-    width: 45px;
-    height: 65px;
-    border-radius: 25px;
-    background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FF8C00 100%);
-    box-shadow:
-        inset 0 -28px 0 rgba(139, 69, 19, 0.3),
-        inset 0 3px 0 rgba(255, 255, 150, 0.6),
-        0 10px 30px rgba(255, 215, 0, 0.5),
-        0 0 40px rgba(255, 215, 0, 0.3);
-
-    &::before {
-        content: '';
-        position: absolute;
-        top: 10px;
-        left: 12px;
-        width: 15px;
-        height: 15px;
-        background: rgba(255, 255, 255, 0.9);
-        border-radius: 50%;
-        box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
-    }
-
-    &::after {
-        content: '';
-        position: absolute;
-        bottom: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 30px;
-        height: 20px;
-        background: radial-gradient(ellipse, rgba(255, 215, 0, 0.4), transparent);
-        border-radius: 50%;
-        filter: blur(5px);
-    }
-`;
-
-// 머신 몸통
-const MachineBody = styled.div`
-    position: absolute;
-    top: 180px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 220px;
-    height: 200px;
-    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 50%, #dc4a5a 100%);
-    border-radius: 20px;
-    box-shadow:
-        inset -5px -5px 20px rgba(0, 0, 0, 0.3),
-        inset 5px 5px 20px rgba(255, 120, 120, 0.3),
-        0 15px 50px rgba(0, 0, 0, 0.5);
-    border: 5px solid rgba(255, 255, 255, 0.3);
-`;
-
-// 출구
-const CapsuleExit = styled.div`
-    position: absolute;
-    bottom: 60px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 85px;
-    height: 55px;
-    background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.7));
-    border-radius: 10px 10px 45px 45px;
-    border: 3px solid rgba(0, 0, 0, 0.4);
-    box-shadow: inset 0 5px 15px rgba(0, 0, 0, 0.6);
-`;
-
-// 손잡이
-const Handle = styled.div`
-    position: absolute;
-    right: -45px;
-    top: 40px;
-    width: 65px;
-    height: 65px;
-`;
-
-const HandleStick = styled.div`
-    position: absolute;
-    top: 30px;
-    right: 55px;
-    width: 45px;
-    height: 10px;
-    background: linear-gradient(90deg, #999 0%, #666 100%);
-    border-radius: 5px;
-    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
-`;
-
-const HandleKnob = styled.div`
-    width: 55px;
-    height: 55px;
-    background: linear-gradient(135deg, #FFD700 0%, #FFED4E 50%, #FFC700 100%);
-    border-radius: 50%;
-    border: 5px solid rgba(139, 69, 19, 0.3);
-    box-shadow:
-        inset -3px -3px 10px rgba(139, 69, 19, 0.4),
-        inset 3px 3px 10px rgba(255, 255, 150, 0.6),
-        0 5px 20px rgba(0, 0, 0, 0.4);
+// ✨ 분석 코어
+const AnalysisCore = styled.div`
     position: relative;
-
-    &::after {
+    width: 120px;
+    height: 120px;
+    
+    &::before {
         content: '';
         position: absolute;
-        top: 12px;
-        left: 12px;
-        width: 18px;
-        height: 18px;
-        background: rgba(255, 255, 255, 0.7);
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 100px;
+        height: 100px;
         border-radius: 50%;
-        box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+        background: radial-gradient(circle at center, rgba(170, 218, 255, 0.6) 0%, rgba(25, 25, 50, 0) 70%);
+        animation: ${corePulse} 3s ease-in-out infinite;
+    }
+    
+    &::after {
+        content: '🌌';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(0deg);
+        font-size: 60px;
+        color: #FFD700;
+        animation: ${coreSwirl} 5s linear infinite;
+        text-shadow: 0 0 15px #FFD700;
+        mix-blend-mode: screen;
     }
 `;
 
-// 폭죽 조각
-const ConfettiPiece = styled.div`
-    position: absolute;
-    width: 12px;
-    height: 12px;
-    background: ${props => props.$color};
-    border-radius: ${props => props.$shape === 'circle' ? '50%' : '2px'};
-    box-shadow: 0 0 10px ${props => props.$color};
+const MessageContainer = styled.div`
+    text-align: center;
+    color: white;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
 `;
 
-// 반짝임 효과
+const Message = styled.h1`
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.5px;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    animation: ${props => props.$isExiting ? css`${fadeOut} 0.5s ease-out forwards` : css`${fadeIn} 0.5s ease-out forwards`};
+
+    @media (min-width: 768px) {
+        font-size: 36px;
+    }
+`;
+
+const SubMessage = styled.p`
+    font-size: 16px;
+    margin: 12px 0 0 0;
+    opacity: 0.9;
+    font-weight: 300;
+    animation: ${props => props.$isExiting ? css`${fadeOut} 0.5s ease-out forwards` : css`${fadeIn} 0.5s ease-out 0.2s forwards`};
+
+    @media (min-width: 768px) {
+        font-size: 18px;
+    }
+`;
+
+const ProgressBarContainer = styled.div`
+    width: 250px;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 24px;
+`;
+
+const ProgressFiller = styled.div.attrs(props => ({
+    style: {
+        width: `${props.$progress}%`,
+    }
+}))`
+    height: 100%;
+    background: linear-gradient(90deg, #aa96da 0%, #ffd700 100%);
+    transition: width 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+    position: relative;
+    
+    &::after {
+        content: '';
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+            90deg,
+            rgba(255, 255, 255, 0) 0%,
+            rgba(255, 255, 255, 0.8) 50%,
+            rgba(255, 255, 255, 0) 100%
+        );
+        animation: ${shimmer} 2s infinite;
+        position: absolute;
+        top: 0;
+        left: 0;
+    }
+`;
+
+
+// ✨ 동서양 점술 문양 효과
+const FadingGlyph = styled.div.attrs(props => ({
+    style: {
+        fontSize: `${props.$size}px`,
+        color: props.$color,
+        animationDuration: `${props.$duration}s`,
+        animationDelay: `${props.$delay}s`,
+        top: `${props.$top}%`,
+        left: `${props.$left}%`,
+        '--tx': `${props.$tx}px`,
+        '--ty': `${props.$ty}px`,
+    }
+}))`
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    animation: ${glyphFade} ease-in-out infinite;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+    z-index: 5;
+`;
+
+// ✨ 천체 궤적 효과
+const CelestialTrail = styled.div.attrs(props => ({
+    style: {
+        background: props.$color,
+        width: `${props.$length}px`,
+        height: '2px',
+        animationDuration: `${props.$duration}s`,
+        animationDelay: `${props.$delay}s`,
+        '--sx': `${props.$sx}px`,
+        '--sy': `${props.$sy}px`,
+        '--ex': `${props.$ex}px`,
+        '--ey': `${props.$ey}px`,
+        '--rot': `${props.$rot}deg`,
+    }
+}))`
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    animation: ${celestialTrail} ease-out infinite;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    z-index: 3;
+`;
+
+
+// --- 기존 서브 애니메이션들 (재활용) ---
+
+const SajuSymbols = styled.div`
+    position: absolute;
+    bottom: 15%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 30px;
+    opacity: ${props => props.$show ? 1 : 0};
+    transition: opacity 0.5s;
+    z-index: 50;
+`;
+
+const SajuSymbol = styled.div.attrs(props => ({
+    style: {
+        animationDelay: `${props.$delay}s`,
+    }
+}))`
+    font-size: 36px;
+    animation: ${pulse} 1.2s ease-in-out infinite;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+    color: #ffd700;
+`;
+
+const TarotDeck = styled.div`
+    position: absolute;
+    bottom: 15%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 10px;
+    opacity: ${props => props.$show ? 1 : 0};
+    transition: opacity 0.5s;
+    z-index: 50;
+`;
+
+const ShuffleCard = styled.div.attrs(props => ({
+    style: {
+        animationDelay: `${props.$delay}s`,
+    }
+}))`
+    width: 50px;
+    height: 75px;
+    background: linear-gradient(135deg, #2d3561 0%, #1a1f3a 100%);
+    border: 2px solid rgba(255, 215, 0, 0.5);
+    border-radius: 8px;
+    animation: ${pulse} 0.8s ease-in-out infinite;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+`;
+
+const StarSymbols = styled.div`
+    position: absolute;
+    bottom: 15%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 20px;
+    opacity: ${props => props.$show ? 1 : 0};
+    transition: opacity 0.5s;
+    z-index: 50;
+`;
+
+const StarSymbol = styled.div.attrs(props => ({
+    style: {
+        animationDelay: `${props.$delay}s`,
+    }
+}))`
+    font-size: 40px;
+    animation: ${pulse} 5s linear infinite;
+    text-shadow: 0 0 15px rgba(170, 218, 255, 0.8);
+    color: #aadaff;
+`;
+
+const FloatingParticles = styled.div`
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+`;
+
+const Particle = styled.div`
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: white;
+    border-radius: 50%;
+    opacity: 0;
+
+    ${Array.from({ length: 20 }, (_, i) => {
+        const x = Math.random() * 100;
+        const delay = i * 0.2;
+        return css`
+            &:nth-child(${i + 1}) {
+                left: ${x}%;
+                bottom: 0;
+                animation: ${floatUp} 3s ease-out ${delay}s infinite;
+            }
+        `;
+    })}
+`;
+
+const Sparkles = styled.div`
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+`;
+
 const Sparkle = styled.div`
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    background: white;
+    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+    animation: ${sparkle} 1.5s ease-in-out infinite;
+
+    ${Array.from({ length: 30 }, (_, i) => {
+        const x = Math.random() * 100;
+        const y = Math.random() * 100;
+        const delay = Math.random() * 2;
+        const duration = 1 + Math.random();
+        return css`
+            &:nth-child(${i + 1}) {
+                left: ${x}%;
+                top: ${y}%;
+                animation-delay: ${delay}s;
+                animation-duration: ${duration}s;
+            }
+        `;
+    })}
+`;
+
+const Fireworks = styled.div`
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    opacity: ${props => props.$show ? 1 : 0};
+    transition: opacity 0.5s;
+    z-index: 1000;
+`;
+
+const FireworkParticle = styled.div.attrs(props => ({
+    style: {
+        left: `${props.$x}%`,
+        top: `${props.$y}%`,
+        background: props.$color,
+        animationDelay: `${props.$delay}s`,
+        '--tx': `${props.$tx}px`,
+        '--ty': `${props.$ty}px`,
+    }
+}))`
     position: absolute;
     width: 4px;
     height: 4px;
-    background: white;
     border-radius: 50%;
-    box-shadow: 0 0 10px white;
+    animation: ${firework} 1s ease-out forwards;
 `;
 
-// 메시지
-const Message = styled.div`
-    position: absolute;
-    bottom: 40px;
-    left: 50%;
-    transform: translateX(-50%);
-    color: white;
-    font-size: 20px;
-    font-weight: 700;
-    text-shadow:
-        0 2px 4px rgba(0, 0, 0, 0.5),
-        0 0 20px rgba(255, 255, 255, 0.3);
-    white-space: nowrap;
-    letter-spacing: 0.5px;
-`;
+
+// 🎯 Main Component
 
 const GachaAnimation = ({ onComplete }) => {
-    const containerRef = useRef(null);
-    const capsulesRef = useRef([]);
-    const goldenCapsuleRef = useRef(null);
-    const handleRef = useRef(null);
-    const confettiRef = useRef([]);
-    const sparklesRef = useRef([]);
-    const messageRef = useRef(null);
-    const backgroundSparklesRef = useRef([]);
-    const flashRef = useRef(null);
+    const [currentStep, setCurrentStep] = useState(0);
+    const [currentSubStepIndex, setCurrentSubStepIndex] = useState(0);
+    const [isExiting, setIsExiting] = useState(false);
+    const [showFireworks, setShowFireworks] = useState(false);
+    const [overallIndex, setOverallIndex] = useState(0); 
+    const totalSteps = 22; // 6 (사주) + 6 (타로) + 6 (별자리) + 4 (최종) = 22
+    const progress = Math.min(100, (overallIndex / totalSteps) * 100);
+    
+    // 단계별 메시지 정의 (단계 번호/진행률 텍스트 제거)
+    const analysisStages = useMemo(() => ([
+        {
+            main: '사주 분석',
+            icon: '☯️',
+            sub: [
+                '운명의 뿌리를 추적합니다...',
+                '천간지지(天干地支) 좌표 설정 중...',
+                '오행(五行) 에너지 흐름 감지 중...',
+                '팔자(八字) 구조 해독 진행 중...',
+                '육십갑자(六十甲子) 순환 분석 중...',
+                '명리(命理) 통계 집계 완료...'
+            ],
+            type: 'saju'
+        },
+        {
+            main: '타로 리딩',
+            icon: '🃏',
+            sub: [
+                '카드가 당신의 운명을 읽습니다...',
+                '우주의 덱(Cosmic Deck) 셔플 중...',
+                '아르카나(Arcana) 에너지 정렬 중...',
+                '시간의 스프레드(Spread) 전개 중...',
+                '상징의 언어 번역 진행 중...',
+                '내면의 진실 포착 완료...'
+            ],
+            type: 'tarot'
+        },
+        {
+            main: '별자리 운세',
+            icon: '✨',
+            sub: [
+                '별들이 당신의 이야기를 들려줍니다...',
+                '천구(天球) 좌표 매핑 중...',
+                '행성 트랜짓(Transit) 추적 중...',
+                '에너지 하우스 분석 진행 중...',
+                '천체 조화(Harmony) 측정 중...',
+                '우주적 영향력 계산 완료...'
+            ],
+            type: 'star'
+        },
+        {
+            main: '최종 집계',
+            icon: '🎉',
+            sub: [
+                '운명의 문이 열립니다...',
+                '모든 차원 데이터 동기화 중...',
+                '종합 운세 보고서 완성...',
+                '당신의 진실, 지금 공개됩니다.'
+            ],
+            type: 'complete'
+        }
+    ]), []);
 
-    // 메시지 텍스트 상태 관리
-    const [messageText, setMessageText] = useState('운세를 뽑는 중...');
+    const currentStage = analysisStages[currentStep];
 
     useEffect(() => {
-        const tl = gsap.timeline({
-            onComplete: () => {
-                setTimeout(onComplete, 500);
+        const timers = [];
+        let cumulativeDelay = 0;
+        let globalIndex = 0;
+
+        const allSubSteps = analysisStages.flatMap((stage, stageIndex) => 
+            stage.sub.map((subMessage, subIndex) => ({
+                stageIndex,
+                subIndex,
+                isFinalStep: stageIndex === analysisStages.length - 1 && subIndex === stage.sub.length - 1,
+            }))
+        );
+
+        allSubSteps.forEach((step, index) => {
+            // 랜덤 딜레이 설정 (100ms ~ 500ms)
+            const delay = 100 + Math.random() * 400; 
+
+            // 상태 업데이트 스케줄링
+            timers.push(setTimeout(() => {
+                // 페이드 아웃 처리
+                setIsExiting(true);
+                
+                // 페이드 아웃 후 상태 업데이트 및 페이드 인 시작
+                timers.push(setTimeout(() => {
+                    setIsExiting(false);
+                    setCurrentStep(step.stageIndex);
+                    setCurrentSubStepIndex(step.subIndex);
+                    setOverallIndex(globalIndex + 1); // 전체 진행 인덱스 업데이트
+
+                    // 최종 완료 단계에서 폭죽 시작
+                    if (step.isFinalStep) {
+                        setShowFireworks(true);
+                    }
+
+                }, 500)); // 500ms는 fadeOut 애니메이션 시간
+
+                globalIndex++;
+
+            }, cumulativeDelay));
+
+            // 누적 딜레이 업데이트
+            cumulativeDelay += delay + 500; // 랜덤 딜레이 + 애니메이션 시간
+
+            // 최종 완료 후 onComplete 호출
+            if (index === allSubSteps.length - 1) {
+                timers.push(setTimeout(() => {
+                    onComplete();
+                }, cumulativeDelay + 1000)); // 최종 문구 표시 후 1초 대기
             }
         });
 
-        // 1. 초기 페이드인 (0-0.5초)
-        tl.fromTo(containerRef.current,
-            { opacity: 0 },
-            { opacity: 1, duration: 0.5, ease: 'power2.out' }
-        );
-
-        // 배경 반짝임 효과 (계속 반복)
-        backgroundSparklesRef.current.forEach((sparkle, i) => {
-            tl.to(sparkle, {
-                opacity: 1,
-                scale: 1.5,
-                duration: 0.3,
-                repeat: -1,
-                yoyo: true,
-                ease: 'power2.inOut',
-                delay: i * 0.1
-            }, 0);
-        });
-
-        // 2. 캡슐들 회전 (0.5-3초)
-        capsulesRef.current.forEach((capsule, i) => {
-            tl.to(capsule, {
-                rotation: 360 * 3,
-                duration: 2.5,
-                ease: 'linear',
-                repeat: 0
-            }, 0.5);
-        });
-
-        // 3. 메시지: "운세를 뽑는 중..."
-        tl.fromTo(messageRef.current,
-            { opacity: 0, y: 20 },
-            { opacity: 1, y: 0, duration: 0.5, ease: 'back.out(1.7)' },
-            0.5
-        );
-
-        // 4. 손잡이 회전 (1.5-2.5초)
-        tl.to(handleRef.current, {
-            rotation: 360,
-            duration: 1,
-            ease: 'power2.inOut'
-        }, 1.5);
-
-        // 5. 황금 캡슐 떨어지기 (2.5-3.5초)
-        tl.call(() => setMessageText('행운의 캡슐이 나왔어요!'), null, 2.5);
-
-        // 황금 캡슐 등장
-        tl.fromTo(goldenCapsuleRef.current,
-            { top: '30%', left: '50%', x: '-50%', y: 0, scale: 0, opacity: 0, rotation: 0 },
-            {
-                scale: 1,
-                opacity: 1,
-                duration: 0.3,
-                ease: 'back.out(2)'
-            },
-            2.5
-        );
-
-        // 출구로 이동 (곡선 경로로 굴러가는 효과)
-        tl.to(goldenCapsuleRef.current, {
-            top: '52%',
-            left: '50%',
-            rotation: 180,
-            duration: 0.6,
-            ease: 'power1.in'
-        }, 2.8);
-
-        // 출구에서 통통 튀면서 나오기 (3번 튕김)
-        // 첫 번째 큰 튕김
-        tl.to(goldenCapsuleRef.current, {
-            top: '68%',
-            left: '50%',
-            rotation: 270,
-            duration: 0.3,
-            ease: 'power2.in'
-        }, 3.4);
-
-        tl.to(goldenCapsuleRef.current, {
-            top: '55%',
-            rotation: 360,
-            duration: 0.25,
-            ease: 'power2.out'
-        }, 3.7);
-
-        // 두 번째 중간 튕김
-        tl.to(goldenCapsuleRef.current, {
-            top: '68%',
-            rotation: 450,
-            duration: 0.2,
-            ease: 'power2.in'
-        }, 3.95);
-
-        tl.to(goldenCapsuleRef.current, {
-            top: '62%',
-            rotation: 540,
-            duration: 0.15,
-            ease: 'power2.out'
-        }, 4.15);
-
-        // 세 번째 작은 튕김
-        tl.to(goldenCapsuleRef.current, {
-            top: '68%',
-            rotation: 600,
-            duration: 0.15,
-            ease: 'power2.in'
-        }, 4.3);
-
-        tl.to(goldenCapsuleRef.current, {
-            top: '65%',
-            rotation: 720,
-            duration: 0.1,
-            ease: 'power2.out'
-        }, 4.45);
-
-        // 7. 진동 효과 (4.5-4.8초)
-        tl.to(goldenCapsuleRef.current, {
-            x: '-50%',
-            rotation: '+=10',
-            duration: 0.05,
-            yoyo: true,
-            repeat: 5,
-            ease: 'none'
-        }, 4.55);
-
-        // 8. 메시지 변경
-        tl.call(() => setMessageText('캡슐을 여는 중...'), null, 4.5);
-
-        // 9. 섬광 효과
-        tl.to(flashRef.current, {
-            opacity: 0.6,
-            duration: 0.1,
-            ease: 'power2.out'
-        }, 4.8);
-
-        tl.to(flashRef.current, {
-            opacity: 0,
-            duration: 0.3,
-            ease: 'power2.in'
-        }, 4.9);
-
-        // 10. 캡슐 폭발 + 강화된 폭죽 (4.8-5.5초)
-        tl.to(goldenCapsuleRef.current, {
-            scale: 2,
-            opacity: 0,
-            rotation: '+=360',
-            duration: 0.2,
-            ease: 'power2.out'
-        }, 4.8);
-
-        // 강화된 폭죽 효과 (더 많은 입자, 더 큰 범위)
-        confettiRef.current.forEach((piece, i) => {
-            const angle = (i / confettiRef.current.length) * Math.PI * 2;
-            const distance = 200 + Math.random() * 150;
-            const tx = Math.cos(angle) * distance;
-            const ty = Math.sin(angle) * distance;
-
-            tl.fromTo(piece,
-                { x: 0, y: 0, scale: 0, opacity: 1 },
-                {
-                    x: tx,
-                    y: ty,
-                    scale: 1.5,
-                    opacity: 0,
-                    rotation: Math.random() * 1080 - 540,
-                    duration: 1.2,
-                    ease: 'power2.out'
-                },
-                4.8 + i * 0.015
-            );
-        });
-
-        // 반짝임 효과 강화
-        sparklesRef.current.forEach((sparkle, i) => {
-            tl.fromTo(sparkle,
-                { scale: 0, opacity: 0 },
-                {
-                    scale: 2,
-                    opacity: 1,
-                    duration: 0.15,
-                    yoyo: true,
-                    repeat: 3,
-                    ease: 'power2.inOut'
-                },
-                4.8 + i * 0.08
-            );
-        });
-
-        // 11. 최종 메시지
-        tl.call(() => setMessageText('운세 결과 준비 완료!'), null, 5.2);
-
-        tl.to(messageRef.current, {
-            scale: 1.1,
-            duration: 0.3,
-            ease: 'back.out(2)'
-        }, 5.2);
-
-        // 12. 페이드 아웃 (5.8-6.3초)
-        tl.to(containerRef.current, {
-            opacity: 0,
-            duration: 0.5,
-            ease: 'power2.in'
-        }, 5.8);
-
         return () => {
-            tl.kill();
+            timers.forEach(timer => clearTimeout(timer));
         };
-    }, [onComplete]);
+    }, [onComplete, analysisStages]);
 
-    // 캡슐 데이터
-    const capsules = [
-        { x: 40, y: 15, gradient: 'linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%)' },
-        { x: 75, y: 25, gradient: 'linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%)' },
-        { x: 25, y: 55, gradient: 'linear-gradient(135deg, #F7B733 0%, #FC4A1A 100%)' },
-        { x: 80, y: 65, gradient: 'linear-gradient(135deg, #A8E063 0%, #56AB2F 100%)' },
-    ];
+    // 폭죽 파티클 생성
+    const fireworkParticles = useMemo(() => {
+        const fireworks = [];
+        const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#95E1D3', '#F38181', '#AA96DA'];
 
-    // 폭죽 색상 (더 밝고 화려하게)
-    const confettiColors = ['#FF6B6B', '#4ECDC4', '#F7B733', '#A8E063', '#FFD93D', '#FF6BCB', '#6B8EFF', '#FFE66D', '#FF6F91', '#00D9FF'];
-    const confettiPieces = Array.from({ length: 50 }, (_, i) => ({
-        id: i,
-        color: confettiColors[i % confettiColors.length],
-        shape: i % 3 === 0 ? 'circle' : 'square'
-    }));
+        for (let i = 0; i < 5; i++) {
+            const x = 20 + Math.random() * 60;
+            const y = 20 + Math.random() * 60;
 
-    // 반짝임 위치
-    const sparkles = Array.from({ length: 20 }, (_, i) => ({
-        id: i,
-        x: Math.random() * 100,
-        y: Math.random() * 100
-    }));
+            for (let j = 0; j < 12; j++) {
+                const angle = (j / 12) * Math.PI * 2;
+                const distance = 50 + Math.random() * 30;
+                const tx = Math.cos(angle) * distance;
+                const ty = Math.sin(angle) * distance;
+                const delay = i * 0.15 + Math.random() * 0.1;
 
-    // 배경 반짝임 (계속 반짝이는 별들)
-    const backgroundSparkles = Array.from({ length: 30 }, (_, i) => ({
-        id: i,
-        x: Math.random() * 100,
-        y: Math.random() * 100
-    }));
+                fireworks.push(
+                    <FireworkParticle
+                        key={`${i}-${j}`}
+                        $x={x}
+                        $y={y}
+                        $tx={tx}
+                        $ty={ty}
+                        $color={colors[Math.floor(Math.random() * colors.length)]}
+                        $delay={delay}
+                    />
+                );
+            }
+        }
+        return fireworks;
+    }, []);
+
+    // Fading Glyphs (점술 문양) 생성
+    const fadingGlyphs = useMemo(() => {
+        const glyphs = [];
+        const symbols = ['🎴', '🔮', '☯️', '☰', '☱', '☴', '♈', '♎', '★', '◇', '◎'];
+        const colors = ['#FFFFFF', '#FFD700', '#AADAFF'];
+
+        for (let i = 0; i < 20; i++) {
+            const symbol = symbols[Math.floor(Math.random() * symbols.length)];
+            const size = 15 + Math.random() * 25;
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            const duration = 5 + Math.random() * 5;
+            const delay = Math.random() * 10;
+            const top = Math.random() * 100;
+            const left = Math.random() * 100;
+            const tx = (Math.random() - 0.5) * 100;
+            const ty = (Math.random() - 0.5) * 100;
+
+            glyphs.push(
+                <FadingGlyph
+                    key={`glyph-${i}`}
+                    $size={size}
+                    $color={color}
+                    $duration={duration}
+                    $delay={delay}
+                    $top={top}
+                    $left={left}
+                    $tx={tx}
+                    $ty={ty}
+                >
+                    {symbol}
+                </FadingGlyph>
+            );
+        }
+        return glyphs;
+    }, []);
+
+    // Celestial Trails (천체 궤적) 생성
+    const celestialTrails = useMemo(() => {
+        const trails = [];
+        const colors = ['rgba(255, 255, 255, 0.8)', 'rgba(170, 218, 255, 0.9)'];
+        
+        for (let i = 0; i < 15; i++) {
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            const length = 50 + Math.random() * 100;
+            const duration = 2 + Math.random() * 3;
+            const delay = Math.random() * 5;
+            const startX = -100 + Math.random() * 1200;
+            const startY = -100 + Math.random() * 1200;
+            const angle = Math.random() * 360;
+            const distance = 1000;
+            const endX = startX + Math.cos(angle * Math.PI / 180) * distance;
+            const endY = startY + Math.sin(angle * Math.PI / 180) * distance;
+
+            trails.push(
+                <CelestialTrail
+                    key={`trail-${i}`}
+                    $color={color}
+                    $length={length}
+                    $duration={duration}
+                    $delay={delay}
+                    $sx={startX}
+                    $sy={startY}
+                    $ex={endX}
+                    $ey={endY}
+                    $rot={angle}
+                />
+            );
+        }
+        return trails;
+    }, []);
+
+    const currentSubMessage = currentStage ? currentStage.sub[currentSubStepIndex] : '';
+    const currentMainMessage = currentStage ? currentStage.main : '';
+
 
     return (
-        <Container ref={containerRef}>
-            {/* 배경 반짝임 */}
-            {backgroundSparkles.map((sparkle, idx) => (
-                <BackgroundSparkle
-                    key={`bg-${sparkle.id}`}
-                    ref={el => backgroundSparklesRef.current[idx] = el}
-                    style={{
-                        left: `${sparkle.x}%`,
-                        top: `${sparkle.y}%`
-                    }}
-                />
-            ))}
-
-            {/* 섬광 효과 */}
-            <Flash ref={flashRef} />
-
-            <GachaMachine>
-                {/* 유리 돔 */}
-                <GlassDome>
-                    <Highlight />
-                    <CapsulesContainer>
-                        {capsules.map((capsule, idx) => (
-                            <Capsule
-                                key={idx}
-                                ref={el => capsulesRef.current[idx] = el}
-                                $gradient={capsule.gradient}
-                                style={{
-                                    left: `${capsule.x}%`,
-                                    top: `${capsule.y}%`,
-                                    transform: 'translate(-50%, -50%)'
-                                }}
-                            />
-                        ))}
-                    </CapsulesContainer>
-                </GlassDome>
-
-                {/* 황금 캡슐 */}
-                <GoldenCapsule ref={goldenCapsuleRef} />
-
-                {/* 머신 몸통 */}
-                <MachineBody>
-                    <CapsuleExit />
-                    <Handle ref={handleRef}>
-                        <HandleStick />
-                        <HandleKnob />
-                    </Handle>
-                </MachineBody>
-
-                {/* 폭죽 */}
-                {confettiPieces.map((piece, idx) => (
-                    <ConfettiPiece
-                        key={piece.id}
-                        ref={el => confettiRef.current[idx] = el}
-                        $color={piece.color}
-                        $shape={piece.shape}
-                        style={{
-                            left: '50%',
-                            top: '65%',
-                            opacity: 0
-                        }}
-                    />
+        <Overlay>
+            {/* 배경 애니메이션 */}
+            <BlackholeVortex />
+            <FloatingParticles>
+                {Array.from({ length: 20 }, (_, i) => (
+                    <Particle key={i} />
                 ))}
-
-                {/* 반짝임 */}
-                {sparkles.map((sparkle, idx) => (
-                    <Sparkle
-                        key={sparkle.id}
-                        ref={el => sparklesRef.current[idx] = el}
-                        style={{
-                            left: `${sparkle.x}%`,
-                            top: `${sparkle.y}%`,
-                            opacity: 0
-                        }}
-                    />
+            </FloatingParticles>
+            {fadingGlyphs}
+            {celestialTrails}
+            <Sparkles>
+                {Array.from({ length: 30 }, (_, i) => (
+                    <Sparkle key={i} />
                 ))}
+            </Sparkles>
 
-                {/* 메시지 */}
-                <Message ref={messageRef}>{messageText}</Message>
-            </GachaMachine>
-        </Container>
+            <Fireworks $show={showFireworks}>
+                {fireworkParticles}
+            </Fireworks>
+
+            {/* 사주팔자 기호 (Step 0) */}
+            <SajuSymbols $show={currentStep === 0}>
+                <SajuSymbol $delay={0}>甲</SajuSymbol>
+                <SajuSymbol $delay={0.15}>子</SajuSymbol>
+                <SajuSymbol $delay={0.3}>木</SajuSymbol>
+                <SajuSymbol $delay={0.45}>火</SajuSymbol>
+            </SajuSymbols>
+
+            {/* 타로 카드 셔플 (Step 1) */}
+            <TarotDeck $show={currentStep === 1}>
+                <ShuffleCard $delay={0} />
+                <ShuffleCard $delay={0.1} />
+                <ShuffleCard $delay={0.2} />
+                <ShuffleCard $delay={0.3} />
+                <ShuffleCard $delay={0.4} />
+            </TarotDeck>
+
+            {/* 별자리 심볼 (Step 2) */}
+            <StarSymbols $show={currentStep === 2}>
+                <StarSymbol $delay={0}>♈</StarSymbol>
+                <StarSymbol $delay={0.15}>♌</StarSymbol>
+                <StarSymbol $delay={0.3}>♎</StarSymbol>
+            </StarSymbols>
+
+
+            <CenterContainer>
+                {/* 중앙 분석 코어 */}
+                <AnalysisCore />
+
+                {currentStage && (
+                    <MessageContainer>
+                        <Message $isExiting={isExiting}>
+                            {currentMainMessage}
+                        </Message>
+                        <SubMessage $isExiting={isExiting}>
+                            {currentSubMessage}
+                        </SubMessage>
+                        {/* 로딩 바에 실제 진행률 적용 */}
+                        <ProgressBarContainer>
+                            <ProgressFiller $progress={progress} />
+                        </ProgressBarContainer>
+                    </MessageContainer>
+                )}
+            </CenterContainer>
+        </Overlay>
     );
 };
 
