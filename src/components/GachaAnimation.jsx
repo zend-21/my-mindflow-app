@@ -221,7 +221,7 @@ const CenterContainer = styled.div`
     z-index: 100;
 `;
 
-// ✨ 분석 코어 (안정화된 초기 구조로 복원)
+// ✨ 분석 코어 (안정화된 초기 구조 - '🌌' 이모지)
 const AnalysisCore = styled.div`
     position: relative;
     width: 120px;
@@ -239,6 +239,7 @@ const AnalysisCore = styled.div`
         border-radius: 50%;
         background: radial-gradient(circle at center, rgba(170, 218, 255, 0.6) 0%, rgba(25, 25, 50, 0) 70%);
         animation: ${corePulse} 3s ease-in-out infinite;
+        z-index: 1;
     }
     
     /* 회전하는 은하수 심볼 ('🌌' 이모지) */
@@ -254,6 +255,7 @@ const AnalysisCore = styled.div`
         animation: ${coreSwirl} 5s linear infinite;
         text-shadow: 0 0 15px #FFD700;
         mix-blend-mode: screen;
+        z-index: 2;
     }
 `;
 
@@ -297,13 +299,27 @@ const SubMessage = styled.p`
     }
 `;
 
+// ✨ 진행률 퍼센티지 텍스트 추가
+const ProgressText = styled.span`
+    position: absolute;
+    right: 0; 
+    bottom: -20px; /* 로딩 바 아래 20px 위치 */
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    font-weight: 300;
+    line-height: 1;
+    white-space: nowrap;
+`;
+
+// ✨ ProgressBarContainer 수정 (position: relative, overflow: visible)
 const ProgressBarContainer = styled.div`
     width: 250px;
     height: 4px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 2px;
-    overflow: hidden;
+    overflow: visible; /* ProgressText를 절대 위치로 표시하기 위해 visible로 변경 */
     margin-top: 24px;
+    position: relative; /* ProgressText의 기준점 */
 `;
 
 const ProgressFiller = styled.div.attrs(props => ({
@@ -577,6 +593,7 @@ const GachaAnimation = ({ onComplete }) => {
     const [showFireworks, setShowFireworks] = useState(false);
     const [overallIndex, setOverallIndex] = useState(0); 
     const totalSteps = 22; 
+    // ✨ 진행률 계산
     const progress = Math.min(100, (overallIndex / totalSteps) * 100);
     
     // 단계별 메시지 정의 (단계 번호/진행률 텍스트 제거)
@@ -862,9 +879,13 @@ const GachaAnimation = ({ onComplete }) => {
                         <SubMessage $isExiting={isExiting}>
                             {currentSubMessage}
                         </SubMessage>
-                        {/* 로딩 바에 실제 진행률 적용 */}
+                        {/* 로딩 바와 진행률 퍼센티지 적용 */}
                         <ProgressBarContainer>
                             <ProgressFiller $progress={progress} />
+                            {/* ✨ 우측 하단에 진행률 표시 */}
+                            <ProgressText>
+                                {Math.round(progress)}%
+                            </ProgressText>
                         </ProgressBarContainer>
                     </MessageContainer>
                 )}
