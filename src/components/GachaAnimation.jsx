@@ -228,7 +228,7 @@ const AnalysisCore = styled.div`
     width: 120px;
     height: 120px;
     
-    /* 1. Swirling Galaxy Effect (원형을 꽉 채움) */
+    /* 1. Swirling Galaxy Effect (블러 제거, 질감 강화) */
     &::before {
         content: '';
         position: absolute;
@@ -237,33 +237,34 @@ const AnalysisCore = styled.div`
         width: 100%;
         height: 100%;
         border-radius: 50%;
-        /* 복잡한 그라데이션으로 은하수/소용돌이 느낌 구현 */
+        /* 선명한 코닉 그라데이션으로 소용돌이 질감 구현 */
         background: conic-gradient(
             from 0deg,
-            rgba(255, 215, 0, 0.4) 0deg, 
-            rgba(170, 218, 255, 0.4) 90deg, 
-            rgba(25, 25, 50, 0) 180deg,
-            rgba(170, 218, 255, 0.6) 270deg, 
-            rgba(255, 215, 0, 0.4) 360deg
+            rgba(255, 215, 0, 0.7) 0deg,      /* Sharper gold */
+            rgba(170, 218, 255, 0.5) 90deg,   /* Brighter blue */
+            rgba(25, 25, 50, 0.1) 180deg,     /* Darker transition */
+            rgba(170, 218, 255, 0.7) 270deg,  /* Brighter blue */
+            rgba(255, 215, 0, 0.7) 360deg
         );
-        animation: ${coreSwirl} 8s linear infinite; /* 회전 애니메이션 적용 */
+        animation: ${coreSwirl} 8s linear infinite; /* 배경 회전 */
         box-shadow: 0 0 30px rgba(170, 218, 255, 0.8);
-        filter: blur(2px);
+        /* filter: blur(2px); <-- 제거됨 */
     }
     
-    /* 2. Central Core Pulse (중앙 맥동 효과) */
+    /* 2. Central Galaxy Symbol (은하수 심볼 복원 + 맥동 효과) */
     &::after {
-        content: ''; 
+        content: '🌌'; /* 은하수 심볼 복원 */
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        width: 80px;
-        height: 80px;
-        border-radius: 50%;
-        /* 중앙 집중형 푸른 빛 그라데이션 */
-        background: radial-gradient(circle at center, rgba(170, 218, 255, 0.8) 0%, rgba(25, 25, 50, 0) 70%);
-        animation: ${corePulse} 3s ease-in-out infinite;
+        font-size: 50px; /* 사이즈 조정 */
+        color: #FFD700;
+        text-shadow: 0 0 15px #FFD700;
+        mix-blend-mode: screen;
+        
+        /* 심볼 자체에 맥동 애니메이션 적용 */
+        animation: ${corePulse} 3s ease-in-out infinite; 
         z-index: 10;
     }
 `;
