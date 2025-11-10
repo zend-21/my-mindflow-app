@@ -27,6 +27,27 @@ const Container = styled.div`
     overflow: hidden;
 `;
 
+// 배경 반짝임 효과
+const BackgroundSparkle = styled.div`
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.8);
+    opacity: 0;
+`;
+
+// 섬광 효과
+const Flash = styled.div`
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, transparent 70%);
+    opacity: 0;
+    pointer-events: none;
+`;
+
 const GachaMachine = styled.div`
     position: relative;
     width: 300px;
@@ -261,6 +282,8 @@ const GachaAnimation = ({ onComplete }) => {
     const confettiRef = useRef([]);
     const sparklesRef = useRef([]);
     const messageRef = useRef(null);
+    const backgroundSparklesRef = useRef([]);
+    const flashRef = useRef(null);
 
     // 메시지 텍스트 상태 관리
     const [messageText, setMessageText] = useState('운세를 뽑는 중...');
@@ -277,6 +300,19 @@ const GachaAnimation = ({ onComplete }) => {
             { opacity: 0 },
             { opacity: 1, duration: 0.5, ease: 'power2.out' }
         );
+
+        // 배경 반짝임 효과 (계속 반복)
+        backgroundSparklesRef.current.forEach((sparkle, i) => {
+            tl.to(sparkle, {
+                opacity: 1,
+                scale: 1.5,
+                duration: 0.3,
+                repeat: -1,
+                yoyo: true,
+                ease: 'power2.inOut',
+                delay: i * 0.1
+            }, 0);
+        });
 
         // 2. 캡슐들 회전 (0.5-3초)
         capsulesRef.current.forEach((capsule, i) => {
@@ -305,64 +341,113 @@ const GachaAnimation = ({ onComplete }) => {
         // 5. 황금 캡슐 떨어지기 (2.5-3.5초)
         tl.call(() => setMessageText('행운의 캡슐이 나왔어요!'), null, 2.5);
 
+        // 황금 캡슐 등장
         tl.fromTo(goldenCapsuleRef.current,
-            { top: '30%', left: '50%', x: '-50%', scale: 0 },
+            { top: '30%', left: '50%', x: '-50%', y: 0, scale: 0, opacity: 0, rotation: 0 },
             {
                 scale: 1,
+                opacity: 1,
                 duration: 0.3,
                 ease: 'back.out(2)'
             },
             2.5
         );
 
+        // 출구로 이동 (곡선 경로로 굴러가는 효과)
         tl.to(goldenCapsuleRef.current, {
-            top: '65%',
-            duration: 1,
-            ease: 'power2.in'
+            top: '52%',
+            left: '50%',
+            rotation: 180,
+            duration: 0.6,
+            ease: 'power1.in'
         }, 2.8);
 
-        // 6. 캡슐 튕기기 (3.5-4.5초)
+        // 출구에서 통통 튀면서 나오기 (3번 튕김)
+        // 첫 번째 큰 튕김
         tl.to(goldenCapsuleRef.current, {
-            y: -30,
+            top: '68%',
+            left: '50%',
+            rotation: 270,
+            duration: 0.3,
+            ease: 'power2.in'
+        }, 3.4);
+
+        tl.to(goldenCapsuleRef.current, {
+            top: '55%',
+            rotation: 360,
+            duration: 0.25,
+            ease: 'power2.out'
+        }, 3.7);
+
+        // 두 번째 중간 튕김
+        tl.to(goldenCapsuleRef.current, {
+            top: '68%',
+            rotation: 450,
             duration: 0.2,
-            ease: 'power2.out',
-            yoyo: true,
-            repeat: 1
-        }, 3.5);
+            ease: 'power2.in'
+        }, 3.95);
 
         tl.to(goldenCapsuleRef.current, {
-            y: -15,
+            top: '62%',
+            rotation: 540,
             duration: 0.15,
-            ease: 'power2.out',
-            yoyo: true,
-            repeat: 1
-        }, 3.9);
+            ease: 'power2.out'
+        }, 4.15);
 
-        // 7. 진동 효과 (4.2-4.5초)
+        // 세 번째 작은 튕김
+        tl.to(goldenCapsuleRef.current, {
+            top: '68%',
+            rotation: 600,
+            duration: 0.15,
+            ease: 'power2.in'
+        }, 4.3);
+
+        tl.to(goldenCapsuleRef.current, {
+            top: '65%',
+            rotation: 720,
+            duration: 0.1,
+            ease: 'power2.out'
+        }, 4.45);
+
+        // 7. 진동 효과 (4.5-4.8초)
         tl.to(goldenCapsuleRef.current, {
             x: '-50%',
-            rotation: 5,
+            rotation: '+=10',
             duration: 0.05,
             yoyo: true,
             repeat: 5,
             ease: 'none'
-        }, 4.2);
+        }, 4.55);
 
         // 8. 메시지 변경
-        tl.call(() => setMessageText('캡슐을 여는 중...'), null, 4.2);
+        tl.call(() => setMessageText('캡슐을 여는 중...'), null, 4.5);
 
-        // 9. 캡슐 폭발 + 폭죽 (4.5-5초)
-        tl.to(goldenCapsuleRef.current, {
-            scale: 1.5,
+        // 9. 섬광 효과
+        tl.to(flashRef.current, {
+            opacity: 0.6,
+            duration: 0.1,
+            ease: 'power2.out'
+        }, 4.8);
+
+        tl.to(flashRef.current, {
             opacity: 0,
             duration: 0.3,
-            ease: 'power2.out'
-        }, 4.5);
+            ease: 'power2.in'
+        }, 4.9);
 
-        // 폭죽 효과
+        // 10. 캡슐 폭발 + 강화된 폭죽 (4.8-5.5초)
+        tl.to(goldenCapsuleRef.current, {
+            scale: 2,
+            opacity: 0,
+            rotation: '+=360',
+            duration: 0.2,
+            ease: 'power2.out'
+        }, 4.8);
+
+        // 강화된 폭죽 효과 (더 많은 입자, 더 큰 범위)
         confettiRef.current.forEach((piece, i) => {
             const angle = (i / confettiRef.current.length) * Math.PI * 2;
-            const distance = 150 + Math.random() * 100;
+            const distance = 200 + Math.random() * 150;
             const tx = Math.cos(angle) * distance;
             const ty = Math.sin(angle) * distance;
 
@@ -371,40 +456,47 @@ const GachaAnimation = ({ onComplete }) => {
                 {
                     x: tx,
                     y: ty,
-                    scale: 1,
+                    scale: 1.5,
                     opacity: 0,
-                    rotation: Math.random() * 720 - 360,
-                    duration: 0.8,
+                    rotation: Math.random() * 1080 - 540,
+                    duration: 1.2,
                     ease: 'power2.out'
                 },
-                4.5 + i * 0.02
+                4.8 + i * 0.015
             );
         });
 
-        // 반짝임 효과
+        // 반짝임 효과 강화
         sparklesRef.current.forEach((sparkle, i) => {
             tl.fromTo(sparkle,
                 { scale: 0, opacity: 0 },
                 {
-                    scale: 1,
+                    scale: 2,
                     opacity: 1,
-                    duration: 0.2,
+                    duration: 0.15,
                     yoyo: true,
-                    repeat: 2,
+                    repeat: 3,
                     ease: 'power2.inOut'
                 },
-                4.5 + i * 0.1
+                4.8 + i * 0.08
             );
         });
 
-        // 10. 최종 메시지
-        tl.call(() => setMessageText('운세 결과 준비 완료!'), null, 4.8);
+        // 11. 최종 메시지
+        tl.call(() => setMessageText('운세 결과 준비 완료!'), null, 5.2);
 
         tl.to(messageRef.current, {
             scale: 1.1,
             duration: 0.3,
             ease: 'back.out(2)'
-        }, 4.8);
+        }, 5.2);
+
+        // 12. 페이드 아웃 (5.8-6.3초)
+        tl.to(containerRef.current, {
+            opacity: 0,
+            duration: 0.5,
+            ease: 'power2.in'
+        }, 5.8);
 
         return () => {
             tl.kill();
@@ -419,16 +511,23 @@ const GachaAnimation = ({ onComplete }) => {
         { x: 80, y: 65, gradient: 'linear-gradient(135deg, #A8E063 0%, #56AB2F 100%)' },
     ];
 
-    // 폭죽 색상
-    const confettiColors = ['#FF6B6B', '#4ECDC4', '#F7B733', '#A8E063', '#FFD93D', '#FF6BCB', '#6B8EFF'];
-    const confettiPieces = Array.from({ length: 30 }, (_, i) => ({
+    // 폭죽 색상 (더 밝고 화려하게)
+    const confettiColors = ['#FF6B6B', '#4ECDC4', '#F7B733', '#A8E063', '#FFD93D', '#FF6BCB', '#6B8EFF', '#FFE66D', '#FF6F91', '#00D9FF'];
+    const confettiPieces = Array.from({ length: 50 }, (_, i) => ({
         id: i,
         color: confettiColors[i % confettiColors.length],
         shape: i % 3 === 0 ? 'circle' : 'square'
     }));
 
     // 반짝임 위치
-    const sparkles = Array.from({ length: 12 }, (_, i) => ({
+    const sparkles = Array.from({ length: 20 }, (_, i) => ({
+        id: i,
+        x: Math.random() * 100,
+        y: Math.random() * 100
+    }));
+
+    // 배경 반짝임 (계속 반짝이는 별들)
+    const backgroundSparkles = Array.from({ length: 30 }, (_, i) => ({
         id: i,
         x: Math.random() * 100,
         y: Math.random() * 100
@@ -436,6 +535,21 @@ const GachaAnimation = ({ onComplete }) => {
 
     return (
         <Container ref={containerRef}>
+            {/* 배경 반짝임 */}
+            {backgroundSparkles.map((sparkle, idx) => (
+                <BackgroundSparkle
+                    key={`bg-${sparkle.id}`}
+                    ref={el => backgroundSparklesRef.current[idx] = el}
+                    style={{
+                        left: `${sparkle.x}%`,
+                        top: `${sparkle.y}%`
+                    }}
+                />
+            ))}
+
+            {/* 섬광 효과 */}
+            <Flash ref={flashRef} />
+
             <GachaMachine>
                 {/* 유리 돔 */}
                 <GlassDome>
@@ -457,7 +571,7 @@ const GachaAnimation = ({ onComplete }) => {
                 </GlassDome>
 
                 {/* 황금 캡슐 */}
-                <GoldenCapsule ref={goldenCapsuleRef} style={{ opacity: 0 }} />
+                <GoldenCapsule ref={goldenCapsuleRef} />
 
                 {/* 머신 몸통 */}
                 <MachineBody>
