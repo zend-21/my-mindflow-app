@@ -38,16 +38,16 @@ const fadeOut = keyframes`
     }
 `;
 
-// ✨ 메인 타이틀을 위한 느린 페이드 애니메이션 (효과 강화)
+// ✨ 메인 타이틀을 위한 느린 페이드 애니메이션 (투명도 0.4 ~ 1.0으로 강화)
 const slowFade = keyframes`
     0% {
-        opacity: 0.6; /* 불투명도 0.6으로 시작하여 변화를 명확하게 인지 */
+        opacity: 0.4; /* 투명도 강화 */
     }
     50% {
-        opacity: 1; /* 최대 불투명도 */
+        opacity: 1; 
     }
     100% {
-        opacity: 0.6; /* 다시 0.6으로 회귀 */
+        opacity: 0.4; 
     }
 `;
 
@@ -153,6 +153,7 @@ const celestialTrail = keyframes`
     }
 `;
 
+// 중앙 코어 회전 및 맥동 애니메이션은 그대로 유지
 const corePulse = keyframes`
     0%, 100% {
         transform: translate(-50%, -50%) scale(1);
@@ -166,10 +167,10 @@ const corePulse = keyframes`
 
 const coreSwirl = keyframes`
     from {
-        transform: translate(-50%, -50%) rotate(0deg);
+        transform: rotate(0deg); /* 원형을 꽉 채우기 위해 translate 제거 */
     }
     to {
-        transform: translate(-50%, -50%) rotate(360deg);
+        transform: rotate(360deg);
     }
 `;
 
@@ -221,36 +222,49 @@ const CenterContainer = styled.div`
     z-index: 100;
 `;
 
-// ✨ 분석 코어
+// ✨ 분석 코어 (원형을 꽉 채우는 소용돌이 효과로 수정)
 const AnalysisCore = styled.div`
     position: relative;
     width: 120px;
     height: 120px;
     
+    /* 1. Swirling Galaxy Effect (원형을 꽉 채움) */
     &::before {
         content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        /* 복잡한 그라데이션으로 은하수/소용돌이 느낌 구현 */
+        background: conic-gradient(
+            from 0deg,
+            rgba(255, 215, 0, 0.4) 0deg, 
+            rgba(170, 218, 255, 0.4) 90deg, 
+            rgba(25, 25, 50, 0) 180deg,
+            rgba(170, 218, 255, 0.6) 270deg, 
+            rgba(255, 215, 0, 0.4) 360deg
+        );
+        animation: ${coreSwirl} 8s linear infinite; /* 회전 애니메이션 적용 */
+        box-shadow: 0 0 30px rgba(170, 218, 255, 0.8);
+        filter: blur(2px);
+    }
+    
+    /* 2. Central Core Pulse (중앙 맥동 효과) */
+    &::after {
+        content: ''; 
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        width: 100px;
-        height: 100px;
+        width: 80px;
+        height: 80px;
         border-radius: 50%;
-        background: radial-gradient(circle at center, rgba(170, 218, 255, 0.6) 0%, rgba(25, 25, 50, 0) 70%);
+        /* 중앙 집중형 푸른 빛 그라데이션 */
+        background: radial-gradient(circle at center, rgba(170, 218, 255, 0.8) 0%, rgba(25, 25, 50, 0) 70%);
         animation: ${corePulse} 3s ease-in-out infinite;
-    }
-    
-    &::after {
-        content: '🌌';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%) rotate(0deg);
-        font-size: 60px;
-        color: #FFD700;
-        animation: ${coreSwirl} 5s linear infinite;
-        text-shadow: 0 0 15px #FFD700;
-        mix-blend-mode: screen;
+        z-index: 10;
     }
 `;
 
@@ -264,7 +278,7 @@ const MessageContainer = styled.div`
     justify-content: center;
 `;
 
-// 🌟 메인 타이틀: 느린 깜빡임 적용 (효과 강화)
+// 🌟 메인 타이틀: 느린 깜빡임 적용 (투명도 0.4 ~ 1.0)
 const Message = styled.h1`
     font-size: 28px;
     font-weight: 600;
@@ -272,7 +286,7 @@ const Message = styled.h1`
     letter-spacing: -0.5px;
     text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
     
-    /* 느린 펄스 효과 적용 및 속도 3s -> 2.5s로 단축 */
+    /* 느린 펄스 효과 적용 */
     animation: ${slowFade} 2.5s ease-in-out infinite;
 
     @media (min-width: 768px) {
@@ -636,7 +650,7 @@ const GachaAnimation = ({ onComplete }) => {
         const timers = [];
         let cumulativeDelay = 0;
         let globalIndex = 0;
-        const fadeDuration = 300; // 애니메이션 속도 단축 (0.5s -> 0.3s)
+        const fadeDuration = 300; 
 
         const allSubSteps = analysisStages.flatMap((stage, stageIndex) => 
             stage.sub.map((subMessage, subIndex) => ({
@@ -669,7 +683,7 @@ const GachaAnimation = ({ onComplete }) => {
                         setShowFireworks(true);
                     }
 
-                }, fadeDuration)); // 단축된 페이드 시간 적용
+                }, fadeDuration)); 
 
                 globalIndex++;
 
@@ -726,7 +740,8 @@ const GachaAnimation = ({ onComplete }) => {
     // Fading Glyphs (점술 문양) 생성
     const fadingGlyphs = useMemo(() => {
         const glyphs = [];
-        const symbols = ['🎴', '🔮', '☯️', '☰', '☱', '☴', '♈', '♎', '★', '◇', '◎'];
+        // 🃏 (조커 카드) 문양을 추가하여 🎴를 대체함
+        const symbols = ['🃏', '🔮', '☯️', '☰', '☱', '☴', '♈', '♎', '★', '◇', '◎'];
         const colors = ['#FFFFFF', '#FFD700', '#AADAFF'];
 
         for (let i = 0; i < 20; i++) {
@@ -845,7 +860,7 @@ const GachaAnimation = ({ onComplete }) => {
 
 
             <CenterContainer>
-                {/* 중앙 분석 코어 */}
+                {/* 중앙 분석 코어 (원형을 꽉 채우는 소용돌이) */}
                 <AnalysisCore />
 
                 {currentStage && (
