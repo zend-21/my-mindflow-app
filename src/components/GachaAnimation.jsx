@@ -38,6 +38,19 @@ const fadeOut = keyframes`
     }
 `;
 
+// ✨ 메인 타이틀을 위한 느린 페이드 애니메이션 (투명도 0.4 ~ 1.0으로 강화)
+const slowFade = keyframes`
+    0% {
+        opacity: 0.4; /* 투명도 강화 */
+    }
+    50% {
+        opacity: 1; 
+    }
+    100% {
+        opacity: 0.4; 
+    }
+`;
+
 const shimmer = keyframes`
     0% {
         background-position: -1000px 0;
@@ -251,25 +264,30 @@ const MessageContainer = styled.div`
     justify-content: center;
 `;
 
+// 🌟 메인 타이틀: 느린 깜빡임 적용 (효과 강화)
 const Message = styled.h1`
     font-size: 28px;
     font-weight: 600;
     margin: 0;
     letter-spacing: -0.5px;
     text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
-    animation: ${props => props.$isExiting ? css`${fadeOut} 0.5s ease-out forwards` : css`${fadeIn} 0.5s ease-out forwards`};
+    
+    /* 느린 펄스 효과 적용 및 속도 3s -> 2.5s로 단축 */
+    animation: ${slowFade} 2.5s ease-in-out infinite;
 
     @media (min-width: 768px) {
         font-size: 36px;
     }
 `;
 
+// 🚀 서브 메시지: 빠른 전환 애니메이션 유지
 const SubMessage = styled.p`
     font-size: 16px;
     margin: 12px 0 0 0;
     opacity: 0.9;
     font-weight: 300;
-    animation: ${props => props.$isExiting ? css`${fadeOut} 0.5s ease-out forwards` : css`${fadeIn} 0.5s ease-out 0.2s forwards`};
+    /* 하위 메시지는 빠른 전환 애니메이션 유지 (0.3s) */
+    animation: ${props => props.$isExiting ? css`${fadeOut} 0.3s ease-out forwards` : css`${fadeIn} 0.3s ease-out 0.1s forwards`};
 
     @media (min-width: 768px) {
         font-size: 18px;
@@ -292,7 +310,7 @@ const ProgressFiller = styled.div.attrs(props => ({
 }))`
     height: 100%;
     background: linear-gradient(90deg, #aa96da 0%, #ffd700 100%);
-    transition: width 0.5s cubic-bezier(0.25, 0.1, 0.25, 1);
+    transition: width 0.3s cubic-bezier(0.25, 0.1, 0.25, 1); 
     position: relative;
     
     &::after {
@@ -369,7 +387,7 @@ const SajuSymbols = styled.div`
     display: flex;
     gap: 30px;
     opacity: ${props => props.$show ? 1 : 0};
-    transition: opacity 0.5s;
+    transition: opacity 0.3s; 
     z-index: 50;
 `;
 
@@ -392,10 +410,11 @@ const TarotDeck = styled.div`
     display: flex;
     gap: 10px;
     opacity: ${props => props.$show ? 1 : 0};
-    transition: opacity 0.5s;
+    transition: opacity 0.3s; 
     z-index: 50;
 `;
 
+// 🃏 수정된 ShuffleCard (카드 뒷면 무늬 추가)
 const ShuffleCard = styled.div.attrs(props => ({
     style: {
         animationDelay: `${props.$delay}s`,
@@ -403,11 +422,36 @@ const ShuffleCard = styled.div.attrs(props => ({
 }))`
     width: 50px;
     height: 75px;
-    background: linear-gradient(135deg, #2d3561 0%, #1a1f3a 100%);
-    border: 2px solid rgba(255, 215, 0, 0.5);
-    border-radius: 8px;
+    border-radius: 6px;
+    border: 1px solid #FFD700;
+    position: relative;
+    overflow: hidden;
+    
+    /* 신비로운 카드 뒷면 패턴 */
+    background: #1a1f3a; 
+    background-image: repeating-conic-gradient(
+        from 0deg, 
+        rgba(255, 215, 0, 0.1) 0%, 
+        transparent 5%, 
+        transparent 50%
+    );
+    background-size: 15px 15px; 
+    
     animation: ${pulse} 0.8s ease-in-out infinite;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+
+    /* 중앙 문양 (신비로운 눈) */
+    &::before {
+        content: '👁️'; 
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 20px;
+        color: #FFD700;
+        opacity: 0.8;
+        text-shadow: 0 0 5px #FFD700;
+    }
 `;
 
 const StarSymbols = styled.div`
@@ -418,7 +462,7 @@ const StarSymbols = styled.div`
     display: flex;
     gap: 20px;
     opacity: ${props => props.$show ? 1 : 0};
-    transition: opacity 0.5s;
+    transition: opacity 0.3s; 
     z-index: 50;
 `;
 
@@ -592,6 +636,7 @@ const GachaAnimation = ({ onComplete }) => {
         const timers = [];
         let cumulativeDelay = 0;
         let globalIndex = 0;
+        const fadeDuration = 300; // 애니메이션 속도 단축 (0.5s -> 0.3s)
 
         const allSubSteps = analysisStages.flatMap((stage, stageIndex) => 
             stage.sub.map((subMessage, subIndex) => ({
@@ -602,18 +647,20 @@ const GachaAnimation = ({ onComplete }) => {
         );
 
         allSubSteps.forEach((step, index) => {
-            // 랜덤 딜레이 설정 (100ms ~ 500ms)
-            const delay = 100 + Math.random() * 400; 
+            // 랜덤 딜레이 설정 (50ms ~ 300ms로 단축)
+            const delay = 50 + Math.random() * 250; 
 
             // 상태 업데이트 스케줄링
             timers.push(setTimeout(() => {
-                // 페이드 아웃 처리
+                // 하위 메시지 페이드 아웃 처리
                 setIsExiting(true);
                 
                 // 페이드 아웃 후 상태 업데이트 및 페이드 인 시작
                 timers.push(setTimeout(() => {
                     setIsExiting(false);
+                    // 메인 타이틀은 단계가 변경될 때만 바뀜
                     setCurrentStep(step.stageIndex);
+                    // 하위 메시지는 매번 바뀜
                     setCurrentSubStepIndex(step.subIndex);
                     setOverallIndex(globalIndex + 1); // 전체 진행 인덱스 업데이트
 
@@ -622,14 +669,14 @@ const GachaAnimation = ({ onComplete }) => {
                         setShowFireworks(true);
                     }
 
-                }, 500)); // 500ms는 fadeOut 애니메이션 시간
+                }, fadeDuration)); // 단축된 페이드 시간 적용
 
                 globalIndex++;
 
             }, cumulativeDelay));
 
-            // 누적 딜레이 업데이트
-            cumulativeDelay += delay + 500; // 랜덤 딜레이 + 애니메이션 시간
+            // 누적 딜레이 업데이트 (단축된 딜레이와 페이드 시간 적용)
+            cumulativeDelay += delay + fadeDuration;
 
             // 최종 완료 후 onComplete 호출
             if (index === allSubSteps.length - 1) {
@@ -803,9 +850,11 @@ const GachaAnimation = ({ onComplete }) => {
 
                 {currentStage && (
                     <MessageContainer>
-                        <Message $isExiting={isExiting}>
+                        {/* 메인 타이틀은 느린 깜빡임 효과로 진행 중임을 표시 */}
+                        <Message>
                             {currentMainMessage}
                         </Message>
+                        {/* 서브 메시지는 전환 시 빠른 페이드 인/아웃으로 진행 속도를 표현 */}
                         <SubMessage $isExiting={isExiting}>
                             {currentSubMessage}
                         </SubMessage>
