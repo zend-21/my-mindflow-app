@@ -306,18 +306,21 @@ const HanjaText = styled.div.attrs(props => ({
 `;
 
 // Phase 2: 타로 배경 요소들
-const TarotCard = styled.div`
+const TarotCard = styled.div.attrs(props => ({
+    style: {
+        left: `${props.$x}%`,
+        top: `${props.$y}%`,
+        animationDelay: `${props.$delay}s`,
+        opacity: props.$visible ? 1 : 0
+    }
+}))`
     position: absolute;
     width: 60px;
     height: 90px;
     background: linear-gradient(135deg, #2a1a4a 0%, #1a0a2a 100%);
     border: 2px solid rgba(218, 165, 32, 0.5);
     border-radius: 8px;
-    left: ${props => props.$x}%;
-    top: ${props => props.$y}%;
     animation: ${cardShuffle} ${props => props.$duration}s ease-in-out infinite;
-    animation-delay: ${props => props.$delay}s;
-    opacity: ${props => props.$visible ? 1 : 0};
     transition: opacity 1s;
     pointer-events: none;
     box-shadow: 0 0 15px rgba(138, 43, 226, 0.5);
