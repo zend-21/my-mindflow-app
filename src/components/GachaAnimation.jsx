@@ -1,21 +1,168 @@
 // src/components/GachaAnimation.jsx
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 
-// 🎨 Animations
+// 🎨 Keyframe Animations
 
-const fadeInScale = keyframes`
-    from {
+// 태극 회전
+const taeguRotate = keyframes`
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+`;
+
+// 음양 입자 흐름
+const yinYangFlow = keyframes`
+    0% {
+        transform: translateY(0) scale(1);
         opacity: 0;
-        transform: translate(-50%, -50%) scale(0.8);
     }
-    to {
-        opacity: 1;
-        transform: translate(-50%, -50%) scale(1);
+    50% {
+        opacity: 0.6;
+    }
+    100% {
+        transform: translateY(-100px) scale(1.5);
+        opacity: 0;
     }
 `;
 
+// 오행 빛줄기
+const wuxingGlow = keyframes`
+    0%, 100% {
+        opacity: 0.3;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1.2);
+    }
+`;
+
+// 한자 번짐 효과
+const hanjaFade = keyframes`
+    0% {
+        opacity: 0;
+        filter: blur(10px);
+    }
+    50% {
+        opacity: 0.3;
+        filter: blur(5px);
+    }
+    100% {
+        opacity: 0;
+        filter: blur(15px);
+    }
+`;
+
+// 타로 카드 셔플
+const cardShuffle = keyframes`
+    0%, 100% {
+        transform: translateX(0) rotateY(0deg);
+    }
+    25% {
+        transform: translateX(-30px) rotateY(-15deg);
+    }
+    75% {
+        transform: translateX(30px) rotateY(15deg);
+    }
+`;
+
+// 차원 이동 효과
+const dimensionShift = keyframes`
+    0%, 100% {
+        opacity: 0.5;
+        transform: translateZ(0) scale(1);
+    }
+    50% {
+        opacity: 1;
+        transform: translateZ(50px) scale(1.1);
+    }
+`;
+
+// 별 가루
+const stardust = keyframes`
+    0% {
+        transform: translateY(0) scale(0);
+        opacity: 0;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-200px) scale(1);
+        opacity: 0;
+    }
+`;
+
+// 행성 궤도
+const planetOrbit = keyframes`
+    from {
+        transform: rotate(0deg) translateX(var(--orbit-radius)) rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg) translateX(var(--orbit-radius)) rotate(-360deg);
+    }
+`;
+
+// 성운 흐름
+const nebulaFlow = keyframes`
+    0%, 100% {
+        transform: translate(0, 0) scale(1);
+        opacity: 0.3;
+    }
+    50% {
+        transform: translate(20px, -20px) scale(1.2);
+        opacity: 0.6;
+    }
+`;
+
+// 혜성
+const comet = keyframes`
+    0% {
+        transform: translate(-100%, 100%) rotate(-45deg);
+        opacity: 0;
+    }
+    10% {
+        opacity: 1;
+    }
+    90% {
+        opacity: 1;
+    }
+    100% {
+        transform: translate(200%, -200%) rotate(-45deg);
+        opacity: 0;
+    }
+`;
+
+// 에너지 응집
+const energyConverge = keyframes`
+    0% {
+        transform: scale(3);
+        opacity: 0;
+    }
+    100% {
+        transform: scale(0);
+        opacity: 1;
+    }
+`;
+
+// 최종 폭발
+const finalExplosion = keyframes`
+    0% {
+        transform: scale(0);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(5);
+        opacity: 0;
+    }
+`;
+
+// 텍스트 페이드인
 const fadeIn = keyframes`
     from {
         opacity: 0;
@@ -27,151 +174,6 @@ const fadeIn = keyframes`
     }
 `;
 
-const fadeOut = keyframes`
-    from {
-        opacity: 1;
-        transform: translateY(0);
-    }
-    to {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-`;
-
-const pulseRing = keyframes`
-    0% {
-        transform: scale(0.95);
-        opacity: 0.7;
-    }
-    50% {
-        transform: scale(1);
-        opacity: 1;
-    }
-    100% {
-        transform: scale(0.95);
-        opacity: 0.7;
-    }
-`;
-
-const rotate = keyframes`
-    from {
-        transform: rotate(0deg);
-    }
-    to {
-        transform: rotate(360deg);
-    }
-`;
-
-const shimmer = keyframes`
-    0% {
-        background-position: -1000px 0;
-    }
-    100% {
-        background-position: 1000px 0;
-    }
-`;
-
-const shuffle = keyframes`
-    0%, 100% {
-        transform: translateX(0) rotate(0deg);
-    }
-    25% {
-        transform: translateX(-30px) rotate(-15deg);
-    }
-    75% {
-        transform: translateX(30px) rotate(15deg);
-    }
-`;
-
-const cardReveal = keyframes`
-    0% {
-        opacity: 0;
-        transform: translateY(50px) rotateY(180deg);
-    }
-    100% {
-        opacity: 1;
-        transform: translateY(0) rotateY(0deg);
-    }
-`;
-
-const pulse = keyframes`
-    0%, 100% {
-        transform: scale(1);
-        opacity: 0.8;
-    }
-    50% {
-        transform: scale(1.1);
-        opacity: 1;
-    }
-`;
-
-const floatUp = keyframes`
-    0% {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    50% {
-        opacity: 1;
-    }
-    100% {
-        opacity: 0;
-        transform: translateY(-50px);
-    }
-`;
-
-const sparkle = keyframes`
-    0%, 100% {
-        opacity: 0;
-        transform: scale(0) rotate(0deg);
-    }
-    50% {
-        opacity: 1;
-        transform: scale(1) rotate(180deg);
-    }
-`;
-
-const cardFlip = keyframes`
-    0% {
-        transform: rotateY(0deg) scale(0.8);
-        opacity: 0;
-    }
-    50% {
-        transform: rotateY(90deg) scale(1);
-        opacity: 1;
-    }
-    100% {
-        transform: rotateY(0deg) scale(1);
-        opacity: 1;
-    }
-`;
-
-const firework = keyframes`
-    0% {
-        transform: translate(0, 0) scale(0);
-        opacity: 1;
-    }
-    50% {
-        opacity: 1;
-    }
-    100% {
-        transform: translate(var(--tx), var(--ty)) scale(1);
-        opacity: 0;
-    }
-`;
-
-const glow = keyframes`
-    0%, 100% {
-        box-shadow: 0 0 20px rgba(255, 215, 0, 0.5),
-                    0 0 40px rgba(255, 215, 0, 0.3),
-                    0 0 60px rgba(255, 215, 0, 0.1);
-    }
-    50% {
-        box-shadow: 0 0 40px rgba(255, 215, 0, 0.8),
-                    0 0 80px rgba(255, 215, 0, 0.5),
-                    0 0 120px rgba(255, 215, 0, 0.3);
-    }
-`;
-
 // 🎨 Styled Components
 
 const Overlay = styled.div`
@@ -180,533 +182,672 @@ const Overlay = styled.div`
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     display: flex;
     justify-content: center;
     align-items: center;
     z-index: 10000;
+    overflow: hidden;
+    transition: background 1s ease-in-out;
+
+    ${props => props.$phase === 0 && css`
+        background: linear-gradient(135deg, #0a0a1a 0%, #1a0a2e 50%, #0d0221 100%);
+    `}
+
+    ${props => props.$phase === 1 && css`
+        background: linear-gradient(135deg, #1a0a2a 0%, #2a1a3a 50%, #1a1a2a 100%);
+    `}
+
+    ${props => props.$phase === 2 && css`
+        background: linear-gradient(135deg, #0a0a2a 0%, #1a0a3a 50%, #0a1a2a 100%);
+    `}
+
+    ${props => props.$phase === 3 && css`
+        background: #000000;
+    `}
 `;
 
-const CenterContainer = styled.div`
+// Phase 1: 사주 배경 요소들
+const TaeguSymbol = styled.div`
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 40px;
-    animation: ${fadeInScale} 0.6s ease-out;
-`;
-
-const LoadingRings = styled.div`
-    position: relative;
-    width: 120px;
-    height: 120px;
-`;
-
-const Ring = styled.div`
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle,
+        rgba(255, 255, 255, 0.8) 0%,
+        rgba(0, 0, 0, 0.9) 50%,
+        rgba(255, 255, 255, 0.8) 50%,
+        rgba(0, 0, 0, 0.9) 100%
+    );
     border-radius: 50%;
-    border: 3px solid rgba(255, 255, 255, 0.2);
-
-    ${props => props.$index === 0 && css`
-        width: 120px;
-        height: 120px;
-        animation: ${pulseRing} 2s ease-in-out infinite;
-    `}
-
-    ${props => props.$index === 1 && css`
-        width: 90px;
-        height: 90px;
-        border-color: rgba(255, 255, 255, 0.3);
-        animation: ${pulseRing} 2s ease-in-out infinite 0.3s;
-    `}
-
-    ${props => props.$index === 2 && css`
-        width: 60px;
-        height: 60px;
-        border-color: rgba(255, 255, 255, 0.4);
-        animation: ${pulseRing} 2s ease-in-out infinite 0.6s;
-    `}
-`;
-
-const CenterOrb = styled.div`
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
-    animation: ${rotate} 3s linear infinite, ${glow} 2s ease-in-out infinite;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 40px;
+    animation: ${taeguRotate} 20s linear infinite;
+    opacity: ${props => props.$visible ? 0.3 : 0};
+    transition: opacity 1s;
+    pointer-events: none;
 
     &::before {
         content: '';
         position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 50%;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 150px 150px 0 0;
+    }
+
+    &::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
         top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 60px;
-        height: 60px;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.3);
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 0 0 150px 150px;
     }
 `;
 
-const TarotCard = styled.div`
-    position: relative;
-    z-index: 1;
-    font-size: 40px;
-    animation: ${cardFlip} 2s ease-in-out infinite;
-    transition: all 0.3s ease-out;
-`;
-
-const FloatingParticles = styled.div`
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-`;
-
-const Particle = styled.div`
-    position: absolute;
-    width: 6px;
-    height: 6px;
-    background: white;
-    border-radius: 50%;
-    opacity: 0;
-
-    ${Array.from({ length: 20 }, (_, i) => {
-        const x = Math.random() * 100;
-        const delay = i * 0.2;
-        return css`
-            &:nth-child(${i + 1}) {
-                left: ${x}%;
-                bottom: 0;
-                animation: ${floatUp} 3s ease-out ${delay}s infinite;
-            }
-        `;
-    })}
-`;
-
-const MessageContainer = styled.div`
-    text-align: center;
-    color: white;
-    min-height: 120px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-`;
-
-const Message = styled.h1`
-    font-size: 28px;
-    font-weight: 600;
-    margin: 0;
-    letter-spacing: -0.5px;
-    animation: ${props => props.$isExiting ? css`${fadeOut} 0.5s ease-out forwards` : css`${fadeIn} 0.5s ease-out forwards`};
-
-    @media (min-width: 768px) {
-        font-size: 36px;
+const YinYangParticle = styled.div.attrs(props => ({
+    style: {
+        background: props.$isYin ? 'rgba(0, 0, 0, 0.6)' : 'rgba(255, 255, 255, 0.6)',
+        left: `${props.$x}%`,
+        animationDelay: `${props.$delay}s`,
+        opacity: props.$visible ? 1 : 0
     }
-`;
-
-const SubMessage = styled.p`
-    font-size: 16px;
-    margin: 12px 0 0 0;
-    opacity: 0.9;
-    font-weight: 300;
-    animation: ${props => props.$isExiting ? css`${fadeOut} 0.5s ease-out forwards` : css`${fadeIn} 0.5s ease-out 0.2s forwards`};
-
-    @media (min-width: 768px) {
-        font-size: 18px;
-    }
-`;
-
-const Sparkles = styled.div`
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-`;
-
-const Sparkle = styled.div`
+}))`
     position: absolute;
     width: 8px;
     height: 8px;
-    background: white;
-    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
-    animation: ${sparkle} 1.5s ease-in-out infinite;
-
-    ${Array.from({ length: 30 }, (_, i) => {
-        const x = Math.random() * 100;
-        const y = Math.random() * 100;
-        const delay = Math.random() * 2;
-        const duration = 1 + Math.random();
-        return css`
-            &:nth-child(${i + 1}) {
-                left: ${x}%;
-                top: ${y}%;
-                animation-delay: ${delay}s;
-                animation-duration: ${duration}s;
-            }
-        `;
-    })}
-`;
-
-const Fireworks = styled.div`
-    position: absolute;
-    width: 100%;
-    height: 100%;
+    border-radius: 50%;
+    bottom: 0;
+    animation: ${yinYangFlow} ${props => props.$duration}s ease-out infinite;
+    transition: opacity 1s;
     pointer-events: none;
-    opacity: ${props => props.$show ? 1 : 0};
-    transition: opacity 0.5s;
 `;
 
-const FireworkParticle = styled.div.attrs(props => ({
+const WuxingRing = styled.div.attrs(props => ({
+    style: {
+        width: `${props.$size}px`,
+        height: `${props.$size}px`,
+        borderColor: props.$color,
+        animationDelay: `${props.$delay}s`,
+        opacity: props.$visible ? 1 : 0,
+        boxShadow: `0 0 20px ${props.$color}`
+    }
+}))`
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    border: 3px solid;
+    animation: ${wuxingGlow} ${props => props.$duration}s ease-in-out infinite;
+    transition: opacity 1s;
+    pointer-events: none;
+`;
+
+const HanjaText = styled.div.attrs(props => ({
+    style: {
+        left: `${props.$x}%`,
+        top: `${props.$y}%`,
+        animationDelay: `${props.$delay}s`,
+        opacity: props.$visible ? 1 : 0
+    }
+}))`
+    position: absolute;
+    font-size: 60px;
+    color: rgba(218, 165, 32, 0.3);
+    font-family: serif;
+    animation: ${hanjaFade} 4s ease-in-out infinite;
+    transition: opacity 1s;
+    pointer-events: none;
+`;
+
+// Phase 2: 타로 배경 요소들
+const TarotCard = styled.div`
+    position: absolute;
+    width: 60px;
+    height: 90px;
+    background: linear-gradient(135deg, #2a1a4a 0%, #1a0a2a 100%);
+    border: 2px solid rgba(218, 165, 32, 0.5);
+    border-radius: 8px;
+    left: ${props => props.$x}%;
+    top: ${props => props.$y}%;
+    animation: ${cardShuffle} ${props => props.$duration}s ease-in-out infinite;
+    animation-delay: ${props => props.$delay}s;
+    opacity: ${props => props.$visible ? 1 : 0};
+    transition: opacity 1s;
+    pointer-events: none;
+    box-shadow: 0 0 15px rgba(138, 43, 226, 0.5);
+`;
+
+const MysticParticle = styled.div.attrs(props => ({
     style: {
         left: `${props.$x}%`,
         top: `${props.$y}%`,
         background: props.$color,
         animationDelay: `${props.$delay}s`,
-        '--tx': `${props.$tx}px`,
-        '--ty': `${props.$ty}px`,
+        opacity: props.$visible ? 1 : 0,
+        boxShadow: `0 0 8px ${props.$color}`
     }
 }))`
     position: absolute;
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    animation: ${firework} 1s ease-out forwards;
+    animation: ${stardust} ${props => props.$duration}s linear infinite;
+    transition: opacity 1s;
+    pointer-events: none;
 `;
 
-const ProgressBar = styled.div`
+const DimensionWave = styled.div`
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(138, 43, 226, 0.8) 50%,
+        transparent 100%
+    );
+    top: ${props => props.$y}%;
+    animation: ${dimensionShift} 3s ease-in-out infinite;
+    animation-delay: ${props => props.$delay}s;
+    opacity: ${props => props.$visible ? 1 : 0};
+    transition: opacity 1s;
+    pointer-events: none;
+`;
+
+// Phase 3: 별자리 배경 요소들
+const Planet = styled.div`
+    position: absolute;
+    width: ${props => props.$size}px;
+    height: ${props => props.$size}px;
+    background: ${props => props.$gradient};
+    border-radius: 50%;
+    top: 50%;
+    left: 50%;
+    --orbit-radius: ${props => props.$orbit}px;
+    animation: ${planetOrbit} ${props => props.$duration}s linear infinite;
+    animation-delay: ${props => props.$delay}s;
+    opacity: ${props => props.$visible ? 1 : 0};
+    transition: opacity 1s;
+    pointer-events: none;
+    box-shadow: 0 0 20px ${props => props.$glowColor};
+`;
+
+const Nebula = styled.div`
+    position: absolute;
     width: 200px;
+    height: 200px;
+    background: radial-gradient(circle,
+        ${props => props.$color1} 0%,
+        ${props => props.$color2} 50%,
+        transparent 100%
+    );
+    border-radius: 50%;
+    left: ${props => props.$x}%;
+    top: ${props => props.$y}%;
+    animation: ${nebulaFlow} ${props => props.$duration}s ease-in-out infinite;
+    animation-delay: ${props => props.$delay}s;
+    opacity: ${props => props.$visible ? 1 : 0};
+    transition: opacity 1s;
+    pointer-events: none;
+    filter: blur(30px);
+`;
+
+const Comet = styled.div`
+    position: absolute;
+    width: 4px;
     height: 4px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 2px;
-    overflow: hidden;
-    margin-top: 24px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 0 10px white, 0 0 20px rgba(255, 255, 255, 0.5);
+    animation: ${comet} ${props => props.$duration}s linear infinite;
+    animation-delay: ${props => props.$delay}s;
+    opacity: ${props => props.$visible ? 1 : 0};
+    transition: opacity 0.5s;
+    pointer-events: none;
 
     &::after {
         content: '';
-        display: block;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(
-            90deg,
-            rgba(255, 255, 255, 0) 0%,
-            rgba(255, 255, 255, 0.8) 50%,
-            rgba(255, 255, 255, 0) 100%
+        position: absolute;
+        top: 50%;
+        left: 100%;
+        width: 80px;
+        height: 2px;
+        background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0.8) 0%,
+            transparent 100%
         );
-        animation: ${shimmer} 2s infinite;
+        transform: translateY(-50%);
     }
 `;
 
-// 타로 카드 덱 (셔플용)
-const TarotDeck = styled.div`
+const StarField = styled.div.attrs(props => ({
+    style: {
+        left: `${props.$x}%`,
+        top: `${props.$y}%`,
+        opacity: props.$visible ? props.$opacity : 0,
+        boxShadow: `0 0 ${props.$glow}px rgba(255, 255, 255, 0.8)`
+    }
+}))`
+    position: absolute;
+    width: 2px;
+    height: 2px;
+    background: white;
+    border-radius: 50%;
+    transition: opacity 1s;
+    pointer-events: none;
+`;
+
+// Final: 에너지 응집 및 폭발
+const EnergyCore = styled.div`
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+        rgba(255, 255, 255, 1) 0%,
+        rgba(138, 43, 226, 0.8) 30%,
+        rgba(218, 165, 32, 0.6) 60%,
+        transparent 100%
+    );
+    opacity: ${props => props.$show ? 1 : 0};
+    animation: ${props => props.$show && css`${energyConverge} 1.5s ease-in-out forwards`};
+    pointer-events: none;
+    filter: blur(10px);
+`;
+
+const ExplosionRing = styled.div`
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 4px solid rgba(255, 255, 255, 0.8);
+    opacity: ${props => props.$show ? 1 : 0};
+    animation: ${props => props.$show && css`${finalExplosion} 1s ease-out forwards`};
+    animation-delay: ${props => props.$delay}s;
+    pointer-events: none;
+    box-shadow: 0 0 40px rgba(255, 255, 255, 1);
+`;
+
+// UI 요소들
+const Container = styled.div`
     position: absolute;
     bottom: 15%;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
-    gap: 10px;
-    opacity: ${props => props.$show ? 1 : 0};
-    transition: opacity 0.5s;
-`;
-
-const ShuffleCard = styled.div.attrs(props => ({
-    style: {
-        animationDelay: `${props.$delay}s`,
-    }
-}))`
-    width: 50px;
-    height: 75px;
-    background: linear-gradient(135deg, #2d3561 0%, #1a1f3a 100%);
-    border: 2px solid rgba(255, 215, 0, 0.5);
-    border-radius: 8px;
-    animation: ${shuffle} 0.8s ease-in-out infinite;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-`;
-
-// 타로 카드 스프레드 (3장)
-const TarotSpread = styled.div`
-    position: absolute;
-    bottom: 15%;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 20px;
-    opacity: ${props => props.$show ? 1 : 0};
-    transition: opacity 0.5s;
-`;
-
-const SpreadCard = styled.div.attrs(props => ({
-    style: {
-        animationDelay: `${props.$delay}s`,
-    }
-}))`
-    width: 60px;
-    height: 90px;
-    background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
-    border: 2px solid #f0c040;
-    border-radius: 8px;
-    display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    font-size: 28px;
-    animation: ${cardReveal} 0.6s ease-out forwards;
-    opacity: 0;
-    box-shadow: 0 6px 20px rgba(255, 215, 0, 0.4);
+    gap: 20px;
+    z-index: 100;
+    width: 80%;
+    max-width: 500px;
 `;
 
-// 사주 기호들
-const SajuSymbols = styled.div`
-    position: absolute;
-    bottom: 15%;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 30px;
-    opacity: ${props => props.$show ? 1 : 0};
-    transition: opacity 0.5s;
+const ProgressBarContainer = styled.div`
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
 `;
 
-const SajuSymbol = styled.div.attrs(props => ({
-    style: {
-        animationDelay: `${props.$delay}s`,
+const ProgressBarFill = styled.div`
+    height: 100%;
+    background: linear-gradient(90deg,
+        #667eea 0%,
+        #764ba2 50%,
+        #f093fb 100%
+    );
+    border-radius: 4px;
+    width: ${props => props.$progress}%;
+    transition: width 0.3s ease-out;
+    box-shadow: 0 0 20px rgba(118, 75, 162, 0.8);
+    position: relative;
+
+    &::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 50px;
+        height: 100%;
+        background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.3) 50%,
+            transparent 100%
+        );
+        animation: shimmer 1.5s infinite;
     }
-}))`
-    font-size: 36px;
-    animation: ${pulse} 1.2s ease-in-out infinite;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+
+    @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+    }
 `;
 
-// 역경 괘상
-const IChingContainer = styled.div`
-    position: absolute;
-    bottom: 15%;
-    left: 50%;
-    transform: translateX(-50%);
-    opacity: ${props => props.$show ? 1 : 0};
-    transition: opacity 0.5s;
+const StatusText = styled.div`
+    font-size: 14px;
+    color: rgba(218, 165, 32, 1);
+    text-align: center;
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    letter-spacing: 1px;
+    animation: ${fadeIn} 0.5s ease-out;
+    text-shadow: 0 0 10px rgba(218, 165, 32, 0.8), 0 0 20px rgba(0, 0, 0, 1);
+    font-weight: 500;
+    min-height: 20px;
 `;
 
-const IChingSymbol = styled.div`
-    font-size: 80px;
-    animation: ${pulse} 1.5s ease-in-out infinite;
-    text-shadow: 0 0 20px rgba(255, 255, 255, 0.6);
-    filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.5));
+const MessageList = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 100px;
+    max-height: 100px;
+    overflow: hidden;
+    align-items: center;
+`;
+
+const Message = styled.div`
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    letter-spacing: 0.5px;
+    line-height: 1.5;
+    animation: ${fadeIn} 0.5s ease-out;
+    text-shadow: 0 0 10px rgba(0, 0, 0, 1), 0 2px 4px rgba(0, 0, 0, 0.8);
+    text-align: center;
 `;
 
 // 🎯 Main Component
-
 const GachaAnimation = ({ onComplete }) => {
-    const [currentStep, setCurrentStep] = useState(0);
-    const [isExiting, setIsExiting] = useState(false);
-    const [showFireworks, setShowFireworks] = useState(false);
+    const [progress, setProgress] = useState(0);
+    const [currentPhase, setCurrentPhase] = useState(0);
+    const [statusText, setStatusText] = useState('');
+    const [visibleMessages, setVisibleMessages] = useState([]);
+    const [showExplosion, setShowExplosion] = useState(false);
+    const [exploding, setExploding] = useState(false);
 
-    // 단계별 메시지 정의 (실제 점술 과정 반영)
-    const steps = [
+    const phases = [
         {
-            main: '타로 카드를 셔플합니다',
-            sub: '카드가 당신의 에너지를 읽고 있습니다 🃏',
-            icon: '🔮',
-            type: 'tarot-shuffle'
+            title: '운명의 뿌리를 추적합니다...',
+            messages: [
+                '천간지지(天干地支) 좌표 설정 중...',
+                '오행(五行) 에너지 흐름 감지 중...',
+                '팔자(八字) 구조 해독 진행 중...',
+                '육십갑자(六十甲子) 순환 분석 중...',
+                '명리(命理) 통계 집계 완료...'
+            ],
+            progressRange: [0, 33]
         },
         {
-            main: '과거·현재·미래 펼치는 중',
-            sub: '3장의 카드가 당신의 이야기를 보여줍니다 ✨',
-            icon: '🎴',
-            type: 'tarot-spread'
+            title: '카드가 당신의 운명을 읽습니다...',
+            messages: [
+                '우주의 덱(Cosmic Deck) 셔플 중...',
+                '아르카나(Arcana) 에너지 정렬 중...',
+                '시간의 스프레드(Spread) 전개 중...',
+                '상징의 언어 번역 진행 중...',
+                '내면의 진실 포착 완료...'
+            ],
+            progressRange: [33, 66]
         },
         {
-            main: '사주팔자 계산 중',
-            sub: '천간지지와 음양오행을 분석합니다 ☯️',
-            icon: '📿',
-            type: 'saju'
-        },
-        {
-            main: '역경 괘상 해석 중',
-            sub: '64괘 중 당신의 운명이 드러납니다 🌙',
-            icon: '☰',
-            type: 'iching'
-        },
-        {
-            main: '최종 분석 완료',
-            sub: '당신만의 운세가 준비되었습니다! 🎉',
-            icon: '✨',
-            type: 'complete'
+            title: '별들이 당신의 이야기를 들려줍니다...',
+            messages: [
+                '천구(天球) 좌표 매핑 중...',
+                '행성 트랜짓(Transit) 추적 중...',
+                '에너지 하우스 분석 진행 중...',
+                '천체 조화(Harmony) 측정 중...',
+                '우주적 영향력 계산 완료...'
+            ],
+            progressRange: [66, 100]
         }
     ];
 
     useEffect(() => {
         const timers = [];
+        let currentTime = 0;
 
-        // Step 1: 타로 셔플 - 800ms
+        phases.forEach((phase, phaseIndex) => {
+            timers.push(setTimeout(() => {
+                setCurrentPhase(phaseIndex);
+                setVisibleMessages([]);
+                setStatusText(`${Math.floor(phase.progressRange[0])}%`);
+            }, currentTime));
+
+            let messageTime = currentTime;
+            const [startProgress, endProgress] = phase.progressRange;
+            const progressPerMessage = (endProgress - startProgress) / phase.messages.length;
+
+            phase.messages.forEach((message, msgIndex) => {
+                const randomDelay = 300 + Math.random() * 400;
+                messageTime += randomDelay;
+
+                timers.push(setTimeout(() => {
+                    setVisibleMessages(prev => [...prev.slice(-2), message]);
+                    const newProgress = startProgress + (progressPerMessage * (msgIndex + 1));
+                    setProgress(newProgress);
+                    setStatusText(`${Math.floor(newProgress)}%`);
+                }, messageTime));
+            });
+
+            currentTime = messageTime + 300;
+        });
+
+        // 최종 집계
+        currentTime += 500;
         timers.push(setTimeout(() => {
-            setCurrentStep(0);
-        }, 800));
+            setProgress(100);
+            setStatusText('100%');
+            setVisibleMessages(['모든 차원 데이터 동기화 중...']);
+            setCurrentPhase(3);
+        }, currentTime));
 
-        // Step 2: 타로 스프레드 - 2000ms
+        currentTime += 400;
         timers.push(setTimeout(() => {
-            setIsExiting(true);
-            setTimeout(() => {
-                setIsExiting(false);
-                setCurrentStep(1);
-            }, 500);
-        }, 2000));
+            setVisibleMessages(['종합 운세 보고서 완성...']);
+        }, currentTime));
 
-        // Step 3: 사주팔자 - 3400ms
+        currentTime += 400;
         timers.push(setTimeout(() => {
-            setIsExiting(true);
-            setTimeout(() => {
-                setIsExiting(false);
-                setCurrentStep(2);
-            }, 500);
-        }, 3400));
+            setVisibleMessages(['당신의 진실, 지금 공개됩니다.']);
+            setShowExplosion(true);
+        }, currentTime));
 
-        // Step 4: 역경 괘상 - 4800ms
+        currentTime += 800;
         timers.push(setTimeout(() => {
-            setIsExiting(true);
-            setTimeout(() => {
-                setIsExiting(false);
-                setCurrentStep(3);
-            }, 500);
-        }, 4800));
+            setExploding(true);
+        }, currentTime));
 
-        // Step 5: 최종 완료 - 6200ms (폭죽 시작)
-        timers.push(setTimeout(() => {
-            setIsExiting(true);
-            setTimeout(() => {
-                setIsExiting(false);
-                setCurrentStep(4);
-                setShowFireworks(true);
-            }, 500);
-        }, 6200));
-
-        // Complete: 7600ms
+        // 완료
+        currentTime += 1500;
         timers.push(setTimeout(() => {
             onComplete();
-        }, 7600));
+        }, currentTime));
 
         return () => {
             timers.forEach(timer => clearTimeout(timer));
         };
     }, [onComplete]);
 
-    // 폭죽 파티클 생성 (useMemo로 최적화)
-    const fireworkParticles = useMemo(() => {
-        const fireworks = [];
-        const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#95E1D3', '#F38181', '#AA96DA'];
+    // 오행 색상
+    const wuxing = [
+        { color: 'rgba(0, 255, 128, 0.6)', size: 350, duration: 3, delay: 0 },     // 木 - 청색
+        { color: 'rgba(255, 69, 58, 0.6)', size: 320, duration: 3.5, delay: 0.6 }, // 火 - 적색
+        { color: 'rgba(255, 204, 0, 0.6)', size: 380, duration: 4, delay: 1.2 },   // 土 - 황색
+        { color: 'rgba(255, 255, 255, 0.6)', size: 340, duration: 3.2, delay: 1.8 }, // 金 - 백색
+        { color: 'rgba(10, 132, 255, 0.6)', size: 360, duration: 3.8, delay: 2.4 }  // 水 - 흑색(청)
+    ];
 
-        for (let i = 0; i < 5; i++) {
-            const x = 20 + Math.random() * 60;
-            const y = 20 + Math.random() * 60;
-
-            for (let j = 0; j < 12; j++) {
-                const angle = (j / 12) * Math.PI * 2;
-                const distance = 50 + Math.random() * 30;
-                const tx = Math.cos(angle) * distance;
-                const ty = Math.sin(angle) * distance;
-                const delay = i * 0.15 + Math.random() * 0.1;
-
-                fireworks.push(
-                    <FireworkParticle
-                        key={`${i}-${j}`}
-                        $x={x}
-                        $y={y}
-                        $tx={tx}
-                        $ty={ty}
-                        $color={colors[Math.floor(Math.random() * colors.length)]}
-                        $delay={delay}
-                    />
-                );
-            }
-        }
-        return fireworks;
-    }, []); // 빈 의존성 배열로 한 번만 생성
+    // 한자 배열
+    const hanja = ['天', '地', '陰', '陽', '五', '行', '命', '運'];
 
     return (
-        <Overlay>
-            <FloatingParticles>
-                {Array.from({ length: 20 }, (_, i) => (
-                    <Particle key={i} />
-                ))}
-            </FloatingParticles>
+        <Overlay $phase={currentPhase}>
+            {/* Phase 1: 사주 배경 */}
+            <TaeguSymbol $visible={currentPhase === 0} />
+            {Array.from({ length: 12 }, (_, i) => (
+                <YinYangParticle
+                    key={`yin-yang-${i}`}
+                    $isYin={i % 2 === 0}
+                    $x={10 + (i % 4) * 25}
+                    $duration={3 + Math.random() * 2}
+                    $delay={i * 0.3}
+                    $visible={currentPhase === 0}
+                />
+            ))}
+            {wuxing.map((wu, i) => (
+                <WuxingRing
+                    key={`wuxing-${i}`}
+                    $size={wu.size}
+                    $color={wu.color}
+                    $duration={wu.duration}
+                    $delay={wu.delay}
+                    $visible={currentPhase === 0}
+                />
+            ))}
+            {hanja.map((char, i) => (
+                <HanjaText
+                    key={`hanja-${i}`}
+                    $x={15 + (i % 4) * 23}
+                    $y={20 + Math.floor(i / 4) * 30}
+                    $delay={i * 0.5}
+                    $visible={currentPhase === 0}
+                >
+                    {char}
+                </HanjaText>
+            ))}
 
-            <Sparkles>
-                {Array.from({ length: 30 }, (_, i) => (
-                    <Sparkle key={i} />
-                ))}
-            </Sparkles>
+            {/* Phase 2: 타로 배경 */}
+            {Array.from({ length: 8 }, (_, i) => (
+                <TarotCard
+                    key={`tarot-${i}`}
+                    $x={15 + (i % 4) * 25}
+                    $y={20 + Math.floor(i / 4) * 40}
+                    $duration={2 + Math.random()}
+                    $delay={i * 0.2}
+                    $visible={currentPhase === 1}
+                />
+            ))}
+            {Array.from({ length: 5 }, (_, i) => (
+                <DimensionWave
+                    key={`wave-${i}`}
+                    $y={20 + i * 15}
+                    $delay={i * 0.3}
+                    $visible={currentPhase === 1}
+                />
+            ))}
+            {Array.from({ length: 30 }, (_, i) => {
+                const colors = ['rgba(138, 43, 226, 0.8)', 'rgba(218, 165, 32, 0.8)', 'rgba(255, 255, 255, 0.8)'];
+                return (
+                    <MysticParticle
+                        key={`mystic-${i}`}
+                        $x={Math.random() * 100}
+                        $y={Math.random() * 100}
+                        $color={colors[i % colors.length]}
+                        $duration={3 + Math.random() * 2}
+                        $delay={i * 0.1}
+                        $visible={currentPhase === 1}
+                    />
+                );
+            })}
 
-            <Fireworks $show={showFireworks}>
-                {fireworkParticles}
-            </Fireworks>
+            {/* Phase 3: 별자리 배경 */}
+            {Array.from({ length: 5 }, (_, i) => {
+                const planets = [
+                    { size: 20, gradient: 'radial-gradient(circle, #ff6b6b, #c92a2a)', glow: 'rgba(255, 107, 107, 0.8)', orbit: 80, duration: 10 },
+                    { size: 25, gradient: 'radial-gradient(circle, #ffd43b, #fab005)', glow: 'rgba(255, 212, 59, 0.8)', orbit: 120, duration: 15 },
+                    { size: 15, gradient: 'radial-gradient(circle, #4dabf7, #1c7ed6)', glow: 'rgba(77, 171, 247, 0.8)', orbit: 150, duration: 20 },
+                    { size: 18, gradient: 'radial-gradient(circle, #ff8787, #fa5252)', glow: 'rgba(255, 135, 135, 0.8)', orbit: 180, duration: 25 },
+                    { size: 30, gradient: 'radial-gradient(circle, #ffd8a8, #fd7e14)', glow: 'rgba(255, 216, 168, 0.8)', orbit: 220, duration: 30 }
+                ];
+                const planet = planets[i];
+                return (
+                    <Planet
+                        key={`planet-${i}`}
+                        $size={planet.size}
+                        $gradient={planet.gradient}
+                        $glowColor={planet.glow}
+                        $orbit={planet.orbit}
+                        $duration={planet.duration}
+                        $delay={i * 2}
+                        $visible={currentPhase === 2}
+                    />
+                );
+            })}
+            {Array.from({ length: 3 }, (_, i) => {
+                const nebulas = [
+                    { color1: 'rgba(138, 43, 226, 0.3)', color2: 'rgba(218, 165, 32, 0.2)', x: 20, y: 30, duration: 8 },
+                    { color1: 'rgba(255, 107, 107, 0.3)', color2: 'rgba(77, 171, 247, 0.2)', x: 70, y: 60, duration: 10 },
+                    { color1: 'rgba(77, 171, 247, 0.3)', color2: 'rgba(138, 43, 226, 0.2)', x: 40, y: 80, duration: 12 }
+                ];
+                const nebula = nebulas[i];
+                return (
+                    <Nebula
+                        key={`nebula-${i}`}
+                        $color1={nebula.color1}
+                        $color2={nebula.color2}
+                        $x={nebula.x}
+                        $y={nebula.y}
+                        $duration={nebula.duration}
+                        $delay={i * 1.5}
+                        $visible={currentPhase === 2}
+                    />
+                );
+            })}
+            {Array.from({ length: 5 }, (_, i) => (
+                <Comet
+                    key={`comet-${i}`}
+                    $duration={4 + Math.random() * 2}
+                    $delay={i * 1.5}
+                    $visible={currentPhase === 2}
+                />
+            ))}
+            {Array.from({ length: 100 }, (_, i) => (
+                <StarField
+                    key={`star-${i}`}
+                    $x={Math.random() * 100}
+                    $y={Math.random() * 100}
+                    $opacity={0.3 + Math.random() * 0.7}
+                    $glow={2 + Math.random() * 3}
+                    $visible={currentPhase === 2}
+                />
+            ))}
 
-            {/* 타로 카드 셔플 (Step 0) */}
-            <TarotDeck $show={currentStep === 0}>
-                <ShuffleCard $delay={0} />
-                <ShuffleCard $delay={0.1} />
-                <ShuffleCard $delay={0.2} />
-                <ShuffleCard $delay={0.3} />
-                <ShuffleCard $delay={0.4} />
-            </TarotDeck>
+            {/* Final: 에너지 응집 및 폭발 */}
+            <EnergyCore $show={showExplosion} />
+            {Array.from({ length: 5 }, (_, i) => (
+                <ExplosionRing
+                    key={`explosion-${i}`}
+                    $show={exploding}
+                    $delay={i * 0.1}
+                />
+            ))}
 
-            {/* 타로 카드 스프레드 3장 (Step 1) */}
-            <TarotSpread $show={currentStep === 1}>
-                <SpreadCard $delay={0}>🌙</SpreadCard>
-                <SpreadCard $delay={0.2}>⭐</SpreadCard>
-                <SpreadCard $delay={0.4}>☀️</SpreadCard>
-            </TarotSpread>
-
-            {/* 사주팔자 기호 (Step 2) */}
-            <SajuSymbols $show={currentStep === 2}>
-                <SajuSymbol $delay={0}>甲</SajuSymbol>
-                <SajuSymbol $delay={0.15}>子</SajuSymbol>
-                <SajuSymbol $delay={0.3}>☯️</SajuSymbol>
-                <SajuSymbol $delay={0.45}>火</SajuSymbol>
-            </SajuSymbols>
-
-            {/* 역경 괘상 (Step 3) */}
-            <IChingContainer $show={currentStep === 3}>
-                <IChingSymbol>☰</IChingSymbol>
-            </IChingContainer>
-
-            <CenterContainer>
-                <LoadingRings>
-                    <Ring $index={0} />
-                    <Ring $index={1} />
-                    <Ring $index={2} />
-                    <CenterOrb>
-                        <TarotCard>
-                            {currentStep >= 0 ? steps[currentStep].icon : '🔮'}
-                        </TarotCard>
-                    </CenterOrb>
-                </LoadingRings>
-
-                {currentStep >= 0 && (
-                    <MessageContainer>
-                        <Message $isExiting={isExiting}>
-                            {steps[currentStep].main}
-                        </Message>
-                        <SubMessage $isExiting={isExiting}>
-                            {steps[currentStep].sub}
-                        </SubMessage>
-                        <ProgressBar />
-                    </MessageContainer>
-                )}
-            </CenterContainer>
+            {/* UI: 로딩바 및 메시지 (항상 하단 고정) */}
+            <Container>
+                <MessageList>
+                    {visibleMessages.map((msg, i) => (
+                        <Message key={`${i}-${msg}`}>{msg}</Message>
+                    ))}
+                </MessageList>
+                <ProgressBarContainer>
+                    <ProgressBarFill $progress={progress} />
+                </ProgressBarContainer>
+                <StatusText>{statusText}</StatusText>
+            </Container>
         </Overlay>
     );
 };

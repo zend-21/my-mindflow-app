@@ -588,9 +588,11 @@ const calculateCategoryScore = (userDayStem, todayPillar, categoryIndex) => {
  * 오행 기반 행운 요소 선택
  * @param {string} dayStem - 일간 (천간)
  * @param {Date} today - 오늘 날짜
+ * @param {Object} todayPillar - 오늘의 일진 { stem, branch, index }
+ * @param {Object} userData - 사용자 정보
  * @returns {Object} 행운 요소 { introText, numbers, color, direction, items, concepts }
  */
-const selectLuckyElements = async (dayStem, today, userData) => {
+const selectLuckyElements = async (dayStem, today, todayPillar, userData) => {
     try {
         const luckyElementsData = await getLuckyElementsData();
         if (!luckyElementsData) {
@@ -604,9 +606,20 @@ const selectLuckyElements = async (dayStem, today, userData) => {
             };
         }
 
-        // 일간의 오행 계산
-        const element = getStemElement(dayStem);
-        const elementData = luckyElementsData[element];
+        // ✨ 개선: 사용자 일간 + 오늘 일진의 오행을 조합
+        const userElement = getStemElement(dayStem);
+        const todayElement = getStemElement(todayPillar.stem);
+
+        // 오행 배열
+        const elements = ['Wood', 'Fire', 'Earth', 'Metal', 'Water'];
+        const userElementIndex = elements.indexOf(userElement);
+        const todayElementIndex = elements.indexOf(todayElement);
+
+        // 두 오행의 조합으로 최종 오행 결정 (날짜마다 달라짐)
+        const combinedElementIndex = (userElementIndex + todayElementIndex) % elements.length;
+        const finalElement = elements[combinedElementIndex];
+
+        const elementData = luckyElementsData[finalElement];
 
         if (!elementData) {
             return {
@@ -619,38 +632,39 @@ const selectLuckyElements = async (dayStem, today, userData) => {
             };
         }
 
-        // 날짜 + 사용자 생년월일 + 출생시간 기반 시드로 개인화된 랜덤 선택
+        // ✨ 시드 생성: 오늘 일진 index 추가하여 매일 다른 결과
         const dateString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
         const birthString = `${userData.birthYear}-${userData.birthMonth}-${userData.birthDay}`;
         const birthTimeString = (userData.birthHour !== undefined && userData.birthMinute !== undefined)
             ? `-${userData.birthHour}-${userData.birthMinute}`
             : '';
-        const combinedString = dateString + birthString + birthTimeString;
+        const todayPillarString = `-${todayPillar.index}`; // 오늘 일진 추가
+        const combinedString = dateString + birthString + birthTimeString + todayPillarString;
         const seed = combinedString.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
-        const random = (max) => {
-            const x = Math.sin(seed + max) * 10000;
+        const random = (max, offset = 0) => {
+            const x = Math.sin(seed + max + offset) * 10000;
             return Math.floor((x - Math.floor(x)) * max);
         };
 
         // 요소 선택
-        const color = elementData.colors[random(elementData.colors.length)];
+        const color = elementData.colors[random(elementData.colors.length, 1)];
         const direction = elementData.direction;
         const selectedItems = [];
         const selectedConcepts = [];
 
-        // 아이템 2개 선택
+        // 아이템 2개 선택 (매일 다른 조합)
         const itemsCopy = [...elementData.items];
         for (let i = 0; i < Math.min(2, itemsCopy.length); i++) {
-            const idx = random(itemsCopy.length - i);
+            const idx = random(itemsCopy.length - i, i * 10);
             selectedItems.push(itemsCopy[idx]);
             itemsCopy.splice(idx, 1);
         }
 
-        // 개념 2개 선택
+        // 개념 2개 선택 (매일 다른 조합)
         const conceptsCopy = [...elementData.concepts];
         for (let i = 0; i < Math.min(2, conceptsCopy.length); i++) {
-            const idx = random(conceptsCopy.length - i);
+            const idx = random(conceptsCopy.length - i, i * 20);
             selectedConcepts.push(conceptsCopy[idx]);
             conceptsCopy.splice(idx, 1);
         }
@@ -719,8 +733,8 @@ export const calculateFortune = async (userData, fortuneData) => {
         };
     });
 
-    // 6. 행운 요소 계산 (오행 + 개인 생년월일 기반)
-    const luckyElements = await selectLuckyElements(userDayStem, today, userData);
+    // 6. 행운 요소 계산 (오행 + 개인 생년월일 + 오늘 일진 기반)
+    const luckyElements = await selectLuckyElements(userDayStem, today, todayPillar, userData);
 
     // 7. 타로 카드 선택 (개선된 로직)
     const tarot = selectTarotCard(userData, today);
@@ -884,4 +898,4 @@ export const getUserProfile = () => {
  * 가챠 테스트 모드 플래그
  * true로 설정하면 하루 1회 제한 무시
  */
-export const IS_TESTING_MODE = false; // ⚠️ 테스트용: true, 배포 시 false로 변경
+export const IS_TESTING_MODE = true; // ⚠️ 테스트용: true, 배포 시 false로 변경

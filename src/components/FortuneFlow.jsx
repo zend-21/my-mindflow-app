@@ -80,8 +80,8 @@ const FortuneFlow = ({ onClose, profile }) => {
     // 🎬 Step 2: 운세 확인 및 가차 시작
     useEffect(() => {
         if (flowState === 'checkFortune') {
-            // 이미 저장된 운세가 있는지 확인
-            const savedFortune = getTodayFortune();
+            // 이미 저장된 운세가 있는지 확인 (테스트 모드에서는 무시)
+            const savedFortune = IS_TESTING_MODE ? null : getTodayFortune();
             if (savedFortune) {
                 // 저장된 운세가 있으면 바로 결과 표시
                 setFortuneResult(savedFortune);

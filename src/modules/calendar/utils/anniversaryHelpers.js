@@ -7,7 +7,7 @@ import { format, startOfDay, addYears } from 'date-fns';
  * @returns {Array} 해당 날짜에 반복되는 기념일 알람 목록
  */
 export const getRepeatedAnniversaries = (targetDate, schedules) => {
-  const repeatedAlarms = [];
+  const repeatedAlarmsMap = new Map(); // ID로 중복 제거
   const target = new Date(targetDate);
   const twoYearsFromNow = addYears(new Date(), 2);
 
@@ -25,6 +25,11 @@ export const getRepeatedAnniversaries = (targetDate, schedules) => {
     );
 
     for (const alarm of anniversaryAlarms) {
+      // 이미 처리한 알람이면 건너뛰기 (중복 방지)
+      if (repeatedAlarmsMap.has(alarm.id)) {
+        continue;
+      }
+
       const alarmDate = new Date(alarm.calculatedTime);
       const alarmDateStr = format(alarmDate, 'yyyy-MM-dd');
       const targetDateStr = format(target, 'yyyy-MM-dd');
@@ -56,11 +61,10 @@ export const getRepeatedAnniversaries = (targetDate, schedules) => {
 
       if (shouldRepeat) {
         // 해당 날짜가 disabledDates에 포함되어 있는지 확인
-        const targetDateStr = format(target, 'yyyy-MM-dd');
         const disabledDates = alarm.disabledDates || [];
         const isDisabledOnThisDate = disabledDates.includes(targetDateStr);
 
-        repeatedAlarms.push({
+        repeatedAlarmsMap.set(alarm.id, {
           ...alarm,
           isRepeated: true, // 반복 표시임을 나타내는 플래그
           originalDate: alarmDate, // 원본 등록일
@@ -70,7 +74,7 @@ export const getRepeatedAnniversaries = (targetDate, schedules) => {
     }
   }
 
-  return repeatedAlarms;
+  return Array.from(repeatedAlarmsMap.values());
 };
 
 /**
