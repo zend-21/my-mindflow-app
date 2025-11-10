@@ -38,16 +38,16 @@ const fadeOut = keyframes`
     }
 `;
 
-// ✨ 메인 타이틀을 위한 느린 페이드 애니메이션 (투명도 0.4 ~ 1.0으로 강화)
+// ✨ 메인 타이틀을 위한 느린 페이드 애니메이션 (효과 강화)
 const slowFade = keyframes`
     0% {
-        opacity: 0.4; /* 투명도 강화 */
+        opacity: 0.6; /* 불투명도 0.6으로 시작하여 변화를 명확하게 인지 */
     }
     50% {
-        opacity: 1; 
+        opacity: 1; /* 최대 불투명도 */
     }
     100% {
-        opacity: 0.4; 
+        opacity: 0.6; /* 다시 0.6으로 회귀 */
     }
 `;
 
