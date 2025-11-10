@@ -945,8 +945,7 @@ ${fortuneResult.starSign.content}
 
                             <TarotContainer>
                                 <TarotNotice>
-                                    타로는 사용자의 선택 또한 운명의 일부로 받아들입니다.<br />
-                                    타로점을 실행한 시간에 따라 그날의 운세가 변동될 수 있습니다.
+                                    타로는 사용자의 선택 또한 운명의 일부로 받아들입니다. 타로점을 실행한 시간에 따라 그날의 운세가 변동될 수 있습니다.
                                 </TarotNotice>
                                 {fortuneResult.tarot.imageFile && (
                                     <TarotImageWrapper>
