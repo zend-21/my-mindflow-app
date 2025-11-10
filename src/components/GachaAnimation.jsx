@@ -243,24 +243,27 @@ const AnalysisCore = styled.div`
         z-index: 1;
     }
     
-    /* 2. 원형 소용돌이 (::after) - 원 안을 꽉 채우는 은하수 질감 */
+    /* 2. 원형 소용돌이 (::after) - 은하수 질감 강화 */
     &::after {
-        content: ''; /* 이모지 제거 */
+        content: ''; 
         position: absolute;
         top: 50%;
         left: 50%;
-        width: 110px; /* 원을 채울만한 크기로 확장 */
+        width: 110px; 
         height: 110px;
         border-radius: 50%;
         
-        /* 선명한 코닉 그라데이션으로 소용돌이 질감 구현 */
+        /* 🔥 은하수 질감 강화를 위해 코닉 그라데이션 색상 중단점 복잡하게 변경 */
         background: conic-gradient(
-            from 0deg,
-            rgba(255, 215, 0, 0.7) 0deg,      
-            rgba(170, 218, 255, 0.5) 90deg,   
-            rgba(25, 25, 50, 0.1) 180deg,     
-            rgba(170, 218, 255, 0.7) 270deg,  
-            rgba(255, 215, 0, 0.7) 360deg
+            from 90deg, /* 시작점 변경 */
+            rgba(170, 218, 255, 0.8) 0deg,    /* 밝은 팔 (파랑) */
+            rgba(255, 255, 255, 0.1) 10deg,   /* 급격히 어두워짐 */
+            rgba(25, 25, 50, 0.8) 20deg,      /* 어두운 공간 */
+            rgba(255, 215, 0, 0.6) 90deg,     /* 금색 스팟 */
+            rgba(25, 25, 50, 0.5) 150deg,     /* 어두운 공간 확장 */
+            rgba(170, 218, 255, 0.7) 270deg,  /* 밝은 팔 2 (파랑) */
+            rgba(255, 215, 0, 0.8) 330deg,    /* 최종 금색 스팟 */
+            rgba(170, 218, 255, 0.8) 360deg   /* 루프 */
         );
         box-shadow: 0 0 20px rgba(170, 218, 255, 0.8);
         
@@ -863,7 +866,7 @@ const GachaAnimation = ({ onComplete }) => {
 
 
             <CenterContainer>
-                {/* 중앙 분석 코어 (원 안을 채우는 원형 소용돌이) */}
+                {/* 중앙 분석 코어 (은하수 질감 강화된 원형 소용돌이) */}
                 <AnalysisCore />
 
                 {currentStage && (
