@@ -173,6 +173,13 @@ const coreSwirl = keyframes`
     }
 `;
 
+// 💥 최종 빛 효과 Keyframe
+const finalFlash = keyframes`
+    0% { opacity: 0; }
+    30% { opacity: 1; } /* 순간적으로 최고 밝기 */
+    100% { opacity: 0; } /* 빠르게 페이드 아웃 */
+`;
+
 // 🎨 Styled Components
 
 const Overlay = styled.div`
@@ -188,6 +195,24 @@ const Overlay = styled.div`
     align-items: center;
     z-index: 10000;
 `;
+
+// 💥 최종 빛 효과 오버레이
+const FinalFlashOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: white; /* 문이 열리며 들어오는 밝은 빛 */
+    opacity: 0;
+    z-index: 10001;
+    pointer-events: none;
+
+    ${props => props.$show && css`
+        animation: ${finalFlash} 0.5s ease-out forwards;
+    `}
+`;
+
 
 const BlackholeVortex = styled.div`
     position: absolute;
@@ -351,7 +376,7 @@ const ProgressFiller = styled.div.attrs(props => ({
 `;
 
 
-// ✨ 동서양 점술 문양 효과
+// ✨ 동서양 점술 문양 효과 (배경)
 const FadingGlyph = styled.div.attrs(props => ({
     style: {
         fontSize: `${props.$size}px`,
@@ -372,7 +397,7 @@ const FadingGlyph = styled.div.attrs(props => ({
     z-index: 5;
 `;
 
-// ✨ 천체 궤적 효과
+// ✨ 천체 궤적 효과 (배경)
 const CelestialTrail = styled.div.attrs(props => ({
     style: {
         background: props.$color,
@@ -592,11 +617,13 @@ const GachaAnimation = ({ onComplete }) => {
     const [isExiting, setIsExiting] = useState(false);
     const [showFireworks, setShowFireworks] = useState(false);
     const [overallIndex, setOverallIndex] = useState(0); 
+    const [showFinalFlash, setShowFinalFlash] = useState(false); 
+    
     const totalSteps = 22; 
     // ✨ 진행률 계산
     const progress = Math.min(100, (overallIndex / totalSteps) * 100);
     
-    // 단계별 메시지 정의 (단계 번호/진행률 텍스트 제거)
+    // 단계별 메시지 정의 
     const analysisStages = useMemo(() => ([
         {
             main: '사주 분석',
@@ -644,7 +671,7 @@ const GachaAnimation = ({ onComplete }) => {
                 '운명의 문이 열립니다...',
                 '모든 차원 데이터 동기화 중...',
                 '종합 운세 보고서 완성...',
-                '당신의 진실, 지금 공개됩니다.'
+                '운명의 문, 지금 열립니다!' // ✨ 최종 문구 적용
             ],
             type: 'complete'
         }
@@ -698,11 +725,26 @@ const GachaAnimation = ({ onComplete }) => {
             // 누적 딜레이 업데이트 (단축된 딜레이와 페이드 시간 적용)
             cumulativeDelay += delay + fadeDuration;
 
-            // 최종 완료 후 onComplete 호출
+            // 최종 완료 후 onComplete 호출 (강조 정지 효과 추가)
             if (index === allSubSteps.length - 1) {
+                
+                // [1] 최종 문구 등장 및 100% 달성 시점 (cumulativeDelay) 후 0.3초 정지 시작
                 timers.push(setTimeout(() => {
-                    onComplete();
-                }, cumulativeDelay + 1000)); // 최종 문구 표시 후 1초 대기
+                    
+                    // [2] 0.3초 정지 후, 1.0초 메시지 읽기 대기 타이머 시작
+                    timers.push(setTimeout(() => {
+                        
+                        // [3] 빛 효과 트리거
+                        setShowFinalFlash(true); 
+                        
+                        // [4] 빛 효과 후 0.5초 뒤 onComplete
+                        timers.push(setTimeout(() => {
+                            onComplete();
+                        }, 500)); 
+
+                    }, 1000)); // 1초 대기 (읽기 시간)
+
+                }, cumulativeDelay + 300)); // <--- 최종 메시지 표시 후 0.3초 정지 (강조)
             }
         });
 
@@ -711,7 +753,7 @@ const GachaAnimation = ({ onComplete }) => {
         };
     }, [onComplete, analysisStages]);
 
-    // 폭죽 파티클 생성
+    // 폭죽 파티클 생성 (생략 가능, 배경 요소)
     const fireworkParticles = useMemo(() => {
         const fireworks = [];
         const colors = ['#FFD700', '#FF6B6B', '#4ECDC4', '#95E1D3', '#F38181', '#AA96DA'];
@@ -743,10 +785,9 @@ const GachaAnimation = ({ onComplete }) => {
         return fireworks;
     }, []);
 
-    // Fading Glyphs (점술 문양) 생성
+    // Fading Glyphs (점술 문양) 생성 (배경 요소)
     const fadingGlyphs = useMemo(() => {
         const glyphs = [];
-        // 🃏 (조커 카드) 문양을 포함하여 최종 리스트 구성
         const symbols = ['🃏', '🔮', '☯️', '☰', '☱', '☴', '♈', '♎', '★', '◇', '◎'];
         const colors = ['#FFFFFF', '#FFD700', '#AADAFF'];
 
@@ -780,7 +821,7 @@ const GachaAnimation = ({ onComplete }) => {
         return glyphs;
     }, []);
 
-    // Celestial Trails (천체 궤적) 생성
+    // Celestial Trails (천체 궤적) 생성 (배경 요소)
     const celestialTrails = useMemo(() => {
         const trails = [];
         const colors = ['rgba(255, 255, 255, 0.8)', 'rgba(170, 218, 255, 0.9)'];
@@ -890,6 +931,9 @@ const GachaAnimation = ({ onComplete }) => {
                     </MessageContainer>
                 )}
             </CenterContainer>
+            
+            {/* 💥 최종 빛 효과 오버레이 */}
+            <FinalFlashOverlay $show={showFinalFlash} />
         </Overlay>
     );
 };
