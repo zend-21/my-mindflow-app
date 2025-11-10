@@ -13,11 +13,10 @@ MindFlow 앱에는 **3가지 독립된 점술 시스템**이 구현되어 있습
 my-mindflow-app/
 ├── public/
 │   └── fortune_data/
+│       ├── fortune_database.json ✅ 사주 운세 345개 (6카테고리)
 │       ├── Tarot.csv              ✅ 타로 카드 156장 (정/역방향)
 │       └── horoscope.csv          ✅ 별자리 운세 240개 (12별자리)
 ├── src/
-│   ├── data/
-│   │   └── fortune_database.json ✅ 사주 운세 345개 (6카테고리)
 │   ├── utils/
 │   │   └── fortuneSelector.js    # 사주 운세 선택 유틸리티
 │   └── components/
@@ -27,7 +26,7 @@ my-mindflow-app/
 
 ### 각 시스템별 데이터 구조
 
-**1. 사주/오늘의 운세** (`src/data/fortune_database.json`)
+**1. 사주/오늘의 운세** (`public/fortune_data/fortune_database.json`)
 - 형식: JSON
 - 구조: `{ Category: { Keyword: [문장들...] } }`
 - 총 345개 문장 (6개 카테고리)
@@ -311,7 +310,7 @@ fetch('/fortune_data/Tarot.csv')
 
 | 구분 | 사주/오늘의 운세 | 별자리 운세 | 타로 카드 |
 |-----|-----------------|------------|----------|
-| **파일 위치** | `src/data/fortune_database.json` | `public/fortune_data/horoscope.csv` | `public/fortune_data/Tarot.csv` |
+| **파일 위치** | `public/fortune_data/fortune_database.json` | `public/fortune_data/horoscope.csv` | `public/fortune_data/Tarot.csv` |
 | **데이터 형식** | JSON | CSV (세미콜론) | CSV (세미콜론) |
 | **총 데이터 수** | 345개 | 240개 | 156개 |
 | **기반 정보** | 출생 정보 + 날짜 | 출생 월일 (별자리) | 랜덤 선택 |

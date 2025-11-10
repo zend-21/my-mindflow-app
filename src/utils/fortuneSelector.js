@@ -1,16 +1,42 @@
 // src/utils/fortuneSelector.js
 // 사주 운세 데이터 선택 유틸리티
 
-import fortuneData from '../data/fortune_database.json';
+// 운세 데이터 캐시
+let fortuneDataCache = null;
+
+/**
+ * 운세 데이터를 로드 (캐싱 적용)
+ * @returns {Promise<Object>} 운세 데이터
+ */
+const loadFortuneData = async () => {
+    if (fortuneDataCache) {
+        return fortuneDataCache;
+    }
+
+    try {
+        const response = await fetch('/fortune_data/fortune_database.json');
+        fortuneDataCache = await response.json();
+        return fortuneDataCache;
+    } catch (error) {
+        console.error('운세 데이터 로딩 실패:', error);
+        return null;
+    }
+};
 
 /**
  * 카테고리와 키워드에 맞는 운세 문장을 랜덤으로 선택
  * @param {string} category - 카테고리 ('Main', 'Money', 'Love', 'Health', 'Advice', 'Lucky')
  * @param {string} keyword - 키워드 (예: '매우좋음', '재물상승', '애정최고' 등)
- * @returns {string} 랜덤으로 선택된 운세 문장
+ * @returns {Promise<string>} 랜덤으로 선택된 운세 문장
  */
-export const getRandomFortune = (category, keyword) => {
+export const getRandomFortune = async (category, keyword) => {
     try {
+        const fortuneData = await loadFortuneData();
+
+        if (!fortuneData) {
+            return '운세 정보를 불러올 수 없습니다.';
+        }
+
         const categoryData = fortuneData[category];
 
         if (!categoryData) {
@@ -38,15 +64,15 @@ export const getRandomFortune = (category, keyword) => {
 /**
  * Main과 Main2를 조합하여 종합 운세 생성
  * @param {string} keyword - 키워드 (예: '매우좋음', '좋음', '보통', '주의')
- * @returns {string} Main + "\n또한, " + Main2로 조합된 운세 문장
+ * @returns {Promise<string>} Main + "\n또한, " + Main2로 조합된 운세 문장
  */
-export const getCombinedFortune = (keyword) => {
+export const getCombinedFortune = async (keyword) => {
     try {
         // Main에서 1개 랜덤 선택
-        const mainContent = getRandomFortune('Main', keyword);
+        const mainContent = await getRandomFortune('Main', keyword);
 
         // Main2에서 1개 랜덤 선택
-        const main2Content = getRandomFortune('Main2', keyword);
+        const main2Content = await getRandomFortune('Main2', keyword);
 
         // 줄바꿈 + "또한," 으로 연결
         return `${mainContent}\n또한, ${main2Content}`;
@@ -66,16 +92,16 @@ export const getCombinedFortune = (keyword) => {
  * @param {string} sajuResult.health - 건강운 키워드
  * @param {string} sajuResult.advice - 조언 키워드
  * @param {string} sajuResult.lucky - 행운 요소 키워드
- * @returns {Object} 각 카테고리별 운세 문장
+ * @returns {Promise<Object>} 각 카테고리별 운세 문장
  */
-export const getTodayFortune = (sajuResult) => {
+export const getTodayFortune = async (sajuResult) => {
     return {
-        main: getRandomFortune('Main', sajuResult.main),
-        money: getRandomFortune('Money', sajuResult.money),
-        love: getRandomFortune('Love', sajuResult.love),
-        health: getRandomFortune('Health', sajuResult.health),
-        advice: getRandomFortune('Advice', sajuResult.advice),
-        lucky: getRandomFortune('Lucky', sajuResult.lucky)
+        main: await getRandomFortune('Main', sajuResult.main),
+        money: await getRandomFortune('Money', sajuResult.money),
+        love: await getRandomFortune('Love', sajuResult.love),
+        health: await getRandomFortune('Health', sajuResult.health),
+        advice: await getRandomFortune('Advice', sajuResult.advice),
+        lucky: await getRandomFortune('Lucky', sajuResult.lucky)
     };
 };
 
