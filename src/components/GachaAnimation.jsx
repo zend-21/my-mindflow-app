@@ -164,6 +164,7 @@ const corePulse = keyframes`
     }
 `;
 
+// ✨ 원형 소용돌이 회전 애니메이션
 const coreSwirl = keyframes`
     from {
         transform: translate(-50%, -50%) rotate(0deg);
@@ -221,13 +222,13 @@ const CenterContainer = styled.div`
     z-index: 100;
 `;
 
-// ✨ 분석 코어 (안정화된 초기 구조로 복원)
+// ✨ 분석 코어 (원 안을 채우는 원형 소용돌이로 수정)
 const AnalysisCore = styled.div`
     position: relative;
     width: 120px;
     height: 120px;
     
-    /* 원형 맥동 테두리 */
+    /* 1. 원형 맥동 테두리 (::before) */
     &::before {
         content: '';
         position: absolute;
@@ -239,21 +240,34 @@ const AnalysisCore = styled.div`
         border-radius: 50%;
         background: radial-gradient(circle at center, rgba(170, 218, 255, 0.6) 0%, rgba(25, 25, 50, 0) 70%);
         animation: ${corePulse} 3s ease-in-out infinite;
+        z-index: 1;
     }
     
-    /* 회전하는 은하수 심볼 ('🌌' 이모지) */
+    /* 2. 원형 소용돌이 (::after) - 원 안을 꽉 채우는 은하수 질감 */
     &::after {
-        content: '🌌';
+        content: ''; /* 이모지 제거 */
         position: absolute;
         top: 50%;
         left: 50%;
+        width: 110px; /* 원을 채울만한 크기로 확장 */
+        height: 110px;
+        border-radius: 50%;
+        
+        /* 선명한 코닉 그라데이션으로 소용돌이 질감 구현 */
+        background: conic-gradient(
+            from 0deg,
+            rgba(255, 215, 0, 0.7) 0deg,      
+            rgba(170, 218, 255, 0.5) 90deg,   
+            rgba(25, 25, 50, 0.1) 180deg,     
+            rgba(170, 218, 255, 0.7) 270deg,  
+            rgba(255, 215, 0, 0.7) 360deg
+        );
+        box-shadow: 0 0 20px rgba(170, 218, 255, 0.8);
+        
         /* 회전 애니메이션 적용 */
         transform: translate(-50%, -50%) rotate(0deg); 
-        font-size: 60px;
-        color: #FFD700;
-        animation: ${coreSwirl} 5s linear infinite;
-        text-shadow: 0 0 15px #FFD700;
-        mix-blend-mode: screen;
+        animation: ${coreSwirl} 8s linear infinite;
+        z-index: 2;
     }
 `;
 
@@ -849,7 +863,7 @@ const GachaAnimation = ({ onComplete }) => {
 
 
             <CenterContainer>
-                {/* 중앙 분석 코어 (안정화된 초기 구조) */}
+                {/* 중앙 분석 코어 (원 안을 채우는 원형 소용돌이) */}
                 <AnalysisCore />
 
                 {currentStage && (
