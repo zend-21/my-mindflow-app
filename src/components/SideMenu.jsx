@@ -17,7 +17,7 @@ const slideOut = keyframes`
 `;
 
 const Overlay = styled.div`
-    position: absolute; 
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;
@@ -27,7 +27,7 @@ const Overlay = styled.div`
 `;
 
 const MenuContainer = styled.div`
-    position: absolute;
+    position: fixed;
     top: 0;
     left: 0;
     height: 100vh;
@@ -42,10 +42,9 @@ const MenuContainer = styled.div`
     z-index: 10006;
     display: flex;
     flex-direction: column;
-    padding: 20px 0;
+    padding: 0;
     transform: translateX(-100%);
     transition: transform 0.3s ease-in-out;
-    position: relative;
 
     &::before {
         content: '';
