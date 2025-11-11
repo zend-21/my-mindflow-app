@@ -866,7 +866,7 @@ const Timer = ({ onClose }) => {
         }
     };
 
-    // 버튼 클릭 효과음 재생 (Web Audio API 사용 - 혀 "쩍" 소리)
+    // 버튼 클릭 효과음 재생 (Web Audio API 사용 - 스마트폰 키보드 타이핑음)
     const playClickSound = () => {
         // 진동 모드이거나 볼륨이 0이면 소리 재생 안함
         if (volume === 0 || vibrationMode) {
@@ -882,42 +882,37 @@ const Timer = ({ onClose }) => {
             const audioContext = clickSoundRef.current;
             const now = audioContext.currentTime;
 
-            // 혀 "쩍" 소리 재현 (임펄스 + 공기 빠지는 소리)
-            const sampleRate = audioContext.sampleRate;
-            const bufferSize = sampleRate * 0.005; // 5ms (매우 짧은 펄스)
-            const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
-            const output = buffer.getChannelData(0);
+            // 스마트폰 키보드 "톡" 소리 재현 (매우 짧고 건조한 클릭)
+            // 화이트 노이즈만 사용 - 타악기처럼 단단하고 건조한 소리
+            const bufferSize = audioContext.sampleRate * 0.01; // 10ms (매우 짧음)
+            const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
 
-            // 임펄스(순간 압력) + 감쇠 노이즈
+            // 노이즈 생성 (클릭 소리의 핵심)
             for (let i = 0; i < bufferSize; i++) {
-                // 초반 강한 임펄스
-                const impulse = i < 50 ? 1.0 : 0;
-                // 뒤따르는 공기 소리 (매우 빠른 감쇠)
-                const noise = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.15));
-                output[i] = impulse * 0.5 + noise * 0.5;
+                output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
             }
 
-            const source = audioContext.createBufferSource();
-            source.buffer = buffer;
+            const noiseSource = audioContext.createBufferSource();
+            noiseSource.buffer = noiseBuffer;
 
-            // 밴드패스 필터 (2000-6000Hz - "쩍" 소리의 주파수 범위)
-            const bandpass = audioContext.createBiquadFilter();
-            bandpass.type = 'bandpass';
-            bandpass.frequency.value = 3500;
-            bandpass.Q.value = 2;
+            // 하이패스 필터 (저음 제거 - 더 "톡" 소리나게)
+            const highpass = audioContext.createBiquadFilter();
+            highpass.type = 'highpass';
+            highpass.frequency.value = 1000; // 1000Hz 이하 차단
 
-            const gain = audioContext.createGain();
-            // 순간적으로 강하고 급격히 사라짐
-            gain.gain.setValueAtTime(Math.min(volume * 0.25, 0.2), now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.005);
+            const noiseGain = audioContext.createGain();
+            // 매우 짧고 급격한 감쇠
+            noiseGain.gain.setValueAtTime(Math.min(volume * 0.2, 0.15), now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
 
-            // 연결: 소스 → 밴드패스 필터 → 볼륨 → 출력
-            source.connect(bandpass);
-            bandpass.connect(gain);
-            gain.connect(audioContext.destination);
+            // 연결: 노이즈 → 하이패스 필터 → 볼륨 → 출력
+            noiseSource.connect(highpass);
+            highpass.connect(noiseGain);
+            noiseGain.connect(audioContext.destination);
 
-            source.start(now);
-            source.stop(now + 0.005);
+            noiseSource.start(now);
+            noiseSource.stop(now + 0.01);
 
         } catch (err) {
             console.log('Click sound error:', err);
