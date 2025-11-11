@@ -121,32 +121,30 @@ const SyncSpinner = styled.div`
 
 const ToastOverlay = styled.div`
   position: fixed;
-  bottom: 80px; /* 하단에서 80px 위 */
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
   z-index: 12000;
-  pointer-events: none; /* 클릭 방지 */
-  animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
+  background: rgba(0, 0, 0, 0.2);
+  animation: ${fadeIn} 0.2s ease-out;
 `;
 
 const ToastBox = styled.div`
-  background: rgba(0, 0, 0, 0.92); /* 세련된 반투명 */
+  background: rgba(0, 0, 0, 0.9); /* 더 어둡게 */
   color: white;
-  padding: 16px 24px;
-  border-radius: 16px; /* 더 둥글게 */
-  font-size: 15px;
-  font-weight: 500;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3),
-              0 0 0 1px rgba(255, 255, 255, 0.1); /* 미세한 테두리 효과 */
+  padding: 24px 32px; /* 더 크게 */
+  border-radius: 12px;
+  font-size: 18px; /* 더 크게 */
+  font-weight: 600; /* 굵게 */
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); /* 더 진한 그림자 */
+  animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
   text-align: center;
-  min-width: 200px;
-  max-width: 90vw;
-  backdrop-filter: blur(10px); /* 블러 효과 */
-  -webkit-backdrop-filter: blur(10px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
+  min-width: 200px; /* 최소 너비 */
+  z-index: 12001; /* z-index 더 높게 */
 `;
 
 const Screen = styled.div`
@@ -1336,7 +1334,7 @@ function App() {
         if (!profile || !accessToken) {
             console.log('❌ 로그인 안 됨');
             if (isManual) {
-                showToast('⚠ 로그인이 필요합니다');
+                showToast('⚠️ 로그인 필요');
                 console.log('Toast 표시: 로그인 필요');
             }
             return false;
@@ -1386,7 +1384,7 @@ function App() {
                     addActivity('동기화', 'Google Drive 동기화 완료');
                     await new Promise(resolve => setTimeout(resolve, 500));
                     console.log('✅ 수동 동기화 - 토스트 표시');
-                    showToast('✓ 동기화가 완료되었습니다');
+                    showToast('✅ 동기화 완료!');
                     console.log('Toast 표시: 동기화 완료');
                 }
                 return true;
@@ -1395,7 +1393,7 @@ function App() {
                 if (result.error === 'TOKEN_EXPIRED') {
                     // ✅ 자동 로그아웃 대신 재로그인 유도
                     if (isManual) {
-                        showToast('⚠ 로그인이 만료되었습니다');
+                        showToast('🔐 로그인이 만료되었습니다. 다시 로그인해주세요.');
                         setTimeout(() => {
                             setIsLoginModalOpen(true);
                         }, 1500);
@@ -1403,14 +1401,14 @@ function App() {
                     // handleLogout()을 호출하지 않음!
                 } else {
                     if (isManual) {
-                        showToast('⚠ 동기화에 실패했습니다');
+                        showToast('❌ 동기화 실패');
                     }
                 }
                 return false;
             }
         } catch (error) {
             console.error('❌ 동기화 중 오류:', error);
-            if (isManual) showToast('⚠ 동기화 오류가 발생했습니다');
+            if (isManual) showToast('❌ 오류 발생');
             return false;
         } finally {
             if (isManual) {
