@@ -80,7 +80,7 @@ const MenuHeader = styled.div`
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
-    padding: 0 20px;
+    padding: 20px 20px 0 20px;
 `;
 
 const ProfileCluster = styled.div`
@@ -217,8 +217,8 @@ const FileInput = styled.input`
 
 const MenuGroup = styled.div`
     position: relative;
-    margin-bottom: 12px;
-    padding-bottom: 12px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
 
     &::after {
         content: '';
@@ -226,7 +226,7 @@ const MenuGroup = styled.div`
         bottom: 0;
         left: 0;
         right: 0;
-        height: 8px;
+        height: 4px;
         background:
             linear-gradient(180deg,
                 rgba(0, 0, 0, 0.3) 0%,
