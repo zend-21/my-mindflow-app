@@ -866,7 +866,7 @@ const Timer = ({ onClose }) => {
         }
     };
 
-    // 버튼 클릭 효과음 재생 (Web Audio API 사용 - iPhone 키보드 스타일)
+    // 버튼 클릭 효과음 재생 (Web Audio API 사용 - iPhone 키보드 타이핑 스타일)
     const playClickSound = () => {
         // 진동 모드이거나 볼륨이 0이면 소리 재생 안함
         if (volume === 0 || vibrationMode) {
@@ -880,29 +880,62 @@ const Timer = ({ onClose }) => {
             }
 
             const audioContext = clickSoundRef.current;
+            const now = audioContext.currentTime;
 
-            // 짧은 틱 소리 생성 (iPhone 키보드 스타일)
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
+            // iPhone 키보드 "딱" 소리 재현 (여러 주파수 레이어 합성)
+            // 레이어 1: 고음 클릭 (1400Hz)
+            const osc1 = audioContext.createOscillator();
+            const gain1 = audioContext.createGain();
+            osc1.frequency.value = 1400;
+            osc1.type = 'sine';
+            gain1.gain.setValueAtTime(Math.min(volume * 0.15, 0.1), now);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
+            osc1.connect(gain1);
+            gain1.connect(audioContext.destination);
 
-            // 1200Hz 주파수 (높고 날카로운 톤)
-            oscillator.frequency.value = 1200;
-            oscillator.type = 'sine';
+            // 레이어 2: 중음 바디 (800Hz)
+            const osc2 = audioContext.createOscillator();
+            const gain2 = audioContext.createGain();
+            osc2.frequency.value = 800;
+            osc2.type = 'triangle';
+            gain2.gain.setValueAtTime(Math.min(volume * 0.1, 0.08), now);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.012);
+            osc2.connect(gain2);
+            gain2.connect(audioContext.destination);
 
-            // 볼륨 설정 (현재 볼륨의 20% - 매우 부드럽게)
-            gainNode.gain.value = Math.min(volume * 0.2, 0.15);
+            // 레이어 3: 저음 베이스 (200Hz) - 단단한 느낌
+            const osc3 = audioContext.createOscillator();
+            const gain3 = audioContext.createGain();
+            osc3.frequency.value = 200;
+            osc3.type = 'square';
+            gain3.gain.setValueAtTime(Math.min(volume * 0.08, 0.05), now);
+            gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.01);
+            osc3.connect(gain3);
+            gain3.connect(audioContext.destination);
 
-            // 빠른 페이드아웃 (30ms)
-            gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.03);
+            // 화이트 노이즈 레이어 (클릭감 강화)
+            const bufferSize = audioContext.sampleRate * 0.02; // 20ms
+            const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            const noiseSource = audioContext.createBufferSource();
+            noiseSource.buffer = noiseBuffer;
+            const noiseGain = audioContext.createGain();
+            noiseGain.gain.setValueAtTime(Math.min(volume * 0.05, 0.03), now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
+            noiseSource.connect(noiseGain);
+            noiseGain.connect(audioContext.destination);
 
-            // 연결
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-
-            // 재생 시작 및 즉시 종료 예약
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.03); // 30ms 후 종료
+            // 모든 소리 시작 및 종료
+            osc1.start(now);
+            osc1.stop(now + 0.015);
+            osc2.start(now);
+            osc2.stop(now + 0.012);
+            osc3.start(now);
+            osc3.stop(now + 0.01);
+            noiseSource.start(now);
 
         } catch (err) {
             console.log('Click sound error:', err);
@@ -932,52 +965,16 @@ const Timer = ({ onClose }) => {
         }
     };
 
-    // 알림 권한 요청
+    // 알림 권한 요청 (비활성화 - 앱용으로 부적격)
     const requestNotificationPermission = async () => {
-        if (!('Notification' in window)) {
-            console.log('이 브라우저는 알림을 지원하지 않습니다.');
-            return false;
-        }
-
-        if (Notification.permission === 'granted') {
-            notificationPermissionGranted.current = true;
-            return true;
-        }
-
-        if (Notification.permission !== 'denied') {
-            const permission = await Notification.requestPermission();
-            if (permission === 'granted') {
-                notificationPermissionGranted.current = true;
-                return true;
-            }
-        }
-
+        // 브라우저 네이티브 알림은 URL 주소가 노출되므로 앱에서 사용 안함
         return false;
     };
 
-    // 타이머 알림 전송
+    // 타이머 알림 전송 (비활성화 - 앱용으로 부적격)
     const sendTimerNotification = (title, body) => {
-        if (!notificationPermissionGranted.current) {
-            return;
-        }
-
-        try {
-            const notification = new Notification(title, {
-                body: body,
-                icon: '/favicon.ico',
-                badge: '/favicon.ico',
-                tag: 'timer-notification',
-                requireInteraction: false
-            });
-
-            // 알림 클릭 시 타이머 창으로 포커스
-            notification.onclick = () => {
-                window.focus();
-                notification.close();
-            };
-        } catch (err) {
-            console.log('알림 전송 실패:', err);
-        }
+        // 브라우저 네이티브 알림 대신 앱 내 UI로만 알림 처리
+        return;
     };
 
     // 전체화면 API 제거 - 모바일에서 화면 요동 방지
