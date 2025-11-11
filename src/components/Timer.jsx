@@ -690,6 +690,8 @@ const Timer = ({ onClose }) => {
     const testAudioTimeoutRef = useRef(null);
     const notificationPermissionGranted = useRef(false);
     const notificationSentAt10s = useRef(false);
+    // 버튼 클릭 효과음용 ref
+    const clickSoundRef = useRef(null);
 
     // 음량 변경 핸들러 (슬라이더 드래그 시 - 테스트 소리 없음)
     const handleVolumeChange = (e) => {
@@ -864,6 +866,49 @@ const Timer = ({ onClose }) => {
         }
     };
 
+    // 버튼 클릭 효과음 재생 (Web Audio API 사용 - iPhone 키보드 스타일)
+    const playClickSound = () => {
+        // 진동 모드이거나 볼륨이 0이면 소리 재생 안함
+        if (volume === 0 || vibrationMode) {
+            return;
+        }
+
+        try {
+            // Web Audio API 컨텍스트 생성 (싱글톤)
+            if (!clickSoundRef.current) {
+                clickSoundRef.current = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            const audioContext = clickSoundRef.current;
+
+            // 짧은 틱 소리 생성 (iPhone 키보드 스타일)
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            // 1200Hz 주파수 (높고 날카로운 톤)
+            oscillator.frequency.value = 1200;
+            oscillator.type = 'sine';
+
+            // 볼륨 설정 (현재 볼륨의 20% - 매우 부드럽게)
+            gainNode.gain.value = Math.min(volume * 0.2, 0.15);
+
+            // 빠른 페이드아웃 (30ms)
+            gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.03);
+
+            // 연결
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            // 재생 시작 및 즉시 종료 예약
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.03); // 30ms 후 종료
+
+        } catch (err) {
+            console.log('Click sound error:', err);
+        }
+    };
+
     // Wake Lock 요청 (화면 꺼짐 방지)
     const requestWakeLock = async () => {
         try {
@@ -994,7 +1039,10 @@ const Timer = ({ onClose }) => {
     const handleMouseDownMinutes = (minutes) => {
         // 타이머 실행 중이면 무시
         if (isRunning) return;
-        
+
+        // 클릭 효과음 재생
+        playClickSound();
+
         // 첫 번째 클릭은 즉시 실행
         addMinutes(minutes);
         // 길게 누르면 반복 실행
@@ -1009,7 +1057,10 @@ const Timer = ({ onClose }) => {
     const handleMouseDownSeconds = (amount) => {
         // 타이머 실행 중이면 무시
         if (isRunning) return;
-        
+
+        // 클릭 효과음 재생
+        playClickSound();
+
         // 첫 번째 클릭은 즉시 실행
         addSeconds(amount);
         // 길게 누르면 반복 실행
