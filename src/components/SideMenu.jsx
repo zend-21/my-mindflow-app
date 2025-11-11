@@ -32,15 +32,38 @@ const MenuContainer = styled.div`
     left: 0;
     height: 100vh;
     width: 75vw;
-    max-width: 350px; 
-    background: linear-gradient(180deg, #f0f2f5 0%, #e2e8f0 100%);
-    box-shadow: 6px 0 25px rgba(0, 0, 0, 0.25);
+    max-width: 350px;
+    background:
+        linear-gradient(135deg, rgba(255,255,255,0.1) 0%, transparent 100%),
+        linear-gradient(180deg, #2a2d35 0%, #1a1d24 100%);
+    box-shadow:
+        6px 0 30px rgba(0, 0, 0, 0.5),
+        inset -1px 0 0 rgba(255, 255, 255, 0.1);
     z-index: 10006;
     display: flex;
     flex-direction: column;
     padding: 20px 0;
     transform: translateX(-100%);
     transition: transform 0.3s ease-in-out;
+    position: relative;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background:
+            repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0,0,0,0.03) 2px,
+                rgba(0,0,0,0.03) 4px
+            );
+        pointer-events: none;
+    }
 
     ${props => props.$isOpen && `
         transform: translateX(0);
@@ -82,12 +105,13 @@ const PlaceholderIcon = styled.div`
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background-color: #e2e8f0;
+    background: linear-gradient(135deg, #4a4d55 0%, #35383f 100%);
     display: flex;
     justify-content: center;
     align-items: center;
-    color: #a0aec0;
+    color: #9ca3af;
     flex-shrink: 0;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 `;
 
 const ProfileInfo = styled.div`
@@ -99,15 +123,16 @@ const ProfileInfo = styled.div`
 const ProfileName = styled.span`
     font-size: 16px;
     font-weight: 600;
-    color: #333;
+    color: #ffffff;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 `;
 
 const ProfileEmail = styled.span`
     font-size: 12px;
-    color: #777;
+    color: #b0b0b0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -117,37 +142,63 @@ const CloseButton = styled.button`
     background: none;
     border: none;
     font-size: 24px;
-    color: #999;
+    color: #ffffff;
     cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+
+    &:hover {
+        opacity: 1;
+    }
 `;
 
 const MenuItem = styled.div`
     padding: 18px 24px;
-    font-size: 18px;
-    color: #808080ff;
+    font-size: 17px;
+    color: #d0d0d0;
     cursor: pointer;
     display: flex;
     align-items: center;
     gap: 12px;
-    transition: background 0.3s ease, color 0.3s ease, transform 0.3s ease;
-    border-bottom: 2px solid #e2e2e2ff;
+    transition: all 0.3s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+    background: transparent;
+
+    &::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 24px;
+        right: 24px;
+        height: 1px;
+        background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.1) 50%,
+            transparent 100%
+        );
+    }
 
     & .icon {
-        font-size: 24px;
+        font-size: 22px;
         line-height: 1;
-        filter: grayscale(100%);
-        transition: filter 0.3s ease;
+        filter: grayscale(100%) brightness(1.2);
+        transition: all 0.3s ease;
     }
 
     &:hover, &:active {
-        background: linear-gradient(90deg, #f093fb, #f5576c);
-        color: white;
-        font-weight: 600;
+        background: linear-gradient(90deg,
+            rgba(240, 147, 251, 0.15),
+            rgba(245, 87, 108, 0.15)
+        );
+        color: #ffffff;
+        font-weight: 500;
         transform: translateX(5px);
+        box-shadow: inset 0 0 20px rgba(240, 147, 251, 0.1);
     }
-    
+
     &:hover .icon, &:active .icon {
-        filter: grayscale(0%);
+        filter: grayscale(0%) brightness(1);
     }
 
     &:last-of-type {
@@ -156,7 +207,7 @@ const MenuItem = styled.div`
 
     &.logout-button {
         margin-top: auto;
-        border-top: 2px solid #e2e2e2ff;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
         border-bottom: none;
     }
 `;
@@ -166,14 +217,30 @@ const FileInput = styled.input`
 `;
 
 const MenuGroup = styled.div`
-    border-bottom: 3px solid #d1d5db;
-    margin-bottom: 8px;
-    padding-bottom: 8px;
+    position: relative;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
 
-    &:last-of-type {
-        border-bottom: none;
-        margin-bottom: 0;
-        padding-bottom: 0;
+    &::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 8px;
+        background:
+            linear-gradient(180deg,
+                rgba(0, 0, 0, 0.3) 0%,
+                transparent 50%,
+                rgba(255, 255, 255, 0.05) 100%
+            );
+        box-shadow:
+            0 1px 0 rgba(255, 255, 255, 0.05),
+            0 -1px 0 rgba(0, 0, 0, 0.2);
+    }
+
+    &:last-of-type::after {
+        display: none;
     }
 `;
 
