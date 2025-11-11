@@ -866,7 +866,7 @@ const Timer = ({ onClose }) => {
         }
     };
 
-    // 버튼 클릭 효과음 재생 (Web Audio API 사용 - 스마트폰 키보드 타이핑음)
+    // 버튼 클릭 효과음 재생 (Web Audio API 사용 - 갤럭시 키보드 타이핑음)
     const playClickSound = () => {
         // 진동 모드이거나 볼륨이 0이면 소리 재생 안함
         if (volume === 0 || vibrationMode) {
@@ -882,37 +882,46 @@ const Timer = ({ onClose }) => {
             const audioContext = clickSoundRef.current;
             const now = audioContext.currentTime;
 
-            // 스마트폰 키보드 "톡" 소리 재현 (매우 짧고 건조한 클릭)
-            // 화이트 노이즈만 사용 - 타악기처럼 단단하고 건조한 소리
-            const bufferSize = audioContext.sampleRate * 0.01; // 10ms (매우 짧음)
-            const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-            const output = noiseBuffer.getChannelData(0);
+            // 갤럭시 키보드 "톡" 소리 재현
+            // 매우 짧은 임펄스 + 고주파 노이즈 버스트
+            const duration = 0.003; // 3ms (매우 짧음)
+            const bufferSize = Math.floor(audioContext.sampleRate * duration);
+            const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+            const output = buffer.getChannelData(0);
 
-            // 노이즈 생성 (클릭 소리의 핵심)
+            // 임펄스 + 노이즈 생성
             for (let i = 0; i < bufferSize; i++) {
-                output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+                // 초반 임펄스 (첫 20샘플)
+                const impulse = i < 20 ? 1.0 : 0;
+                // 화이트 노이즈
+                const noise = Math.random() * 2 - 1;
+                // 매우 급격한 지수 감쇠
+                const envelope = Math.exp(-i / (bufferSize * 0.1));
+
+                output[i] = (impulse * 0.6 + noise * 0.4) * envelope;
             }
 
-            const noiseSource = audioContext.createBufferSource();
-            noiseSource.buffer = noiseBuffer;
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
 
-            // 하이패스 필터 (저음 제거 - 더 "톡" 소리나게)
-            const highpass = audioContext.createBiquadFilter();
-            highpass.type = 'highpass';
-            highpass.frequency.value = 1000; // 1000Hz 이하 차단
+            // 밴드패스 필터 (2000-6000Hz) - 갤럭시 특유의 "톡" 음역대
+            const bandpass = audioContext.createBiquadFilter();
+            bandpass.type = 'bandpass';
+            bandpass.frequency.value = 4000; // 중심 주파수
+            bandpass.Q.value = 1.5; // Q값 (대역폭)
 
-            const noiseGain = audioContext.createGain();
-            // 매우 짧고 급격한 감쇠
-            noiseGain.gain.setValueAtTime(Math.min(volume * 0.2, 0.15), now);
-            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
+            const gain = audioContext.createGain();
+            // 급격한 감쇠
+            gain.gain.setValueAtTime(Math.min(volume * 0.25, 0.2), now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.002);
 
-            // 연결: 노이즈 → 하이패스 필터 → 볼륨 → 출력
-            noiseSource.connect(highpass);
-            highpass.connect(noiseGain);
-            noiseGain.connect(audioContext.destination);
+            // 연결: 소스 → 밴드패스 필터 → 볼륨 → 출력
+            source.connect(bandpass);
+            bandpass.connect(gain);
+            gain.connect(audioContext.destination);
 
-            noiseSource.start(now);
-            noiseSource.stop(now + 0.01);
+            source.start(now);
+            source.stop(now + duration);
 
         } catch (err) {
             console.log('Click sound error:', err);
