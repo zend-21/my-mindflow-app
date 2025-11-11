@@ -859,18 +859,24 @@ function App() {
         let message = '이벤트 시간이 저장되었습니다.';
 
         if (hasAlarms) {
+            const alarmType = alarmSettings.alarmType; // 'anniversary' or 'normal'
+
             switch (actionType) {
                 case 'register':
-                    message = '새로운 알람이 등록되었습니다. 🔔';
+                    message = alarmType === 'anniversary' ? '기념일을 등록하였습니다. 🔔' : '알람을 등록하였습니다. 🔔';
                     break;
+                case 'update':
                 case 'edit':
-                    message = '알람이 수정되었습니다.';
+                    message = alarmType === 'anniversary' ? '기념일을 수정하였습니다.' : '알람을 수정하였습니다.';
+                    break;
+                case 'delete':
+                    message = alarmType === 'anniversary' ? '기념일을 삭제하였습니다.' : '알람을 삭제하였습니다.';
                     break;
                 case 'toggle_on':
-                    message = '알람기능을 활성화하였습니다.';
+                    message = alarmType === 'anniversary' ? '기념일 알람이 활성화 되었습니다.' : '알람이 활성화 되었습니다.';
                     break;
                 case 'toggle_off':
-                    message = '알람기능을 일시중지하였습니다.';
+                    message = alarmType === 'anniversary' ? '기념일 알람이 일시중지 되었습니다.' : '알람이 일시중지 되었습니다.';
                     break;
                 case 'apply':
                     message = '변경사항이 적용되었습니다.';

@@ -196,11 +196,15 @@ const FortuneFlow = ({ onClose, profile }) => {
             )}
 
             {flowState === 'result' && fortuneResult && (
-                <FortuneResultPage
-                    fortuneResult={fortuneResult}
-                    onClose={onClose}
-                    onReset={handleReset}
-                />
+                <>
+                    {console.log('[FortuneFlow] fortuneResult 전달:', fortuneResult)}
+                    {console.log('[FortuneFlow] overall.content:', fortuneResult?.overall?.content)}
+                    <FortuneResultPage
+                        fortuneResult={fortuneResult}
+                        onClose={onClose}
+                        onReset={handleReset}
+                    />
+                </>
             )}
         </>
     );

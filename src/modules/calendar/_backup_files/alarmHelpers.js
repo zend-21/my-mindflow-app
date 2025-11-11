@@ -1,5 +1,5 @@
 import { format, startOfDay, addYears } from 'date-fns';
-import { AUTO_DELETE_DAYS } from '../alarm/constants/alarmConstants';
+import { AUTO_DELETE_DAYS } from '../constants/alarmConstants';
 
 /**
  * 알람이 자동삭제되었는지 확인 (기념일은 자동삭제 안 함)
@@ -43,7 +43,10 @@ export const hasAlarm = (date, schedules) => {
   const hasDirectAlarm = entry && entry.alarm && entry.alarm.registeredAlarms &&
     entry.alarm.registeredAlarms.filter(alarm => !alarm.isAnniversary && !isAutoDeleted(alarm)).length > 0;
 
-  if (hasDirectAlarm) return true;
+  if (hasDirectAlarm) {
+    console.log(`[hasAlarm] ${key}: 직접 등록된 일반 알람 있음`);
+    return true;
+  }
 
   // 2. 기념일 알람 확인 - 모든 날짜의 기념일을 순회하면서 오늘이 반복 날짜인지 확인
   const twoYearsFromNow = addYears(new Date(), 2);
@@ -64,6 +67,8 @@ export const hasAlarm = (date, schedules) => {
 
     for (const alarm of anniversaryAlarms) {
       const alarmDate = new Date(alarm.calculatedTime);
+      const alarmDateStr = format(alarmDate, 'yyyy-MM-dd');
+      const targetDateStr = format(targetDate, 'yyyy-MM-dd');
 
       // 과거 날짜는 반복 적용 안 함 (등록일 포함 미래만)
       if (targetDate < startOfDay(alarmDate)) {
@@ -72,29 +77,32 @@ export const hasAlarm = (date, schedules) => {
 
       // 기념일 반복 로직 확인
       if (alarm.anniversaryRepeat === 'daily') {
-        // 매일 주기는 등록일에만 점 표시
-        const alarmDateStr = format(alarmDate, 'yyyy-MM-dd');
-        const targetDateStr = format(targetDate, 'yyyy-MM-dd');
+        // 매일 주기는 등록일만 점 표시
         if (alarmDateStr === targetDateStr) {
+          console.log(`[hasAlarm] ${key}: 매일 기념일 등록일 일치 (${alarm.title})`);
           return true;
         }
       } else if (alarm.anniversaryRepeat === 'weekly') {
         if (alarmDate.getDay() === targetDate.getDay()) {
+          console.log(`[hasAlarm] ${key}: 매주 기념일 일치 (${alarm.title}, 원본: ${alarmDateStr})`);
           return true;
         }
       } else if (alarm.anniversaryRepeat === 'monthly') {
         if (alarmDate.getDate() === targetDate.getDate()) {
+          console.log(`[hasAlarm] ${key}: 매달 기념일 일치 (${alarm.title}, 원본: ${alarmDateStr})`);
           return true;
         }
       } else if (alarm.anniversaryRepeat === 'yearly') {
         if (alarmDate.getMonth() === targetDate.getMonth() &&
           alarmDate.getDate() === targetDate.getDate()) {
+          console.log(`[hasAlarm] ${key}: 매년 기념일 일치 (${alarm.title}, 원본: ${alarmDateStr})`);
           return true;
         }
       }
     }
   }
 
+  console.log(`[hasAlarm] ${key}: 알람 없음`);
   return false;
 };
 
@@ -132,6 +140,8 @@ export const hasActiveAlarm = (date, schedules) => {
 
     for (const alarm of activeAnniversaryAlarms) {
       const alarmDate = new Date(alarm.calculatedTime);
+      const alarmDateStr = format(alarmDate, 'yyyy-MM-dd');
+      const targetDateStr = format(targetDate, 'yyyy-MM-dd');
 
       // 과거 날짜는 반복 적용 안 함
       if (targetDate < startOfDay(alarmDate)) {
@@ -139,7 +149,6 @@ export const hasActiveAlarm = (date, schedules) => {
       }
 
       // disabledDates에 해당 날짜가 포함되어 있으면 비활성
-      const targetDateStr = format(targetDate, 'yyyy-MM-dd');
       const disabledDates = alarm.disabledDates || [];
       if (disabledDates.includes(targetDateStr)) {
         continue;
@@ -147,9 +156,7 @@ export const hasActiveAlarm = (date, schedules) => {
 
       // 기념일 반복 로직 확인
       if (alarm.anniversaryRepeat === 'daily') {
-        // 매일 주기는 등록일에만 점 표시
-        const alarmDateStr = format(alarmDate, 'yyyy-MM-dd');
-        const targetDateStr = format(targetDate, 'yyyy-MM-dd');
+        // 매일 주기는 등록일만 점 표시
         if (alarmDateStr === targetDateStr) {
           return true;
         }

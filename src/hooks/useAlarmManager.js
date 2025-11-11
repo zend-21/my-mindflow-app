@@ -102,7 +102,7 @@ const useAlarmManager = (schedules) => {
               ...alarm,
               scheduleData: {
                 date: schedule.date || snoozeInfo.originalDate,
-                text: schedule.text || alarm.title
+                text: alarm.title
               },
               snoozeCount: snoozeInfo.count || 0
             });
@@ -133,7 +133,7 @@ const useAlarmManager = (schedules) => {
             ...alarm,
             scheduleData: {
               date: schedule.date || alarmTime,
-              text: schedule.text || alarm.title
+              text: alarm.title
             },
             snoozeCount: 0
           });

@@ -882,8 +882,10 @@ ${fortuneResult.starSign.content}
                                 <FortuneWrapper>
                                     <FortuneTabTitle $bgColor="#a5b4fc">🌟 종합 운세</FortuneTabTitle>
                                     <FortuneContainer $borderColor="#a5b4fc">
-                                        {fortuneResult.overall.keyword && <Keyword $color="#a5b4fc">{fortuneResult.overall.keyword}</Keyword>}
-                                        <Text style={{ whiteSpace: 'pre-wrap' }}>{fortuneResult.overall.content}</Text>
+                                        {fortuneResult?.overall?.keyword && <Keyword $color="#a5b4fc">{fortuneResult.overall.keyword}</Keyword>}
+                                        <Text style={{ whiteSpace: 'pre-wrap' }}>
+                                            {fortuneResult?.overall?.content || '운세 정보를 불러올 수 없습니다.'}
+                                        </Text>
                                     </FortuneContainer>
                                 </FortuneWrapper>
                             </Section>
@@ -893,8 +895,8 @@ ${fortuneResult.starSign.content}
                                 <FortuneWrapper>
                                     <FortuneTabTitle $bgColor="#f6ad55">💰 재물운</FortuneTabTitle>
                                     <FortuneContainer $borderColor="#f6ad55">
-                                        {fortuneResult.money.keyword && <Keyword $color="#f6ad55">{fortuneResult.money.keyword}</Keyword>}
-                                        <Text>{fortuneResult.money.content}</Text>
+                                        {fortuneResult?.money?.keyword && <Keyword $color="#f6ad55">{fortuneResult.money.keyword}</Keyword>}
+                                        <Text>{fortuneResult?.money?.content || '운세 정보를 불러올 수 없습니다.'}</Text>
                                     </FortuneContainer>
                                 </FortuneWrapper>
                             </Section>
@@ -904,8 +906,8 @@ ${fortuneResult.starSign.content}
                                 <FortuneWrapper>
                                     <FortuneTabTitle $bgColor="#48bb78">💪 건강운</FortuneTabTitle>
                                     <FortuneContainer $borderColor="#48bb78">
-                                        {fortuneResult.health.keyword && <Keyword $color="#48bb78">{fortuneResult.health.keyword}</Keyword>}
-                                        <Text>{fortuneResult.health.content}</Text>
+                                        {fortuneResult?.health?.keyword && <Keyword $color="#48bb78">{fortuneResult.health.keyword}</Keyword>}
+                                        <Text>{fortuneResult?.health?.content || '운세 정보를 불러올 수 없습니다.'}</Text>
                                     </FortuneContainer>
                                 </FortuneWrapper>
                             </Section>
@@ -915,8 +917,8 @@ ${fortuneResult.starSign.content}
                                 <FortuneWrapper>
                                     <FortuneTabTitle $bgColor="#f687b3">💕 애정운</FortuneTabTitle>
                                     <FortuneContainer $borderColor="#f687b3">
-                                        {fortuneResult.love.keyword && <Keyword $color="#f687b3">{fortuneResult.love.keyword}</Keyword>}
-                                        <Text>{fortuneResult.love.content}</Text>
+                                        {fortuneResult?.love?.keyword && <Keyword $color="#f687b3">{fortuneResult.love.keyword}</Keyword>}
+                                        <Text>{fortuneResult?.love?.content || '운세 정보를 불러올 수 없습니다.'}</Text>
                                     </FortuneContainer>
                                 </FortuneWrapper>
                             </Section>
@@ -926,8 +928,8 @@ ${fortuneResult.starSign.content}
                                 <FortuneWrapper>
                                     <FortuneTabTitle $bgColor="#c4b5fd">💡 오늘의 조언</FortuneTabTitle>
                                     <FortuneContainer $borderColor="#c4b5fd">
-                                        {fortuneResult.advice.keyword && <Keyword $color="#c4b5fd">{fortuneResult.advice.keyword}</Keyword>}
-                                        <Text>{fortuneResult.advice.content}</Text>
+                                        {fortuneResult?.advice?.keyword && <Keyword $color="#c4b5fd">{fortuneResult.advice.keyword}</Keyword>}
+                                        <Text>{fortuneResult?.advice?.content || '운세 정보를 불러올 수 없습니다.'}</Text>
                                     </FortuneContainer>
                                 </FortuneWrapper>
                             </Section>

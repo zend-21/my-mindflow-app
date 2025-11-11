@@ -1,6 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { ALARM_COLORS } from '../constants';
+import { ALARM_COLORS } from '../alarm/constants/alarmConstants';
 
 /**
  * 기념일 알람 아이템 컴포넌트

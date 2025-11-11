@@ -1,4 +1,4 @@
-// src/modules/calendar/AlarmModal.jsx
+// src/modules/calendar/AlarmModal_SIMPLE.jsx
 // 알람 설정 모달 - 심플 버전 (레이아웃만 유지, 기능은 단순화)
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -6,7 +6,6 @@ import styled from 'styled-components';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import Portal from '../../components/Portal';
-import { saveAudioFile, loadAudioFile } from '../../utils/audioStorage';
 
 // alarm 모듈에서 필요한 것만 import
 import {
@@ -17,28 +16,10 @@ import {
   ClockIcon,
   TitleIcon,
   VolumeIcon,
-  VibrateIcon,
-  AlertIcon,
-  RadioGroup,
-  RadioOption,
-  VolumeContainer,
-  VolumeSlider,
-  VolumeLabel,
-  SoundUploadContainer,
-  FileInputLabel,
-  HiddenFileInput,
-  FileName,
-  SoundPreview,
-  PlayButton,
 } from './alarm';
 
 // 기존 레이아웃의 AlarmItemComponent 사용
 import { AlarmItemComponent } from './alarm/components/AlarmItemComponent';
-// 모달 컴포넌트 import
-import { ValidationModal, DeleteConfirmModal, EditConfirmModal } from './alarm/components/ConfirmationModals';
-import { AlarmEditModal } from './alarm/components/AlarmEditModal';
-// 기념일 반복 유틸 함수
-import { getRepeatedAnniversaries } from './utils/anniversaryHelpers';
 
 // ==================== STYLED COMPONENTS ====================
 const Overlay = styled.div`
@@ -175,16 +156,33 @@ const TimeInput = styled.input`
   }
 `;
 
-const Select = styled.select`
+const RadioGroup = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+`;
+
+const RadioOption = styled.div`
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #dee2e6;
+  border: 2px solid ${props => props.$checked ? ALARM_COLORS.primary : '#dee2e6'};
+  background: ${props => props.$checked ? `${ALARM_COLORS.primary}15` : 'white'};
   font-size: 14px;
-  background: white;
+  color: ${props => props.$checked ? ALARM_COLORS.primary : '#495057'};
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
 
-  &:focus {
-    outline: 2px solid ${ALARM_COLORS.primary};
-    border-color: transparent;
+  input {
+    display: none;
+  }
+
+  &:hover {
+    border-color: ${ALARM_COLORS.primary};
+    background: ${ALARM_COLORS.primaryLight};
   }
 `;
 
@@ -296,42 +294,18 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [hourInput, setHourInput] = useState('');
   const [minuteInput, setMinuteInput] = useState('');
   const [isAnniversary, setIsAnniversary] = useState(false);
-  const [anniversaryRepeat, setAnniversaryRepeat] = useState('');
-
-  // 모달 상태
-  const [showValidationModal, setShowValidationModal] = useState(false);
-  const [validationMessage, setValidationMessage] = useState('');
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [alarmToDelete, setAlarmToDelete] = useState(null);
-
-  // 수정 모달
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [alarmToEdit, setAlarmToEdit] = useState(null);
-
-  // 수정 전 확인 모달
-  const [showEditConfirmModal, setShowEditConfirmModal] = useState(false);
-  const [editConfirmMessage, setEditConfirmMessage] = useState('');
-  const [pendingEditAlarm, setPendingEditAlarm] = useState(null);
-
-  const [anniversaryTiming, setAnniversaryTiming] = useState('');
+  const [anniversaryRepeat, setAnniversaryRepeat] = useState('yearly');
+  const [anniversaryTiming, setAnniversaryTiming] = useState('today');
   const [anniversaryDaysBefore, setAnniversaryDaysBefore] = useState('');
 
   // 알람 리스트
   const [alarms, setAlarms] = useState([]);
 
-  // 기본 알람옵션
+  // 기본 옵션
   const [showOptions, setShowOptions] = useState(false);
-  const [soundFile, setSoundFile] = useState('default');
-  const [customSoundName, setCustomSoundName] = useState('');
-  const [volume, setVolume] = useState(80);
   const [notificationType, setNotificationType] = useState('sound');
-  const [snoozeEnabled, setSnoozeEnabled] = useState(false);
-  const [snoozeMinutes, setSnoozeMinutes] = useState(0);
-
-  // Refs
-  const optionsButtonRef = useRef(null);
-  const soundFileInputRef = useRef(null);
-  const audioRef = useRef(null);
+  const [volume, setVolume] = useState(80);
+  const [soundFile, setSoundFile] = useState('default');
 
   // ==================== LOAD DATA ====================
   useEffect(() => {
@@ -345,26 +319,9 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       const dateKey = format(new Date(scheduleData.date), 'yyyy-MM-dd');
       const dayData = allSchedules[dateKey];
 
-      // 중복 제거를 위한 Map 사용
-      const alarmsMap = new Map();
-
-      // 1. 해당 날짜에 직접 등록된 알람 로드 (원본 우선)
       if (dayData?.alarm?.registeredAlarms) {
-        dayData.alarm.registeredAlarms.forEach(alarm => {
-          alarmsMap.set(alarm.id, alarm);
-        });
+        setAlarms(dayData.alarm.registeredAlarms);
       }
-
-      // 2. 반복 기념일 알람 로드 (직접 등록된 알람과 ID가 겹치지 않는 것만)
-      const repeatedAnniversaries = getRepeatedAnniversaries(new Date(scheduleData.date), allSchedules);
-      repeatedAnniversaries.forEach(alarm => {
-        if (!alarmsMap.has(alarm.id)) {
-          alarmsMap.set(alarm.id, alarm);
-        }
-      });
-
-      const loadedAlarms = Array.from(alarmsMap.values());
-      setAlarms(loadedAlarms);
     } catch (error) {
       console.error('알람 데이터 로드 오류:', error);
     }
@@ -377,79 +334,10 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     setHourInput('');
     setMinuteInput('');
     setIsAnniversary(false);
-    setAnniversaryRepeat('');
-    setAnniversaryTiming('');
+    setAnniversaryRepeat('yearly');
+    setAnniversaryTiming('today');
     setAnniversaryDaysBefore('');
-
-    // 기본 알람옵션 접기
-    setShowOptions(false);
-
     onClose();
-  };
-
-  // Handle sound file upload
-  const handleSoundUpload = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      // 파일 크기 체크 (500KB 제한 - 알람음은 짧을수록 좋음)
-      const maxSize = 500 * 1024; // 500KB
-      if (file.size > maxSize) {
-        setValidationMessage('알람 소리는 500KB 이하여야 합니다.\n짧은 알람음(3-5초) 사용을 권장합니다.');
-        setShowValidationModal(true);
-        return;
-      }
-
-      setCustomSoundName(file.name);
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const audioData = event.target.result;
-
-        // IndexedDB에 저장
-        try {
-          await saveAudioFile('alarm_sound_main', audioData);
-          setSoundFile('custom');
-          console.log('✅ 알람 소리 저장 완료:', file.name);
-        } catch (error) {
-          console.error('❌ 알람 소리 저장 실패:', error);
-          setValidationMessage('알람 소리 저장에 실패했습니다.');
-          setShowValidationModal(true);
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // Play sound preview with volume
-  const handlePlaySound = async () => {
-    if (audioRef.current) {
-      if (soundFile === 'default') {
-        audioRef.current.src = '/sound/Schedule_alarm/default.mp3';
-      } else if (soundFile === 'custom') {
-        // IndexedDB에서 커스텀 사운드 불러오기
-        const audioData = await loadAudioFile('alarm_sound_main');
-        if (audioData) {
-          audioRef.current.src = audioData;
-        } else {
-          console.error('❌ 커스텀 사운드를 찾을 수 없습니다.');
-          setValidationMessage('저장된 알람 소리를 찾을 수 없습니다.');
-          setShowValidationModal(true);
-          return;
-        }
-      }
-      audioRef.current.volume = volume / 100;
-      audioRef.current.play();
-    }
-  };
-
-  // Handle volume change with sound preview
-  const handleVolumeChange = (e) => {
-    const newVolume = parseInt(e.target.value);
-    setVolume(newVolume);
-
-    // Play sound preview at new volume
-    if (audioRef.current) {
-      audioRef.current.volume = newVolume / 100;
-    }
   };
 
   const handleSetCurrentTime = () => {
@@ -479,79 +367,12 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     console.log('토글 클릭 - ID:', id);
     console.log('현재 알람 목록:', alarms);
 
-    let toggledAlarm = null;
-    const alarm = alarms.find(a => a.id === id);
-
-    // 반복 기념일 알람인 경우 전체 기념일 토글
-    if (alarm?.isRepeated) {
-      try {
-        const allSchedulesStr = localStorage.getItem('calendarSchedules_shared');
-        if (allSchedulesStr) {
-          const allSchedules = JSON.parse(allSchedulesStr);
-
-          // 원본 알람을 찾아서 enabled 상태 변경
-          const originalDateStr = format(alarm.originalDate, 'yyyy-MM-dd');
-          const originalDayData = allSchedules[originalDateStr];
-
-          if (originalDayData?.alarm?.registeredAlarms) {
-            const originalAlarms = originalDayData.alarm.registeredAlarms;
-            const originalAlarmIndex = originalAlarms.findIndex(a => a.id === id);
-
-            if (originalAlarmIndex !== -1) {
-              const currentEnabled = alarm.enabled !== false;
-              const newEnabled = !currentEnabled;
-
-              // 원본 알람의 enabled 상태 변경 (disabledDates는 초기화)
-              originalAlarms[originalAlarmIndex] = {
-                ...originalAlarms[originalAlarmIndex],
-                enabled: newEnabled,
-                disabledDates: [] // 전체 토글이므로 개별 비활성 날짜 초기화
-              };
-
-              allSchedules[originalDateStr].alarm.registeredAlarms = originalAlarms;
-              localStorage.setItem('calendarSchedules_shared', JSON.stringify(allSchedules));
-
-              // UI 업데이트: 현재 보여지는 알람 목록 업데이트
-              const updatedAlarms = alarms.map(a =>
-                a.id === id ? { ...a, enabled: newEnabled } : a
-              );
-              setAlarms(updatedAlarms);
-
-              toggledAlarm = { ...alarm, enabled: newEnabled };
-
-              if (onSave && toggledAlarm) {
-                const actionType = newEnabled ? 'toggle_on' : 'toggle_off';
-                onSave({ registeredAlarms: updatedAlarms, toggledAlarm, alarmType: 'anniversary' }, actionType);
-              }
-            }
-          }
-        }
-      } catch (error) {
-        console.error('반복 기념일 토글 오류:', error);
-      }
-      return;
-    }
-
-    // 일반 알람 또는 원본 기념일 알람 처리
     const updatedAlarms = alarms.map(alarm => {
       if (alarm.id === id) {
         // enabled가 undefined나 null일 경우를 대비
         const currentEnabled = alarm.enabled !== false;
         console.log('현재 enabled:', alarm.enabled, '→ currentEnabled:', currentEnabled, '→ 변경 후:', !currentEnabled);
-
-        // 일반 알람이 비활성화되는 경우 disabledAt 저장
-        const updates = { enabled: !currentEnabled };
-        if (!alarm.isAnniversary && currentEnabled && alarm.calculatedTime) {
-          const alarmTime = new Date(alarm.calculatedTime);
-          const now = new Date();
-          // 알람 시간이 경과된 경우에만 disabledAt 저장
-          if (alarmTime < now) {
-            updates.disabledAt = now.toISOString();
-          }
-        }
-
-        toggledAlarm = { ...alarm, ...updates };
-        return toggledAlarm;
+        return { ...alarm, enabled: !currentEnabled };
       }
       return alarm;
     });
@@ -573,19 +394,14 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
           allSchedules[dateKey].alarm = {};
         }
 
-        // 반복 알람이 아닌 경우만 해당 날짜에 저장
-        const alarmsToSave = updatedAlarms.filter(a => !a.isRepeated);
-        allSchedules[dateKey].alarm.registeredAlarms = alarmsToSave;
+        allSchedules[dateKey].alarm.registeredAlarms = updatedAlarms;
         localStorage.setItem('calendarSchedules_shared', JSON.stringify(allSchedules));
 
-        // onSave 호출 - 토글된 알람 정보와 함께 전달
-        if (onSave && toggledAlarm) {
-          const actionType = toggledAlarm.enabled ? 'toggle_on' : 'toggle_off';
-          const alarmType = toggledAlarm.isAnniversary ? 'anniversary' : 'normal';
-          onSave({ registeredAlarms: updatedAlarms, toggledAlarm, alarmType }, actionType);
+        // onSave 호출
+        if (onSave) {
+          onSave({ registeredAlarms: updatedAlarms }, 'toggle');
         }
       }
-
     } catch (error) {
       console.error('토글 저장 오류:', error);
     }
@@ -597,35 +413,13 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const handleRegisterAlarm = () => {
     console.log('알람 등록 버튼 클릭');
 
-    // 유효성 검사 (순서: 타이틀 → 알림주기 → 알림시기 → 알람 시간)
+    // 유효성 검사
     if (!alarmTitle.trim()) {
-      setValidationMessage('알람 타이틀을 입력해주세요.');
-      setShowValidationModal(true);
+      alert('알람 타이틀을 입력해주세요.');
       return;
     }
-
-    // 기념일 알람 유효성 검사
-    if (isAnniversary) {
-      if (!anniversaryRepeat) {
-        setValidationMessage('알림주기를 선택해주세요.');
-        setShowValidationModal(true);
-        return;
-      }
-      if (!anniversaryTiming) {
-        setValidationMessage('알림시기를 선택해주세요.');
-        setShowValidationModal(true);
-        return;
-      }
-      if (anniversaryTiming === 'before' && !anniversaryDaysBefore) {
-        setValidationMessage('며칠 전에 알림을 받을지 입력해주세요.');
-        setShowValidationModal(true);
-        return;
-      }
-    }
-
     if (hourInput === '' || minuteInput === '') {
-      setValidationMessage('알람 시간을 입력해주세요.');
-      setShowValidationModal(true);
+      alert('알람 시간을 입력해주세요.');
       return;
     }
 
@@ -654,7 +448,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     const updatedAlarms = [...alarms, newAlarm];
     setAlarms(updatedAlarms);
 
-    // localStorage에 저장 (반복 알람 제외)
+    // localStorage에 저장
     try {
       const allSchedulesStr = localStorage.getItem('calendarSchedules_shared');
       const allSchedules = allSchedulesStr ? JSON.parse(allSchedulesStr) : {};
@@ -667,15 +461,19 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
         allSchedules[dateKey].alarm = {};
       }
 
-      // 반복 알람(isRepeated)은 localStorage에 저장하지 않음
-      const alarmsToSave = updatedAlarms.filter(a => !a.isRepeated);
-      allSchedules[dateKey].alarm.registeredAlarms = alarmsToSave;
+      allSchedules[dateKey].alarm.registeredAlarms = updatedAlarms;
       localStorage.setItem('calendarSchedules_shared', JSON.stringify(allSchedules));
 
       // onSave 호출
       if (onSave) {
-        const alarmType = isAnniversary ? 'anniversary' : 'normal';
-        onSave({ registeredAlarms: updatedAlarms, alarmType }, 'register');
+        onSave({ registeredAlarms: updatedAlarms }, 'register');
+      }
+
+      // 성공 메시지
+      if (isAnniversary) {
+        alert('새로운 기념일이 등록되었습니다');
+      } else {
+        alert('알람이 등록되었습니다');
       }
 
       // 입력 필드 초기화
@@ -683,235 +481,20 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       setHourInput('');
       setMinuteInput('');
       setIsAnniversary(false);
-      setAnniversaryRepeat('');
-      setAnniversaryTiming('');
+      setAnniversaryRepeat('yearly');
+      setAnniversaryTiming('today');
       setAnniversaryDaysBefore('');
 
     } catch (error) {
       console.error('알람 등록 오류:', error);
-      setValidationMessage('알람 등록 중 오류가 발생했습니다.');
-      setShowValidationModal(true);
-    }
-  };
-
-  // 삭제 핸들러
-  const handleDeleteAlarm = (alarm) => {
-    setAlarmToDelete(alarm);
-    setShowDeleteModal(true);
-  };
-
-  const confirmDelete = () => {
-    if (!alarmToDelete) return;
-
-    console.log('=== 삭제 시작 ===');
-    console.log('삭제할 알람:', alarmToDelete);
-    console.log('현재 알람 목록:', alarms);
-
-    try {
-      const allSchedulesStr = localStorage.getItem('calendarSchedules_shared');
-      const allSchedules = allSchedulesStr ? JSON.parse(allSchedulesStr) : {};
-
-      // 반복 기념일인 경우 원본 날짜에서 삭제
-      if (alarmToDelete.isRepeated) {
-        console.log('반복 기념일 삭제 로직');
-        const originalDateStr = format(alarmToDelete.originalDate, 'yyyy-MM-dd');
-        const originalDayData = allSchedules[originalDateStr];
-
-        if (originalDayData?.alarm?.registeredAlarms) {
-          console.log('원본 날짜:', originalDateStr);
-          console.log('원본 날짜의 알람들:', originalDayData.alarm.registeredAlarms);
-
-          const originalAlarms = originalDayData.alarm.registeredAlarms.filter(
-            a => a.id !== alarmToDelete.id
-          );
-          console.log('삭제 후 원본 알람들:', originalAlarms);
-
-          allSchedules[originalDateStr].alarm.registeredAlarms = originalAlarms;
-          localStorage.setItem('calendarSchedules_shared', JSON.stringify(allSchedules));
-        }
-      } else {
-        console.log('일반 알람 또는 원본 기념일 삭제 로직');
-        const dateKey = format(new Date(scheduleData.date), 'yyyy-MM-dd');
-        console.log('현재 날짜:', dateKey);
-
-        // localStorage 업데이트: 해당 날짜의 알람 목록에서 삭제
-        if (!allSchedules[dateKey]) {
-          allSchedules[dateKey] = {};
-        }
-        if (!allSchedules[dateKey].alarm) {
-          allSchedules[dateKey].alarm = {};
-        }
-
-        // 현재 날짜에 직접 등록된 알람 중에서 삭제할 알람 제외
-        const currentAlarms = allSchedules[dateKey].alarm.registeredAlarms || [];
-        const alarmsToSave = currentAlarms.filter(a => a.id !== alarmToDelete.id);
-        console.log('localStorage에 저장할 알람들:', alarmsToSave);
-        allSchedules[dateKey].alarm.registeredAlarms = alarmsToSave;
-        localStorage.setItem('calendarSchedules_shared', JSON.stringify(allSchedules));
-      }
-
-      // localStorage 업데이트 후 알람 목록 완전히 다시 로드 (중복 제거)
-      const dateKey = format(new Date(scheduleData.date), 'yyyy-MM-dd');
-      const reloadedSchedules = JSON.parse(localStorage.getItem('calendarSchedules_shared'));
-      const alarmsMap = new Map();
-
-      // 1. 해당 날짜에 직접 등록된 알람 로드 (원본 우선)
-      if (reloadedSchedules[dateKey]?.alarm?.registeredAlarms) {
-        reloadedSchedules[dateKey].alarm.registeredAlarms.forEach(alarm => {
-          alarmsMap.set(alarm.id, alarm);
-        });
-      }
-
-      // 2. 반복 기념일 알람 로드 (직접 등록된 알람과 ID가 겹치지 않는 것만)
-      const repeatedAnniversaries = getRepeatedAnniversaries(new Date(scheduleData.date), reloadedSchedules);
-      repeatedAnniversaries.forEach(alarm => {
-        if (!alarmsMap.has(alarm.id)) {
-          alarmsMap.set(alarm.id, alarm);
-        }
-      });
-
-      const loadedAlarms = Array.from(alarmsMap.values());
-      console.log('다시 로드된 알람들:', loadedAlarms);
-      setAlarms(loadedAlarms);
-
-      // onSave 호출
-      if (onSave) {
-        const alarmType = alarmToDelete?.isAnniversary ? 'anniversary' : 'normal';
-        onSave({ registeredAlarms: loadedAlarms, alarmType }, 'delete');
-      }
-
-      setShowDeleteModal(false);
-      setAlarmToDelete(null);
-    } catch (error) {
-      console.error('알람 삭제 오류:', error);
-      setValidationMessage('알람 삭제 중 오류가 발생했습니다.');
-      setShowValidationModal(true);
-    }
-  };
-
-  // 수정 핸들러
-  const handleEditAlarm = (alarm) => {
-    console.log('수정 알람:', alarm);
-
-    // 수정 확인 메시지 결정
-    let confirmMessage = '';
-
-    if (alarm.isRepeated) {
-      // 반복 주기일
-      confirmMessage = '해당 기념일 전체에 영향을 줍니다.';
-    } else if (alarm.isAnniversary) {
-      // 원본 기념일
-      confirmMessage = '이 기념일 설정을 수정할까요?';
-    } else {
-      // 일반 알람
-      confirmMessage = '이 알람 설정을 수정할까요?';
-    }
-
-    setPendingEditAlarm(alarm);
-    setEditConfirmMessage(confirmMessage);
-    setShowEditConfirmModal(true);
-  };
-
-  // 수정 확인 후 실제 수정 모달 열기
-  const handleConfirmEdit = () => {
-    setShowEditConfirmModal(false);
-    setAlarmToEdit(pendingEditAlarm);
-    setShowEditModal(true);
-    setPendingEditAlarm(null);
-  };
-
-  // 수정 취소
-  const handleCancelEdit = () => {
-    setShowEditConfirmModal(false);
-    setPendingEditAlarm(null);
-  };
-
-  const handleSaveEdit = (updatedAlarm) => {
-    try {
-      const allSchedulesStr = localStorage.getItem('calendarSchedules_shared');
-      const allSchedules = allSchedulesStr ? JSON.parse(allSchedulesStr) : {};
-
-      console.log('=== 알람 수정 시작 ===');
-      console.log('수정된 알람:', updatedAlarm);
-
-      // 반복 기념일인 경우 원본 날짜에 저장
-      if (updatedAlarm.isRepeated && updatedAlarm.originalDate) {
-        const originalDateStr = format(updatedAlarm.originalDate, 'yyyy-MM-dd');
-        console.log('반복 기념일 수정 - 원본 날짜:', originalDateStr);
-
-        if (allSchedules[originalDateStr]?.alarm?.registeredAlarms) {
-          const originalAlarms = allSchedules[originalDateStr].alarm.registeredAlarms.map(a =>
-            a.id === updatedAlarm.id ? { ...updatedAlarm, isRepeated: undefined, originalDate: undefined } : a
-          );
-          allSchedules[originalDateStr].alarm.registeredAlarms = originalAlarms;
-          localStorage.setItem('calendarSchedules_shared', JSON.stringify(allSchedules));
-          console.log('원본 날짜에 저장 완료');
-        }
-      } else {
-        // 일반 알람 또는 원본 기념일 수정
-        const dateKey = format(new Date(scheduleData.date), 'yyyy-MM-dd');
-        console.log('원본 알람 수정 - 현재 날짜:', dateKey);
-
-        if (!allSchedules[dateKey]) {
-          allSchedules[dateKey] = {};
-        }
-        if (!allSchedules[dateKey].alarm) {
-          allSchedules[dateKey].alarm = {};
-        }
-
-        const currentAlarms = allSchedules[dateKey].alarm.registeredAlarms || [];
-        const updatedAlarmsForStorage = currentAlarms.map(a =>
-          a.id === updatedAlarm.id ? updatedAlarm : a
-        );
-
-        allSchedules[dateKey].alarm.registeredAlarms = updatedAlarmsForStorage;
-        localStorage.setItem('calendarSchedules_shared', JSON.stringify(allSchedules));
-        console.log('현재 날짜에 저장 완료');
-      }
-
-      // localStorage 업데이트 후 알람 목록 완전히 다시 로드 (중복 제거)
-      const dateKey = format(new Date(scheduleData.date), 'yyyy-MM-dd');
-      const reloadedSchedules = JSON.parse(localStorage.getItem('calendarSchedules_shared'));
-      const alarmsMap = new Map();
-
-      // 1. 해당 날짜에 직접 등록된 알람 로드 (원본 우선)
-      if (reloadedSchedules[dateKey]?.alarm?.registeredAlarms) {
-        reloadedSchedules[dateKey].alarm.registeredAlarms.forEach(alarm => {
-          alarmsMap.set(alarm.id, alarm);
-        });
-      }
-
-      // 2. 반복 기념일 알람 로드 (직접 등록된 알람과 ID가 겹치지 않는 것만)
-      const repeatedAnniversaries = getRepeatedAnniversaries(new Date(scheduleData.date), reloadedSchedules);
-      repeatedAnniversaries.forEach(alarm => {
-        if (!alarmsMap.has(alarm.id)) {
-          alarmsMap.set(alarm.id, alarm);
-        }
-      });
-
-      const reloadedAlarms = Array.from(alarmsMap.values());
-      console.log('수정 후 다시 로드된 알람들:', reloadedAlarms);
-      setAlarms(reloadedAlarms);
-
-      // onSave 호출
-      if (onSave) {
-        const alarmType = updatedAlarm?.isAnniversary ? 'anniversary' : 'normal';
-        onSave({ registeredAlarms: reloadedAlarms, alarmType }, 'update');
-      }
-
-      setShowEditModal(false);
-      setAlarmToEdit(null);
-    } catch (error) {
-      console.error('알람 수정 오류:', error);
-      setValidationMessage('알람 수정 중 오류가 발생했습니다.');
-      setShowValidationModal(true);
+      alert('알람 등록 중 오류가 발생했습니다.');
     }
   };
 
   return (
     <Portal>
-      <Overlay>
-        <ModalContent $isPastDate={isPastDate}>
+      <Overlay onClick={handleClose}>
+        <ModalContent $isPastDate={isPastDate} onClick={(e) => e.stopPropagation()}>
           <Header>
             <div style={{ width: '32px' }}></div>
             <HeaderTitle>{scheduleDateStr} {isPastDate ? '알람 기록' : '알람 설정'}</HeaderTitle>
@@ -986,7 +569,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                       <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px' }}>
                         알림주기 <span style={{ color: ALARM_COLORS.danger, fontWeight: 'normal' }}>(필수항목)</span>
                       </div>
-                      <RadioGroup style={{ flexDirection: 'row', gap: '8px' }}>
+                      <RadioGroup>
                         <RadioOption $checked={anniversaryRepeat === 'daily'} onClick={() => setAnniversaryRepeat('daily')}>
                           <input type="radio" name="anniversaryRepeat" value="daily" checked={anniversaryRepeat === 'daily'} onChange={() => {}} />
                           <span>매일</span>
@@ -1004,9 +587,6 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                           <span>매년</span>
                         </RadioOption>
                       </RadioGroup>
-                      <div style={{ marginTop: '8px', fontSize: '11px', color: '#999', lineHeight: '1.4' }}>
-                        * 매일 주기는 등록일 이후의 날짜에는 점표시 되지 않습니다
-                      </div>
                     </div>
 
                     {/* 알림시기 */}
@@ -1159,31 +739,23 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 </SectionTitle>
                 <AlarmBox>
                   <AlarmList>
-                    {alarms
-                      .filter(alarm => alarm.isAnniversary)
-                      .slice()
-                      .sort((a, b) => {
-                        const timeA = new Date(a.calculatedTime).getTime();
-                        const timeB = new Date(b.calculatedTime).getTime();
-                        return timeA - timeB;
-                      })
-                      .map((alarm) => (
-                        <AlarmItemComponent
-                          key={alarm.id}
-                          alarm={alarm}
-                          scheduleData={scheduleData}
-                          onToggle={handleToggleAlarm}
-                          onDelete={handleDeleteAlarm}
-                          onEdit={handleEditAlarm}
-                        />
-                      ))}
+                    {alarms.filter(alarm => alarm.isAnniversary).map((alarm) => (
+                      <AlarmItemComponent
+                        key={alarm.id}
+                        alarm={alarm}
+                        scheduleData={scheduleData}
+                        onToggle={handleToggleAlarm}
+                        onDelete={(alarm) => console.log('삭제:', alarm)}
+                        onEdit={(alarm) => console.log('수정:', alarm)}
+                      />
+                    ))}
                   </AlarmList>
                 </AlarmBox>
               </Section>
             )}
 
-            {/* 5. 등록된 알람 (일반 알람만 표시, 시간순 정렬) */}
-            {!isPastDate && (
+            {/* 5. 등록된 알람 (일반 알람만 표시) */}
+            {!isPastDate && alarms.filter(alarm => !alarm.isAnniversary).length > 0 && (
               <Section>
                 <div style={{
                   height: '1px',
@@ -1196,24 +768,16 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                 </SectionTitle>
                 <AlarmBox>
                   <AlarmList>
-                    {alarms
-                      .filter(alarm => !alarm.isAnniversary)
-                      .slice()
-                      .sort((a, b) => {
-                        const timeA = new Date(a.calculatedTime).getTime();
-                        const timeB = new Date(b.calculatedTime).getTime();
-                        return timeA - timeB;
-                      })
-                      .map((alarm) => (
-                        <AlarmItemComponent
-                          key={alarm.id}
-                          alarm={alarm}
-                          scheduleData={scheduleData}
-                          onToggle={handleToggleAlarm}
-                          onDelete={handleDeleteAlarm}
-                          onEdit={handleEditAlarm}
-                        />
-                      ))}
+                    {alarms.filter(alarm => !alarm.isAnniversary).map((alarm) => (
+                      <AlarmItemComponent
+                        key={alarm.id}
+                        alarm={alarm}
+                        scheduleData={scheduleData}
+                        onToggle={handleToggleAlarm}
+                        onDelete={(alarm) => console.log('삭제:', alarm)}
+                        onEdit={(alarm) => console.log('수정:', alarm)}
+                      />
+                    ))}
                   </AlarmList>
                 </AlarmBox>
               </Section>
@@ -1299,115 +863,50 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   </div>
                 )}
 
-                {/* Alarm Sound */}
+                {/* 알람 소리 */}
                 {showOptions && (
                   <Section style={{ marginTop: '-16px' }}>
                     <SectionTitle>
                       <VolumeIcon />
                       알람 소리
                     </SectionTitle>
-                    <SoundUploadContainer>
-                      <Select
-                        value={soundFile === 'default' ? 'default' : 'custom'}
-                        onChange={(e) => {
-                          if (e.target.value === 'default') {
-                            setSoundFile('default');
-                            setCustomSoundName('');
-                          } else if (e.target.value === 'custom') {
-                            setSoundFile('custom');
-                            setTimeout(() => {
-                              soundFileInputRef.current?.click();
-                            }, 50);
-                          }
-                        }}
-                      >
-                        <option value="default">기본 알림음</option>
-                        <option value="custom">사용자 지정</option>
-                      </Select>
-
-                      {/* 항상 렌더링하되, 필요할 때만 보이도록 */}
-                      <HiddenFileInput
-                        ref={soundFileInputRef}
-                        type="file"
-                        accept="audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/m4a,audio/aac,.mp3,.wav,.ogg,.m4a,.aac"
-                        onChange={handleSoundUpload}
-                        style={{ display: 'none' }}
-                      />
-                      {soundFile !== 'default' && (
-                        <FileInputLabel onClick={() => soundFileInputRef.current?.click()}>
-                          사운드 파일 선택
-                        </FileInputLabel>
-                      )}
-                      {soundFile !== 'default' && customSoundName && (
-                        <FileName>선택된 파일: {customSoundName}</FileName>
-                      )}
-
-                      <SoundPreview>
-                        <PlayButton onClick={handlePlaySound}>▶</PlayButton>
-                        <span style={{ fontSize: '13px', color: '#495057' }}>
-                          미리듣기
-                        </span>
-                      </SoundPreview>
-                    </SoundUploadContainer>
+                    <div style={{ fontSize: '14px', color: '#495057' }}>
+                      현재: {soundFile === 'default' ? '기본 알림음' : '사용자 지정'}
+                    </div>
                   </Section>
                 )}
 
-                {/* Volume Control */}
+                {/* 알람 볼륨 */}
                 {showOptions && (
                   <Section>
                     <SectionTitle>
                       <VolumeIcon />
                       알람 볼륨
                     </SectionTitle>
-                    <VolumeContainer>
-                      <VolumeSlider
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={volume}
-                        onChange={handleVolumeChange}
-                      />
-                      <VolumeLabel>{volume}%</VolumeLabel>
-                    </VolumeContainer>
+                    <div style={{ fontSize: '14px', color: '#495057' }}>
+                      현재: {volume}%
+                    </div>
                   </Section>
                 )}
 
-                {/* Notification Type */}
+                {/* 알림 유형 */}
                 {showOptions && (
                   <Section>
                     <SectionTitle>
-                      <VibrateIcon />
+                      <VolumeIcon />
                       알림 유형
                     </SectionTitle>
                     <RadioGroup>
-                      <RadioOption $checked={notificationType === 'sound'}>
-                        <input
-                          type="radio"
-                          name="notificationType"
-                          value="sound"
-                          checked={notificationType === 'sound'}
-                          onChange={(e) => setNotificationType(e.target.value)}
-                        />
+                      <RadioOption $checked={notificationType === 'sound'} onClick={() => setNotificationType('sound')}>
+                        <input type="radio" name="notificationType" value="sound" checked={notificationType === 'sound'} onChange={() => {}} />
                         <span>소리만</span>
                       </RadioOption>
-                      <RadioOption $checked={notificationType === 'vibration'}>
-                        <input
-                          type="radio"
-                          name="notificationType"
-                          value="vibration"
-                          checked={notificationType === 'vibration'}
-                          onChange={(e) => setNotificationType(e.target.value)}
-                        />
+                      <RadioOption $checked={notificationType === 'vibration'} onClick={() => setNotificationType('vibration')}>
+                        <input type="radio" name="notificationType" value="vibration" checked={notificationType === 'vibration'} onChange={() => {}} />
                         <span>진동만</span>
                       </RadioOption>
-                      <RadioOption $checked={notificationType === 'both'}>
-                        <input
-                          type="radio"
-                          name="notificationType"
-                          value="both"
-                          checked={notificationType === 'both'}
-                          onChange={(e) => setNotificationType(e.target.value)}
-                        />
+                      <RadioOption $checked={notificationType === 'both'} onClick={() => setNotificationType('both')}>
+                        <input type="radio" name="notificationType" value="both" checked={notificationType === 'both'} onChange={() => {}} />
                         <span>소리 + 진동</span>
                       </RadioOption>
                     </RadioGroup>
@@ -1422,52 +921,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
               닫기
             </Button>
           </Footer>
-
-          {/* Hidden audio element for sound preview */}
-          <audio ref={audioRef} />
         </ModalContent>
       </Overlay>
-
-      {/* 검증 모달 */}
-      <ValidationModal
-        isOpen={showValidationModal}
-        message={validationMessage}
-        onClose={() => setShowValidationModal(false)}
-      />
-
-      {/* 삭제 확인 모달 */}
-      <DeleteConfirmModal
-        isOpen={showDeleteModal}
-        message={
-          alarmToDelete?.isRepeated || (alarmToDelete?.isAnniversary && alarmToDelete?.anniversaryRepeat && alarmToDelete?.anniversaryRepeat !== 'none')
-            ? `이 기념일을 정말 삭제할까요?\n해당 기념일은 모두 삭제됩니다.`
-            : `"${alarmToDelete?.title || '알람'}"을(를) 삭제하시겠습니까?`
-        }
-        onConfirm={confirmDelete}
-        onCancel={() => {
-          setShowDeleteModal(false);
-          setAlarmToDelete(null);
-        }}
-      />
-
-      {/* 수정 전 확인 모달 */}
-      <EditConfirmModal
-        isOpen={showEditConfirmModal}
-        message={editConfirmMessage}
-        onConfirm={handleConfirmEdit}
-        onCancel={handleCancelEdit}
-      />
-
-      {/* 수정 모달 */}
-      <AlarmEditModal
-        isOpen={showEditModal}
-        alarm={alarmToEdit}
-        onSave={handleSaveEdit}
-        onClose={() => {
-          setShowEditModal(false);
-          setAlarmToEdit(null);
-        }}
-      />
     </Portal>
   );
 };

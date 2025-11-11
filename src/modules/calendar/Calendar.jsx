@@ -7,7 +7,7 @@ import { format, isBefore, startOfDay, addDays, subMonths, addMonths, subDays, i
 import { motion, AnimatePresence } from "framer-motion";
 import { useSwipeable } from 'react-swipeable';
 import { useTrashContext } from '../../contexts/TrashContext';
-import { AUTO_DELETE_DAYS, ALARM_COLORS } from './constants';
+import { AUTO_DELETE_DAYS, ALARM_COLORS } from './alarm/constants/alarmConstants';
 import { hasAlarm, hasActiveAlarm, isAutoDeleted, getRepeatedAnniversaries } from './utils';
 
 // 개인 기념일
@@ -2085,12 +2085,14 @@ const Calendar = ({
                                     return new Date() >= deletionDate;
                                 };
 
-                                // 등록된 알람 중에서 기념일 알람들을 추출 (자동삭제된 것 제외)
+                                // 등록된 알람 중에서 기념일 알람들을 추출 (자동삭제된 것만 제외)
                                 const directAnniversaryAlarms = currentEntry?.alarm?.registeredAlarms?.filter(alarm =>
-                                    alarm.isAnniversary && (alarm.anniversaryName || alarm.title) && !isAutoDeleted(alarm)
+                                    alarm.isAnniversary &&
+                                    (alarm.anniversaryName || alarm.title) &&
+                                    !isAutoDeleted(alarm)
                                 ) || [];
 
-                                // 반복 기념일 알람들을 추출
+                                // 반복 기념일 알람들을 추출 (자동삭제된 것만 제외)
                                 const repeatedAnniversaryAlarms = (() => {
                                     if (!selectedDate) return [];
                                     try {
@@ -2107,8 +2109,20 @@ const Calendar = ({
                                     }
                                 })();
 
-                                // 직접 등록된 기념일과 반복 기념일 합치기
-                                const anniversaryAlarms = [...directAnniversaryAlarms, ...repeatedAnniversaryAlarms];
+                                // 직접 등록된 기념일과 반복 기념일 합치기 (ID 중복 제거)
+                                const anniversaryAlarmsMap = new Map();
+                                directAnniversaryAlarms.forEach(alarm => anniversaryAlarmsMap.set(alarm.id, alarm));
+                                repeatedAnniversaryAlarms.forEach(alarm => {
+                                    if (!anniversaryAlarmsMap.has(alarm.id)) {
+                                        anniversaryAlarmsMap.set(alarm.id, alarm);
+                                    }
+                                });
+                                // 알람 시간순으로 정렬
+                                const anniversaryAlarms = Array.from(anniversaryAlarmsMap.values()).sort((a, b) => {
+                                    const timeA = new Date(a.calculatedTime).getTime();
+                                    const timeB = new Date(b.calculatedTime).getTime();
+                                    return timeA - timeB;
+                                });
 
                                 const hasAnniversaries = anniversaryAlarms.length > 0;
                                 const hasSpecialEvents = specialEvents.length > 0;
@@ -2119,11 +2133,17 @@ const Calendar = ({
                                     <div className="special-event-note" style={{ marginBottom: '4px' }}>
                                         {/* 기념일들을 먼저 표시 (파란색) */}
                                         {anniversaryAlarms.map((alarm, index) => (
-                                            <span key={`anniversary-${alarm.id || index}`}>
+                                            <span key={`anniversary-${alarm.id}-${selectedDate?.getTime()}`} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                                {alarm.enabled === false && (
+                                                    <svg width="12" height="12" viewBox="0 0 12 12" style={{ marginRight: '3px', display: 'inline-block' }}>
+                                                        <circle cx="6" cy="6" r="5" fill="none" stroke="#dc3545" strokeWidth="1.5"/>
+                                                        <line x1="2.5" y1="2.5" x2="9.5" y2="9.5" stroke="#dc3545" strokeWidth="1.5"/>
+                                                    </svg>
+                                                )}
                                                 <span style={{ color: '#4a90e2' }}>
                                                     {alarm.anniversaryName || alarm.title}
                                                 </span>
-                                                {(index < anniversaryAlarms.length - 1 || hasSpecialEvents) && <span> · </span>}
+                                                {(index < anniversaryAlarms.length - 1 || hasSpecialEvents) && <span style={{ margin: '0 4px' }}>·</span>}
                                             </span>
                                         ))}
                                         {/* 특일들을 나중에 표시 */}
@@ -2174,14 +2194,27 @@ const Calendar = ({
                                         paddingLeft: '3px'
                                     }}>
                                         {sortedAlarms.map((alarm, index) => {
-                                            // 비활성화된 알람인지 확인 (과거 날짜가 아니어도)
-                                            const isTerminated = alarm.enabled === false;
+                                            // 알람 시간이 경과되었는지 확인
+                                            const now = new Date();
+                                            const alarmTime = new Date(alarm.calculatedTime);
+                                            const isExpired = alarmTime < now;
 
-                                            // 자동삭제까지 남은 일수 계산
+                                            // 표시 상태 결정
+                                            // 1. 토글 OFF + 경과 전: 흐릿 + "일시중지" (미리보기에서는 표시 안함)
+                                            // 2. 토글 OFF + 경과 후: 흐릿 + 붉은색 "종료" + "0일 후 자동삭제"
+                                            // 3. 토글 ON + 경과 후: 흐릿 + 붉은색 "종료" + "0일 후 자동삭제"
+                                            // 4. 토글 ON + 경과 전: 선명 표시
+
+                                            const isToggleOff = alarm.enabled === false;
+                                            const isPaused = isToggleOff && !isExpired; // 일시중지 상태
+                                            const isTerminated = (isToggleOff && isExpired) || (!isToggleOff && isExpired); // 종료 상태
+
+                                            // 자동삭제까지 남은 일수 계산 (종료 상태일 때만)
                                             let daysUntilDeletion = null;
-                                            if (isTerminated && alarm.disabledAt) {
-                                                const disabledDate = new Date(alarm.disabledAt);
-                                                const deletionDate = new Date(disabledDate);
+                                            if (isTerminated) {
+                                                // disabledAt이 있으면 사용, 없으면 알람 시간 기준
+                                                const baseDate = alarm.disabledAt ? new Date(alarm.disabledAt) : alarmTime;
+                                                const deletionDate = new Date(baseDate);
                                                 deletionDate.setDate(deletionDate.getDate() + AUTO_DELETE_DAYS);
                                                 const todayStart = startOfDay(new Date());
                                                 const deletionStart = startOfDay(deletionDate);
@@ -2198,20 +2231,21 @@ const Calendar = ({
                                                 }}>
                                                     <AlarmClock
                                                         size={14}
-                                                        color={isTerminated ? 'rgba(214, 48, 49, 0.3)' : '#d63031'}
+                                                        color={(isTerminated || isPaused) ? 'rgba(214, 48, 49, 0.3)' : '#d63031'}
                                                         style={{ marginTop: '2px', flexShrink: 0 }}
                                                     />
                                                     <div style={{ flex: 1 }}>
                                                         <span style={{
                                                             fontSize: '13px',
-                                                            color: isTerminated ? 'rgba(51, 51, 51, 0.3)' : '#333'
+                                                            color: (isTerminated || isPaused) ? 'rgba(51, 51, 51, 0.3)' : '#333'
                                                         }}>
                                                             {alarm.title || '제목 없음'}
-                                                            {isTerminated && <span style={{ fontSize: '13px', color: 'rgba(214, 48, 49, 0.6)' }}> - 종료된 알람</span>}
+                                                            {isPaused && <span style={{ fontSize: '13px', color: 'rgba(153, 153, 153, 0.6)' }}> - 일시중지</span>}
+                                                            {isTerminated && <span style={{ fontSize: '13px', color: 'rgba(214, 48, 49, 0.6)' }}> - 종료</span>}
                                                         </span>
                                                         <div style={{
                                                             fontSize: '11px',
-                                                            color: isTerminated ? 'rgba(153, 153, 153, 0.5)' : '#999'
+                                                            color: (isTerminated || isPaused) ? 'rgba(153, 153, 153, 0.5)' : '#999'
                                                         }}>
                                                             {format(new Date(alarm.calculatedTime), 'HH:mm')}
                                                             {isTerminated && daysUntilDeletion !== null && (

@@ -48,7 +48,8 @@ export const getRepeatedAnniversaries = (targetDate, schedules) => {
       let shouldRepeat = false;
 
       if (alarm.anniversaryRepeat === 'daily') {
-        shouldRepeat = true;
+        // 매일 주기는 등록일에만 점 표시하므로 주기일에는 표시하지 않음
+        shouldRepeat = false;
       } else if (alarm.anniversaryRepeat === 'weekly') {
         shouldRepeat = alarmDate.getDay() === target.getDay();
       } else if (alarm.anniversaryRepeat === 'monthly') {

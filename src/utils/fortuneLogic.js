@@ -710,13 +710,14 @@ export const calculateFortune = async (userData, fortuneData) => {
     // 4. 종합 운세 계산 (Main + Main2 조합)
     const overallScore = calculateCategoryScore(userDayStem, todayPillar, 0);
     const overallKeyword = mapScoreToKeyword(overallScore, 'Main');
-    const overallContent = getCombinedFortune(overallKeyword);
+    const overallContent = await getCombinedFortune(overallKeyword);
 
     // 5. 세부 운세 계산: 각 카테고리별로 점수 → 키워드 → 랜덤 콘텐츠 선택
     const categories = ['Money', 'Health', 'Love', 'Advice'];
     const results = {};
 
-    categories.forEach((category, index) => {
+    for (let index = 0; index < categories.length; index++) {
+        const category = categories[index];
         // 사주 기반 점수 계산 (0~100)
         // index + 1 을 사용하여 Main(0)과 다른 시드값 사용
         const score = calculateCategoryScore(userDayStem, todayPillar, index + 1);
@@ -725,13 +726,13 @@ export const calculateFortune = async (userData, fortuneData) => {
         const keyword = mapScoreToKeyword(score, category);
 
         // 새 JSON DB에서 랜덤 문장 선택
-        const content = getRandomFortune(category, keyword);
+        const content = await getRandomFortune(category, keyword);
 
         results[category.toLowerCase()] = {
             keyword: keyword || '',
             content: content || `${category} 운세를 불러올 수 없습니다.`
         };
-    });
+    }
 
     // 6. 행운 요소 계산 (오행 + 개인 생년월일 + 오늘 일진 기반)
     const luckyElements = await selectLuckyElements(userDayStem, today, todayPillar, userData);
@@ -812,6 +813,8 @@ export const getTodayFortune = () => {
     if (!savedFortune) return null;
 
     const fortuneData = JSON.parse(savedFortune);
+    console.log('[getTodayFortune] 로드한 데이터:', fortuneData);
+    console.log('[getTodayFortune] overall.content:', fortuneData?.overall?.content);
     const today = new Date().toLocaleDateString('ko-KR');
 
     // 날짜가 오늘과 같으면 반환
@@ -831,6 +834,8 @@ export const getTodayFortune = () => {
  */
 export const saveTodayFortune = (fortuneResult) => {
     const storageKey = getFortuneStorageKey();
+    console.log('[saveTodayFortune] 저장하는 데이터:', fortuneResult);
+    console.log('[saveTodayFortune] overall.content:', fortuneResult?.overall?.content);
     localStorage.setItem(storageKey, JSON.stringify(fortuneResult));
 };
 
