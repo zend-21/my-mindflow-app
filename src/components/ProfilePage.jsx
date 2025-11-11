@@ -1,12 +1,14 @@
 // src/components/ProfilePage.jsx
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { getUserProfile } from '../utils/fortuneLogic';
 import { getTodayFortune } from '../utils/fortuneLogic';
 import FortuneInputModal from './FortuneInputModal';
 import FortuneFlow from './FortuneFlow';
 import { syncProfilePictureToGoogleDrive, loadProfilePictureFromGoogleDrive } from '../utils/googleDriveSync';
+import AvatarSelector from './AvatarSelector';
+import { avatarList } from './avatars/AvatarIcons';
 
 // 🎨 Styled Components
 
@@ -30,7 +32,7 @@ const Overlay = styled.div`
 `;
 
 const ModalContainer = styled.div`
-    background: linear-gradient(180deg, #fafafa 0%, #f0f2f5 100%);
+    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
     width: 100%;
     height: 100%;
     max-width: 450px;
@@ -44,7 +46,7 @@ const ModalContainer = styled.div`
         height: 90vh;
         max-height: 900px;
         border-radius: 24px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     }
 
     @media (min-width: 1024px) {
@@ -54,10 +56,13 @@ const ModalContainer = styled.div`
 
 const Header = styled.div`
     padding: 24px 24px 16px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background:
+        linear-gradient(135deg, rgba(240, 147, 251, 0.2) 0%, rgba(245, 87, 108, 0.2) 100%),
+        linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
     color: white;
     position: relative;
     flex-shrink: 0;
+    border-bottom: 1px solid rgba(240, 147, 251, 0.2);
 `;
 
 const HeaderTitle = styled.h1`
@@ -98,6 +103,7 @@ const ScrollContent = styled.div`
     flex: 1;
     overflow-y: auto;
     padding: 20px 24px 40px;
+    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
 
     /* 커스텀 스크롤바 */
     &::-webkit-scrollbar {
@@ -105,16 +111,17 @@ const ScrollContent = styled.div`
     }
 
     &::-webkit-scrollbar-track {
-        background: #f1f1f1;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
     }
 
     &::-webkit-scrollbar-thumb {
-        background: #c1c1c1;
+        background: rgba(240, 147, 251, 0.3);
         border-radius: 4px;
     }
 
     &::-webkit-scrollbar-thumb:hover {
-        background: #a1a1a1;
+        background: rgba(240, 147, 251, 0.5);
     }
 `;
 
@@ -125,10 +132,35 @@ const Container = styled.div`
 `;
 
 const Section = styled.div`
-    background: white;
+    background:
+        linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%),
+        linear-gradient(180deg, #2a2d35 0%, #25282f 100%);
     border-radius: 16px;
     padding: 24px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow:
+        0 4px 16px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background:
+            repeating-linear-gradient(
+                0deg,
+                transparent,
+                transparent 2px,
+                rgba(0, 0, 0, 0.02) 2px,
+                rgba(0, 0, 0, 0.02) 4px
+            );
+        pointer-events: none;
+    }
 `;
 
 const ProfileHeader = styled.div`
@@ -137,7 +169,9 @@ const ProfileHeader = styled.div`
     align-items: center;
     gap: 16px;
     padding-bottom: 20px;
-    border-bottom: 1px solid #f0f2f5;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    z-index: 1;
 `;
 
 const ProfileImageWrapper = styled.div`
@@ -154,21 +188,41 @@ const ProfileImage = styled.img`
     height: 100px;
     border-radius: 50%;
     object-fit: cover;
-    border: 3px solid #667eea;
+    border: 3px solid rgba(240, 147, 251, 0.5);
+    box-shadow: 0 4px 16px rgba(240, 147, 251, 0.3);
+`;
+
+const AvatarIconWrapper = styled.div`
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 3px solid rgba(240, 147, 251, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(240, 147, 251, 0.3);
+
+    svg {
+        width: 100%;
+        height: 100%;
+    }
 `;
 
 const DefaultProfileIcon = styled.div`
     width: 100px;
     height: 100px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, rgba(240, 147, 251, 0.3) 0%, rgba(245, 87, 108, 0.3) 100%);
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 40px;
     color: white;
     font-weight: 600;
-    border: 3px solid #667eea;
+    border: 3px solid rgba(240, 147, 251, 0.5);
+    box-shadow: 0 4px 16px rgba(240, 147, 251, 0.3);
 `;
 
 const EditOverlay = styled.div`
@@ -189,6 +243,34 @@ const EditOverlay = styled.div`
     font-weight: 600;
 `;
 
+const ProfileImageTypeSelector = styled.div`
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+`;
+
+const ImageTypeButton = styled.button`
+    padding: 8px 16px;
+    border: 2px solid ${props => props.$selected ? 'rgba(240, 147, 251, 0.8)' : 'rgba(255, 255, 255, 0.2)'};
+    background: ${props => props.$selected
+        ? 'linear-gradient(135deg, rgba(240, 147, 251, 0.2), rgba(245, 87, 108, 0.2))'
+        : 'rgba(255, 255, 255, 0.05)'
+    };
+    color: ${props => props.$selected ? '#f093fb' : '#b0b0b0'};
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: ${props => props.$selected ? '0 2px 8px rgba(240, 147, 251, 0.2)' : 'none'};
+
+    &:hover {
+        border-color: rgba(240, 147, 251, 0.8);
+        background: linear-gradient(135deg, rgba(240, 147, 251, 0.15), rgba(245, 87, 108, 0.15));
+        color: #f093fb;
+    }
+`;
+
 const NicknameContainer = styled.div`
     display: flex;
     align-items: center;
@@ -199,38 +281,45 @@ const Nickname = styled.h2`
     margin: 0;
     font-size: 24px;
     font-weight: 600;
-    color: #2d3748;
+    color: #ffffff;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 `;
 
 const EditButton = styled.button`
-    background: transparent;
-    border: none;
-    color: #667eea;
+    background: rgba(240, 147, 251, 0.1);
+    border: 1px solid rgba(240, 147, 251, 0.3);
+    color: #f093fb;
     cursor: pointer;
     font-size: 14px;
     padding: 4px 8px;
     text-decoration: none;
+    border-radius: 6px;
+    transition: all 0.2s;
 
     &:hover {
-        background: #edf2f7;
-        border-radius: 6px;
+        background: rgba(240, 147, 251, 0.2);
+        border-color: rgba(240, 147, 251, 0.5);
+        box-shadow: 0 2px 8px rgba(240, 147, 251, 0.2);
     }
 `;
 
 const Email = styled.p`
     margin: 0;
     font-size: 14px;
-    color: #718096;
+    color: #b0b0b0;
 `;
 
 const SectionTitle = styled.h3`
     margin: 0 0 16px 0;
     font-size: 18px;
     font-weight: 600;
-    color: #2d3748;
+    color: #ffffff;
     display: flex;
     align-items: center;
     gap: 8px;
+    position: relative;
+    z-index: 1;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 `;
 
 const StatsGrid = styled.div`
@@ -246,20 +335,25 @@ const StatsGrid = styled.div`
 const StatItem = styled.div`
     text-align: center;
     padding: 16px;
-    background: #f7fafc;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
     border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    z-index: 1;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 `;
 
 const StatValue = styled.div`
     font-size: 24px;
     font-weight: 700;
-    color: #667eea;
+    color: #f093fb;
     margin-bottom: 4px;
+    text-shadow: 0 2px 4px rgba(240, 147, 251, 0.3);
 `;
 
 const StatLabel = styled.div`
     font-size: 12px;
-    color: #718096;
+    color: #b0b0b0;
 `;
 
 const FortuneSection = styled.div`
@@ -276,7 +370,7 @@ const FortuneSectionHeader = styled.div`
 
 const CollapseIcon = styled.span`
     font-size: 20px;
-    color: #718096;
+    color: #b0b0b0;
     transition: transform 0.3s;
     transform: ${props => props.$isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'};
 `;
@@ -289,16 +383,19 @@ const FortuneContent = styled.div`
 
 const FortuneInfo = styled.div`
     padding: 16px;
-    background: #f7fafc;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
     border-radius: 12px;
     margin-bottom: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    z-index: 1;
 `;
 
 const InfoRow = styled.div`
     display: flex;
     justify-content: space-between;
     padding: 8px 0;
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 
     &:last-child {
         border-bottom: none;
@@ -307,13 +404,37 @@ const InfoRow = styled.div`
 
 const InfoLabel = styled.span`
     font-size: 14px;
-    color: #718096;
+    color: #b0b0b0;
 `;
 
 const InfoValue = styled.span`
     font-size: 14px;
-    color: #2d3748;
+    color: #ffffff;
     font-weight: 600;
+`;
+
+const MaskedInfoValue = styled.span`
+    font-size: 14px;
+    color: #ffffff;
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    background: rgba(240, 147, 251, 0.1);
+    border: 1px solid rgba(240, 147, 251, 0.2);
+
+    &:hover {
+        background: rgba(240, 147, 251, 0.15);
+        border-color: rgba(240, 147, 251, 0.3);
+        box-shadow: 0 2px 8px rgba(240, 147, 251, 0.2);
+    }
+
+    &:active {
+        transform: scale(0.98);
+    }
 `;
 
 const FortuneStatusBadge = styled.div`
@@ -344,19 +465,26 @@ const ActionButton = styled.button`
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
+    position: relative;
+    z-index: 1;
 
     ${props => props.$primary ? `
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, rgba(240, 147, 251, 0.3), rgba(245, 87, 108, 0.3));
         color: white;
+        border: 1px solid rgba(240, 147, 251, 0.5);
+        box-shadow: 0 2px 8px rgba(240, 147, 251, 0.2);
         &:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 6px 20px rgba(240, 147, 251, 0.4);
+            background: linear-gradient(135deg, rgba(240, 147, 251, 0.4), rgba(245, 87, 108, 0.4));
         }
     ` : `
-        background: #edf2f7;
-        color: #4a5568;
+        background: rgba(255, 255, 255, 0.05);
+        color: #d0d0d0;
+        border: 1px solid rgba(255, 255, 255, 0.1);
         &:hover {
-            background: #e2e8f0;
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
         }
     `}
 `;
@@ -370,19 +498,24 @@ const ProfilePictureSyncSection = styled.div`
 const SyncButton = styled.button`
     flex: 1;
     padding: 12px;
-    border: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 10px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    background: #edf2f7;
-    color: #4a5568;
+    background: rgba(255, 255, 255, 0.05);
+    color: #d0d0d0;
     white-space: nowrap;
+    position: relative;
+    z-index: 1;
 
     &:hover {
-        background: #e2e8f0;
+        background: rgba(240, 147, 251, 0.1);
+        border-color: rgba(240, 147, 251, 0.3);
+        color: #f093fb;
         transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(240, 147, 251, 0.2);
     }
 
     &:active {
@@ -392,9 +525,12 @@ const SyncButton = styled.button`
 
 const BirthdayReminderSection = styled.div`
     padding: 16px;
-    background: #f7fafc;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
     border-radius: 12px;
     margin-top: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
+    z-index: 1;
 `;
 
 const ReminderOption = styled.div`
@@ -406,7 +542,7 @@ const ReminderOption = styled.div`
 
 const ReminderLabel = styled.span`
     font-size: 14px;
-    color: #4a5568;
+    color: #d0d0d0;
 `;
 
 const ToggleSwitch = styled.label`
@@ -422,7 +558,8 @@ const ToggleInput = styled.input`
     height: 0;
 
     &:checked + span {
-        background-color: #667eea;
+        background: linear-gradient(135deg, rgba(240, 147, 251, 0.5), rgba(245, 87, 108, 0.5));
+        border-color: rgba(240, 147, 251, 0.8);
     }
 
     &:checked + span:before {
@@ -437,9 +574,10 @@ const ToggleSlider = styled.span`
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: #cbd5e0;
+    background-color: rgba(255, 255, 255, 0.1);
     transition: 0.3s;
     border-radius: 26px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
 
     &:before {
         position: absolute;
@@ -451,6 +589,7 @@ const ToggleSlider = styled.span`
         background-color: white;
         transition: 0.3s;
         border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     }
 `;
 
@@ -463,9 +602,12 @@ const CalendarTypeSelector = styled.div`
 const CalendarTypeButton = styled.button`
     flex: 1;
     padding: 8px;
-    border: 2px solid ${props => props.$selected ? '#667eea' : '#e2e8f0'};
-    background: ${props => props.$selected ? '#f0f4ff' : 'white'};
-    color: ${props => props.$selected ? '#667eea' : '#718096'};
+    border: 2px solid ${props => props.$selected ? 'rgba(240, 147, 251, 0.8)' : 'rgba(255, 255, 255, 0.2)'};
+    background: ${props => props.$selected
+        ? 'linear-gradient(135deg, rgba(240, 147, 251, 0.2), rgba(245, 87, 108, 0.2))'
+        : 'rgba(255, 255, 255, 0.05)'
+    };
+    color: ${props => props.$selected ? '#f093fb' : '#b0b0b0'};
     border-radius: 8px;
     font-size: 13px;
     font-weight: 600;
@@ -473,22 +615,31 @@ const CalendarTypeButton = styled.button`
     transition: all 0.2s;
 
     &:hover {
-        border-color: #667eea;
+        border-color: rgba(240, 147, 251, 0.8);
+        background: linear-gradient(135deg, rgba(240, 147, 251, 0.15), rgba(245, 87, 108, 0.15));
+        color: #f093fb;
     }
 `;
 
 const NicknameInput = styled.input`
     padding: 8px 12px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid rgba(240, 147, 251, 0.3);
     border-radius: 8px;
     font-size: 16px;
     font-weight: 600;
     text-align: center;
     width: 200px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
 
     &:focus {
         outline: none;
-        border-color: #667eea;
+        border-color: rgba(240, 147, 251, 0.8);
+        box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
+    }
+
+    &::placeholder {
+        color: #808080;
     }
 `;
 
@@ -503,6 +654,15 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     const [isFortuneInputModalOpen, setIsFortuneInputModalOpen] = useState(false);
     const [isFortuneFlowOpen, setIsFortuneFlowOpen] = useState(false);
     const [imageError, setImageError] = useState(false);
+
+    // 아바타 관련 상태
+    const [profileImageType, setProfileImageType] = useState(localStorage.getItem('profileImageType') || 'avatar'); // 'avatar' | 'photo'
+    const [selectedAvatarId, setSelectedAvatarId] = useState(localStorage.getItem('selectedAvatarId') || null);
+    const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
+
+    // 생년월일 마스킹 관련 상태
+    const [isBirthDateRevealed, setIsBirthDateRevealed] = useState(false);
+    const birthDateTimerRef = useRef(null);
 
     // 운세 프로필 정보
     const fortuneProfile = getUserProfile();
@@ -547,7 +707,69 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     };
 
     // 프로필 사진 업로드 input ref
-    const fileInputRef = React.useRef(null);
+    const fileInputRef = useRef(null);
+
+    // 이미지 타입 변경 핸들러
+    const handleImageTypeChange = (type) => {
+        setProfileImageType(type);
+        localStorage.setItem('profileImageType', type);
+
+        if (type === 'avatar' && !selectedAvatarId) {
+            // 아바타를 선택했는데 아직 선택된 아바타가 없으면 모달 열기
+            setIsAvatarSelectorOpen(true);
+        }
+    };
+
+    // 아바타 선택 핸들러
+    const handleAvatarSelect = (avatarId) => {
+        setSelectedAvatarId(avatarId);
+        localStorage.setItem('selectedAvatarId', avatarId);
+        showToast?.('아바타가 변경되었습니다');
+    };
+
+    // 아바타 아이콘 렌더링
+    const renderAvatarIcon = () => {
+        if (!selectedAvatarId) return null;
+        const avatar = avatarList.find(a => a.id === selectedAvatarId);
+        if (!avatar) return null;
+        const AvatarComponent = avatar.component;
+        return <AvatarComponent />;
+    };
+
+    // 생년월일 탭 핸들러 (3초간 표시)
+    const handleBirthDateTap = () => {
+        if (birthDateTimerRef.current) {
+            clearTimeout(birthDateTimerRef.current);
+        }
+
+        setIsBirthDateRevealed(true);
+
+        birthDateTimerRef.current = setTimeout(() => {
+            setIsBirthDateRevealed(false);
+        }, 3000);
+    };
+
+    // 컴포넌트 언마운트 시 타이머 정리
+    useEffect(() => {
+        return () => {
+            if (birthDateTimerRef.current) {
+                clearTimeout(birthDateTimerRef.current);
+            }
+        };
+    }, []);
+
+    // 생년월일 마스킹 함수
+    const maskBirthDate = (year, month, day) => {
+        if (isBirthDateRevealed) {
+            return `${year}년 ${month}월 ${day}일`;
+        }
+
+        // 연도의 앞 2자리만 표시, 나머지는 *로 마스킹
+        const yearStr = String(year);
+        const maskedYear = yearStr.substring(0, 2) + '**';
+
+        return `${maskedYear}년 **월 **일`;
+    };
 
     // 이미지를 압축하고 Base64로 변환
     const compressAndConvertImage = (file) => {
@@ -604,7 +826,13 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
 
     // 프로필 사진 변경
     const handleProfileImageClick = () => {
-        fileInputRef.current?.click();
+        if (profileImageType === 'avatar') {
+            // 아바타 모드일 때는 아바타 선택 모달 열기
+            setIsAvatarSelectorOpen(true);
+        } else {
+            // 사진 모드일 때는 파일 선택
+            fileInputRef.current?.click();
+        }
     };
 
     // 파일 선택 시 처리
@@ -789,7 +1017,11 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                 <Section>
                     <ProfileHeader>
                         <ProfileImageWrapper onClick={handleProfileImageClick}>
-                            {(profile?.customPicture || profile?.picture) && !imageError ? (
+                            {profileImageType === 'avatar' && selectedAvatarId ? (
+                                <AvatarIconWrapper>
+                                    {renderAvatarIcon()}
+                                </AvatarIconWrapper>
+                            ) : profileImageType === 'photo' && (profile?.customPicture || profile?.picture) && !imageError ? (
                                 <ProfileImage
                                     src={profile.customPicture || profile.picture}
                                     alt="Profile"
@@ -802,6 +1034,28 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                             <EditOverlay className="edit-overlay">변경</EditOverlay>
                         </ProfileImageWrapper>
 
+                        {/* 이미지 타입 선택 버튼 */}
+                        <ProfileImageTypeSelector>
+                            <ImageTypeButton
+                                $selected={profileImageType === 'avatar'}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleImageTypeChange('avatar');
+                                }}
+                            >
+                                🎨 아바타
+                            </ImageTypeButton>
+                            <ImageTypeButton
+                                $selected={profileImageType === 'photo'}
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleImageTypeChange('photo');
+                                }}
+                            >
+                                📸 사진
+                            </ImageTypeButton>
+                        </ProfileImageTypeSelector>
+
                         {/* 숨겨진 파일 input (카메라/앨범 선택) */}
                         <input
                             ref={fileInputRef}
@@ -811,15 +1065,17 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                             style={{ display: 'none' }}
                         />
 
-                        {/* 프로필 사진 동기화/복원 버튼 */}
-                        <ProfilePictureSyncSection>
-                            <SyncButton onClick={handleSyncProfilePicture}>
-                                ☁️ 프사 저장
-                            </SyncButton>
-                            <SyncButton onClick={handleRestoreProfilePicture}>
-                                📥 프사 복원
-                            </SyncButton>
-                        </ProfilePictureSyncSection>
+                        {/* 프로필 사진 동기화/복원 버튼 (사진 모드일 때만 표시) */}
+                        {profileImageType === 'photo' && (
+                            <ProfilePictureSyncSection>
+                                <SyncButton onClick={handleSyncProfilePicture}>
+                                    ☁️ 프사 저장
+                                </SyncButton>
+                                <SyncButton onClick={handleRestoreProfilePicture}>
+                                    📥 프사 복원
+                                </SyncButton>
+                            </ProfilePictureSyncSection>
+                        )}
 
                         <NicknameContainer>
                             {isEditingNickname ? (
@@ -887,9 +1143,16 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                             <FortuneInfo>
                                 <InfoRow>
                                     <InfoLabel>생년월일</InfoLabel>
-                                    <InfoValue>
-                                        {fortuneProfile.birthYear}년 {fortuneProfile.birthMonth}월 {fortuneProfile.birthDay}일
-                                    </InfoValue>
+                                    <MaskedInfoValue
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleBirthDateTap();
+                                        }}
+                                        title="탭하면 3초간 표시됩니다"
+                                    >
+                                        {maskBirthDate(fortuneProfile.birthYear, fortuneProfile.birthMonth, fortuneProfile.birthDay)}
+                                        {!isBirthDateRevealed && ' 👁️'}
+                                    </MaskedInfoValue>
                                 </InfoRow>
                                 {fortuneProfile.birthHour !== undefined && (
                                     <InfoRow>
@@ -996,6 +1259,19 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                 <FortuneFlow
                     onClose={() => setIsFortuneFlowOpen(false)}
                     profile={profile}
+                />
+            )}
+
+            {/* 아바타 선택 모달 */}
+            {isAvatarSelectorOpen && (
+                <AvatarSelector
+                    isOpen={isAvatarSelectorOpen}
+                    onClose={() => setIsAvatarSelectorOpen(false)}
+                    onSelect={handleAvatarSelect}
+                    currentAvatarId={selectedAvatarId}
+                    birthYear={fortuneProfile?.birthYear}
+                    birthMonth={fortuneProfile?.birthMonth}
+                    birthDay={fortuneProfile?.birthDay}
                 />
             )}
         </>
