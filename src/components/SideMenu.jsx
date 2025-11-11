@@ -243,35 +243,7 @@ const SideMenu = ({
                         </MenuHeader>
 
                         <MenuItemsWrapper>
-                            {/* 📱 그룹 1: 백업/복원 */}
-                            <MenuGroup>
-                                <MenuItem onClick={onExport}>
-                                    <span className="icon">💾</span> 휴대폰 백업
-                                </MenuItem>
-                                <MenuItem onClick={handleImportClick}>
-                                    <span className="icon">📂</span> 휴대폰 복원
-                                    <FileInput
-                                        type="file"
-                                        accept=".json"
-                                        onChange={onImport}
-                                        ref={fileInputRef}
-                                    />
-                                </MenuItem>
-                            </MenuGroup>
-
-                            {/* ☁️ 그룹 2: 동기화 (로그인 사용자 전용) */}
-                            {profile && (
-                                <MenuGroup>
-                                    <MenuItem onClick={onSync}>
-                                        <span className="icon">☁️</span> 동기화 (폰→구글)
-                                    </MenuItem>
-                                    <MenuItem onClick={onRestoreFromDrive}>
-                                        <span className="icon">📥</span> 동기화 (구글→폰)
-                                    </MenuItem>
-                                </MenuGroup>
-                            )}
-
-                            {/* 🔮 그룹 3: 기능 */}
+                            {/* 🔮 그룹 1: 기능 */}
                             <MenuGroup>
                                 <MenuItem onClick={() => {
                                     onClose();
@@ -287,20 +259,44 @@ const SideMenu = ({
                                 </MenuItem>
                             </MenuGroup>
 
-                            {/* 🗑️ 그룹 4: 관리 */}
+                            {/* 📱 그룹 2: 백업/복원 */}
                             <MenuGroup>
+                                <MenuItem onClick={onExport}>
+                                    <span className="icon">💾</span> 휴대폰 백업
+                                </MenuItem>
+                                <MenuItem onClick={handleImportClick}>
+                                    <span className="icon">📂</span> 휴대폰 복원
+                                    <FileInput
+                                        type="file"
+                                        accept=".json"
+                                        onChange={onImport}
+                                        ref={fileInputRef}
+                                    />
+                                </MenuItem>
+                            </MenuGroup>
+
+                            {/* ☁️ 그룹 3: 동기화 (로그인 사용자 전용) */}
+                            {profile && (
+                                <MenuGroup>
+                                    <MenuItem onClick={onSync}>
+                                        <span className="icon">☁️</span> 동기화 (폰→구글)
+                                    </MenuItem>
+                                    <MenuItem onClick={onRestoreFromDrive}>
+                                        <span className="icon">📥</span> 동기화 (구글→폰)
+                                    </MenuItem>
+                                </MenuGroup>
+                            )}
+
+                            {/* ⚙️ 그룹 4: 설정/관리 */}
+                            <MenuGroup>
+                                <MenuItem>
+                                    <span className="icon">⚙️</span> 설정
+                                </MenuItem>
                                 <MenuItem onClick={() => {
                                     onClose();
                                     if (onOpenTrash) onOpenTrash();
                                 }}>
                                     <span className="icon">🗑️</span> 휴지통
-                                </MenuItem>
-                            </MenuGroup>
-
-                            {/* ⚙️ 그룹 5: 설정 */}
-                            <MenuGroup>
-                                <MenuItem>
-                                    <span className="icon">⚙️</span> 설정
                                 </MenuItem>
                             </MenuGroup>
 
