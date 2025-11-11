@@ -926,7 +926,7 @@ function App() {
         };
         exportData('mindflow_backup', dataToExport);
         addActivity('백업', '전체 데이터 백업 (휴대폰)');
-        showToast("✓ 백업이 완료되었습니다");
+        // 백업 완료 토스트 제거 - 브라우저 다운로드 UI가 이미 피드백을 제공함
     };
 
     const handleDataImport = (event) => {

@@ -34,17 +34,36 @@ const decrypt = (encryptedData) => {
     }
 };
 
-export const exportData = (dataType, data) => {
+export const exportData = async (dataType, data) => {
     const encryptedData = encrypt(data);
     const blob = new Blob([encryptedData], { type: 'application/json' });
+    const filename = `${dataType}_${new Date().toISOString().slice(0, 10)}.json`;
+
+    // 모바일에서 Share API 지원 여부 확인
+    if (navigator.canShare && navigator.canShare({ files: [new File([blob], filename)] })) {
+        try {
+            const file = new File([blob], filename, { type: 'application/json' });
+            await navigator.share({
+                files: [file],
+                title: '백업 파일',
+                text: 'MindFlow 백업 데이터'
+            });
+            return; // Share API 성공
+        } catch (err) {
+            // 사용자가 공유를 취소했거나 오류 발생 시 기본 다운로드로 fallback
+            console.log('Share cancelled or failed, using download fallback');
+        }
+    }
+
+    // Share API 미지원 또는 실패 시 기본 다운로드 방식
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${dataType}_backup_${new Date().toISOString()}.json`;
+    a.download = filename;
+    a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
-    
-    // 이 부분을 수정했습니다. 100ms 후 링크를 제거합니다.
+
     setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
