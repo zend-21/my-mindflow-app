@@ -743,8 +743,11 @@ export const calculateFortune = async (userData, fortuneData) => {
     // 8. 별자리 운세 선택 (신문 스타일: 날짜 기반)
     const horoscopeFortune = selectHoroscopeFortune(zodiacSign, today);
 
+    // 날짜를 YYYY-MM-DD 형식으로 저장 (자정 기준 정확한 비교)
+    const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
     return {
-        date: today.toLocaleDateString('ko-KR'),
+        date: dateStr,
         userName: userData.name,
         userDayStem: `${userDayStem}(${getStemHanja(userDayStem)})`,
         todayPillar: `${todayPillar.stem}${todayPillar.branch}(${getStemHanja(todayPillar.stem)}${getBranchHanja(todayPillar.branch)})`,
@@ -815,10 +818,13 @@ export const getTodayFortune = () => {
     const fortuneData = JSON.parse(savedFortune);
     console.log('[getTodayFortune] 로드한 데이터:', fortuneData);
     console.log('[getTodayFortune] overall.content:', fortuneData?.overall?.content);
-    const today = new Date().toLocaleDateString('ko-KR');
+
+    // 오늘 날짜를 YYYY-MM-DD 형식으로 생성 (자정 기준 정확한 비교)
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     // 날짜가 오늘과 같으면 반환
-    if (fortuneData.date === today) {
+    if (fortuneData.date === todayStr) {
         return fortuneData;
     }
 

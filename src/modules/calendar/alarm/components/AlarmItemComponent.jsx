@@ -4,7 +4,7 @@
 import React from 'react';
 import { format } from 'date-fns';
 import styled from 'styled-components';
-import { AlarmClock } from 'lucide-react';
+import { AlarmClock, Repeat } from 'lucide-react';
 import { ALARM_COLORS, getDaysUntilAutoDelete } from '../';
 
 const AlarmItem = styled.div`
@@ -195,15 +195,17 @@ export const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, on
 
           {/* 기념일/반복/일반 알람 아이콘 */}
           {isRepeated ? (
-            // 반복 기념일 주기일: 🔄 아이콘 표시
+            // 반복 기념일 주기일: Repeat 아이콘 표시
             <div style={{
-              fontSize: '14px',
               flexShrink: 0,
               display: 'flex',
               alignItems: 'center',
-              marginTop: '2px'
+              marginTop: '4px'
             }}>
-              🔄
+              <Repeat
+                size={14}
+                color={ALARM_COLORS.primary}
+              />
             </div>
           ) : alarm.isAnniversary ? (
             // 등록일: '기' 뱃지 표시
