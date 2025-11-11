@@ -866,7 +866,7 @@ const Timer = ({ onClose }) => {
         }
     };
 
-    // 버튼 클릭 효과음 재생 (Web Audio API 사용 - iPhone 키보드 타이핑 스타일)
+    // 버튼 클릭 효과음 재생 (Web Audio API 사용 - 혀 "쩍" 소리)
     const playClickSound = () => {
         // 진동 모드이거나 볼륨이 0이면 소리 재생 안함
         if (volume === 0 || vibrationMode) {
@@ -882,60 +882,42 @@ const Timer = ({ onClose }) => {
             const audioContext = clickSoundRef.current;
             const now = audioContext.currentTime;
 
-            // iPhone 키보드 "딱" 소리 재현 (여러 주파수 레이어 합성)
-            // 레이어 1: 고음 클릭 (1400Hz)
-            const osc1 = audioContext.createOscillator();
-            const gain1 = audioContext.createGain();
-            osc1.frequency.value = 1400;
-            osc1.type = 'sine';
-            gain1.gain.setValueAtTime(Math.min(volume * 0.15, 0.1), now);
-            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.015);
-            osc1.connect(gain1);
-            gain1.connect(audioContext.destination);
+            // 혀 "쩍" 소리 재현 (임펄스 + 공기 빠지는 소리)
+            const sampleRate = audioContext.sampleRate;
+            const bufferSize = sampleRate * 0.005; // 5ms (매우 짧은 펄스)
+            const buffer = audioContext.createBuffer(1, bufferSize, sampleRate);
+            const output = buffer.getChannelData(0);
 
-            // 레이어 2: 중음 바디 (800Hz)
-            const osc2 = audioContext.createOscillator();
-            const gain2 = audioContext.createGain();
-            osc2.frequency.value = 800;
-            osc2.type = 'triangle';
-            gain2.gain.setValueAtTime(Math.min(volume * 0.1, 0.08), now);
-            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.012);
-            osc2.connect(gain2);
-            gain2.connect(audioContext.destination);
-
-            // 레이어 3: 저음 베이스 (200Hz) - 단단한 느낌
-            const osc3 = audioContext.createOscillator();
-            const gain3 = audioContext.createGain();
-            osc3.frequency.value = 200;
-            osc3.type = 'square';
-            gain3.gain.setValueAtTime(Math.min(volume * 0.08, 0.05), now);
-            gain3.gain.exponentialRampToValueAtTime(0.001, now + 0.01);
-            osc3.connect(gain3);
-            gain3.connect(audioContext.destination);
-
-            // 화이트 노이즈 레이어 (클릭감 강화)
-            const bufferSize = audioContext.sampleRate * 0.02; // 20ms
-            const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-            const output = noiseBuffer.getChannelData(0);
+            // 임펄스(순간 압력) + 감쇠 노이즈
             for (let i = 0; i < bufferSize; i++) {
-                output[i] = Math.random() * 2 - 1;
+                // 초반 강한 임펄스
+                const impulse = i < 50 ? 1.0 : 0;
+                // 뒤따르는 공기 소리 (매우 빠른 감쇠)
+                const noise = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.15));
+                output[i] = impulse * 0.5 + noise * 0.5;
             }
-            const noiseSource = audioContext.createBufferSource();
-            noiseSource.buffer = noiseBuffer;
-            const noiseGain = audioContext.createGain();
-            noiseGain.gain.setValueAtTime(Math.min(volume * 0.05, 0.03), now);
-            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.008);
-            noiseSource.connect(noiseGain);
-            noiseGain.connect(audioContext.destination);
 
-            // 모든 소리 시작 및 종료
-            osc1.start(now);
-            osc1.stop(now + 0.015);
-            osc2.start(now);
-            osc2.stop(now + 0.012);
-            osc3.start(now);
-            osc3.stop(now + 0.01);
-            noiseSource.start(now);
+            const source = audioContext.createBufferSource();
+            source.buffer = buffer;
+
+            // 밴드패스 필터 (2000-6000Hz - "쩍" 소리의 주파수 범위)
+            const bandpass = audioContext.createBiquadFilter();
+            bandpass.type = 'bandpass';
+            bandpass.frequency.value = 3500;
+            bandpass.Q.value = 2;
+
+            const gain = audioContext.createGain();
+            // 순간적으로 강하고 급격히 사라짐
+            gain.gain.setValueAtTime(Math.min(volume * 0.25, 0.2), now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.005);
+
+            // 연결: 소스 → 밴드패스 필터 → 볼륨 → 출력
+            source.connect(bandpass);
+            bandpass.connect(gain);
+            gain.connect(audioContext.destination);
+
+            source.start(now);
+            source.stop(now + 0.005);
 
         } catch (err) {
             console.log('Click sound error:', err);
