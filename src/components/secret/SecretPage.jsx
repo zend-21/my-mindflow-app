@@ -29,7 +29,7 @@ const Container = styled.div`
 `;
 
 const InnerContent = styled.div`
-    padding: 20px 24px;
+    padding: 10px 24px 20px 24px;
 `;
 
 const SearchBar = styled.div`
@@ -163,7 +163,7 @@ const EmptyText = styled.p`
 
 const AddButton = styled.button`
     position: fixed;
-    bottom: 84px;
+    bottom: 104px;
     right: 24px;
     width: 80px;
     height: 80px;
@@ -193,15 +193,48 @@ const AddButton = styled.button`
     }
 `;
 
-const MaskIcon = styled.svg`
+const MaskImage = styled.img`
     width: 70px;
     height: 70px;
+    object-fit: contain;
     filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3));
     transition: all 0.2s;
 
     &:hover {
         filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.4));
         transform: scale(1.05);
+    }
+`;
+
+const PlusIcon = styled.div`
+    position: absolute;
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #f093fb, #f5576c);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+
+    &::before,
+    &::after {
+        content: '';
+        position: absolute;
+        background: white;
+    }
+
+    &::before {
+        width: 12px;
+        height: 2px;
+    }
+
+    &::after {
+        width: 2px;
+        height: 12px;
     }
 `;
 
@@ -638,52 +671,11 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                     }
                 }}
             >
-                <MaskIcon viewBox="0 0 640 480" xmlns="http://www.w3.org/2000/svg">
-                    {/* 외곽선 */}
-                    <path
-                        d="M 100 240 Q 80 200, 80 160 Q 80 100, 120 60 Q 160 20, 220 20 Q 260 20, 280 50 Q 290 70, 290 100 Q 290 160, 250 200 Q 210 220, 170 230 Q 130 240, 100 240 Z"
-                        fill="none"
-                        stroke="#1a1a1a"
-                        strokeWidth="8"
-                    />
-                    <path
-                        d="M 540 240 Q 560 200, 560 160 Q 560 100, 520 60 Q 480 20, 420 20 Q 380 20, 360 50 Q 350 70, 350 100 Q 350 160, 390 200 Q 430 220, 470 230 Q 510 240, 540 240 Z"
-                        fill="none"
-                        stroke="#1a1a1a"
-                        strokeWidth="8"
-                    />
-
-                    {/* 마스크 본체 - 왼쪽 */}
-                    <path
-                        d="M 100 240 Q 80 200, 80 160 Q 80 100, 120 60 Q 160 20, 220 20 Q 260 20, 280 50 Q 290 70, 290 100 Q 290 160, 250 200 Q 210 220, 170 230 Q 130 240, 100 240 Z"
-                        fill="#f0f0f0"
-                    />
-
-                    {/* 마스크 본체 - 오른쪽 */}
-                    <path
-                        d="M 540 240 Q 560 200, 560 160 Q 560 100, 520 60 Q 480 20, 420 20 Q 380 20, 360 50 Q 350 70, 350 100 Q 350 160, 390 200 Q 430 220, 470 230 Q 510 240, 540 240 Z"
-                        fill="#f0f0f0"
-                    />
-
-                    {/* 중앙 연결부 */}
-                    <ellipse cx="320" cy="240" rx="40" ry="20" fill="#f0f0f0" stroke="#1a1a1a" strokeWidth="6"/>
-
-                    {/* 왼쪽 눈 구멍 */}
-                    <ellipse cx="180" cy="140" rx="40" ry="50" fill="#1a1a1a"/>
-                    <ellipse cx="180" cy="140" rx="38" ry="48" fill="#2a2a2a"/>
-
-                    {/* 오른쪽 눈 구멍 */}
-                    <ellipse cx="460" cy="140" rx="40" ry="50" fill="#1a1a1a"/>
-                    <ellipse cx="460" cy="140" rx="38" ry="48" fill="#2a2a2a"/>
-
-                    {/* 장식 라인들 */}
-                    <path d="M 150 80 Q 160 70, 170 65" stroke="#c0c0c0" strokeWidth="3" fill="none"/>
-                    <path d="M 490 80 Q 480 70, 470 65" stroke="#c0c0c0" strokeWidth="3" fill="none"/>
-
-                    {/* 반짝이는 포인트 */}
-                    <circle cx="140" cy="100" r="8" fill="#ffffff" opacity="0.8"/>
-                    <circle cx="500" cy="100" r="8" fill="#ffffff" opacity="0.8"/>
-                </MaskIcon>
+                <MaskImage
+                    src="/images/secret/mask-gray.svg"
+                    alt="Add Secret Document"
+                />
+                <PlusIcon />
             </AddButton>
 
             {isEditorOpen && (

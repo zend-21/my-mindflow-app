@@ -20,6 +20,7 @@ const Container = styled.div`
     min-height: 400px;
     justify-content: flex-start;
     padding-top: 20px;
+    transform: translateY(-25px);
 `;
 
 const Title = styled.h2`
@@ -68,15 +69,27 @@ const ErrorMessage = styled.div`
     color: #ff6b6b;
     font-size: 14px;
     text-align: center;
-    min-height: 20px;
+    height: 20px;
     font-weight: 500;
+    line-height: 20px;
 `;
 
 const AttemptsWarning = styled.div`
     color: #ffa500;
     font-size: 13px;
     text-align: center;
-    margin-top: -8px;
+    height: 20px;
+    line-height: 20px;
+    margin-top: 10px;
+`;
+
+const MessageContainer = styled.div`
+    height: 50px;
+    margin-bottom: -14px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    transform: translateY(-15px);
 `;
 
 const ForgotPinButton = styled.button`
@@ -292,13 +305,15 @@ const PinInput = ({
                 ))}
             </PinDisplay>
 
-            <ErrorMessage>{error}</ErrorMessage>
+            <MessageContainer>
+                <ErrorMessage>{error}</ErrorMessage>
 
-            {attempts > 0 && attempts < maxAttempts && !isLocked && (
-                <AttemptsWarning>
-                    ⚠️ {maxAttempts - attempts}번의 시도가 남았습니다.
-                </AttemptsWarning>
-            )}
+                {attempts > 0 && attempts < maxAttempts && !isLocked && (
+                    <AttemptsWarning>
+                        ⚠️ {maxAttempts - attempts}번의 시도가 남았습니다.
+                    </AttemptsWarning>
+                )}
+            </MessageContainer>
 
             <PinPad
                 onNumberClick={handleNumberClick}
