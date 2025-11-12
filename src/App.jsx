@@ -213,8 +213,8 @@ const Screen = styled.div`
 
 const ContentArea = styled.div`
     flex: 1;
-    padding-left: 24px;
-    padding-right: 24px;
+    padding-left: ${props => props.$isSecretTab ? '0' : '24px'};
+    padding-right: ${props => props.$isSecretTab ? '0' : '24px'};
     padding-bottom: 80px;
     padding-top: ${props => props.$showHeader ? '90px' : '20px'};
     overflow-y: auto;
@@ -224,6 +224,7 @@ const ContentArea = styled.div`
     will-change: transform;
     overscroll-behavior: none;
     touch-action: pan-y;
+    background: ${props => props.$isSecretTab ? 'linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%)' : 'transparent'};
 `;
 
 const LoginScreen = styled.div`
@@ -344,7 +345,6 @@ function App() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isFortuneFlowOpen, setIsFortuneFlowOpen] = useState(false);
     const [isTimerOpen, setIsTimerOpen] = useState(false);
-    const [isSecretPageOpen, setIsSecretPageOpen] = useState(false);
     const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
     const [restoreType, setRestoreType] = useState('phone'); // 'phone' or 'google'
     const [pendingRestoreFile, setPendingRestoreFile] = useState(null);
@@ -1129,11 +1129,7 @@ function App() {
     ];
 
     const handleSwitchTab = (tab) => {
-        if (tab === 'secret') {
-            setIsSecretPageOpen(true);
-        } else {
-            setActiveTab(tab);
-        }
+        setActiveTab(tab);
     };
 
     const handleFloatingButtonClick = () => {
@@ -1803,6 +1799,7 @@ if (isLoading) {
                         $pullDistance={pullDistance}
                         $showHeader={showHeader}
                         $isDragging={isDragging}
+                        $isSecretTab={activeTab === 'secret'}
                         // 터치 이벤트 (모바일)
                         onTouchStart={handleTouchStart}
                         onTouchMove={handleTouchMove}
@@ -1865,6 +1862,13 @@ if (isLoading) {
                         {activeTab === 'todo' && <div>할 일 페이지</div>}
                         {activeTab === 'recent-detail' && <div>최근 활동 상세 페이지</div>}
                         {activeTab === 'trash' && <TrashPage showToast={showToast} />}
+                        {activeTab === 'secret' && (
+                            <SecretPage
+                                onClose={() => setActiveTab('home')}
+                                profile={profile}
+                                showToast={showToast}
+                            />
+                        )}
                     </ContentArea>
 
                     <FloatingButton onClick={handleOpenNewMemoFromFAB} activeTab={activeTab} />
@@ -1889,7 +1893,10 @@ if (isLoading) {
                             setIsMenuOpen(false);
                             setActiveTab('trash');
                         }}
-                        onOpenSecret={() => setIsSecretPageOpen(true)}
+                        onOpenSecret={() => {
+                            setIsMenuOpen(false);
+                            setActiveTab('secret');
+                        }}
                     />
                 </>
             </Screen>
@@ -2044,14 +2051,6 @@ if (isLoading) {
                 />
             )}
 
-            {/* 🔒 시크릿 페이지 */}
-            {isSecretPageOpen && (
-                <SecretPage
-                    onClose={() => setIsSecretPageOpen(false)}
-                    profile={profile}
-                    showToast={showToast}
-                />
-            )}
             </AppContent>
         </TrashProvider>
     );

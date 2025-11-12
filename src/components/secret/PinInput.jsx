@@ -15,8 +15,8 @@ const Container = styled.div`
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 24px;
-    padding: 20px 20px;
+    gap: 20px;
+    padding: 10px 20px;
     min-height: 400px;
     justify-content: center;
 `;

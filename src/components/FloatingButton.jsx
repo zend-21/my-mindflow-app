@@ -281,11 +281,16 @@ const FloatingButton = ({ activeTab, onClick }) => {
         };
     }, []);
 
+    // secret 탭에서는 FloatingButton 숨김
+    if (activeTab === 'secret') {
+        return null;
+    }
+
     return (
         <FloatingButtonContainer
             ref={containerRef}
-            role="button" 
-            tabIndex="0"  
+            role="button"
+            tabIndex="0"
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}

@@ -22,96 +22,14 @@ import {
 } from '../../utils/secretStorage';
 
 const Container = styled.div`
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
-    z-index: 11000;
-    display: flex;
-    flex-direction: column;
-`;
-
-const Header = styled.div`
-    padding: 20px 24px;
-    background: linear-gradient(135deg, rgba(240, 147, 251, 0.2) 0%, rgba(245, 87, 108, 0.2) 100%);
-    border-bottom: 1px solid rgba(240, 147, 251, 0.2);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-shrink: 0;
-`;
-
-const HeaderLeft = styled.div`
-    display: flex;
-    align-items: center;
-    gap: 12px;
-`;
-
-const BackButton = styled.button`
-    background: none;
-    border: none;
-    color: #ffffff;
-    font-size: 24px;
-    cursor: pointer;
+    width: 100%;
+    height: 100%;
     padding: 0;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0.8;
-    transition: opacity 0.2s;
-
-    &:hover {
-        opacity: 1;
-    }
+    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
 `;
 
-const Title = styled.h1`
-    font-size: 24px;
-    font-weight: 600;
-    color: #ffffff;
-    margin: 0;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-`;
-
-const LockButton = styled.button`
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #ffffff;
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-
-    &:hover {
-        background: rgba(255, 255, 255, 0.15);
-        border-color: rgba(255, 255, 255, 0.3);
-    }
-`;
-
-const Content = styled.div`
-    flex: 1;
-    overflow-y: auto;
+const InnerContent = styled.div`
     padding: 20px 24px;
-
-    &::-webkit-scrollbar {
-        width: 8px;
-    }
-
-    &::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 4px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-        background: rgba(240, 147, 251, 0.3);
-        border-radius: 4px;
-    }
 `;
 
 const SearchBar = styled.div`
@@ -192,7 +110,7 @@ const EmptyText = styled.p`
 
 const AddButton = styled.button`
     position: fixed;
-    bottom: 24px;
+    bottom: 84px;
     right: 24px;
     width: 56px;
     height: 56px;
@@ -484,13 +402,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     if (!isUnlocked) {
         return (
             <Container>
-                <Header>
-                    <HeaderLeft>
-                        <BackButton onClick={onClose}>←</BackButton>
-                        <Title>🔒 시크릿</Title>
-                    </HeaderLeft>
-                </Header>
-                <Content>
+                <InnerContent>
                     <PinInput
                         pinLength={settings.pinLength}
                         title={hasPinSet()
@@ -506,23 +418,15 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                         onSubmit={handlePinSubmit}
                         onForgotPin={profile?.email ? handleForgotPin : null}
                     />
-                </Content>
+                </InnerContent>
             </Container>
         );
     }
 
     return (
         <Container>
-            <Header>
-                <HeaderLeft>
-                    <BackButton onClick={onClose}>←</BackButton>
-                    <Title>🔒 시크릿</Title>
-                </HeaderLeft>
-                <LockButton onClick={handleLock}>🔒 잠금</LockButton>
-            </Header>
-
-            <Content>
-                <SearchBar>
+            <InnerContent>
+            <SearchBar>
                     <SearchInput
                         type="text"
                         placeholder="검색..."
@@ -581,7 +485,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                         ))}
                     </DocsGrid>
                 )}
-            </Content>
+            </InnerContent>
 
             <AddButton onClick={() => {
                 setEditingDoc(null);
