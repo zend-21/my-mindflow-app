@@ -292,6 +292,9 @@ const ShowPasswordButton = styled.button`
     display: flex;
     align-items: center;
     justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
     cursor: pointer;
     transition: all 0.2s;
     flex-shrink: 0;
@@ -370,6 +373,60 @@ const Button = styled.button`
     }
 `;
 
+const ErrorModal = styled.div`
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
+    border: 1px solid rgba(255, 107, 107, 0.3);
+    border-radius: 12px;
+    padding: 24px;
+    z-index: 10001;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    min-width: 280px;
+    max-width: 90vw;
+`;
+
+const ErrorModalTitle = styled.div`
+    font-size: 16px;
+    font-weight: 600;
+    color: #ff6b6b;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+`;
+
+const ErrorModalMessage = styled.div`
+    font-size: 14px;
+    color: #d0d0d0;
+    margin-bottom: 20px;
+    line-height: 1.5;
+`;
+
+const ErrorModalButton = styled.button`
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: none;
+    background: linear-gradient(135deg, rgba(240, 147, 251, 0.3), rgba(245, 87, 108, 0.3));
+    color: white;
+    border: 1px solid rgba(240, 147, 251, 0.5);
+
+    &:hover {
+        background: linear-gradient(135deg, rgba(240, 147, 251, 0.4), rgba(245, 87, 108, 0.4));
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
+`;
+
 const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) => {
     const [formData, setFormData] = useState({
         title: '',
@@ -384,6 +441,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
     const [tagInput, setTagInput] = useState('');
     const [passwordConfirm, setPasswordConfirm] = useState('');
     const [passwordError, setPasswordError] = useState('');
+    const [validationError, setValidationError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
@@ -449,14 +507,14 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
 
     const handleSave = () => {
         if (!formData.content.trim()) {
-            alert('내용을 입력해주세요.');
+            setValidationError('내용을 입력해주세요.');
             return;
         }
 
         // 비밀번호 확인 검증
         if (formData.hasPassword) {
             if (!formData.password) {
-                alert('문서 비밀번호를 입력해주세요.');
+                setValidationError('문서 비밀번호를 입력해주세요.');
                 return;
             }
             if (formData.password !== passwordConfirm) {
@@ -666,6 +724,18 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
                     <Button $primary onClick={handleSave}>{doc ? '수정' : '저장'}</Button>
                 </Footer>
                 </Modal>
+
+                {validationError && (
+                    <ErrorModal onClick={(e) => e.stopPropagation()}>
+                        <ErrorModalTitle>
+                            ⚠️ 입력 오류
+                        </ErrorModalTitle>
+                        <ErrorModalMessage>{validationError}</ErrorModalMessage>
+                        <ErrorModalButton onClick={() => setValidationError('')}>
+                            확인
+                        </ErrorModalButton>
+                    </ErrorModal>
+                )}
             </Overlay>
         </Portal>
     );
