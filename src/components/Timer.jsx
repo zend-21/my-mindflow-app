@@ -407,11 +407,9 @@ const ConfirmButtonRow = styled.div`
 
 const ConfirmButton = styled.button`
     background: ${props => props.$primary
-        ? 'linear-gradient(135deg, rgba(240, 147, 251, 0.3), rgba(245, 87, 108, 0.3))'
+        ? '#4a4a4a'
         : 'rgba(0, 0, 0, 0.05)'};
-    border: 1px solid ${props => props.$primary
-        ? 'rgba(240, 147, 251, 0.5)'
-        : 'rgba(0, 0, 0, 0.1)'};
+    border: 1px solid rgba(0, 0, 0, 0.1);
     color: ${props => props.$primary ? '#ffffff' : '#333333'};
     font-size: 16px;
     font-weight: 600;
@@ -423,11 +421,9 @@ const ConfirmButton = styled.button`
 
     &:hover {
         transform: translateY(-2px);
-        box-shadow: ${props => props.$primary
-            ? '0 4px 12px rgba(240, 147, 251, 0.3)'
-            : '0 4px 12px rgba(0, 0, 0, 0.1)'};
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         background: ${props => props.$primary
-            ? 'linear-gradient(135deg, rgba(240, 147, 251, 0.4), rgba(245, 87, 108, 0.4))'
+            ? '#5a5a5a'
             : 'rgba(0, 0, 0, 0.08)'};
     }
 
@@ -633,9 +629,7 @@ const StartStopButton = styled.button`
     background: ${props => props.$isRunning
         ? 'rgba(0, 0, 0, 0.08)'
         : '#4a4a4a'};
-    border: 1px solid ${props => props.$isRunning
-        ? 'rgba(0, 0, 0, 0.12)'
-        : '#3a3a3a'};
+    border: 1px solid rgba(0, 0, 0, 0.12);
     color: ${props => props.$isRunning ? '#333333' : '#ffffff'};
     font-size: 22px;
     font-weight: 700;
@@ -643,9 +637,7 @@ const StartStopButton = styled.button`
     border-radius: 14px;
     cursor: pointer;
     user-select: none;
-    box-shadow: ${props => props.$isRunning
-        ? '0 2px 8px rgba(0, 0, 0, 0.1)'
-        : '0 2px 8px rgba(0, 0, 0, 0.3)'};
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     min-width: 200px;
     transition: all 0.2s;
 
@@ -653,9 +645,7 @@ const StartStopButton = styled.button`
         background: ${props => props.$isRunning
             ? 'rgba(0, 0, 0, 0.1)'
             : '#5a5a5a'};
-        box-shadow: ${props => props.$isRunning
-            ? '0 4px 12px rgba(0, 0, 0, 0.15)'
-            : '0 4px 12px rgba(0, 0, 0, 0.4)'};
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     }
 
     &:disabled {
