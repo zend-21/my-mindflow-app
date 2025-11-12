@@ -446,6 +446,10 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
 
     useEffect(() => {
+        // 에디터가 열릴 때마다 에러 상태 초기화
+        setValidationError('');
+        setPasswordError('');
+
         if (doc) {
             setFormData({
                 title: doc.title || '',
