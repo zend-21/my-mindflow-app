@@ -27,10 +27,15 @@ const Container = styled.div`
     height: 100%;
     padding: 0;
     background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
+    overflow-y: auto;
+    overflow-x: hidden;
+    position: relative;
 `;
 
 const InnerContent = styled.div`
-    padding: 10px 24px 20px 24px;
+    padding: 10px 24px 200px 24px;
+    min-height: calc(100vh - 60px);
+    box-sizing: border-box;
 `;
 
 const SearchBar = styled.div`
@@ -201,13 +206,15 @@ const AddButton = styled.button`
     border: none;
     background: transparent;
     cursor: grab;
-    z-index: 100;
+    z-index: 10000;
     user-select: none;
-    touch-action: none;
+    -webkit-user-select: none;
+    touch-action: pan-y;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 0;
+    isolation: isolate;
 
     ${props => props.$isDragging && `
         transform: translateY(${props.$offsetY}px) !important;
