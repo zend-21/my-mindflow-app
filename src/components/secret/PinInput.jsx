@@ -16,9 +16,10 @@ const Container = styled.div`
     flex-direction: column;
     align-items: center;
     gap: 20px;
-    padding: 10px 20px;
+    padding: 10px 20px 60px 20px;
     min-height: 400px;
-    justify-content: center;
+    justify-content: flex-start;
+    padding-top: 20px;
 `;
 
 const Title = styled.h2`
@@ -86,6 +87,7 @@ const ForgotPinButton = styled.button`
     text-decoration: underline;
     cursor: pointer;
     margin-top: 8px;
+    margin-bottom: 40px;
     padding: 8px;
     transition: all 0.2s;
 
