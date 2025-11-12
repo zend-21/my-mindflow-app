@@ -15,8 +15,8 @@ const Container = styled.div`
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 32px;
-    padding: 40px 20px;
+    gap: 24px;
+    padding: 20px 20px;
     min-height: 400px;
     justify-content: center;
 `;
@@ -39,7 +39,7 @@ const Subtitle = styled.p`
 const PinDisplay = styled.div`
     display: flex;
     gap: 14px;
-    margin-bottom: 24px;
+    margin-bottom: 16px;
     animation: ${props => props.$shake ? shake : 'none'} 0.5s;
     justify-content: center;
 `;
@@ -85,7 +85,7 @@ const ForgotPinButton = styled.button`
     font-size: 14px;
     text-decoration: underline;
     cursor: pointer;
-    margin-top: 16px;
+    margin-top: 8px;
     padding: 8px;
     transition: all 0.2s;
 
