@@ -15,13 +15,13 @@ export const AlarmList = styled.div`
 export const AlarmItem = styled.div`
   position: relative;
   background: ${props => {
-    if (props.$isPending) return '#e9ecef';
-    return '#f8f9fa';
+    if (props.$isPending) return '#3d424d';
+    return '#333842';
   }};
   border: ${props => {
     if (props.$isModified) return `2px dashed ${ALARM_COLORS.danger}`;
-    if (props.$isPending) return '2px dashed #adb5bd';
-    return '1px solid #ced4da';
+    if (props.$isPending) return '2px dashed rgba(255, 255, 255, 0.2)';
+    return '1px solid rgba(255, 255, 255, 0.1)';
   }};
   border-radius: 8px;
   padding: 12px;
@@ -39,7 +39,7 @@ export const AlarmInfo = styled.div`
 export const AlarmTimeDisplay = styled.span`
   font-size: 16px;
   font-weight: 600;
-  color: #343a40;
+  color: #e0e0e0;
 `;
 
 export const AlarmRelativeTime = styled.span`
@@ -55,9 +55,9 @@ export const SortContainer = styled.div`
 `;
 
 export const SortButton = styled.button`
-  background: ${props => props.$active ? ALARM_COLORS.primary : 'white'};
-  color: ${props => props.$active ? 'white' : '#495057'};
-  border: 1px solid ${props => props.$active ? ALARM_COLORS.primary : '#dee2e6'};
+  background: ${props => props.$active ? ALARM_COLORS.primary : '#333842'};
+  color: ${props => props.$active ? 'white' : '#e0e0e0'};
+  border: 1px solid ${props => props.$active ? ALARM_COLORS.primary : 'rgba(255, 255, 255, 0.1)'};
   border-radius: 6px;
   padding: 6px 12px;
   font-size: 13px;
@@ -65,6 +65,6 @@ export const SortButton = styled.button`
   transition: all 0.2s;
 
   &:hover {
-    background: ${props => props.$active ? ALARM_COLORS.primary : '#f8f9fa'};
+    background: ${props => props.$active ? ALARM_COLORS.primary : '#3d424d'};
   }
 `;

@@ -36,19 +36,20 @@ const Overlay = styled.div`
 `;
 
 const ModalContent = styled.div`
-  background: #ffffff;
+  background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
   border-radius: 16px;
   width: 95vw;
   max-width: 480px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 const Header = styled.div`
   padding: 16px 20px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -57,7 +58,7 @@ const Header = styled.div`
 const HeaderTitle = styled.h2`
   font-size: 18px;
   font-weight: 600;
-  color: #343a40;
+  color: #e0e0e0;
   margin: 0;
   flex: 1;
   text-align: center;
@@ -79,7 +80,7 @@ const CloseButton = styled.button`
   transition: background-color 0.2s;
 
   &:hover {
-    background-color: #f1f3f5;
+    background-color: rgba(255, 255, 255, 0.1);
   }
 `;
 
@@ -100,7 +101,7 @@ const Section = styled.div`
 const SectionTitle = styled.h3`
   font-size: 16px;
   font-weight: 600;
-  color: #495057;
+  color: #e0e0e0;
   margin: 0;
   display: flex;
   align-items: center;
@@ -114,12 +115,13 @@ const SectionTitle = styled.h3`
 const Input = styled.input`
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #dee2e6;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 14px;
-  background: white;
+  background: #333842;
+  color: #e0e0e0;
 
   &::placeholder {
-    color: #adb5bd;
+    color: #808080;
   }
 
   &:focus {
@@ -132,13 +134,14 @@ const TimeInput = styled.input`
   width: 60px;
   padding: 14px 10px;
   border-radius: 8px;
-  border: 1px solid #dee2e6;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 16px;
   text-align: center;
-  background: white;
+  background: #333842;
+  color: #e0e0e0;
 
   &::placeholder {
-    color: #adb5bd;
+    color: #808080;
   }
 
   &:focus {
@@ -150,9 +153,10 @@ const TimeInput = styled.input`
 const Select = styled.select`
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #dee2e6;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 14px;
-  background: white;
+  background: #333842;
+  color: #e0e0e0;
 
   &:focus {
     outline: 2px solid ${ALARM_COLORS.primary};
@@ -163,12 +167,12 @@ const Select = styled.select`
 const ToggleButton = styled.button`
   width: 100%;
   padding: 12px;
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
+  background: #333842;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  color: #495057;
+  color: #e0e0e0;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
@@ -176,13 +180,13 @@ const ToggleButton = styled.button`
   transition: all 0.2s;
 
   &:hover {
-    background: #e9ecef;
+    background: #3d424d;
   }
 `;
 
 const Footer = styled.div`
   padding: 16px 20px;
-  border-top: 1px solid #e9ecef;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   gap: 8px;
   justify-content: flex-end;
@@ -221,8 +225,8 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
   const [editHourInput, setEditHourInput] = useState('');
   const [editMinuteInput, setEditMinuteInput] = useState('');
   const [editIsAnniversary, setEditIsAnniversary] = useState(false);
-  const [editAnniversaryRepeat, setEditAnniversaryRepeat] = useState('yearly');
-  const [editAnniversaryTiming, setEditAnniversaryTiming] = useState('today');
+  const [editAnniversaryRepeat, setEditAnniversaryRepeat] = useState('');
+  const [editAnniversaryTiming, setEditAnniversaryTiming] = useState('');
   const [editAnniversaryDaysBefore, setEditAnniversaryDaysBefore] = useState('');
 
   // 기본 알람옵션 from main modal (read-only for display)
@@ -252,9 +256,18 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
       setEditMinuteInput(String(alarmTime.getMinutes()).padStart(2, '0'));
 
       setEditIsAnniversary(alarm.isAnniversary || false);
-      setEditAnniversaryRepeat(alarm.anniversaryRepeat || 'yearly');
-      setEditAnniversaryTiming(alarm.anniversaryTiming || 'today');
-      setEditAnniversaryDaysBefore(alarm.anniversaryDaysBefore ? String(alarm.anniversaryDaysBefore) : '');
+
+      // 기념일 알람인 경우에만 기본값 설정, 일반 알람은 빈 값으로 초기화
+      if (alarm.isAnniversary) {
+        setEditAnniversaryRepeat(alarm.anniversaryRepeat || 'yearly');
+        setEditAnniversaryTiming(alarm.anniversaryTiming || 'today');
+        setEditAnniversaryDaysBefore(alarm.anniversaryDaysBefore ? String(alarm.anniversaryDaysBefore) : '');
+      } else {
+        // 일반 알람을 기념일로 변경할 때는 사용자가 선택하도록 빈 값으로 초기화
+        setEditAnniversaryRepeat('');
+        setEditAnniversaryTiming('');
+        setEditAnniversaryDaysBefore('');
+      }
 
       // Load 기본 알람옵션 from localStorage
       try {
@@ -373,7 +386,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                   autoFocus
                   style={{ flex: 1 }}
                 />
-                <div style={{ fontSize: '11px', color: '#999', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: '11px', color: '#808080', whiteSpace: 'nowrap' }}>
                   {calculateByteLength(editTitle)}/20
                 </div>
               </div>
@@ -389,7 +402,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                   style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                 />
                 <span
-                  style={{ fontSize: '14px', color: '#343a40', cursor: 'pointer' }}
+                  style={{ fontSize: '14px', color: '#e0e0e0', cursor: 'pointer' }}
                   onClick={() => setEditIsAnniversary(!editIsAnniversary)}
                 >
                   기념일로 등록
@@ -400,7 +413,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   {/* 알림주기 */}
                   <div>
-                    <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '13px', color: '#e0e0e0', marginBottom: '8px' }}>
                       알림주기 <span style={{ color: ALARM_COLORS.danger, fontWeight: 'normal' }}>(필수항목)</span>
                     </div>
                     <RadioGroup style={{ flexDirection: 'row', gap: '8px' }}>
@@ -421,14 +434,14 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                         <span>매년</span>
                       </RadioOption>
                     </RadioGroup>
-                    <div style={{ marginTop: '8px', fontSize: '11px', color: '#999', lineHeight: '1.4' }}>
+                    <div style={{ marginTop: '8px', fontSize: '11px', color: '#808080', lineHeight: '1.4' }}>
                       * 매일 주기는 등록일 이후의 날짜에는 점표시 되지 않습니다
                     </div>
                   </div>
 
                   {/* 알림시기 */}
                   <div>
-                    <div style={{ fontSize: '13px', color: '#495057', marginBottom: '8px' }}>
+                    <div style={{ fontSize: '13px', color: '#e0e0e0', marginBottom: '8px' }}>
                       알림시기 <span style={{ color: ALARM_COLORS.danger, fontWeight: 'normal' }}>(필수항목)</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
@@ -442,7 +455,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                           onChange={() => setEditAnniversaryTiming('today')}
                           style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                         />
-                        <label htmlFor="edit-timing-today" style={{ fontSize: '14px', color: '#495057', cursor: 'pointer' }}>
+                        <label htmlFor="edit-timing-today" style={{ fontSize: '14px', color: '#e0e0e0', cursor: 'pointer' }}>
                           당일
                         </label>
                       </div>
@@ -459,7 +472,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                           }}
                           style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                         />
-                        <label htmlFor="edit-timing-before" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#495057', cursor: 'pointer' }}>
+                        <label htmlFor="edit-timing-before" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#e0e0e0', cursor: 'pointer' }}>
                           <TimeInput
                             ref={editAnniversaryDaysInputRef}
                             type="number"
@@ -518,7 +531,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                   }}
                   onFocus={(e) => e.target.select()}
                 />
-                <span style={{ fontSize: '16px', color: '#495057' }}>시</span>
+                <span style={{ fontSize: '16px', color: '#e0e0e0' }}>시</span>
                 <TimeInput
                   type="number"
                   min="0"
@@ -538,7 +551,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                   }}
                   onFocus={(e) => e.target.select()}
                 />
-                <span style={{ fontSize: '16px', color: '#495057' }}>분</span>
+                <span style={{ fontSize: '16px', color: '#e0e0e0' }}>분</span>
               </div>
             </Section>
 
@@ -563,7 +576,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                 padding: '6px 20px 8px 20px',
                 fontSize: '12px',
                 color: ALARM_COLORS.muted,
-                background: '#f8f9fa',
+                background: '#333842',
                 borderRadius: '0 0 8px 8px',
                 margin: '0 20px 8px 20px',
                 marginTop: '-20px',
@@ -582,21 +595,21 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                   style={{
                     padding: '4px 12px',
                     fontSize: '11px',
-                    color: '#495057',
-                    background: '#f1f3f5',
-                    border: '1px solid #dee2e6',
+                    color: '#e0e0e0',
+                    background: '#3d424d',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '4px',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
                     fontWeight: '500'
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#e9ecef';
-                    e.currentTarget.style.color = '#343a40';
+                    e.currentTarget.style.background = '#4a5058';
+                    e.currentTarget.style.color = '#ffffff';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#f1f3f5';
-                    e.currentTarget.style.color = '#495057';
+                    e.currentTarget.style.background = '#3d424d';
+                    e.currentTarget.style.color = '#e0e0e0';
                   }}
                 >
                   초기화
@@ -675,7 +688,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                 {editCustomSound === 'default' && (
                   <SoundPreview>
                     <PlayButton onClick={handlePlaySound}>▶</PlayButton>
-                    <span style={{ fontSize: '13px', color: '#495057' }}>
+                    <span style={{ fontSize: '13px', color: '#e0e0e0' }}>
                       미리듣기
                     </span>
                   </SoundPreview>

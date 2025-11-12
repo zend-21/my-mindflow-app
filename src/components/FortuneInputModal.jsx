@@ -23,15 +23,16 @@ const Overlay = styled.div`
 `;
 
 const Container = styled.div`
-    background: linear-gradient(180deg, #fafafa 0%, #f0f2f5 100%);
+    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
     width: 90%;
     max-width: 500px;
     max-height: 85vh;
     border-radius: 20px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 const Header = styled.div`
@@ -94,38 +95,48 @@ const InputSection = styled.div`
 const Label = styled.label`
     font-size: 16px;
     font-weight: 600;
-    color: #333;
+    color: #e0e0e0;
 `;
 
 const Input = styled.input`
     padding: 12px 16px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     font-size: 16px;
     transition: border-color 0.2s;
+    background: #333842;
+    color: #e0e0e0;
 
     &:focus {
         outline: none;
         border-color: #667eea;
+        background: #3a3f4a;
     }
 
     &::placeholder {
-        color: #cbd5e0;
+        color: #808080;
     }
 `;
 
 const Select = styled.select`
     padding: 12px 16px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     font-size: 16px;
-    background: white;
+    background: #333842;
+    color: #e0e0e0;
     cursor: pointer;
     transition: border-color 0.2s;
 
     &:focus {
         outline: none;
         border-color: #667eea;
+        background: #3a3f4a;
+    }
+
+    option {
+        background: #333842;
+        color: #e0e0e0;
     }
 `;
 
@@ -141,7 +152,7 @@ const RadioLabel = styled.label`
     gap: 8px;
     cursor: pointer;
     font-size: 16px;
-    color: #555;
+    color: #d0d0d0;
     transition: color 0.2s;
 
     &:hover {
@@ -221,7 +232,7 @@ const Button = styled.button`
 
 const InfoText = styled.p`
     font-size: 12px;
-    color: #888;
+    color: #b0b0b0;
     margin: 4px 0 0 0;
     line-height: 1.4;
 `;
@@ -304,11 +315,11 @@ const LunarContainer = styled.div`
 
 const UserNameDisplay = styled.div`
     padding: 12px 16px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     font-size: 16px;
-    background: #f7fafc;
-    color: #555;
+    background: rgba(255, 255, 255, 0.05);
+    color: #d0d0d0;
 `;
 
 // 도시 검색 모달 오버레이
@@ -327,15 +338,16 @@ const CitySearchModalOverlay = styled.div`
 
 // 도시 검색 모달 컨테이너
 const CitySearchModalContainer = styled.div`
-    background: white;
+    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
     width: 90%;
     max-width: 500px;
     max-height: 70vh;
     border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 // 도시 검색 모달 헤더
@@ -367,18 +379,21 @@ const CitySearchModalBody = styled.div`
 // 도시 검색 인풋
 const CitySearchInput = styled.input`
     padding: 14px 16px;
-    border: 2px solid #e2e8f0;
+    border: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     font-size: 16px;
     transition: border-color 0.2s;
+    background: #333842;
+    color: #e0e0e0;
 
     &:focus {
         outline: none;
         border-color: #667eea;
+        background: #3a3f4a;
     }
 
     &::placeholder {
-        color: #cbd5e0;
+        color: #808080;
     }
 `;
 
@@ -386,16 +401,30 @@ const CitySearchInput = styled.input`
 const CitySearchResultsList = styled.div`
     flex: 1;
     overflow-y: auto;
-    background: #f7f9fc;
+    background: rgba(0, 0, 0, 0.2);
     border-radius: 10px;
     padding: 8px;
+
+    &::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(240, 147, 251, 0.3);
+        border-radius: 4px;
+    }
 `;
 
 // 도시 검색 헬퍼 텍스트
 const CitySearchHelperText = styled.div`
     padding: 16px;
     text-align: center;
-    color: #888;
+    color: #b0b0b0;
     font-size: 14px;
     line-height: 1.6;
 `;
@@ -406,53 +435,54 @@ const CitySearchItem = styled.div`
     transition: background 0.2s;
     border-radius: 8px;
     margin-bottom: 4px;
-    background: white;
+    background: rgba(255, 255, 255, 0.05);
 
     &:last-child {
         margin-bottom: 0;
     }
 
     &:hover {
-        background: #eef1f8;
+        background: rgba(255, 255, 255, 0.1);
     }
 
     &:active {
-        background: #e2e8f0;
+        background: rgba(255, 255, 255, 0.08);
     }
 `;
 
 const CitySearchItemPrimary = styled.div`
     font-size: 16px;
     font-weight: 600;
-    color: #333;
+    color: #e0e0e0;
     margin-bottom: 4px;
 `;
 
 const CitySearchItemSecondary = styled.div`
     font-size: 13px;
-    color: #718096;
+    color: #b0b0b0;
     line-height: 1.4;
 `;
 
 const CitySearchLoading = styled.div`
     padding: 32px 16px;
     text-align: center;
-    color: #888;
+    color: #b0b0b0;
     font-size: 14px;
 `;
 
 const CitySearchEmpty = styled.div`
     padding: 32px 16px;
     text-align: center;
-    color: #888;
+    color: #b0b0b0;
     font-size: 14px;
 `;
 
 const ConfirmSection = styled.div`
-    background: white;
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 12px;
     padding: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 const ConfirmTitle = styled.h3`
@@ -465,7 +495,7 @@ const ConfirmItem = styled.div`
     display: flex;
     justify-content: space-between;
     padding: 10px 0;
-    border-bottom: 1px solid #f0f2f5;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 
     &:last-child {
         border-bottom: none;
@@ -473,12 +503,12 @@ const ConfirmItem = styled.div`
 `;
 
 const ConfirmLabel = styled.span`
-    color: #888;
+    color: #b0b0b0;
     font-size: 14px;
 `;
 
 const ConfirmValue = styled.span`
-    color: #333;
+    color: #e0e0e0;
     font-size: 14px;
     font-weight: 600;
 `;
@@ -498,13 +528,14 @@ const WarningOverlay = styled.div`
 `;
 
 const WarningBox = styled.div`
-    background: white;
+    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
     border-radius: 16px;
     padding: 32px 24px;
     width: 90%;
     max-width: 400px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
     text-align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 const WarningIcon = styled.div`
@@ -515,13 +546,13 @@ const WarningIcon = styled.div`
 const WarningTitle = styled.h3`
     font-size: 20px;
     font-weight: 700;
-    color: #333;
+    color: #e0e0e0;
     margin: 0 0 12px 0;
 `;
 
 const WarningMessage = styled.p`
     font-size: 15px;
-    color: #666;
+    color: #b0b0b0;
     line-height: 1.6;
     margin: 0 0 24px 0;
     white-space: pre-line;

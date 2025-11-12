@@ -15,8 +15,8 @@ export const RadioOption = styled.label`
   align-items: center;
   gap: 8px;
   padding: 10px;
-  background: ${props => props.$checked ? '#e7f3ff' : '#f8f9fa'};
-  border: 2px solid ${props => props.$checked ? ALARM_COLORS.primary : '#dee2e6'};
+  background: ${props => props.$checked ? '#3d424d' : '#333842'};
+  border: 2px solid ${props => props.$checked ? ALARM_COLORS.primary : 'rgba(255, 255, 255, 0.1)'};
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
@@ -33,7 +33,7 @@ export const RadioOption = styled.label`
 
   span {
     font-size: 14px;
-    color: #343a40;
+    color: #e0e0e0;
   }
 `;
 
@@ -41,7 +41,7 @@ export const SnoozeContainer = styled.div`
   display: flex;
   flex-direction: column;
   gap: 12px;
-  background: #f8f9fa;
+  background: #333842;
   padding: 12px;
   border-radius: 8px;
 `;
@@ -63,7 +63,7 @@ export const VolumeSlider = styled.input`
   height: 6px;
   border-radius: 3px;
   outline: none;
-  background: linear-gradient(to right, ${ALARM_COLORS.primary} 0%, ${ALARM_COLORS.primary} ${props => props.value}%, #dee2e6 ${props => props.value}%, #dee2e6 100%);
+  background: linear-gradient(to right, ${ALARM_COLORS.primary} 0%, ${ALARM_COLORS.primary} ${props => props.value}%, rgba(255, 255, 255, 0.1) ${props => props.value}%, rgba(255, 255, 255, 0.1) 100%);
 
   &::-webkit-slider-thumb {
     -webkit-appearance: none;
@@ -87,7 +87,7 @@ export const VolumeSlider = styled.input`
 
 export const VolumeLabel = styled.span`
   font-size: 14px;
-  color: #495057;
+  color: #e0e0e0;
   min-width: 40px;
   text-align: right;
 `;
@@ -101,18 +101,18 @@ export const SoundUploadContainer = styled.div`
 export const FileInputLabel = styled.label`
   display: inline-block;
   padding: 10px 16px;
-  background: #f8f9fa;
-  border: 1px solid #dee2e6;
+  background: #333842;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
   text-align: center;
   font-size: 14px;
-  color: #495057;
+  color: #e0e0e0;
 
   &:hover {
-    background: #e9ecef;
-    border-color: #adb5bd;
+    background: #3d424d;
+    border-color: rgba(255, 255, 255, 0.2);
   }
 `;
 
@@ -122,7 +122,7 @@ export const HiddenFileInput = styled.input`
 
 export const FileName = styled.span`
   font-size: 13px;
-  color: #6c757d;
+  color: #b0b0b0;
 `;
 
 export const SoundPreview = styled.div`
@@ -130,7 +130,7 @@ export const SoundPreview = styled.div`
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
-  background: #f8f9fa;
+  background: #333842;
   border-radius: 6px;
 `;
 

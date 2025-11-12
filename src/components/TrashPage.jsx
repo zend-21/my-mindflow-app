@@ -15,7 +15,7 @@ const PageContainer = styled.div`
 
 const Header = styled.div`
     padding: 12px 0 12px 0;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     margin-bottom: 16px;
 `;
 
@@ -26,14 +26,14 @@ const TitleSection = styled.div`
 const Title = styled.h2`
     font-size: 28px;
     font-weight: 700;
-    color: #1a1a1a;
+    color: #e0e0e0;
     margin: 0 0 8px 0;
     letter-spacing: -0.5px;
 `;
 
 const SubTitle = styled.p`
     font-size: 14px;
-    color: #999;
+    color: #b0b0b0;
     margin: 0;
     font-weight: 400;
 `;
@@ -48,19 +48,19 @@ const TopActionButton = styled.button`
     flex: 1;
     padding: 10px 16px;
     border-radius: 10px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
-    background: white;
-    color: #666;
+    background: #333842;
+    color: #e0e0e0;
 
     ${props => props.$variant === 'select' && !props.$isAllSelected && `
         &:hover {
             border-color: #667eea;
             color: #667eea;
-            background: #f8f9ff;
+            background: #3d4250;
         }
     `}
 
@@ -72,7 +72,7 @@ const TopActionButton = styled.button`
             background: #059669;
             border-color: #059669;
             transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.5);
         }
     `}
 
@@ -80,7 +80,7 @@ const TopActionButton = styled.button`
         &:hover {
             border-color: #667eea;
             color: #667eea;
-            background: #f8f9ff;
+            background: #3d4250;
         }
     `}
 
@@ -92,7 +92,7 @@ const TopActionButton = styled.button`
             background: #5568d3;
             border-color: #5568d3;
             transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
         }
     `}
 
@@ -100,7 +100,7 @@ const TopActionButton = styled.button`
         &:hover {
             border-color: #f5576c;
             color: #f5576c;
-            background: #fff5f7;
+            background: #3d3237;
         }
     `}
 
@@ -112,7 +112,7 @@ const TopActionButton = styled.button`
             background: #e04757;
             border-color: #e04757;
             transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(245, 87, 108, 0.3);
+            box-shadow: 0 2px 8px rgba(245, 87, 108, 0.5);
         }
     `}
 
@@ -144,11 +144,13 @@ const SearchBox = styled.div`
 const SearchInput = styled.input`
     width: 100%;
     padding: 12px 40px 12px 16px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     font-size: 14px;
     transition: all 0.2s;
     box-sizing: border-box;
+    background: #333842;
+    color: #e0e0e0;
 
     &:focus {
         outline: none;
@@ -157,7 +159,7 @@ const SearchInput = styled.input`
     }
 
     &::placeholder {
-        color: #bbb;
+        color: #808080;
     }
 `;
 
@@ -168,7 +170,7 @@ const ClearButton = styled.button`
     transform: translateY(-50%);
     background: none;
     border: none;
-    color: #999;
+    color: #b0b0b0;
     cursor: pointer;
     font-size: 18px;
     padding: 4px;
@@ -177,7 +179,7 @@ const ClearButton = styled.button`
     justify-content: center;
 
     &:hover {
-        color: #666;
+        color: #e0e0e0;
     }
 `;
 
@@ -189,9 +191,9 @@ const FilterRow = styled.div`
 `;
 
 const FilterButton = styled.button`
-    background: ${props => props.$active ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'white'};
-    color: ${props => props.$active ? 'white' : '#666'};
-    border: 1px solid ${props => props.$active ? 'transparent' : '#e0e0e0'};
+    background: ${props => props.$active ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#333842'};
+    color: ${props => props.$active ? 'white' : '#e0e0e0'};
+    border: 1px solid ${props => props.$active ? 'transparent' : 'rgba(255, 255, 255, 0.1)'};
     padding: 8px 14px;
     border-radius: 8px;
     font-size: 13px;
@@ -204,15 +206,15 @@ const FilterButton = styled.button`
         ${props => !props.$active && `
             border-color: #667eea;
             color: #667eea;
-            background: #f8f9ff;
+            background: #3d4250;
         `}
     }
 `;
 
 const SortButton = styled.button`
-    background: white;
-    color: #666;
-    border: 1px solid #e0e0e0;
+    background: #333842;
+    color: #e0e0e0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     padding: 8px 14px;
     border-radius: 8px;
     font-size: 13px;
@@ -227,13 +229,13 @@ const SortButton = styled.button`
     &:hover {
         border-color: #667eea;
         color: #667eea;
-        background: #f8f9ff;
+        background: #3d4250;
     }
 `;
 
 const ResultCount = styled.div`
     font-size: 13px;
-    color: #999;
+    color: #b0b0b0;
     margin-bottom: 12px;
     font-weight: 500;
 `;
@@ -245,7 +247,7 @@ const DetailModalOverlay = styled.div`
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.8);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -256,20 +258,20 @@ const DetailModalOverlay = styled.div`
 `;
 
 const DetailModalContainer = styled.div`
-    background: white;
+    background: #2a2d35;
     border-radius: 20px;
     width: 100%;
     max-width: 600px;
     max-height: 80vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     pointer-events: auto; /* 모달 자체는 클릭 가능 */
 `;
 
 const DetailModalHeader = styled.div`
     padding: 24px 24px 16px 24px;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
@@ -303,13 +305,13 @@ const DetailTypeLabel = styled.span`
 
 const DetailDeleteInfo = styled.div`
     font-size: 13px;
-    color: #999;
+    color: #b0b0b0;
     margin-bottom: 4px;
 `;
 
 const DetailDaysLeft = styled.div`
     font-size: 12px;
-    color: ${props => props.$days <= 7 ? '#f44336' : '#666'};
+    color: ${props => props.$days <= 7 ? '#ff6b6b' : '#b0b0b0'};
     font-weight: ${props => props.$days <= 7 ? '600' : '500'};
 `;
 
@@ -317,7 +319,7 @@ const CloseIconButton = styled.button`
     background: none;
     border: none;
     font-size: 28px;
-    color: #999;
+    color: #b0b0b0;
     cursor: pointer;
     padding: 0;
     width: 32px;
@@ -329,8 +331,8 @@ const CloseIconButton = styled.button`
     transition: all 0.2s;
 
     &:hover {
-        background: #f5f5f5;
-        color: #666;
+        background: #333842;
+        color: #e0e0e0;
     }
 `;
 
@@ -341,7 +343,7 @@ const DetailModalContent = styled.div`
     padding: 24px;
     font-size: 15px;
     line-height: 1.8;
-    color: #333;
+    color: #e0e0e0;
     white-space: pre-wrap;
     word-break: break-word;
     min-height: 0; /* Flexbox에서 스크롤을 위해 필요 */
@@ -354,23 +356,23 @@ const DetailModalContent = styled.div`
     }
 
     &::-webkit-scrollbar-track {
-        background: #f1f1f1;
+        background: #1a1d23;
         border-radius: 10px;
     }
 
     &::-webkit-scrollbar-thumb {
-        background: #888;
+        background: #4a4d55;
         border-radius: 10px;
     }
 
     &::-webkit-scrollbar-thumb:hover {
-        background: #555;
+        background: #5a5d65;
     }
 `;
 
 const DetailModalActions = styled.div`
     padding: 16px 24px;
-    border-top: 1px solid #f0f0f0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     gap: 12px;
     flex-shrink: 0;
@@ -412,17 +414,18 @@ const DetailActionButton = styled.button`
 const EmptyState = styled.div`
     text-align: center;
     padding: 100px 20px;
-    
+
     svg {
         width: 80px;
         height: 80px;
         margin-bottom: 20px;
         opacity: 0.3;
+        color: #b0b0b0;
     }
-    
+
     .empty-text {
         font-size: 16px;
-        color: #999;
+        color: #b0b0b0;
         font-weight: 500;
     }
 `;
@@ -435,8 +438,8 @@ const TrashList = styled.div`
 `;
 
 const TrashItem = styled.div`
-    background: white;
-    border: 1px solid ${props => props.$isSelected ? '#667eea' : '#f0f0f0'};
+    background: #2a2d35;
+    border: 1px solid ${props => props.$isSelected ? '#667eea' : 'rgba(255, 255, 255, 0.1)'};
     border-radius: 16px;
     padding: 20px;
     padding-right: 60px; /* 라디오 버튼 공간 확보 */
@@ -446,13 +449,13 @@ const TrashItem = styled.div`
     overflow: hidden;
 
     ${props => props.$isSelected && `
-        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.15);
+        box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
         transform: translateY(-2px);
     `}
 
     &:hover {
-        border-color: ${props => props.$isSelected ? '#667eea' : '#e0e0e0'};
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+        border-color: ${props => props.$isSelected ? '#667eea' : 'rgba(255, 255, 255, 0.2)'};
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
     }
 
     &::before {
@@ -468,7 +471,7 @@ const TrashItem = styled.div`
                 case 'schedule': return 'linear-gradient(180deg, #f093fb 0%, #f5576c 100%)';
                 case 'secret': return 'linear-gradient(180deg, #fbc2eb 0%, #a6c1ee 100%)';
                 case 'review': return 'linear-gradient(180deg, #a8edea 0%, #fed6e3 100%)';
-                default: return '#e0e0e0';
+                default: return 'rgba(255, 255, 255, 0.1)';
             }
         }};
         opacity: ${props => props.$isSelected ? '1' : '0'};
@@ -538,13 +541,13 @@ const ItemType = styled.span`
 
 const DeleteInfo = styled.div`
     font-size: 11px;
-    color: #bbb;
+    color: #808080;
     white-space: nowrap;
     font-weight: 500;
 `;
 
 const ItemContent = styled.div`
-    color: #333;
+    color: #e0e0e0;
     font-size: 15px;
     line-height: 1.6;
     margin-bottom: 12px;
@@ -561,12 +564,12 @@ const DaysLeft = styled.div`
     align-items: center;
     gap: 6px;
     font-size: 12px;
-    color: ${props => props.$days <= 7 ? '#f44336' : '#999'};
+    color: ${props => props.$days <= 7 ? '#ff6b6b' : '#b0b0b0'};
     font-weight: ${props => props.$days <= 7 ? '600' : '500'};
     padding: 4px 10px;
-    background: ${props => props.$days <= 7 ? '#fff0f0' : '#f9f9f9'};
+    background: ${props => props.$days <= 7 ? 'rgba(255, 107, 107, 0.15)' : '#1f2229'};
     border-radius: 6px;
-    
+
     &::before {
         content: '⏱';
         font-size: 14px;

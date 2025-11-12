@@ -22,11 +22,11 @@ const TimerContainer = styled.div`
     flex-direction: column;
     align-items: center;
     padding: 50px 40px;
-    background: #ffffff;
+    background: linear-gradient(180deg, #e8e6e3 0%, #d4d2cf 100%);
     border-radius: 32px;
     box-shadow:
-        0 3px 6px rgba(0, 0, 0, 0.08),
-        0 1px 3px rgba(0, 0, 0, 0.05);
+        0 3px 6px rgba(0, 0, 0, 0.16),
+        0 1px 3px rgba(0, 0, 0, 0.1);
     width: 90%;
     max-width: 600px;
     max-height: 90vh;
@@ -69,13 +69,14 @@ const VolumeControlContainer = styled.div`
     display: flex;
     flex-direction: column;
     gap: 8px;
-    background: #ffffff;
+    background: rgba(0, 0, 0, 0.05);
     padding: 12px 16px;
     border-radius: 12px;
     box-shadow:
-        0 2px 8px rgba(0, 0, 0, 0.12),
-        0 1px 4px rgba(0, 0, 0, 0.08);
+        0 2px 8px rgba(0, 0, 0, 0.1),
+        0 1px 4px rgba(0, 0, 0, 0.05);
     flex-shrink: 0;
+    border: 1px solid rgba(0, 0, 0, 0.08);
 
     @media (max-width: 480px) {
         padding: 10px 14px;
@@ -102,7 +103,7 @@ const VolumeControlInner = styled.div`
 const VolumeIconButton = styled.button`
     background: none;
     border: none;
-    color: #5c5c5c;
+    color: #333333;
     cursor: pointer;
     padding: 0;
     display: flex;
@@ -112,7 +113,7 @@ const VolumeIconButton = styled.button`
     transition: all 0.2s;
 
     &:hover:not(:disabled) {
-        color: #4a4a4a;
+        color: #000000;
         transform: scale(1.1);
     }
 
@@ -123,7 +124,7 @@ const VolumeIconButton = styled.button`
     &:disabled {
         opacity: 0.3;
         cursor: not-allowed;
-        color: #afafaf;
+        color: #999999;
     }
 `;
 
@@ -143,7 +144,7 @@ const VolumeSlider = styled.input`
     appearance: none;
     height: 4px;
     border-radius: 2px;
-    background: #e8e6e3;
+    background: rgba(0, 0, 0, 0.15);
     outline: none;
     cursor: pointer;
 
@@ -158,18 +159,18 @@ const VolumeSlider = styled.input`
         width: 18px;
         height: 18px;
         border-radius: 50%;
-        background: #4a4a4a;
+        background: #333333;
         cursor: pointer;
         transition: all 0.2s;
 
         &:hover {
             transform: scale(1.2);
-            box-shadow: 0 2px 8px rgba(74, 74, 74, 0.3);
+            box-shadow: 0 2px 8px rgba(51, 51, 51, 0.3);
         }
     }
 
     &:disabled::-webkit-slider-thumb {
-        background: #afafaf;
+        background: #999999;
         cursor: not-allowed;
         &:hover {
             transform: none;
@@ -181,19 +182,19 @@ const VolumeSlider = styled.input`
         width: 18px;
         height: 18px;
         border-radius: 50%;
-        background: #4a4a4a;
+        background: #333333;
         border: none;
         cursor: pointer;
         transition: all 0.2s;
 
         &:hover {
             transform: scale(1.2);
-            box-shadow: 0 2px 8px rgba(74, 74, 74, 0.3);
+            box-shadow: 0 2px 8px rgba(51, 51, 51, 0.3);
         }
     }
 
     &:disabled::-moz-range-thumb {
-        background: #afafaf;
+        background: #999999;
         cursor: not-allowed;
         &:hover {
             transform: none;
@@ -278,9 +279,9 @@ const VolumeButtonRow = styled.div`
 `;
 
 const VolumeButton = styled.button`
-    background: #f5f5f5;
-    border: none;
-    color: #4a4a4a;
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: #333333;
     font-size: 18px;
     font-weight: 600;
     width: 32px;
@@ -296,19 +297,19 @@ const VolumeButton = styled.button`
     flex-shrink: 0;
 
     &:hover:not(:disabled) {
-        background: #e8e6e3;
-        color: #4a4a4a;
+        background: rgba(0, 0, 0, 0.08);
+        color: #000000;
     }
 
     &:active:not(:disabled) {
-        background: #d8d6d3;
+        background: rgba(0, 0, 0, 0.1);
     }
 
     &:disabled {
         opacity: 0.3;
         cursor: not-allowed;
-        background: #f5f5f5;
-        color: #afafaf;
+        background: rgba(0, 0, 0, 0.03);
+        color: #999999;
     }
 
     @media (max-width: 480px) {
@@ -324,9 +325,9 @@ const WarningNotice = styled.div`
     margin-top: 24px;
     text-align: left;
     font-size: 13px;
-    color: #4a4a4a;
+    color: #666666;
     line-height: 1.4;
-    opacity: 0.5;
+    opacity: 0.7;
 
     @media (max-width: 480px) {
         font-size: 12px;
@@ -340,9 +341,9 @@ const WarningNotice = styled.div`
 `;
 
 const CloseButton = styled.button`
-    background: #ffffff;
-    border: none;
-    color: #4a4a4a;
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: #333333;
     font-size: 16px;
     font-weight: 500;
     padding: 14px 32px;
@@ -351,13 +352,18 @@ const CloseButton = styled.button`
     user-select: none;
     margin-top: 0;
     box-shadow:
-        0 2px 8px rgba(0, 0, 0, 0.12),
-        0 1px 4px rgba(0, 0, 0, 0.08);
+        0 2px 8px rgba(0, 0, 0, 0.1),
+        0 1px 4px rgba(0, 0, 0, 0.05);
     flex-shrink: 0;
 
+    &:hover {
+        background: rgba(0, 0, 0, 0.08);
+        color: #000000;
+    }
+
     &:disabled {
-        background: #e8e6e3;
-        color: #afafaf;
+        background: rgba(0, 0, 0, 0.03);
+        color: #999999;
         cursor: not-allowed;
         opacity: 0.5;
     }
@@ -374,21 +380,22 @@ const ConfirmModal = styled.div`
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: #ffffff;
+    background: linear-gradient(180deg, #f5f5f5 0%, #e8e8e8 100%);
     border-radius: 16px;
     padding: 30px;
     box-shadow:
-        0 20px 60px rgba(0, 0, 0, 0.3),
-        0 10px 30px rgba(0, 0, 0, 0.2);
+        0 20px 60px rgba(0, 0, 0, 0.2),
+        0 10px 30px rgba(0, 0, 0, 0.1);
     z-index: 30001;
     min-width: 300px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
 `;
 
 const ConfirmMessage = styled.p`
     margin: 0 0 25px 0;
     font-size: 18px;
     font-weight: 500;
-    color: #2c2c2c;
+    color: #333333;
     text-align: center;
 `;
 
@@ -399,9 +406,13 @@ const ConfirmButtonRow = styled.div`
 `;
 
 const ConfirmButton = styled.button`
-    background: ${props => props.$primary ? '#4a4a4a' : '#e8e6e3'};
-    border: none;
-    color: ${props => props.$primary ? '#ffffff' : '#5c5c5c'};
+    background: ${props => props.$primary
+        ? 'linear-gradient(135deg, rgba(240, 147, 251, 0.3), rgba(245, 87, 108, 0.3))'
+        : 'rgba(0, 0, 0, 0.05)'};
+    border: 1px solid ${props => props.$primary
+        ? 'rgba(240, 147, 251, 0.5)'
+        : 'rgba(0, 0, 0, 0.1)'};
+    color: ${props => props.$primary ? '#ffffff' : '#333333'};
     font-size: 16px;
     font-weight: 600;
     padding: 12px 28px;
@@ -412,9 +423,12 @@ const ConfirmButton = styled.button`
 
     &:hover {
         transform: translateY(-2px);
-        box-shadow:
-            0 4px 12px rgba(0, 0, 0, 0.15),
-            0 2px 6px rgba(0, 0, 0, 0.08);
+        box-shadow: ${props => props.$primary
+            ? '0 4px 12px rgba(240, 147, 251, 0.3)'
+            : '0 4px 12px rgba(0, 0, 0, 0.1)'};
+        background: ${props => props.$primary
+            ? 'linear-gradient(135deg, rgba(240, 147, 251, 0.4), rgba(245, 87, 108, 0.4))'
+            : 'rgba(0, 0, 0, 0.08)'};
     }
 
     &:active {
@@ -433,8 +447,8 @@ const ModalOverlay = styled.div`
 `;
 
 const Display = styled.div`
-    background: #e8e6e3;
-    color: #2c2c2c;
+    background: rgba(0, 0, 0, 0.08);
+    color: #1a1a1a;
     font-size: 90px;
     font-weight: 700;
     font-family: ${props => props.$fontFamily || "'Courier New', 'Consolas', monospace"};
@@ -455,6 +469,7 @@ const Display = styled.div`
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    border: 1px solid rgba(0, 0, 0, 0.1);
 
     /* 디지털 숫자 효과 - 고정폭 숫자 */
     font-variant-numeric: tabular-nums;
@@ -514,9 +529,9 @@ const TimeButtonRow = styled.div`
 `;
 
 const TimeButton = styled.button`
-    background: #ffffff;
-    border: none;
-    color: #4a4a4a;
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: #333333;
     font-size: 18px;
     font-weight: 500;
     padding: 18px 28px;
@@ -524,17 +539,23 @@ const TimeButton = styled.button`
     cursor: pointer;
     user-select: none;
     box-shadow:
-        0 2px 8px rgba(0, 0, 0, 0.12),
-        0 1px 4px rgba(0, 0, 0, 0.08);
+        0 2px 8px rgba(0, 0, 0, 0.1),
+        0 1px 4px rgba(0, 0, 0, 0.05);
     min-width: 80px;
+    transition: all 0.2s;
+
+    &:hover:not(:disabled) {
+        background: rgba(0, 0, 0, 0.08);
+        color: #000000;
+    }
 
     &:disabled {
-        background: #e8e6e3;
-        color: #afafaf;
+        background: rgba(0, 0, 0, 0.03);
+        color: #999999;
         cursor: not-allowed;
         box-shadow:
-            0 2px 8px rgba(0, 0, 0, 0.12),
-            0 1px 4px rgba(0, 0, 0, 0.08);
+            0 2px 8px rgba(0, 0, 0, 0.1),
+            0 1px 4px rgba(0, 0, 0, 0.05);
     }
 
     @media (max-width: 480px) {
@@ -576,9 +597,9 @@ const ControlRow = styled.div`
 `;
 
 const ResetButton = styled.button`
-    background: #ffffff;
-    border: none;
-    color: #4a4a4a;
+    background: rgba(0, 0, 0, 0.05);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    color: #333333;
     font-size: 18px;
     font-weight: 500;
     padding: 18px 28px;
@@ -586,12 +607,18 @@ const ResetButton = styled.button`
     cursor: pointer;
     user-select: none;
     box-shadow:
-        0 2px 8px rgba(0, 0, 0, 0.12),
-        0 1px 4px rgba(0, 0, 0, 0.08);
+        0 2px 8px rgba(0, 0, 0, 0.1),
+        0 1px 4px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s;
+
+    &:hover:not(:disabled) {
+        background: rgba(0, 0, 0, 0.08);
+        color: #000000;
+    }
 
     &:disabled {
-        background: #e8e6e3;
-        color: #afafaf;
+        background: rgba(0, 0, 0, 0.03);
+        color: #999999;
         cursor: not-allowed;
         opacity: 0.5;
     }
@@ -603,27 +630,41 @@ const ResetButton = styled.button`
 `;
 
 const StartStopButton = styled.button`
-    background: ${props => props.$isRunning ? '#d4d4d4' : '#4a4a4a'};
-    border: none;
-    color: ${props => props.$isRunning ? '#5c5c5c' : '#ffffff'};
+    background: ${props => props.$isRunning
+        ? 'rgba(0, 0, 0, 0.08)'
+        : 'linear-gradient(135deg, rgba(240, 147, 251, 0.3), rgba(245, 87, 108, 0.3))'};
+    border: 1px solid ${props => props.$isRunning
+        ? 'rgba(0, 0, 0, 0.12)'
+        : 'rgba(240, 147, 251, 0.5)'};
+    color: ${props => props.$isRunning ? '#333333' : '#ffffff'};
     font-size: 22px;
     font-weight: 700;
     padding: 28px 60px;
     border-radius: 14px;
     cursor: pointer;
     user-select: none;
-    box-shadow:
-        0 2px 8px rgba(0, 0, 0, 0.12),
-        0 1px 4px rgba(0, 0, 0, 0.08);
+    box-shadow: ${props => props.$isRunning
+        ? '0 2px 8px rgba(0, 0, 0, 0.1)'
+        : '0 2px 8px rgba(240, 147, 251, 0.2)'};
     min-width: 200px;
+    transition: all 0.2s;
+
+    &:hover:not(:disabled) {
+        background: ${props => props.$isRunning
+            ? 'rgba(0, 0, 0, 0.1)'
+            : 'linear-gradient(135deg, rgba(240, 147, 251, 0.4), rgba(245, 87, 108, 0.4))'};
+        box-shadow: ${props => props.$isRunning
+            ? '0 4px 12px rgba(0, 0, 0, 0.15)'
+            : '0 4px 12px rgba(240, 147, 251, 0.3)'};
+    }
 
     &:disabled {
-        background: #e8e6e3;
-        color: #afafaf;
+        background: rgba(0, 0, 0, 0.03);
+        color: #999999;
         cursor: not-allowed;
         box-shadow:
-            0 2px 8px rgba(0, 0, 0, 0.12),
-            0 1px 4px rgba(0, 0, 0, 0.08);
+            0 2px 8px rgba(0, 0, 0, 0.1),
+            0 1px 4px rgba(0, 0, 0, 0.05);
     }
 
     @media (max-width: 480px) {

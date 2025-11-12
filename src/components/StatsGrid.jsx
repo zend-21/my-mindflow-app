@@ -12,39 +12,40 @@ const GridWrapper = styled.div`
 `;
 
 const StatCard = styled.div`
-    background: #fff;
+    background: linear-gradient(135deg, #2a2d35, #333842);
     border-radius: 20px;
     padding: 24px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     cursor: pointer;
-    
+
     &:hover {
         transform: translateY(-4px);
-        box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.5);
     }
 `;
 
 const StatTitle = styled.h3`
     font-size: 16px;
     font-weight: 600;
-    color: #4a5568;
+    color: #b0b0b0;
     margin: 0;
 `;
 
 const StatValue = styled.p`
     font-size: 32px;
     font-weight: 700;
-    color: #2d3748;
+    color: #ffffff;
     margin: 8px 0 0;
 `;
 
 const StatDescription = styled.p`
     font-size: 12px;
-    color: #a0aec0;
+    color: #b0b0b0;
     margin: 4px 0 0;
 `;
 

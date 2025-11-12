@@ -21,12 +21,13 @@ const Overlay = styled.div`
 `;
 
 const Modal = styled.div`
-    background: white;
+    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
     border-radius: 20px;
     padding: 32px 28px;
     max-width: 400px;
     width: 100%;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 
     @media (min-width: 768px) {
         padding: 40px 36px;
@@ -37,7 +38,7 @@ const Title = styled.h2`
     margin: 0 0 8px 0;
     font-size: 22px;
     font-weight: 600;
-    color: #2d3748;
+    color: #e0e0e0;
     text-align: center;
 
     @media (min-width: 768px) {
@@ -48,7 +49,7 @@ const Title = styled.h2`
 const Subtitle = styled.p`
     margin: 0 0 28px 0;
     font-size: 14px;
-    color: #718096;
+    color: #b0b0b0;
     text-align: center;
     line-height: 1.5;
 
@@ -58,10 +59,11 @@ const Subtitle = styled.p`
 `;
 
 const InfoBox = styled.div`
-    background: #f7fafc;
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 12px;
     padding: 20px;
     margin-bottom: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 const InfoRow = styled.div`
@@ -77,13 +79,13 @@ const InfoRow = styled.div`
 
 const InfoLabel = styled.span`
     font-size: 14px;
-    color: #718096;
+    color: #b0b0b0;
     font-weight: 500;
 `;
 
 const InfoValue = styled.span`
     font-size: 15px;
-    color: #2d3748;
+    color: #e0e0e0;
     font-weight: 600;
 
     @media (min-width: 768px) {
@@ -93,13 +95,14 @@ const InfoValue = styled.span`
 
 const Notice = styled.p`
     font-size: 11px;
-    color: #a0aec0;
+    color: #b0b0b0;
     text-align: center;
     line-height: 1.6;
     margin: 0 0 24px 0;
     padding: 12px;
-    background: #f7fafc;
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 
     @media (min-width: 768px) {
         font-size: 12px;
@@ -147,7 +150,7 @@ const Button = styled.button`
 
 const LunarNote = styled.div`
     font-size: 11px;
-    color: #a0aec0;
+    color: #b0b0b0;
     margin-top: 4px;
     font-weight: 400;
 

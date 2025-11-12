@@ -20,7 +20,7 @@ const Overlay = styled.div`
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.6);
+    background-color: rgba(0, 0, 0, 0.8);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -29,19 +29,19 @@ const Overlay = styled.div`
 `;
 
 const ModalContent = styled.div`
-    background: white;
+    background: #2a2d35;
     border-radius: 16px;
     padding: 24px;
     min-width: 300px;
     max-width: 90%;
     margin: 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
 `;
 
 const ModalMessage = styled.p`
     font-size: 16px;
-    color: #333;
+    color: #e0e0e0;
     text-align: center;
     margin-bottom: 24px;
     line-height: 1.5;
@@ -63,32 +63,33 @@ const ModalButton = styled.button`
     transition: all 0.2s ease;
     border: none;
     min-width: 80px;
-    
+
     &:hover {
         transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
     }
-    
+
     &:active {
         transform: translateY(0px);
     }
 `;
 
 const CancelButton = styled(ModalButton)`
-    background-color: #e2e8f0;
-    color: #4a5568;
-    
+    background-color: #333842;
+    color: #e0e0e0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+
     &:hover {
-        background-color: #cbd5e0;
+        background-color: #3d4250;
     }
 `;
 
 const ConfirmButton = styled(ModalButton)`
-    background-color: #e53e3e;
+    background-color: #f5576c;
     color: white;
-    
+
     &:hover {
-        background-color: #c53030;
+        background-color: #e04757;
     }
 `;
 

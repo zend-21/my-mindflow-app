@@ -17,20 +17,20 @@ export const Overlay = styled.div`
 `;
 
 export const ModalContent = styled.div`
-  background: ${props => props.$isPastDate ? '#e0e0e0' : '#ffffff'};
+  background: ${props => props.$isPastDate ? '#1f2229' : '#2a2d35'};
   border-radius: 16px;
   width: 95vw;
   max-width: 500px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
   animation: ${slideUp} 0.25s cubic-bezier(0.2, 0, 0, 1);
 `;
 
 export const Header = styled.div`
   padding: 16px 20px;
-  border-bottom: 1px solid #e9ecef;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -39,7 +39,7 @@ export const Header = styled.div`
 export const HeaderTitle = styled.h2`
   font-size: 18px;
   font-weight: 600;
-  color: #343a40;
+  color: #e0e0e0;
   margin: 0;
   flex: 1;
   text-align: center;
@@ -61,7 +61,7 @@ export const CloseButton = styled.button`
   transition: background-color 0.2s;
 
   &:hover {
-    background-color: #f1f3f5;
+    background-color: rgba(255, 255, 255, 0.1);
   }
 `;
 
@@ -82,7 +82,7 @@ export const Section = styled.div`
 export const SectionTitle = styled.h3`
   font-size: 16px;
   font-weight: 600;
-  color: #495057;
+  color: #e0e0e0;
   margin: 0;
   display: flex;
   align-items: center;

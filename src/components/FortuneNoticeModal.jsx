@@ -26,13 +26,14 @@ const Overlay = styled.div`
 `;
 
 const ModalContainer = styled.div`
-    background: white;
+    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
     width: 90%;
     max-width: 400px;
     border-radius: 20px;
     padding: 32px 24px 24px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     animation: slideUp 0.3s ease-out;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 
     @keyframes slideUp {
         from {
@@ -61,7 +62,7 @@ const Title = styled.h2`
     margin: 0 0 16px 0;
     font-size: 22px;
     font-weight: 700;
-    color: #2d3748;
+    color: #e0e0e0;
     text-align: center;
     line-height: 1.4;
 
@@ -73,7 +74,7 @@ const Title = styled.h2`
 const Message = styled.p`
     margin: 0 0 24px 0;
     font-size: 15px;
-    color: #4a5568;
+    color: #d0d0d0;
     text-align: center;
     line-height: 1.7;
     white-space: pre-line;
@@ -94,14 +95,14 @@ const CheckboxContainer = styled.div`
     justify-content: center;
     gap: 8px;
     padding: 16px;
-    background: #f7fafc;
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 12px;
     margin-bottom: 20px;
     cursor: pointer;
     transition: background 0.2s;
 
     &:hover {
-        background: #edf2f7;
+        background: rgba(255, 255, 255, 0.08);
     }
 `;
 
@@ -116,9 +117,9 @@ const HiddenCheckbox = styled.input.attrs({ type: 'checkbox' })`
 const StyledCheckbox = styled.div`
     width: 20px;
     height: 20px;
-    border: 2px solid ${props => props.$checked ? '#667eea' : '#cbd5e0'};
+    border: 2px solid ${props => props.$checked ? '#667eea' : 'rgba(255, 255, 255, 0.3)'};
     border-radius: 4px;
-    background: ${props => props.$checked ? '#667eea' : 'white'};
+    background: ${props => props.$checked ? '#667eea' : 'rgba(255, 255, 255, 0.1)'};
     display: flex;
     align-items: center;
     justify-content: center;
@@ -136,7 +137,7 @@ const StyledCheckbox = styled.div`
 
 const CheckboxLabel = styled.span`
     font-size: 14px;
-    color: #4a5568;
+    color: #d0d0d0;
     user-select: none;
 
     @media (min-width: 768px) {

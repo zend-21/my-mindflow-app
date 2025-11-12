@@ -320,10 +320,10 @@ const ConfirmOverlay = styled.div`
 `;
 
 const ConfirmModalBox = styled.div`
-  background: #ffffff;
+  background: #2a2d35;
   border-radius: 12px;
   padding: 24px 30px;
-  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
   width: 90vw;
   max-width: 350px;
   display: flex;
@@ -339,7 +339,7 @@ const ConfirmModalBox = styled.div`
 
 const ConfirmMessage = styled.p`
   font-size: 16px;
-  color: #333;
+  color: #e0e0e0;
   margin: 0;
   line-height: 1.5;
   text-align: center;
@@ -404,9 +404,9 @@ const CalendarWrapper = styled.div`
     max-width: 100%;
     margin: 0 auto;
     padding: 14px;
-    background-color: white;
+    background-color: #2a2d35;
     border-radius: 16px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     overflow: hidden;
     position: relative;
 
@@ -414,12 +414,12 @@ const CalendarWrapper = styled.div`
         max-width: 95%;
         padding: 24px;
     }
-    
+
     @media (min-width: 1024px) {
         max-width: 100%;
         padding: 32px;
     }
-    
+
     @media (min-width: 1440px) {
         max-width: 100%;
         padding: 40px;
@@ -506,21 +506,21 @@ const GoToTodayButton = styled.button`
 const MonthDisplay = styled.div`
     font-size: 20px;
     font-weight: 800;
-    color: #333;
+    color: #e0e0e0;
     cursor: pointer;
     margin: 0 8px;
-    
+
     /* 반응형 폰트 크기 */
     @media (min-width: 768px) {
         font-size: 24px;
         margin: 0 12px;
     }
-    
+
     @media (min-width: 1024px) {
         font-size: 28px;
         margin: 0 16px;
     }
-    
+
     &:hover {
         color: #4a90e2;
     }
@@ -531,7 +531,7 @@ const Weekdays = styled.div`
     grid-template-columns: repeat(7, 1fr);
     text-align: center;
     font-weight: 600;
-    color: #718096;
+    color: #b0b0b0;
     margin-bottom: 8px;
     gap: 0;
 `;
@@ -605,79 +605,80 @@ const DateCell = styled.div`
     box-sizing: border-box;
     padding: 2px;
     overflow: visible;
-    
+    background-color: #333842;
+
     /* 반응형 폰트 크기 */
     @media (min-width: 768px) {
         font-size: 18px;
         border-radius: 10px;
         padding: 4px;
     }
-    
+
     @media (min-width: 1024px) {
         font-size: 20px;
         border-radius: 12px;
         padding: 6px;
     }
-    
+
     @media (min-width: 1440px) {
         font-size: 22px;
     }
-    
+
     color: ${props => {
         if (props.$isToday && props.$isSelected) {
             return 'white';
         }
-        
+
         if (props.$isSelected && !props.$isToday) {
             if (!props.$isCurrentMonth) {
                 if (props.$isNationalHoliday || props.$dateDay === 0) {
-                    return 'rgba(255, 0, 0, 0.4)';
+                    return 'rgba(255, 100, 100, 0.5)';
                 }
                 if (props.$dateDay === 6) {
-                    return 'rgba(51, 153, 255, 0.4)';
+                    return 'rgba(100, 180, 255, 0.5)';
                 }
-                return '#cbd5e0';
-            } 
+                return '#808080';
+            }
             else {
                 if (props.$dateDay === 0) {
-                    return 'red';
+                    return '#ff6b6b';
                 }
                 if (props.$dateDay === 6) {
-                    return '#3399ff';
+                    return '#5bb4ff';
                 }
                 if (props.$isNationalHoliday) {
-                    return 'red';
+                    return '#ff6b6b';
                 }
-                return '#4a5568';
+                return '#e0e0e0';
             }
         }
-        
+
         if (props.$isCurrentMonth && props.$isNationalHoliday && props.$dateDay !== 0) {
-            return 'red';
+            return '#ff6b6b';
         }
-        
+
         if (props.$isCurrentMonth && props.$dateDay === 0) {
-            return 'red';
+            return '#ff6b6b';
         }
-        
+
         if (props.$isCurrentMonth) {
-            return '#4a5568';
+            return '#e0e0e0';
         }
-        
+
         if (props.$isNationalHoliday || props.$dateDay === 0) {
-            return 'rgba(255, 0, 0, 0.4)';
+            return 'rgba(255, 100, 100, 0.5)';
         }
-        
-        return '#cbd5e0';
+
+        return '#808080';
     }};
-    
+
     &:nth-child(7n) {
-                color: ${props => props.$isCurrentMonth ? '#3399ff' : 'rgba(51, 153, 255, 0.4)'};
+                color: ${props => props.$isCurrentMonth ? '#5bb4ff' : 'rgba(100, 180, 255, 0.5)'};
     }
 
     &:hover {
         transform: scale(1.05);
-        background-color: #f0f8ff;
+        background-color: #3d424d;
     }
 
     ${props => props.$isToday && props.$isSelected ? `
@@ -802,12 +803,12 @@ const DateCell = styled.div`
 const ScheduleContainer = styled.div`
     margin-top: 12px;
     padding: 18px;
-    background-color: #f7f7f7;
+    background-color: #333842;
     border-radius: 12px;
     text-align: center;
-    color: #718096;
+    color: #b0b0b0;
     font-size: 16px;
-    
+
     /* 반응형 패딩과 폰트 크기 */
     @media (min-width: 768px) {
         margin-top: 16px;
@@ -815,7 +816,7 @@ const ScheduleContainer = styled.div`
         font-size: 18px;
         border-radius: 16px;
     }
-    
+
     @media (min-width: 1024px) {
         margin-top: 20px;
         padding: 32px;
@@ -826,25 +827,25 @@ const ScheduleContainer = styled.div`
 
 const SmallNote = styled.div`
     font-size: 12px;
-    color: #9aa4b2;
+    color: #b0b0b0;
     margin-top: 6px;
 `;
 
 const ScheduleInput = styled.div`
     margin-top: 12px;
     max-height: 180px;
-    min-height: 180px; 
+    min-height: 180px;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
-    border: 1px solid #ccc;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    background-color: ${props => props.$isPastDate ? '#f1f1f1ff' : '#fff'};
+    background-color: ${props => props.$isPastDate ? '#2a2d35' : '#333842'};
     position: relative;
     box-sizing: border-box;
-    
+
     /* 반응형 높이와 간격 */
     @media (min-width: 768px) {
         margin-top: 16px;
@@ -854,7 +855,7 @@ const ScheduleInput = styled.div`
         border-radius: 12px;
         border-width: 2px;
     }
-    
+
     @media (min-width: 1024px) {
         margin-top: 20px;
         max-height: 280px;
@@ -900,12 +901,12 @@ const ScheduleInput = styled.div`
     }
 
     .special-event-note {
-        color: #555;
+        color: #e0e0e0;
         font-weight: 600;
         font-size: 14px;
         line-height: 1.5;
         margin-bottom: 5px;
-        border-bottom: 1px dashed #ddd;
+        border-bottom: 1px dashed rgba(255, 255, 255, 0.2);
         padding-bottom: 5px;
         text-align: center;
         width: 100%;
@@ -936,7 +937,7 @@ const ScheduleInput = styled.div`
     }
 
     .placeholder-note {
-        color: #a0a0a0;
+        color: #808080;
         font-size: 14px;
         text-align: center;
         padding-top: 10px;
@@ -956,13 +957,14 @@ const ScheduleInput = styled.div`
         box-sizing: border-box;
         text-align: left;
         padding-bottom: 12px;
-        
+        color: #e0e0e0;
+
         @media (min-width: 768px) {
             font-size: 18px;
             padding: 8px;
             padding-bottom: 16px;
         }
-        
+
         @media (min-width: 1024px) {
             font-size: 20px;
             padding: 10px;
@@ -1035,11 +1037,11 @@ const ErrorIndicator = styled.div`
     left: 50%;
     transform: translateX(-50%);
     font-size: 11px;
-    color: #ff4444;
-    background: rgba(255, 255, 255, 0.95);
+    color: #ff6b6b;
+    background: rgba(42, 45, 53, 0.95);
     padding: 4px 8px;
     border-radius: 4px;
-    border: 1px solid #ff4444;
+    border: 1px solid #ff6b6b;
     max-width: 80%;
     text-align: center;
 `;
@@ -1626,7 +1628,13 @@ const Calendar = ({
         if (!scheduleText.trim()) return;
         const key = format(selectedDate, 'yyyy-MM-dd');
         const now = Date.now();
-        const payload = { text: scheduleText, createdAt: now, updatedAt: now };
+        const existingEntry = schedules[key];
+
+        // 기존 알람이 있으면 유지, 없으면 새로 생성
+        const payload = existingEntry && existingEntry.alarm
+            ? { ...existingEntry, text: scheduleText, createdAt: now, updatedAt: now }
+            : { text: scheduleText, createdAt: now, updatedAt: now };
+
         setSchedules(prev => ({
             ...prev,
             [key]: payload
@@ -1642,11 +1650,23 @@ const Calendar = ({
     const handleUpdateSchedule = () => {
         if (!selectedDate) return;
         const key = format(selectedDate, 'yyyy-MM-dd');
+        const existingEntry = schedules[key];
 
         if (scheduleText.trim() === "") {
             setSchedules(prev => {
                 const copy = { ...prev };
-                delete copy[key];
+
+                // 알람이 있으면 텍스트만 삭제하고 알람은 유지
+                if (existingEntry && existingEntry.alarm && existingEntry.alarm.registeredAlarms && existingEntry.alarm.registeredAlarms.length > 0) {
+                    copy[key] = {
+                        alarm: existingEntry.alarm,
+                        text: ''
+                    };
+                } else {
+                    // 알람이 없으면 전체 삭제
+                    delete copy[key];
+                }
+
                 return copy;
             });
             showToast("스케줄이 삭제되었습니다.");
@@ -1728,11 +1748,10 @@ const Calendar = ({
 
             if (updatedSchedules[key]) {
                 if (hasAlarms) {
-                    // 알람이 있으면 텍스트만 빈 문자열로
+                    // 알람이 있으면 텍스트만 빈 문자열로, createdAt/updatedAt 제거
                     updatedSchedules[key] = {
-                        ...updatedSchedules[key],
-                        text: '',
-                        updatedAt: Date.now()
+                        alarm: updatedSchedules[key].alarm, // 알람 데이터만 유지
+                        text: ''
                     };
                 } else {
                     // 알람이 없으면 전체 삭제
@@ -1792,10 +1811,17 @@ const Calendar = ({
                 } else {
                     // 기념일 알람이 없으면 alarm 필드 완전히 제거
                     const { alarm, ...restOfEntry } = updatedSchedules[key];
-                    updatedSchedules[key] = {
-                        ...restOfEntry,
-                        updatedAt: Date.now()
-                    };
+
+                    // 일정 텍스트도 없으면 엔트리 전체 삭제
+                    if (!restOfEntry.text || !restOfEntry.text.trim()) {
+                        delete updatedSchedules[key];
+                    } else {
+                        // 일정 텍스트가 있으면 알람만 제거하고 유지
+                        updatedSchedules[key] = {
+                            ...restOfEntry,
+                            updatedAt: Date.now()
+                        };
+                    }
                 }
             }
 
@@ -1822,13 +1848,34 @@ const Calendar = ({
             return;
         }
 
-        onSave(key, {
-            ...currentSchedule,
-            alarm: {
-                ...currentSchedule.alarm,
-                registeredAlarms: remainingAlarms
+        // 남은 알람이 있으면 알람만 업데이트, 없으면 처리
+        if (remainingAlarms.length > 0) {
+            onSave(key, {
+                ...currentSchedule,
+                alarm: {
+                    ...currentSchedule.alarm,
+                    registeredAlarms: remainingAlarms
+                }
+            });
+        } else {
+            // 남은 알람이 없으면 alarm 필드 제거
+            const { alarm, ...restOfEntry } = currentSchedule;
+
+            // 일정 텍스트도 없으면 엔트리 전체 삭제
+            if (!restOfEntry.text || !restOfEntry.text.trim()) {
+                setSchedules((prevSchedules) => {
+                    const updatedSchedules = { ...prevSchedules };
+                    delete updatedSchedules[key];
+                    return updatedSchedules;
+                });
+            } else {
+                // 일정 텍스트가 있으면 알람만 제거하고 유지
+                onSave(key, {
+                    ...restOfEntry,
+                    updatedAt: Date.now()
+                });
             }
-        });
+        }
 
         showToast('종료된 알람이 삭제되었습니다.');
     };
@@ -1867,7 +1914,8 @@ const Calendar = ({
 
         // 과거 날짜에도 알람창 열기 (단, 모달에서 isPastDate를 전달하여 처리)
         if (onOpenAlarm) {
-            const entryData = currentEntry || { text: '', createdAt: Date.now(), updatedAt: Date.now() };
+            // currentEntry가 없으면 text만 빈 문자열로 전달 (createdAt/updatedAt은 실제 일정 저장 시에만 생성)
+            const entryData = currentEntry || { text: '' };
             const isPastDate = isBefore(selectedDay, today);
             const dataToPass = { ...entryData, date: selectedDate, isPastDate };
             onOpenAlarm(dataToPass);
@@ -2231,17 +2279,17 @@ const Calendar = ({
                                                 }}>
                                                     <AlarmClock
                                                         size={14}
-                                                        color={(isTerminated || isPaused) ? 'rgba(214, 48, 49, 0.3)' : '#d63031'}
+                                                        color={(isTerminated || isPaused) ? 'rgba(255, 107, 107, 0.3)' : '#ff6b6b'}
                                                         style={{ marginTop: '2px', flexShrink: 0 }}
                                                     />
                                                     <div style={{ flex: 1 }}>
                                                         <span style={{
                                                             fontSize: '13px',
-                                                            color: (isTerminated || isPaused) ? 'rgba(51, 51, 51, 0.3)' : '#333'
+                                                            color: (isTerminated || isPaused) ? 'rgba(208, 208, 208, 0.3)' : '#d0d0d0'
                                                         }}>
                                                             {alarm.title || '제목 없음'}
                                                             {isPaused && <span style={{ fontSize: '13px', color: 'rgba(153, 153, 153, 0.6)' }}> - 일시중지</span>}
-                                                            {isTerminated && <span style={{ fontSize: '13px', color: 'rgba(214, 48, 49, 0.6)' }}> - 종료</span>}
+                                                            {isTerminated && <span style={{ fontSize: '13px', color: 'rgba(255, 107, 107, 0.6)' }}> - 종료</span>}
                                                         </span>
                                                         <div style={{
                                                             fontSize: '11px',
@@ -2251,8 +2299,8 @@ const Calendar = ({
                                                             {isTerminated && daysUntilDeletion !== null && (
                                                                 <span style={{
                                                                     color: daysUntilDeletion === 0
-                                                                        ? 'rgba(214, 48, 49, 0.7)'
-                                                                        : 'rgba(214, 48, 49, 0.5)'
+                                                                        ? 'rgba(255, 107, 107, 0.7)'
+                                                                        : 'rgba(255, 107, 107, 0.5)'
                                                                 }}> · {daysUntilDeletion}일후 자동삭제</span>
                                                             )}
                                                         </div>

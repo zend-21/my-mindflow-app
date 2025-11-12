@@ -38,14 +38,14 @@ const Overlay = styled.div`
 `;
 
 const ModalContent = styled.div`
-    background: ${props => props.$isImportant ? 'rgba(255, 210, 210, 1)' : '#fff8e1'};
-    
-    width: 95vw;    
+    background: ${props => props.$isImportant ? 'linear-gradient(135deg, #3d2a2e, #4a2d32)' : 'linear-gradient(135deg, #2a2d35, #333842)'};
+
+    width: 95vw;
     min-height: 90vh;
     height: 95vh; /* ★★★ 정확한 높이 설정 ★★★ */
     border-radius: 16px;
     margin: 0;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
     position: relative;
     padding: 24px;
     display: flex;
@@ -80,19 +80,20 @@ const ModalTextarea = styled.textarea`
     /* height: 300px; */ /* <-- 기존 300px 고정 높이 제거 */
     flex: 1; /* ★ 남은 공간을 모두 차지하도록 flex: 1 추가 */
     padding: 16px;
-    border: 1px solid #a1b4ceff;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     font-size: 18px;
     resize: none;
     line-height: 1.5;
-    background-color: transparent;
+    background-color: #333842;
+    color: #e0e0e0;
     white-space: pre-wrap;
     &:focus {
         outline: none;
         border-color: #4a90e2;
     }
     &::placeholder {
-        color: #9bafc9ff;
+        color: #808080;
     }
 `;
 
@@ -103,9 +104,9 @@ const LeftButtonWrapper = styled.div`
 `;
 
 const HideKeyboardButton = styled.button`
-    background: #e7e7e7ff;
-    color: #292b2eff;
-    border: none;
+    background: #333842;
+    color: #e0e0e0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     padding: 10px 12px;
     font-size: 14px;
@@ -113,7 +114,7 @@ const HideKeyboardButton = styled.button`
     transition: background-color 0.2s ease;
     white-space: nowrap;
     &:hover {
-        background-color: #d2d6db;
+        background-color: #3d424d;
     }
 `;
 
@@ -128,9 +129,9 @@ const ButtonContainer = styled.div`
 
 const DoubleTapGuide = styled.p`
     font-size: 12px;
-    color: #888;
+    color: #b0b0b0;
     text-align: left;
-    margin-top: -10px; 
+    margin-top: -10px;
     margin-bottom: 5px; /* ✅ 이 값을 15px에서 5px로 변경하거나 0으로 설정하세요 */
 `;
 
@@ -147,8 +148,8 @@ const ModalButton = styled.button`
     cursor: pointer;
     transition: background-color 0.2s ease, color 0.2s ease;
     &:disabled {
-        background-color: #d2d6db;
-        color: #888;
+        background-color: #3d424d;
+        color: #666;
         cursor: not-allowed;
     }
 `;
@@ -162,10 +163,11 @@ const SaveButton = styled(ModalButton)`
 `;
 
 const CancelButton = styled(ModalButton)`
-    background-color: #e2e8f0;
-    color: #4a5568;
+    background-color: #333842;
+    color: #e0e0e0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     &:hover:not(:disabled) {
-        background-color: #d2d6db;
+        background-color: #3d424d;
     }
 `;
 
@@ -175,7 +177,7 @@ const ImportantCheckWrapper = styled.div`
     cursor: pointer;
     user-select: none;
     font-size: 16px;
-    color: #4a5568;
+    color: #e0e0e0;
     gap: 8px;
     font-weight: 500;
 `;
@@ -184,18 +186,18 @@ const ImportantRadioButton = styled.div`
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    border: 2px solid #cbd5e0;
+    border: 2px solid rgba(255, 255, 255, 0.3);
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
-    
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    
+
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+
     ${props => props.$isImportant && `
         background-color: #e53e3e;
         border-color: #e53e3e;
-        box-shadow: 0 4px 8px rgba(229, 62, 62, 0.2);
+        box-shadow: 0 4px 8px rgba(229, 62, 62, 0.4);
     `}
 `;
 
@@ -225,10 +227,11 @@ const ConfirmOverlay = styled.div`
 `;
 
 const ConfirmModalBox = styled.div`
-    background: #ffffff;
+    background: #2a2d35;
     border-radius: 12px;
     padding: 24px 30px;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     animation: ${slideUp} 0.2s cubic-bezier(0.2, 0, 0, 1);
     width: 90vw;
     max-width: 350px;
@@ -239,11 +242,11 @@ const ConfirmModalBox = styled.div`
 
 const ConfirmMessage = styled.p`
     font-size: 16px;
-    color: #333;
+    color: #e0e0e0;
     margin: 0;
     line-height: 1.5;
     text-align: center;
-    word-break: keep-all; 
+    word-break: keep-all;
 `;
 
 const ConfirmButtonWrapper = styled.div`

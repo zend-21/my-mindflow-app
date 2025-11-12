@@ -31,10 +31,10 @@ const Overlay = styled.div`
 `;
 
 const ModalContent = styled.div`
-    background: #fff;
+    background: #2a2d35;
     border-radius: 16px;
     padding: 24px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
     animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
     width: 100%;
     max-width: 400px;
@@ -56,7 +56,7 @@ const ModalHeader = styled.div`
 const Title = styled.h3`
     font-size: 18px;
     font-weight: 600;
-    color: #333;
+    color: #e0e0e0;
     margin: 0;
 `;
 
@@ -84,7 +84,7 @@ const CurrentSelection = styled.div`
 
 const ViewToggle = styled.div`
     display: flex;
-    background: #f1f5f9;
+    background: #333842;
     border-radius: 12px;
     padding: 4px;
     margin-bottom: 20px;
@@ -106,7 +106,7 @@ const ToggleButton = styled.button`
         color: white;
     ` : `
         background-color: transparent;
-        color: #64748b;
+        color: #b0b0b0;
     `}
 `;
 
@@ -122,10 +122,10 @@ const GridContainer = styled.div`
 
 const GridItem = styled.button`
     padding: 16px 8px;
-    border: 2px solid ${props => props.$selected ? '#4a90e2' : '#e2e8f0'};
+    border: 2px solid ${props => props.$selected ? '#4a90e2' : 'rgba(255, 255, 255, 0.1)'};
     border-radius: 12px;
-    background-color: ${props => props.$selected ? '#eff6ff' : 'white'};
-    color: ${props => props.$selected ? '#4a90e2' : '#334155'};
+    background-color: ${props => props.$selected ? '#3d424d' : '#333842'};
+    color: ${props => props.$selected ? '#4a90e2' : '#e0e0e0'};
     font-size: 16px;
     font-weight: ${props => props.$selected ? '700' : '500'};
     cursor: pointer;
@@ -134,12 +134,12 @@ const GridItem = styled.button`
     display: flex;
     align-items: center;
     justify-content: center;
-    
+
     &:hover {
         border-color: #4a90e2;
-        background-color: ${props => props.$selected ? '#eff6ff' : '#f8fafc'};
+        background-color: ${props => props.$selected ? '#3d424d' : '#3d424d'};
     }
-    
+
     &:disabled {
         opacity: 0.5;
         cursor: not-allowed;
@@ -151,7 +151,7 @@ const ButtonGroup = styled.div`
     justify-content: flex-start;   /* 버튼 왼쪽 정렬 */
     gap: 20px;                     /* 버튼 사이 간격 넓힘 */
     padding-top: 16px;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 const Button = styled.button`
@@ -166,10 +166,10 @@ const Button = styled.button`
 `;
 
 const CancelButton = styled(Button)`
-    background-color: #f1f5f9;
-    color: #64748b;
+    background-color: #333842;
+    color: #e0e0e0;
     &:hover {
-        background-color: #e2e8f0;
+        background-color: #3d424d;
     }
 `;
 
@@ -190,17 +190,18 @@ const QuickSelectContainer = styled.div`
 
 const QuickSelectButton = styled.button`
     padding: 8px 16px;
-    border: 1px solid #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 20px;
-    background-color: white;
-    color: #64748b;
+    background-color: #333842;
+    color: #e0e0e0;
     font-size: 14px;
     cursor: pointer;
     transition: all 0.2s ease;
-    
+
     &:hover {
         border-color: #4a90e2;
         color: #4a90e2;
+        background-color: #3d424d;
     }
 `;
 

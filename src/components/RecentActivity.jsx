@@ -6,7 +6,7 @@ import styled from 'styled-components';
 const SectionTitle = styled.h2`
     font-size: 18px;
     font-weight: 700;
-    color: #2d3748;
+    color: #e0e0e0;
     margin-bottom: 16px;
     display: flex;
     align-items: center;
@@ -24,32 +24,33 @@ const ActivityList = styled.div`
 `;
 
 const ActivityItem = styled.div`
-    background: #fff;
+    background: #2a2d35;
     border-radius: 16px;
     padding: 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     position: relative;
     display: flex;
     flex-direction: column; // 내용을 세로로 정렬
-    
+
     &:hover {
         transform: translateY(-2px);
-        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.4);
     }
 `;
 
 const ActivityText = styled.p`
     font-size: 14px;
-    color: #4a5568;
+    color: #e0e0e0;
     margin: 0;
 `;
 
 // 추가: 활동 날짜 스타일
 const ActivityDate = styled.span`
     font-size: 12px;
-    color: #a0aec0;
+    color: #b0b0b0;
     margin-top: 4px;
 `;
 
@@ -59,12 +60,12 @@ const DeleteButton = styled.button`
     right: 10px;
     background: none;
     border: none;
-    color: #999;
+    color: #b0b0b0;
     font-size: 18px;
     cursor: pointer;
     padding: 5px;
     &:hover {
-        color: #333;
+        color: #e0e0e0;
     }
 `;
 

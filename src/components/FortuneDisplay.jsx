@@ -97,18 +97,20 @@ const styles = {
         maxWidth: '800px',
         margin: '0 auto',
         padding: '20px',
-        fontFamily: 'system-ui, -apple-system, sans-serif'
+        fontFamily: 'system-ui, -apple-system, sans-serif',
+        background: 'linear-gradient(180deg, #2a2d35 0%, #1f2229 100%)',
+        minHeight: '100vh'
     },
     title: {
         fontSize: '28px',
         fontWeight: 'bold',
         textAlign: 'center',
         marginBottom: '10px',
-        color: '#333'
+        color: '#e0e0e0'
     },
     date: {
         textAlign: 'center',
-        color: '#666',
+        color: '#b0b0b0',
         marginBottom: '30px',
         fontSize: '14px'
     },
@@ -118,11 +120,11 @@ const styles = {
         gap: '20px'
     },
     card: {
-        backgroundColor: '#fff',
+        background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%)',
         borderRadius: '12px',
         padding: '20px',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-        border: '1px solid #f0f0f0'
+        boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
     },
     cardHeader: {
         display: 'flex',
@@ -136,7 +138,7 @@ const styles = {
     cardTitle: {
         fontSize: '18px',
         fontWeight: '600',
-        color: '#333',
+        color: '#e0e0e0',
         margin: 0,
         flex: 1
     },
@@ -144,14 +146,15 @@ const styles = {
         fontSize: '14px',
         fontWeight: '500',
         color: '#fff',
-        backgroundColor: '#4CAF50',
+        background: 'linear-gradient(135deg, rgba(240, 147, 251, 0.3), rgba(245, 87, 108, 0.3))',
         padding: '4px 12px',
-        borderRadius: '12px'
+        borderRadius: '12px',
+        border: '1px solid rgba(240, 147, 251, 0.5)'
     },
     content: {
         fontSize: '15px',
         lineHeight: '1.6',
-        color: '#555',
+        color: '#d0d0d0',
         margin: 0
     }
 };

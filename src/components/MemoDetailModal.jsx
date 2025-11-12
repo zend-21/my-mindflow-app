@@ -31,10 +31,10 @@ const Overlay = styled.div`
 `;
 
 const ModalContent = styled.div`
-    background: ${props => props.$isImportant ? '#ffe6e6' : '#fff8e1'};
+    background: ${props => props.$isImportant ? 'linear-gradient(135deg, #3d2a2e, #4a2d32)' : 'linear-gradient(135deg, #2a2d35, #333842)'};
     border-radius: 16px;
     padding: 24px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
     animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
@@ -109,9 +109,9 @@ const HistoryButton = styled.button`
 // ★★★ 추가: 키보드 숨김 버튼 스타일 ★★★
 const HideKeyboardButton = styled.button`
   right: 0;
-  background: #efefef;
-  color: #333;
-  border: 0.5px solid #949494ff;
+  background: #333842;
+  color: #e0e0e0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   padding: 8px 13px;      /* 🔼 버튼 크기 키움 */
   font-size: 13px;        /* 🔼 글씨 크게 */
@@ -129,16 +129,16 @@ const HideKeyboardButton = styled.button`
 const ModalTextarea = styled.textarea`
     flex: 1;
     width: 100%;
-    
+
     min-height: 200px;
-    
+
     padding: 16px;
-    border: 1px solid #a1b4ceff;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    background-color: transparent;
+    background-color: #333842;
     resize: none;
     font-size: 16px;
-    color: #4a5568;
+    color: #e0e0e0;
     line-height: 1.6;
     outline: none;
     &:focus {
@@ -177,16 +177,17 @@ const SaveButton = styled(ModalButton)`
 `;
 
 const CancelButton = styled(ModalButton)`
-    background-color: #e2e8f0;
-    color: #4a5568;
+    background-color: #333842;
+    color: #e0e0e0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     &:hover {
-        background-color: #d2d6db;
+        background-color: #3d424d;
     }
 `;
 
 const DateText = styled.span`
     font-size: 12px;
-    color: #a0aec0;
+    color: #b0b0b0;
     margin-top: 10px;
     text-align: right;
     flex-shrink: 0;
@@ -198,7 +199,7 @@ const ImportantCheckWrapper = styled.div`
     cursor: pointer;
     user-select: none;
     font-size: 16px;
-    color: #e53e3e;
+    color: #e0e0e0;
     flex-shrink: 0;
 `;
 
@@ -206,7 +207,7 @@ const ImportantRadioButton = styled.div`
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    border: 2px solid ${props => props.$isImportant ? '#e53e3e' : '#a0aec0'};
+    border: 2px solid ${props => props.$isImportant ? '#e53e3e' : 'rgba(255, 255, 255, 0.3)'};
     display: flex;
     justify-content: center;
     align-items: center;
@@ -291,10 +292,11 @@ const ConfirmOverlay = styled.div`
 `;
 
 const ConfirmModalBox = styled.div`
-    background: #ffffff;
+    background: #2a2d35;
     border-radius: 12px;
     padding: 24px 30px;
-    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     animation: ${slideUp} 0.2s cubic-bezier(0.2, 0, 0, 1);
     width: 90vw;
     max-width: 350px;
@@ -305,7 +307,7 @@ const ConfirmModalBox = styled.div`
 
 const ConfirmMessage = styled.p`
     font-size: 16px;
-    color: #333;
+    color: #e0e0e0;
     margin: 0;
     line-height: 1.5;
     text-align: center;

@@ -59,16 +59,17 @@ const Overlay = styled.div`
 `;
 
 const Container = styled.div`
-    background: #ffffff;
+    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
     width: 100%;
     max-width: 700px;
     max-height: 90vh;
     border-radius: 24px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
     overflow: hidden;
     animation: ${scaleIn} 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 
     @media (max-width: 768px) {
         max-height: 100vh;
@@ -134,26 +135,26 @@ const Content = styled.div`
     }
 
     &::-webkit-scrollbar-track {
-        background: #f1f1f1;
+        background: rgba(255, 255, 255, 0.05);
     }
 
     &::-webkit-scrollbar-thumb {
-        background: #c1c1c1;
+        background: rgba(255, 255, 255, 0.2);
         border-radius: 4px;
     }
 
     &::-webkit-scrollbar-thumb:hover {
-        background: #a1a1a1;
+        background: rgba(255, 255, 255, 0.3);
     }
 `;
 
 // 큰 카테고리 컨테이너 (사주/타로/별자리 구분용)
 const CategoryContainer = styled.div`
-    background: ${props => props.$bgColor || '#ffffff'};
+    background: rgba(255, 255, 255, 0.03);
     border-radius: 20px;
     padding: 32px 24px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-    border: 2px solid ${props => props.$borderColor || '#e2e8f0'};
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    border: 2px solid ${props => props.$borderColor || 'rgba(255, 255, 255, 0.1)'};
     animation: ${slideUp} 0.6s ease-out backwards;
     animation-delay: ${props => props.$delay || '0s'};
     margin-bottom: 32px;
@@ -167,12 +168,12 @@ const CategoryTitle = styled.h2`
     margin: 0 0 28px 0;
     font-size: 24px;
     font-weight: 700;
-    color: ${props => props.$color || '#2d3748'};
+    color: ${props => props.$color || '#e0e0e0'};
     display: flex;
     align-items: center;
     gap: 12px;
     padding-bottom: 16px;
-    border-bottom: 3px solid ${props => props.$borderColor || '#e2e8f0'};
+    border-bottom: 3px solid ${props => props.$borderColor || 'rgba(255, 255, 255, 0.1)'};
 
     @media (min-width: 768px) {
         font-size: 28px;
@@ -193,7 +194,7 @@ const SectionTitle = styled.h3`
     margin: 0 0 16px 0;
     font-size: 18px;
     font-weight: 600;
-    color: #2d3748;
+    color: #e0e0e0;
     display: flex;
     align-items: center;
     gap: 8px;
@@ -235,7 +236,7 @@ const Text = styled.p`
     margin: 0;
     font-size: 15px;
     line-height: 1.7;
-    color: #4a5568;
+    color: #d0d0d0;
 
     @media (min-width: 768px) {
         font-size: 16px;
@@ -244,8 +245,8 @@ const Text = styled.p`
 `;
 
 const SajuInfoBox = styled.div`
-    background: #fefcfb;
-    border: 1px solid #d4a574;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(212, 165, 116, 0.3);
     border-radius: 12px;
     padding: 16px 20px;
     display: flex;
@@ -268,13 +269,13 @@ const SajuInfoItem = styled.div`
 
 const SajuInfoLabel = styled.span`
     font-size: 12px;
-    color: #8b5e34;
+    color: #d4a574;
     font-weight: 500;
 `;
 
 const SajuInfoValue = styled.span`
     font-size: 16px;
-    color: #2d3748;
+    color: #e0e0e0;
     font-weight: 700;
 
     @media (min-width: 768px) {
@@ -311,13 +312,13 @@ const LuckyContainer = styled.div`
     flex-direction: column;
     align-items: center;
     gap: 20px;
-    background: #fefcfb;
-    border: 2px solid #d4a574;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(212, 165, 116, 0.3);
     border-radius: 20px;
     padding: 32px 24px;
     padding-top: 44px;
     text-align: center;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
     position: relative;
     margin-top: 15px;
 
@@ -328,7 +329,7 @@ const LuckyContainer = styled.div`
 
 const LuckyIntroText = styled.p`
     margin: 0;
-    color: #8b5e34;
+    color: #d4a574;
     font-size: 16px;
     font-weight: 600;
     line-height: 1.6;
@@ -374,7 +375,7 @@ const LuckyNumber = styled.div`
 
 const LuckyNumberCaption = styled.p`
     margin: 0;
-    color: #8b5e34;
+    color: #d4a574;
     font-size: 13px;
     font-weight: 500;
 
@@ -384,12 +385,12 @@ const LuckyNumberCaption = styled.p`
 `;
 
 const LuckyDetailsBox = styled.div`
-    background: #f7f5f3;
+    background: rgba(255, 255, 255, 0.05);
     border-radius: 12px;
     padding: 20px 24px;
     width: 100%;
     max-width: 500px;
-    border: 1px solid #e6dfd8;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 const LuckyDetailRow = styled.div`
@@ -404,7 +405,7 @@ const LuckyDetailRow = styled.div`
 `;
 
 const LuckyLabel = styled.span`
-    color: #6b5d54;
+    color: #b0b0b0;
     font-size: 14px;
     font-weight: 500;
 
@@ -414,7 +415,7 @@ const LuckyLabel = styled.span`
 `;
 
 const LuckyValue = styled.span`
-    color: #2d3748;
+    color: #e0e0e0;
     font-size: 15px;
     font-weight: 600;
     text-align: right;
@@ -476,13 +477,13 @@ const TarotContainer = styled.div`
 `;
 
 const TarotCard = styled.div`
-    background: white;
-    color: #2c3e50;
+    background: rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
     font-size: 22px;
     font-weight: 600;
     padding: 20px 32px;
     border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     text-align: center;
 
     @media (min-width: 768px) {

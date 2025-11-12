@@ -30,15 +30,16 @@ const Overlay = styled.div`
 `;
 
 const ModalContent = styled.div`
-    background: #f0f2f5;
+    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
     border-radius: 0 0 20px 20px;
     width: 100%;
     max-width: 760px;
     padding: 16px;
     padding-bottom: 24px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
-    animation: ${slideIn} 0.3s ease-out forwards;  
-    
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+    animation: ${slideIn} 0.3s ease-out forwards;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+
     /* 가로 모드일 때 padding-bottom을 줄여 공간 확보 */
     @media (orientation: landscape) {
         padding-bottom: 10px;
@@ -59,15 +60,20 @@ const ModalContent = styled.div`
 const SearchInput = styled.input`
     width: 100%;
     padding: 12px 16px;
-    border: none;
-    background-color: #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background-color: #333842;
     border-radius: 12px;
     font-size: 16px;
-    color: #4a5568;
+    color: #e0e0e0;
     outline: none;
-    
+
     &::placeholder {
-        color: #a0aec0;
+        color: #808080;
+    }
+
+    &:focus {
+        border-color: rgba(240, 147, 251, 0.5);
+        background-color: #3a3f4a;
     }
 `;
 
@@ -80,17 +86,25 @@ const FilterContainer = styled.div`
 `;
 
 const FilterButton = styled.button`
-    background-color: ${props => props.$active ? '#4a90e2' : '#e2e8f0'};
-    color: ${props => props.$active ? '#fff' : '#4a5568'};
-    border: none;
+    background: ${props => props.$active
+        ? 'linear-gradient(135deg, #d0d0d0, #a8a8a8)'
+        : 'rgba(255, 255, 255, 0.05)'};
+    color: ${props => props.$active ? '#1a1a1a' : '#b0b0b0'};
+    border: 1px solid ${props => props.$active
+        ? 'rgba(255, 255, 255, 0.3)'
+        : 'rgba(255, 255, 255, 0.1)'};
     border-radius: 20px;
     padding: 8px 16px;
     font-size: 14px;
+    font-weight: ${props => props.$active ? '600' : '400'};
     cursor: pointer;
     transition: all 0.2s ease;
-    
+
     &:hover {
-        background-color: ${props => props.$active ? '#3b78c4' : '#d2d6db'};
+        background-color: ${props => props.$active
+            ? 'linear-gradient(135deg, rgba(240, 147, 251, 0.4), rgba(245, 87, 108, 0.4))'
+            : 'rgba(255, 255, 255, 0.08)'};
+        color: #ffffff;
     }
 `;
 
@@ -98,26 +112,52 @@ const SearchResultList = styled.div`
     margin-top: 16px;
     max-height: 400px;
     overflow-y: auto;
+
+    /* 커스텀 스크롤바 */
+    &::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(240, 147, 251, 0.3);
+        border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+        background: rgba(240, 147, 251, 0.5);
+    }
 `;
 
 const SearchResultItem = styled.div`
-    padding: 12px 0;
-    border-bottom: 1px solid #e2e8f0;
+    padding: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     cursor: pointer;
+    border-radius: 8px;
+    transition: all 0.2s;
+
     &:last-child {
         border-bottom: none;
+    }
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.05);
     }
 `;
 
 const SearchResultText = styled.p`
     font-size: 14px;
-    color: #4a5568;
+    color: #d0d0d0;
     margin: 0;
 `;
 
 const NoResultText = styled.p`
     font-size: 14px;
-    color: #718096;
+    color: #b0b0b0;
     text-align: center;
     margin-top: 20px;
 `;

@@ -27,7 +27,7 @@ export const GlobalStyle = createGlobalStyle`
     }
     
     body {
-        background: #f0f2f5;
+        background: #0f0f0f;
         display: flex;
         justify-content: center;
 
@@ -65,6 +65,6 @@ export const GlobalStyle = createGlobalStyle`
         justify-content: space-between;
         padding: 8px 24px 0;
         font-size: 12px;
-        color: #999;
+        color: #b0b0b0;
     }
 `;

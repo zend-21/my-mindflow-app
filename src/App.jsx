@@ -153,8 +153,8 @@ const Screen = styled.div`
     width: 100%;
     max-width: 450px;
     margin: 0 auto;
-    
-    background: linear-gradient(180deg, #fafafa 0%, #f0f2f5 100%);
+
+    background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
     position: relative;
     display: flex;
     flex-direction: column;
@@ -224,7 +224,7 @@ const ContentArea = styled.div`
     will-change: transform;
     overscroll-behavior: none;
     touch-action: pan-y;
-    background: ${props => props.$isSecretTab ? 'linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%)' : 'transparent'};
+    background: ${props => props.$isSecretTab ? 'linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%)' : '#1a1a1a'};
 `;
 
 const LoginScreen = styled.div`
@@ -237,12 +237,12 @@ const LoginScreen = styled.div`
     padding: 0 24px;
     h2 {
         font-size: 24px;
-        color: #333;
+        color: #e0e0e0;
         margin-bottom: 10px;
     }
     p {
         font-size: 16px;
-        color: #888;
+        color: #b0b0b0;
         margin-bottom: 30px;
     }
 `;
@@ -254,7 +254,7 @@ const LoadingScreen = styled.div`
     justify-content: center;
     align-items: center;
     font-size: 20px;
-    color: #888;
+    color: #b0b0b0;
 `;
 
 const LoginButton = styled.button`
@@ -814,6 +814,36 @@ function App() {
         return () => clearTimeout(midnightTimer);
     }, []);
 
+    // 앱 시작 시 일정 데이터 정리 (text가 없으면 createdAt/updatedAt 제거)
+    useEffect(() => {
+        setCalendarSchedules(prevSchedules => {
+            const updatedSchedules = { ...prevSchedules };
+            let hasChanges = false;
+
+            Object.keys(updatedSchedules).forEach(dateKey => {
+                const schedule = updatedSchedules[dateKey];
+
+                // text가 없거나 빈 문자열인 경우 createdAt/updatedAt 제거
+                if (!schedule.text || schedule.text.trim() === '') {
+                    if (schedule.createdAt || schedule.updatedAt) {
+                        hasChanges = true;
+                        const { createdAt, updatedAt, ...rest } = schedule;
+
+                        // 알람이 있으면 알람만 유지
+                        if (rest.alarm && rest.alarm.registeredAlarms && rest.alarm.registeredAlarms.length > 0) {
+                            updatedSchedules[dateKey] = rest;
+                        } else {
+                            // 알람도 없으면 엔트리 전체 삭제
+                            delete updatedSchedules[dateKey];
+                        }
+                    }
+                }
+            });
+
+            return hasChanges ? updatedSchedules : prevSchedules;
+        });
+    }, []); // 앱 시작 시 한 번만 실행
+
     const handleOpenAlarmModal = (scheduleData) => {
         console.log('✅ handleOpenAlarmModal 호출됨:', scheduleData);
         setScheduleForAlarm(scheduleData);
@@ -841,12 +871,9 @@ function App() {
                     alarm: alarmSettings
                 };
             } else {
-                // 일정이 없는 경우 새로운 스케줄 엔트리 생성
-                const now = Date.now();
+                // 일정이 없는 경우 알람만 저장 (createdAt/updatedAt은 실제 일정 저장 시에만 생성)
                 updatedSchedules[key] = {
                     text: '',  // 빈 일정
-                    createdAt: now,
-                    updatedAt: now,
                     alarm: alarmSettings
                 };
             }

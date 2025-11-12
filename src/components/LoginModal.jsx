@@ -10,7 +10,7 @@ const ModalOverlay = styled.div`
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.8);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -18,22 +18,22 @@ const ModalOverlay = styled.div`
 `;
 
 const ModalContent = styled.div`
-    background: white;
+    background: #2a2d35;
     padding: 40px;
     border-radius: 16px;
     text-align: center;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
     position: relative;
-    
+
     h2 {
         margin-top: 0;
         margin-bottom: 10px;
-        color: #333;
+        color: #e0e0e0;
     }
-    
+
     p {
         margin-bottom: 25px;
-        color: #777;
+        color: #b0b0b0;
     }
 `;
 
@@ -45,7 +45,7 @@ const CloseButton = styled.button`
     border: none;
     font-size: 24px;
     cursor: pointer;
-    color: #aaa;
+    color: #b0b0b0;
 `;
 
 function LoginModal({ onSuccess, onError, onClose, setProfile }) {
@@ -117,22 +117,22 @@ const GoogleButton = styled.button`
     gap: 12px;
     width: 100%;
     padding: 12px 24px;
-    background: white;
-    border: 1px solid #dadce0;
+    background: #333842;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     font-size: 16px;
     font-weight: 500;
-    color: #3c4043;
+    color: #e0e0e0;
     cursor: pointer;
     transition: all 0.2s;
 
     &:hover {
-        background: #f8f9fa;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        background: #3d4250;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
     }
 
     &:active {
-        background: #f1f3f4;
+        background: #2d3139;
     }
 `;
 
@@ -158,11 +158,11 @@ const ModalTitle = styled.h2`
     font-size: 24px;
     font-weight: 600;
     margin-bottom: 10px;
-    color: #333;
+    color: #e0e0e0;
 `;
 
 const ModalDescription = styled.p`
     font-size: 16px;
-    color: #666;
+    color: #b0b0b0;
     line-height: 1.5;
 `;

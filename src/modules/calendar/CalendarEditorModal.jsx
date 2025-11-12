@@ -17,8 +17,8 @@ const slideUp = keyframes`
 
 /* 취소 버튼 */
 const CancelButton = styled.button`
-  background: #e2e8f0;
-  color: #4a5568;
+  background: #333842;
+  color: #e0e0e0;
   border: none;
   border-radius: 8px;
   padding: 8px 14px;
@@ -49,10 +49,10 @@ const ConfirmOverlay = styled.div`
 
 /* 확인 모달 박스 */
 const ConfirmModalBox = styled.div`
-  background: #ffffff;
+  background: #2a2d35;
   border-radius: 12px;
   padding: 24px 30px;
-  box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+  box-shadow: 0 5px 20px rgba(0,0,0,0.3);
   animation: ${slideUp} 0.2s cubic-bezier(0.2, 0, 0, 1);
   width: 90vw;
   max-width: 350px;
@@ -64,7 +64,7 @@ const ConfirmModalBox = styled.div`
 /* 확인 모달 메시지 */
 const ConfirmMessage = styled.p`
   font-size: 16px;
-  color: #333;
+  color: #e0e0e0;
   margin: 0;
   line-height: 1.5;
   text-align: center;
@@ -96,14 +96,14 @@ const Overlay = styled.div`
 
 /* 모달 본체 */
 const ModalContent = styled.div`
-  background: #f1f1f1ff;
+  background: #2a2d35;
   border-radius: 16px;
   width: 95vw;
   height: 97vh;      /* 높이도 약간 줄임 */
   display: flex;
   flex-direction: column;
   padding: 14px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
   animation: ${slideUp} 0.22s ease-out;   
     
     /* 가로 모드일 때 padding-bottom을 줄여 공간 확보 */
@@ -142,7 +142,7 @@ const TitleRow = styled.div`
   text-align: center;
   font-size: 16px;
   font-weight: 500;
-  color: #333;
+  color: #e0e0e0;
 `;
 
 /* 버튼 행 (30:40:30 분할) */
@@ -233,9 +233,9 @@ const HistoryButton = styled.button`
 /* 자판 숨김 버튼 */
 const HideKeyboardButton = styled.button`
   right: 0;
-  background: #efefef;
-  color: #333;
-  border: 0.5px solid #949494ff;
+  background: #333842;
+  color: #e0e0e0;
+  border: 0.5px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   padding: 8px 14px;      /* 🔼 버튼 크기 키움 */
   font-size: 15px;        /* 🔼 글씨 크게 */
@@ -254,31 +254,31 @@ const HideKeyboardButton = styled.button`
 const Textarea = styled.textarea`
   flex: 1;
   width: 100%;
-  border: 1px solid #adadadff;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
   padding: 12px;
   font-size: 15px;
   line-height: 1.5;
   resize: none;
   outline: none;
-  background: #ffffffff;
-  color: #333;  /* 실제 입력한 글씨는 진하게 */
+  background: #333842;
+  color: #e0e0e0;  /* 실제 입력한 글씨는 밝게 */
 
   /* 안내문구(placeholder)는 연하게 */
   &::placeholder {
-    color: #818181ff;   /* 연한 회색 */
+    color: #808080;   /* 연한 회색 */
     opacity: 1;    /* 브라우저마다 흐림 방지 */
   }
 
   /* 🔽 브라우저 호환용 */
   &::-webkit-input-placeholder {
-    color: #818181ff;
+    color: #808080;
   }
   &:-ms-input-placeholder {
-    color: #818181ff;
+    color: #808080;
   }
   &::-ms-input-placeholder {
-    color: #818181ff;
+    color: #808080;
   }
 `;
 
@@ -298,10 +298,10 @@ const Toast = styled.div`
 
 const SmallNote = styled.div`
     font-size: 12px;
-    color: #9aa4b2;
+    color: #b0b0b0;
     text-align: center;
     /* 헤더와 입력창 사이의 간격을 위해 추가 */
-    margin-bottom: 12px; 
+    margin-bottom: 12px;
     line-height: 1.5;
 `;
 

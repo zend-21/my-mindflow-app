@@ -1,7 +1,7 @@
 // src/modules/calendar/alarm/components/AlarmItemComponent.jsx
 // 개별 알람 아이템 컴포넌트 - 원본 레이아웃 기반
 
-import React from 'react';
+import React, { memo } from 'react';
 import { format } from 'date-fns';
 import styled from 'styled-components';
 import { AlarmClock, Repeat } from 'lucide-react';
@@ -10,13 +10,13 @@ import { ALARM_COLORS, getDaysUntilAutoDelete } from '../';
 const AlarmItem = styled.div`
   position: relative;
   background: ${props => {
-    if (props.$isPending) return '#e9ecef';
-    return '#f8f9fa';
+    if (props.$isPending) return '#3d424d';
+    return '#4a5058';
   }};
   border: ${props => {
     if (props.$isModified) return `2px dashed ${ALARM_COLORS.danger}`;
-    if (props.$isPending) return '2px dashed #adb5bd';
-    return '1px solid #ced4da';
+    if (props.$isPending) return '2px dashed rgba(255, 255, 255, 0.2)';
+    return '1px solid rgba(255, 255, 255, 0.15)';
   }};
   border-radius: 8px;
   padding: 12px;
@@ -146,7 +146,110 @@ const ApplyButton = styled.button`
   }
 `;
 
-export const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, onEdit }) => {
+const TitleContainer = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+`;
+
+const IconWrapper = styled.div`
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+`;
+
+const BadgeIcon = styled.div`
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: ${ALARM_COLORS.primary};
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: bold;
+`;
+
+const TitleText = styled.div`
+  font-size: 15px;
+  color: ${props => props.$isAnniversary ? ALARM_COLORS.primary : '#d0d0d0'};
+  word-break: break-all;
+  line-height: 1.3;
+  max-width: 8em;
+  display: inline-block;
+  min-height: calc(1.3em * 2);
+  margin-top: 2px;
+`;
+
+const PausedLabel = styled.span`
+  margin-left: 6px;
+  font-size: 12px;
+  color: #808080;
+`;
+
+const TimeInfo = styled.div`
+  font-size: 12px;
+  color: ${ALARM_COLORS.muted};
+`;
+
+const ExpiredLabel = styled.span`
+  margin-left: 6px;
+  font-size: 12px;
+  color: #ff6b6b;
+`;
+
+const Separator = styled.span`
+  margin-left: 4px;
+  font-size: 12px;
+  color: ${ALARM_COLORS.muted};
+`;
+
+const AutoDeleteLabel = styled.span`
+  margin-left: 4px;
+  font-size: 11px;
+  color: #ff6b6b;
+`;
+
+const ModifiedBadge = styled.div`
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  font-size: 11px;
+  color: ${ALARM_COLORS.danger};
+  font-weight: 600;
+`;
+
+const RepeatText = styled.div`
+  font-size: 12px;
+  color: #808080;
+  text-align: center;
+  padding: 8px 0;
+`;
+
+const PauseIcon = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: #808080;
+  padding: 4px 0;
+`;
+
+const PauseIconText = styled.div`
+  text-align: center;
+  line-height: 1.3;
+`;
+
+const RepeatLabel = styled.span`
+  font-size: 11px;
+  color: #808080;
+`;
+
+const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, onEdit }) => {
   // 반복 표시인지 확인 (getRepeatedAnniversaries에서 추가한 플래그)
   const isRepeated = alarm.isRepeated === true;
 
@@ -182,7 +285,7 @@ export const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, on
       $isExpired={shouldDim}
     >
       <AlarmInfo>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', marginBottom: '4px' }}>
+        <TitleContainer>
           {/* 토글 스위치 - 항상 선명하게 표시 */}
           <ToggleSwitch>
             <input
@@ -196,81 +299,43 @@ export const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, on
           {/* 기념일/반복/일반 알람 아이콘 */}
           {isRepeated ? (
             // 반복 기념일 주기일: Repeat 아이콘 표시
-            <div style={{
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              marginTop: '4px'
-            }}>
+            <IconWrapper>
               <Repeat
                 size={14}
                 color={ALARM_COLORS.primary}
               />
-            </div>
+            </IconWrapper>
           ) : alarm.isAnniversary ? (
             // 등록일: '기' 뱃지 표시
-            <div style={{
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              marginTop: '4px'
-            }}>
-              <div style={{
-                width: '14px',
-                height: '14px',
-                borderRadius: '50%',
-                backgroundColor: ALARM_COLORS.primary,
-                color: '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '9px',
-                fontWeight: 'bold'
-              }}>
+            <IconWrapper>
+              <BadgeIcon>
                 기
-              </div>
-            </div>
+              </BadgeIcon>
+            </IconWrapper>
           ) : (
             // 일반 알람: 자명종시계 아이콘 표시
-            <div style={{
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              marginTop: '4px'
-            }}>
+            <IconWrapper>
               <AlarmClock
                 size={14}
-                color="#d63031"
+                color="#ff6b6b"
               />
-            </div>
+            </IconWrapper>
           )}
 
           {/* 타이틀 */}
-          <div style={{
-            fontSize: '15px',
-            color: alarm.isAnniversary ? ALARM_COLORS.primary : '#495057',
-            wordBreak: 'break-all',
-            lineHeight: '1.3',
-            maxWidth: '8em',
-            display: 'inline-block',
-            minHeight: 'calc(1.3em * 2)',
-            marginTop: '2px'
-          }}>
+          <TitleText $isAnniversary={alarm.isAnniversary}>
             {alarm.title || '제목 없음'}
             {/* 일반 알람이 토글 OFF && 경과 전일 때만 "일시중지" 표시 */}
             {!alarm.isAnniversary && alarm.enabled === false && !isExpired && (
-              <span style={{ marginLeft: '6px', fontSize: '12px', color: '#999' }}>
+              <PausedLabel>
                 (일시중지)
-              </span>
+              </PausedLabel>
             )}
-          </div>
-        </div>
+          </TitleText>
+        </TitleContainer>
 
         {/* 시간 정보 */}
-        <div style={{
-          fontSize: '12px',
-          color: ALARM_COLORS.muted
-        }}>
+        <TimeInfo>
           {alarm.isAnniversary ? (
             // 기념일 알람
             <>
@@ -278,14 +343,14 @@ export const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, on
               <div>
                 알람시간 {format(alarm.calculatedTime, 'HH:mm')}
                 {isRepeated ? (
-                  <span style={{ fontSize: '11px', color: '#999' }}>
+                  <RepeatLabel>
                     {' '}({alarm.anniversaryRepeat === 'daily' ? '매일' :
                       alarm.anniversaryRepeat === 'weekly' ? '매주' :
                       alarm.anniversaryRepeat === 'monthly' ? '매달' :
                       alarm.anniversaryRepeat === 'yearly' ? '매년' : ''})
-                  </span>
+                  </RepeatLabel>
                 ) : hasRepeat && isRegisteredToday ? (
-                  <span style={{ fontSize: '11px', color: '#999' }}> (직접등록)</span>
+                  <RepeatLabel> (직접등록)</RepeatLabel>
                 ) : null}
               </div>
             </>
@@ -296,35 +361,28 @@ export const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, on
               {/* 시간 경과 시에만 "종료" 및 자동삭제 표시 (토글 상태 무관) */}
               {isExpired && (
                 <>
-                  <span style={{ marginLeft: '6px', fontSize: '12px', color: ALARM_COLORS.danger }}>
+                  <ExpiredLabel>
                     종료
-                  </span>
-                  <span style={{ marginLeft: '4px', fontSize: '12px', color: ALARM_COLORS.muted }}>
+                  </ExpiredLabel>
+                  <Separator>
                     /
-                  </span>
-                  <span style={{ marginLeft: '4px', fontSize: '11px', color: ALARM_COLORS.danger }}>
+                  </Separator>
+                  <AutoDeleteLabel>
                     {daysUntilDelete !== null ? daysUntilDelete : 3}일 후 자동삭제
-                  </span>
+                  </AutoDeleteLabel>
                 </>
               )}
               {/* 토글 OFF && 경과 전일 때는 아무것도 표시하지 않음 (타이틀에 "일시중지"만 표시) */}
             </>
           )}
-        </div>
+        </TimeInfo>
       </AlarmInfo>
 
       {/* 변경사항 미적용 표시 */}
       {alarm.isModified && (
-        <div style={{
-          position: 'absolute',
-          bottom: '12px',
-          right: '12px',
-          fontSize: '11px',
-          color: ALARM_COLORS.danger,
-          fontWeight: '600'
-        }}>
+        <ModifiedBadge>
           변경사항 미적용
-        </div>
+        </ModifiedBadge>
       )}
 
       {/* 액션 버튼 */}
@@ -332,35 +390,22 @@ export const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, on
         {isRepeated ? (
           // 반복 기념일: 버튼 없음 (토글만 가능)
           alarm.enabled !== false ? (
-            <div style={{
-              fontSize: '12px',
-              color: '#999',
-              textAlign: 'center',
-              padding: '8px 0'
-            }}>
+            <RepeatText>
               등록일에서<br/>수정/삭제 가능
-            </div>
+            </RepeatText>
           ) : (
             // 일시중지 상태
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '4px',
-              fontSize: '13px',
-              color: '#999',
-              padding: '4px 0'
-            }}>
+            <PauseIcon>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="1" y="1" width="22" height="22" rx="3" stroke={ALARM_COLORS.primary} strokeWidth="2"/>
                 <rect x="8" y="7" width="2.5" height="10" fill={ALARM_COLORS.primary}/>
                 <rect x="13.5" y="7" width="2.5" height="10" fill={ALARM_COLORS.primary}/>
               </svg>
-              <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
+              <PauseIconText>
                 <div>알람</div>
                 <div>일시중지</div>
-              </div>
-            </div>
+              </PauseIconText>
+            </PauseIcon>
           )
         ) : (
           // 원본 기념일 또는 일반 알람
@@ -397,25 +442,17 @@ export const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, on
               </>
             ) : (
               // 일시중지 상태
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '4px',
-                fontSize: '13px',
-                color: '#999',
-                padding: '4px 0'
-              }}>
+              <PauseIcon>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <rect x="1" y="1" width="22" height="22" rx="3" stroke={ALARM_COLORS.primary} strokeWidth="2"/>
                   <rect x="8" y="7" width="2.5" height="10" fill={ALARM_COLORS.primary}/>
                   <rect x="13.5" y="7" width="2.5" height="10" fill={ALARM_COLORS.primary}/>
                 </svg>
-                <div style={{ textAlign: 'center', lineHeight: '1.3' }}>
+                <PauseIconText>
                   <div>알람</div>
                   <div>일시중지</div>
-                </div>
-              </div>
+                </PauseIconText>
+              </PauseIcon>
             )}
           </>
         )}
@@ -423,3 +460,8 @@ export const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, on
     </AlarmItem>
   );
 };
+
+// React.memo로 컴포넌트 최적화 - props가 변경되지 않으면 리렌더링하지 않음
+const MemoizedAlarmItemComponent = memo(AlarmItemComponent);
+export { MemoizedAlarmItemComponent as AlarmItemComponent };
+export default MemoizedAlarmItemComponent;

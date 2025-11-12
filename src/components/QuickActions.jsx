@@ -30,11 +30,11 @@ const ActionsGrid = styled.div`
 `;
 
 const ActionCard = styled.div`
-    background: rgba(255,255,255,0.9);
+    background: linear-gradient(135deg, #2a2d35, #333842);
     backdrop-filter: blur(10px);
     border-radius: 20px;
     padding: 20px;
-    border: 1px solid rgba(255,255,255,0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     cursor: grab;
     transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1),
                 box-shadow 0.2s cubic-bezier(0.2, 0, 0, 1),
@@ -50,20 +50,20 @@ const ActionCard = styled.div`
 
     &:hover {
         transform: translateY(-4px) scale(1.02);
-        box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        box-shadow: 0 8px 25px rgba(0,0,0,0.4);
     }
 
     ${props => props.$isDragging && `
         transform: rotate(5deg) scale(1.05);
-        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-        background: rgba(255,255,255,0.95);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        background: linear-gradient(135deg, #333842, #3d4451);
         z-index: 1000;
         opacity: 0.9;
     `}
 
     ${props => props.$isOver && `
-        background: rgba(74, 144, 226, 0.1);
-        border-color: rgba(74, 144, 226, 0.3);
+        background: rgba(240, 147, 251, 0.15);
+        border-color: rgba(240, 147, 251, 0.3);
         transform: scale(0.98);
     `}
 `;
@@ -85,13 +85,13 @@ const CardContent = styled.div`
 const CardTitle = styled.div`
     font-size: 16px;
     font-weight: 600;
-    color: #333;
+    color: #e0e0e0;
     transition: color 0.2s ease;
 `;
 
 const CardSubtitle = styled.div`
     font-size: 12px;
-    color: #999;
+    color: #b0b0b0;
     margin-top: 2px;
     transition: color 0.2s ease;
 `;

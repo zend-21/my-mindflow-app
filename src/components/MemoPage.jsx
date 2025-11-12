@@ -48,41 +48,41 @@ const SelectionHeader = styled.div`
     position: sticky;
     top: 0;
     z-index: 100;
-    background-color: #ececec; /* 단일 색상으로 변경 */
+    background-color: #2a2d35; /* 다크 배경 */
     padding: 10px 20px;
     animation: ${fadeIn} 0.3s ease-out;
     transform: translateY(-5px);
     border-radius: 12px;
 `;
 const HeaderButton = styled.button`
-    background-color: white;
-    border: none;
+    background-color: #333842;
+    border: 1px solid rgba(255, 255, 255, 0.1);
     font-size: 16px;
-    color: #4a90e2;
+    color: #f093fb;
     cursor: pointer;
     font-weight: 600;
     width: 60px;
     height: 60px;
     border-radius: 50%;
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 
     &:disabled {
-        background-color: #e9ecef;
+        background-color: #2a2d35;
         box-shadow: none;
-        color: #a0aec0;
+        color: #606060;
         cursor: not-allowed;
     }
-    
+
     &:hover:not(:disabled) {
         transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 6px 12px rgba(240, 147, 251, 0.3);
     }
 `;
 const SelectionCount = styled.span`
     font-size: 20px;
     font-weight: bold;
-    color: #ff2b2b;
+    color: #f093fb;
     margin-top: 0px; /* 오타 수정 및 정렬을 위해 margin-top 사용 */
 `;
 const SectionTitleWrapper = styled.div`
@@ -93,7 +93,7 @@ const SectionTitleWrapper = styled.div`
 const SectionTitle = styled.h2`
     font-size: 24px;
     font-weight: 500;
-    color: #482d2d;
+    color: #e0e0e0;
     margin: 0;
 `;
 const MemoCount = styled.span`
@@ -182,24 +182,26 @@ const ListIcon = () => (
     </ListIconContainer>
 );
 const MemoCard = styled.div`
-    background: ${props => props.$isImportant ? 'rgba(255, 230, 230, 0.9)' : '#fff8e1'};
+    background: ${props => props.$isImportant
+        ? 'linear-gradient(135deg, rgba(245, 87, 108, 0.15), rgba(240, 147, 251, 0.15))'
+        : 'linear-gradient(135deg, #2a2d35, #333842)'};
     border-radius: 16px;
     padding: 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     cursor: pointer;
     transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     position: relative;
-    border: 2px solid ${props => props.$isSelected ? '#4a90e2' : 'transparent'};
-    
+    border: 2px solid ${props => props.$isSelected ? '#f093fb' : 'rgba(255, 255, 255, 0.05)'};
+
     &:hover {
         transform: translateY(-4px);
-        box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 6px 16px rgba(240, 147, 251, 0.2);
     }
 
     ${props => props.$isSelectionMode && `
         &:hover {
             transform: none;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
     `}
 `;
@@ -210,14 +212,14 @@ const MemoHeader = styled.div`
 `;
 const MemoText = styled.p`
     font-size: 16px;
-    color: #4a5568;
+    color: #e0e0e0;
     margin: 0;
-    white-space: pre-wrap; 
-    word-break: break-word; 
+    white-space: pre-wrap;
+    word-break: break-word;
 `;
 const DateText = styled.span`
     font-size: 12px;
-    color: #a0aec0;
+    color: #b0b0b0;
     margin-top: 8px;
     display: block;
 `;
@@ -225,12 +227,12 @@ const DeleteButton = styled.button`
     background: none;
     border: none;
     font-size: 20px;
-    color: #a0aec0;
+    color: #b0b0b0;
     cursor: pointer;
     margin-left: 10px;
     transition: color 0.2s ease;
     &:hover {
-        color: #e53e3e;
+        color: #f5576c;
     }
     ${props => props.$isSelectionMode && `
         display: none;
@@ -284,6 +286,13 @@ const ImportantIndicator = styled.span`
         transform: none;
     `}
 `;
+const EmptyMessage = styled.p`
+    color: #b0b0b0;
+    text-align: center;
+    font-size: 16px;
+    padding: 40px 20px;
+`;
+
 const MemoList = styled.div`
     display: flex;
     flex-direction: column;
@@ -550,7 +559,7 @@ const MemoPage = ({
                         );
                     })
                 ) : (
-                    <p>작성된 메모가 없습니다.</p>
+                    <EmptyMessage>작성된 메모가 없습니다.</EmptyMessage>
                 )}
             </MemoList>
         </MemoContainer>

@@ -88,11 +88,14 @@ const Pointer = styled.div`
 const ResultBox = styled.div`
     position: absolute;
     bottom: -120px;
-    background: #fff;
+    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
     padding: 10px 20px;
     border-radius: 12px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     animation: ${fadeIn} 0.5s ease-out;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+    font-weight: 600;
 `;
 
 const spin = keyframes`

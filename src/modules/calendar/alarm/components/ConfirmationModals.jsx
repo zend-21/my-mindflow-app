@@ -17,25 +17,26 @@ const ModalOverlay = styled.div`
 `;
 
 const ModalBox = styled.div`
-  background: white;
+  background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
   border-radius: 12px;
   padding: 24px;
   max-width: 400px;
   width: 90%;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 const ModalTitle = styled.h3`
   margin: 0 0 12px 0;
   font-size: 18px;
   font-weight: 600;
-  color: #343a40;
+  color: #e0e0e0;
 `;
 
 const ModalMessage = styled.p`
   margin: 0 0 20px 0;
   font-size: 14px;
-  color: #6c757d;
+  color: #b0b0b0;
   line-height: 1.5;
   white-space: pre-line;
 `;

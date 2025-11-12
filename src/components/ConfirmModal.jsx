@@ -24,13 +24,14 @@ const Overlay = styled.div`
 `;
 
 const ModalContainer = styled.div`
-    background: white;
+    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
     width: 90%;
     max-width: 420px;
     border-radius: 20px;
     padding: 32px 24px 24px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     animation: slideUp 0.3s ease-out;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 
     @keyframes slideUp {
         from {
@@ -59,7 +60,7 @@ const Title = styled.h2`
     margin: 0 0 16px 0;
     font-size: 22px;
     font-weight: 700;
-    color: #2d3748;
+    color: #e0e0e0;
     text-align: center;
     line-height: 1.4;
 
@@ -71,7 +72,7 @@ const Title = styled.h2`
 const Message = styled.p`
     margin: 0 0 24px 0;
     font-size: 15px;
-    color: #4a5568;
+    color: #b0b0b0;
     text-align: center;
     line-height: 1.7;
     white-space: pre-line;
@@ -87,13 +88,13 @@ const Highlight = styled.span`
 `;
 
 const Warning = styled.div`
-    background: #fff5f5;
-    border: 1px solid #feb2b2;
+    background: rgba(254, 178, 178, 0.1);
+    border: 1px solid rgba(254, 178, 178, 0.3);
     border-radius: 12px;
     padding: 16px;
     margin-bottom: 20px;
     font-size: 14px;
-    color: #742a2a;
+    color: #ffb3b3;
     line-height: 1.6;
 
     @media (min-width: 768px) {
@@ -123,11 +124,13 @@ const Button = styled.button`
 `;
 
 const CancelButton = styled(Button)`
-    background: #e2e8f0;
-    color: #2d3748;
+    background: rgba(255, 255, 255, 0.08);
+    color: #d0d0d0;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 
     &:hover {
-        background: #cbd5e0;
+        background: rgba(255, 255, 255, 0.12);
+        color: #ffffff;
         transform: translateY(-2px);
     }
 

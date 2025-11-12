@@ -7,12 +7,13 @@ import { ALARM_COLORS } from '../constants/alarmConstants';
 export const Input = styled.input`
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #dee2e6;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 14px;
-  background: white;
+  background: #333842;
+  color: #e0e0e0;
 
   &::placeholder {
-    color: #adb5bd;
+    color: #808080;
   }
 
   &:focus {
@@ -24,9 +25,10 @@ export const Input = styled.input`
 export const Select = styled.select`
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid #dee2e6;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 14px;
-  background: white;
+  background: #333842;
+  color: #e0e0e0;
 
   &:focus {
     outline: 2px solid ${ALARM_COLORS.primary};
@@ -47,13 +49,14 @@ export const TimeInput = styled.input`
   width: 60px;
   padding: 14px 10px;
   border-radius: 8px;
-  border: 1px solid #dee2e6;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 16px;
   text-align: center;
-  background: white;
+  background: #333842;
+  color: #e0e0e0;
 
   &::placeholder {
-    color: #adb5bd;
+    color: #808080;
   }
 
   &:focus {
@@ -69,5 +72,5 @@ export const SmallInput = styled(Input)`
 
 export const Label = styled.label`
   font-size: 14px;
-  color: #495057;
+  color: #e0e0e0;
 `;

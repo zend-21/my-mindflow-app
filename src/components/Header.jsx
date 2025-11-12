@@ -5,12 +5,13 @@ import styled from 'styled-components';
 import { getDailyGreeting } from '../utils/greetingMessages';
 
 const HeaderWrapper = styled.header`
-  background-color: #ffe59fff;
+  background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
   padding: 16px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   z-index: 500;
   position: fixed;
   top: ${props => props.$isHidden ? '-100px' : '0'};
@@ -79,20 +80,20 @@ const ProfileNameContainer = styled.div`
 const ProfileName = styled.span`
     font-size: 18px;
     font-weight: 600;
-    color: #4a5568;
+    color: #e0e0e0;
 `;
 
 const GreetingMessage = styled.span`
     font-size: 14px;
     font-weight: 400;
-    color: #718096;
+    color: #b0b0b0;
     white-space: nowrap;
 `;
 
 const LoginText = styled.span`
     font-size: 18px;
     font-weight: 600;
-    color: #4a5568;
+    color: #e0e0e0;
     cursor: pointer;
 `;
 
@@ -100,10 +101,14 @@ const ActionButton = styled.button`
     background: none;
     border: none;
     cursor: pointer;
-    color: #4a5568;
+    color: #e0e0e0;
     padding: 0;
     line-height: 1;
     font-size: 24px;
+
+    &:hover {
+        color: #ffffff;
+    }
 `;
 
 // Header 컴포넌트

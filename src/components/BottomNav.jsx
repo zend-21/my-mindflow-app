@@ -14,8 +14,9 @@ const NavContainer = styled.nav`
     right: 0px;
     z-index: 9999;
     height: 80px;
-    background: rgba(238, 237, 237, 0.9);
+    background: rgba(31, 34, 41, 0.95);
     backdrop-filter: blur(10px);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
 `;
 
 const NavItem = styled.div`
@@ -24,7 +25,7 @@ const NavItem = styled.div`
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: ${props => props.$active ? '#4a90e2' : '#999'};
+    color: ${props => props.$active ? '#f093fb' : '#808080'};
     font-weight: 600;
     transition: all 0.3s ease;
 
@@ -37,7 +38,7 @@ const NavItem = styled.div`
     }
 
     &:hover {
-        color: #4a90e2;
+        color: #f093fb;
     }
 `;
 
@@ -45,15 +46,15 @@ const NavItem = styled.div`
 const NavIcon = styled.div`
     font-size: 30px; /* 아이콘 크기를 더 확실하게 키웠습니다. */
     margin-bottom: 4px;
-    color: ${props => props.$active ? '#4a90e2' : '#777'};
+    color: ${props => props.$active ? '#f093fb' : '#808080'};
     transition: all 0.3s ease;
 
     /* ★★★ 아래 두 줄 추가 ★★★ */
     /* 활성화($active)되면 흑백 필터(grayscale)를 0%로, 비활성화되면 100%(흑백)로 설정 */
     filter: grayscale(${props => props.$active ? '0%' : '100%'});
-    
+
     /* 비활성화 시 연하게 보이도록 투명도(opacity) 조절 */
-    opacity: ${props => props.$active ? 1 : 0.3};
+    opacity: ${props => props.$active ? 1 : 0.4};
 `;
 
 const NavLabel = styled.span`
