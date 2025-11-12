@@ -33,8 +33,7 @@ const Container = styled.div`
 `;
 
 const InnerContent = styled.div`
-    padding: 10px 24px 200px 24px;
-    min-height: calc(100vh - 60px);
+    padding: 10px 24px 20px 24px;
     box-sizing: border-box;
 `;
 
@@ -209,7 +208,7 @@ const AddButton = styled.button`
     z-index: 10000;
     user-select: none;
     -webkit-user-select: none;
-    touch-action: pan-y;
+    touch-action: none;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -662,7 +661,6 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     const latestDragY = useRef(0);
 
     const handlePointerDown = (e) => {
-        e.preventDefault();
         e.stopPropagation();
 
         clearTimeout(longPressTimerRef.current);
@@ -699,10 +697,6 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             return;
         }
 
-        // 드래그 중일 때만 preventDefault 호출
-        e.preventDefault();
-        e.stopPropagation();
-
         // 실시간 범위 제한 (clamping)
         if (newY < MAX_DRAG_UP) {
             newY = MAX_DRAG_UP;
@@ -725,7 +719,6 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     };
 
     const handlePointerUp = (e) => {
-        e.preventDefault();
         e.stopPropagation();
 
         clearTimeout(longPressTimerRef.current);
@@ -908,6 +901,9 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
                 onPointerCancel={handlePointerUp}
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchMove={(e) => e.stopPropagation()}
+                onTouchEnd={(e) => e.stopPropagation()}
                 onContextMenu={(e) => e.preventDefault()}
                 draggable="false"
             >
