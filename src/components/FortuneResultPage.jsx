@@ -79,10 +79,11 @@ const Container = styled.div`
 
 const Header = styled.div`
     padding: 17px 24px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
+    color: #e0e0e0;
     text-align: center;
     position: relative;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 
     &::after {
         content: '';
@@ -92,7 +93,7 @@ const Header = styled.div`
         transform: translateX(-50%);
         width: 40px;
         height: 4px;
-        background: white;
+        background: #e0e0e0;
         border-radius: 2px;
     }
 `;

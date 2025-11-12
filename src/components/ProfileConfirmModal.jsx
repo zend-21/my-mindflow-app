@@ -125,11 +125,12 @@ const Button = styled.button`
     transition: all 0.2s;
 
     ${props => props.$primary ? `
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: #4a4a4a;
         color: white;
         &:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            background: #5a5a5a;
         }
         &:active {
             transform: translateY(0);
