@@ -6,6 +6,7 @@ import styled from 'styled-components';
 import PinInput from './PinInput';
 import SecretDocCard from './SecretDocCard';
 import SecretDocEditor from './SecretDocEditor';
+import PasswordModal from './PasswordModal';
 import {
     hasPinSet,
     setPin,
@@ -63,8 +64,38 @@ const SearchInput = styled.input`
 const FilterBar = styled.div`
     display: flex;
     gap: 8px;
+    margin-bottom: 12px;
+    width: 100%;
+`;
+
+const SortBar = styled.div`
+    display: flex;
+    gap: 8px;
     margin-bottom: 20px;
     width: 100%;
+`;
+
+const SortButton = styled.button`
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid ${props => props.$active ? 'rgba(240, 147, 251, 0.5)' : 'rgba(255, 255, 255, 0.15)'};
+    background: ${props => props.$active ? 'rgba(240, 147, 251, 0.2)' : 'rgba(255, 255, 255, 0.05)'};
+    color: ${props => props.$active ? '#f093fb' : '#b0b0b0'};
+    font-size: 13px;
+    font-weight: ${props => props.$active ? '600' : '500'};
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+
+    &:hover {
+        background: ${props => props.$active ? 'rgba(240, 147, 251, 0.25)' : 'rgba(255, 255, 255, 0.08)'};
+        border-color: ${props => props.$active ? 'rgba(240, 147, 251, 0.6)' : 'rgba(255, 255, 255, 0.25)'};
+    }
 `;
 
 const FilterButton = styled.button`
@@ -197,11 +228,11 @@ const MaskImage = styled.img`
     width: 70px;
     height: 70px;
     object-fit: contain;
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3));
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3)) drop-shadow(0 0 0 2px #8B0000);
     transition: all 0.2s;
 
     &:hover {
-        filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.4));
+        filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.4)) drop-shadow(0 0 0 2px #8B0000);
         transform: scale(1.05);
     }
 `;
@@ -259,6 +290,11 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     });
     const [isConfirmingPin, setIsConfirmingPin] = useState(false);
     const [firstPin, setFirstPin] = useState('');
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [pendingDoc, setPendingDoc] = useState(null);
+    const [sortBy, setSortBy] = useState('date'); // 'date' or 'importance'
+    const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
+    const [showPinRecovery, setShowPinRecovery] = useState(false);
 
     // 드래그 상태 관리
     const [isDragging, setIsDragging] = useState(false);
@@ -266,6 +302,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     const [hasBeenDragged, setHasBeenDragged] = useState(false);
     const dragStartY = useRef(0);
     const dragStartOffsetY = useRef(0);
+    const addButtonRef = useRef(null);
 
     // 자동 잠금 타이머
     const autoLockTimerRef = useRef(null);
@@ -313,15 +350,29 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             window.addEventListener('keydown', handleActivity);
             window.addEventListener('click', handleActivity);
             window.addEventListener('scroll', handleActivity);
+            window.addEventListener('touchstart', handleActivity);
+            window.addEventListener('touchmove', handleActivity);
 
             return () => {
                 window.removeEventListener('mousemove', handleActivity);
                 window.removeEventListener('keydown', handleActivity);
                 window.removeEventListener('click', handleActivity);
                 window.removeEventListener('scroll', handleActivity);
+                window.removeEventListener('touchstart', handleActivity);
+                window.removeEventListener('touchmove', handleActivity);
             };
         }
     }, [isUnlocked]);
+
+    // 컴포넌트 언마운트 시 타이머 및 rAF 정리
+    useEffect(() => {
+        return () => {
+            clearTimeout(longPressTimerRef.current);
+            if (rafRef.current) {
+                cancelAnimationFrame(rafRef.current);
+            }
+        };
+    }, []);
 
     // PIN 검증 및 문서 로드
     const handlePinSubmit = async (pin) => {
@@ -384,7 +435,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         }
     };
 
-    // 검색 및 필터링
+    // 검색, 필터링 및 정렬
     useEffect(() => {
         let filtered = docs;
 
@@ -403,25 +454,117 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             );
         }
 
-        setFilteredDocs(filtered);
-    }, [docs, searchQuery, selectedCategory]);
+        // 정렬
+        const sorted = [...filtered].sort((a, b) => {
+            if (sortBy === 'date') {
+                // 등록순 (createdAt 기준)
+                const dateA = new Date(a.createdAt || 0).getTime();
+                const dateB = new Date(b.createdAt || 0).getTime();
+                return sortOrder === 'desc' ? dateB - dateA : dateA - dateB;
+            } else if (sortBy === 'importance') {
+                // 중요도순
+                const importanceA = a.isImportant ? 1 : 0;
+                const importanceB = b.isImportant ? 1 : 0;
+
+                if (importanceA !== importanceB) {
+                    return sortOrder === 'desc' ? importanceB - importanceA : importanceA - importanceB;
+                }
+
+                // 중요도가 같으면 날짜순으로 2차 정렬
+                const dateA = new Date(a.createdAt || 0).getTime();
+                const dateB = new Date(b.createdAt || 0).getTime();
+                return dateB - dateA;
+            }
+            return 0;
+        });
+
+        setFilteredDocs(sorted);
+    }, [docs, searchQuery, selectedCategory, sortBy, sortOrder]);
 
     // 문서 클릭
     const handleDocClick = async (doc) => {
         if (doc.hasPassword) {
-            const password = prompt('문서 비밀번호를 입력하세요:');
-            if (!password) return;
-
-            const result = await unlockDoc(currentPin, doc.id, password);
-            if (result.success) {
-                setEditingDoc({ ...doc, content: result.content });
-                setIsEditorOpen(true);
-            } else {
-                showToast?.(result.message);
-            }
+            setPendingDoc(doc);
+            setShowPasswordModal(true);
         } else {
             setEditingDoc(doc);
             setIsEditorOpen(true);
+        }
+    };
+
+    // 비밀번호 모달 제출
+    const handlePasswordSubmit = async (password) => {
+        if (!pendingDoc) return false;
+
+        const result = await unlockDoc(currentPin, pendingDoc.id, password);
+        if (result.success) {
+            setEditingDoc({ ...pendingDoc, content: result.content });
+            setIsEditorOpen(true);
+            setShowPasswordModal(false);
+            setPendingDoc(null);
+            return true;
+        } else {
+            showToast?.(result.message);
+            return false;
+        }
+    };
+
+    // 비밀번호 모달 취소
+    const handlePasswordCancel = () => {
+        setShowPasswordModal(false);
+        setPendingDoc(null);
+    };
+
+    // 비밀번호 복구 (PIN 재입력)
+    const handleForgotPassword = () => {
+        setShowPasswordModal(false);
+        setShowPinRecovery(true);
+    };
+
+    // PIN 재입력 후 비밀번호 확인
+    const handlePinRecovery = async (pin) => {
+        const isValid = await verifyPin(pin);
+        if (isValid && pendingDoc) {
+            // PIN이 맞으면 문서를 복호화하여 바로 열기
+            setShowPinRecovery(false);
+
+            const result = await unlockDoc(currentPin, pendingDoc.id, pendingDoc.password);
+            if (result.success) {
+                setEditingDoc({ ...pendingDoc, content: result.content });
+                setIsEditorOpen(true);
+                setPendingDoc(null);
+            } else {
+                showToast?.('문서를 열 수 없습니다.');
+                setPendingDoc(null);
+            }
+
+            return { success: true };
+        } else {
+            return { success: false, message: '잘못된 PIN입니다.' };
+        }
+    };
+
+    // 정렬 버튼 클릭
+    const handleSortClick = (type) => {
+        if (sortBy === type) {
+            // 같은 버튼 클릭 시 오름차순/내림차순 토글
+            setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+        } else {
+            // 다른 버튼 클릭 시 해당 타입으로 변경하고 내림차순으로 초기화
+            setSortBy(type);
+            setSortOrder('desc');
+        }
+    };
+
+    // 카테고리 변경
+    const handleCategoryChange = async (docId, newCategory) => {
+        try {
+            await updateSecretDoc(currentPin, docId, { category: newCategory });
+            await loadDocs(currentPin);
+            showToast?.('카테고리가 변경되었습니다.');
+        } catch (error) {
+            console.error('카테고리 변경 오류:', error);
+            showToast?.('카테고리 변경에 실패했습니다.');
         }
     };
 
@@ -500,33 +643,111 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         setSelectedCategory('all');
     };
 
-    // 드래그 핸들러
-    const MAX_DRAG_UP = -150;
+    // 드래그 핸들러 (Pointer API 사용 - FloatingButton과 동일한 로직)
+    const MAX_DRAG_UP = -100;
     const MIN_DRAG_DOWN = 0;
+    const LONG_PRESS_DURATION = 500; // 0.5초
+    const DRAG_THRESHOLD = 10;
 
-    const handleDragStart = (e) => {
-        const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
-        dragStartY.current = clientY;
+    const longPressTimerRef = useRef(null);
+    const isLongPressSuccessful = useRef(false);
+    const rafRef = useRef(null);
+    const latestDragY = useRef(0);
+
+    const handlePointerDown = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        clearTimeout(longPressTimerRef.current);
+        isLongPressSuccessful.current = false;
+
+        try {
+            e.target.setPointerCapture(e.pointerId);
+        } catch (error) { /* 무시 */ }
+
+        dragStartY.current = e.clientY;
         dragStartOffsetY.current = offsetY;
-        setIsDragging(true);
+        latestDragY.current = offsetY;
+
+        longPressTimerRef.current = setTimeout(() => {
+            isLongPressSuccessful.current = true;
+            setIsDragging(true);
+            setHasBeenDragged(true);
+        }, LONG_PRESS_DURATION);
     };
 
-    const handleDragMove = (e) => {
-        if (!isDragging) return;
-        const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
-        const deltaY = clientY - dragStartY.current;
-        let newOffsetY = dragStartOffsetY.current + deltaY;
+    const handlePointerMove = (e) => {
+        const deltaY = e.clientY - dragStartY.current;
+        let newY = dragStartOffsetY.current + deltaY;
 
-        // 범위 제한
-        if (newOffsetY < MAX_DRAG_UP) newOffsetY = MAX_DRAG_UP;
-        if (newOffsetY > MIN_DRAG_DOWN) newOffsetY = MIN_DRAG_DOWN;
+        // 드래그 모드 즉시 진입 (임계값 초과 시)
+        if (!isLongPressSuccessful.current && Math.abs(deltaY) > DRAG_THRESHOLD) {
+            clearTimeout(longPressTimerRef.current);
+            isLongPressSuccessful.current = true;
+            setIsDragging(true);
+            setHasBeenDragged(true);
+        }
 
-        setOffsetY(newOffsetY);
-        setHasBeenDragged(true);
+        if (!isLongPressSuccessful.current) {
+            return;
+        }
+
+        // 드래그 중일 때만 preventDefault 호출
+        e.preventDefault();
+        e.stopPropagation();
+
+        // 실시간 범위 제한 (clamping)
+        if (newY < MAX_DRAG_UP) {
+            newY = MAX_DRAG_UP;
+        } else if (newY > MIN_DRAG_DOWN) {
+            newY = MIN_DRAG_DOWN;
+        }
+
+        latestDragY.current = newY;
+
+        // rAF가 이미 예약되어 있으면 추가 예약 안 함
+        if (rafRef.current) {
+            return;
+        }
+
+        // rAF를 예약하여 다음 프레임에 한 번만 state 업데이트
+        rafRef.current = requestAnimationFrame(() => {
+            setOffsetY(latestDragY.current);
+            rafRef.current = null;
+        });
     };
 
-    const handleDragEnd = () => {
-        setIsDragging(false);
+    const handlePointerUp = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        clearTimeout(longPressTimerRef.current);
+
+        try {
+            e.target.releasePointerCapture(e.pointerId);
+        } catch (error) { /* 무시 */ }
+
+        if (isLongPressSuccessful.current) {
+            // 드래그가 끝났을 때
+            setIsDragging(false);
+
+            const finalY = latestDragY.current;
+
+            setOffsetY(() => {
+                if (finalY < MAX_DRAG_UP) {
+                    return MAX_DRAG_UP;
+                } else if (finalY > MIN_DRAG_DOWN) {
+                    return MIN_DRAG_DOWN;
+                }
+                return finalY;
+            });
+        } else {
+            // 클릭으로 간주 (짧게 터치했거나, 500ms 안에 10px 미만 움직임)
+            setEditingDoc(null);
+            setIsEditorOpen(true);
+        }
+
+        isLongPressSuccessful.current = false;
     };
 
     // PIN 복구 (이메일 전송)
@@ -631,6 +852,21 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                 </FilterButton>
             </FilterBar>
 
+            <SortBar>
+                <SortButton
+                    $active={sortBy === 'date'}
+                    onClick={() => handleSortClick('date')}
+                >
+                    등록순 {sortBy === 'date' && (sortOrder === 'desc' ? '↓' : '↑')}
+                </SortButton>
+                <SortButton
+                    $active={sortBy === 'importance'}
+                    onClick={() => handleSortClick('importance')}
+                >
+                    중요도순 {sortBy === 'importance' && (sortOrder === 'desc' ? '↓' : '↑')}
+                </SortButton>
+            </SortBar>
+
                 {filteredDocs.length === 0 ? (
                     <EmptyState>
                         <EmptyIcon>🔒</EmptyIcon>
@@ -647,6 +883,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                                 key={doc.id}
                                 doc={doc}
                                 onClick={handleDocClick}
+                                onCategoryChange={handleCategoryChange}
                             />
                         ))}
                     </DocsGrid>
@@ -654,22 +891,18 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             </InnerContent>
 
             <AddButton
+                ref={addButtonRef}
+                role="button"
+                tabIndex="0"
                 $isDragging={isDragging}
                 $offsetY={offsetY}
                 $hasBeenDragged={hasBeenDragged}
-                onMouseDown={handleDragStart}
-                onMouseMove={handleDragMove}
-                onMouseUp={handleDragEnd}
-                onMouseLeave={handleDragEnd}
-                onTouchStart={handleDragStart}
-                onTouchMove={handleDragMove}
-                onTouchEnd={handleDragEnd}
-                onClick={(e) => {
-                    if (!hasBeenDragged || Math.abs(offsetY - dragStartOffsetY.current) < 5) {
-                        setEditingDoc(null);
-                        setIsEditorOpen(true);
-                    }
-                }}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+                onContextMenu={(e) => e.preventDefault()}
+                draggable="false"
             >
                 <MaskImage
                     src="/images/secret/mask-gray.svg"
@@ -681,6 +914,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             {isEditorOpen && (
                 <SecretDocEditor
                     doc={editingDoc}
+                    existingDocs={docs}
                     onClose={() => {
                         setIsEditorOpen(false);
                         setEditingDoc(null);
@@ -688,6 +922,57 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                     onSave={handleSaveDoc}
                     onDelete={handleDeleteDoc}
                 />
+            )}
+
+            {showPasswordModal && (
+                <PasswordModal
+                    onSubmit={handlePasswordSubmit}
+                    onCancel={handlePasswordCancel}
+                    onForgotPassword={handleForgotPassword}
+                />
+            )}
+
+            {showPinRecovery && (
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%)',
+                    zIndex: 10001,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '20px'
+                }}>
+                    <div style={{ width: '100%', maxWidth: '500px' }}>
+                        <PinInput
+                            pinLength={settings.pinLength}
+                            title="PIN 재입력"
+                            subtitle="비밀번호 확인을 위해 PIN을 다시 입력하세요"
+                            onSubmit={handlePinRecovery}
+                        />
+                        <button
+                            onClick={() => {
+                                setShowPinRecovery(false);
+                                setShowPasswordModal(true);
+                            }}
+                            style={{
+                                marginTop: '20px',
+                                padding: '10px 20px',
+                                background: 'rgba(255, 255, 255, 0.05)',
+                                border: '1px solid rgba(255, 255, 255, 0.1)',
+                                borderRadius: '8px',
+                                color: '#d0d0d0',
+                                cursor: 'pointer',
+                                width: '100%'
+                            }}
+                        >
+                            뒤로 가기
+                        </button>
+                    </div>
+                </div>
             )}
         </Container>
     );

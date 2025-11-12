@@ -71,10 +71,10 @@ const PinPad = ({ onNumberClick, onBackspace, disabled }) => {
         setPressedKey(value);
         onNumberClick(value);
 
-        // 50ms 후 즉시 눌림 효과 해제 (보안)
+        // 150ms 후 눌림 효과 해제 (보안 - 애니메이션은 보이되 상태는 남기지 않음)
         setTimeout(() => {
             setPressedKey(null);
-        }, 50);
+        }, 150);
     };
 
     const handleBackspacePress = () => {
@@ -83,10 +83,10 @@ const PinPad = ({ onNumberClick, onBackspace, disabled }) => {
         setPressedKey('backspace');
         onBackspace();
 
-        // 50ms 후 즉시 눌림 효과 해제
+        // 150ms 후 눌림 효과 해제
         setTimeout(() => {
             setPressedKey(null);
-        }, 50);
+        }, 150);
     };
 
     return (

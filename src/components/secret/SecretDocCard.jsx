@@ -1,7 +1,7 @@
 // src/components/secret/SecretDocCard.jsx
 // 시크릿 문서 카드 컴포넌트
 
-import React from 'react';
+import React, { useState } from 'react';
 import styled from 'styled-components';
 
 const Card = styled.div`
@@ -61,6 +61,12 @@ const LockIcon = styled.span`
     opacity: 0.7;
 `;
 
+const ImportantIcon = styled.svg`
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+`;
+
 const Title = styled.h3`
     font-size: 16px;
     font-weight: 600;
@@ -72,11 +78,13 @@ const Title = styled.h3`
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 `;
 
-const CategoryBadge = styled.span`
+const CategoryBadge = styled.button`
     padding: 4px 8px;
     border-radius: 6px;
     font-size: 11px;
     font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
     background: ${props => {
         switch (props.$category) {
             case 'financial': return 'rgba(255, 215, 0, 0.2)';
@@ -104,6 +112,136 @@ const CategoryBadge = styled.span`
             default: return 'rgba(255, 255, 255, 0.2)';
         }
     }};
+
+    &:hover {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+`;
+
+const CategoryModal = styled.div`
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 16px;
+    z-index: 10;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    width: 85%;
+    padding-top: 20px;
+`;
+
+const ModalHeader = styled.div`
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+`;
+
+const ModalTitle = styled.div`
+    font-size: 13px;
+    font-weight: 600;
+    color: #ffffff;
+    text-align: center;
+    flex: 1;
+    transform: translateY(-7px);
+`;
+
+const CloseButton = styled.button`
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    position: relative;
+    top: -12px;
+    right: -9px;
+`;
+
+const CategoryGrid = styled.div`
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+`;
+
+const CategoryOptionBadge = styled.button`
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+    position: relative;
+
+    ${props => {
+        // 모든 카테고리에 색상 적용
+        switch (props.$category) {
+            case 'financial':
+                return `
+                    background: rgba(255, 215, 0, 0.2);
+                    color: #FFD700;
+                    border-color: rgba(255, 215, 0, 0.3);
+                `;
+            case 'personal':
+                return `
+                    background: rgba(147, 51, 234, 0.2);
+                    color: #A78BFA;
+                    border-color: rgba(147, 51, 234, 0.3);
+                `;
+            case 'work':
+                return `
+                    background: rgba(59, 130, 246, 0.2);
+                    color: #60A5FA;
+                    border-color: rgba(59, 130, 246, 0.3);
+                `;
+            case 'diary':
+                return `
+                    background: rgba(236, 72, 153, 0.2);
+                    color: #F472B6;
+                    border-color: rgba(236, 72, 153, 0.3);
+                `;
+            default:
+                return `
+                    background: rgba(255, 255, 255, 0.05);
+                    color: #d0d0d0;
+                    border-color: rgba(255, 255, 255, 0.1);
+                `;
+        }
+    }}
+
+    &:hover {
+        transform: scale(1.05);
+        opacity: 0.9;
+    }
+`;
+
+const ActiveDot = styled.div`
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    position: absolute;
+    top: -11px;
 `;
 
 const Preview = styled.p`
@@ -118,6 +256,7 @@ const Preview = styled.p`
     -webkit-box-orient: vertical;
     position: relative;
     z-index: 1;
+    white-space: pre-wrap;
 `;
 
 const CardFooter = styled.div`
@@ -145,11 +284,13 @@ const Tag = styled.span`
     font-size: 11px;
 `;
 
-const Date = styled.span`
+const DateText = styled.span`
     white-space: nowrap;
 `;
 
-const SecretDocCard = ({ doc, onClick }) => {
+const SecretDocCard = ({ doc, onClick, onCategoryChange }) => {
+    const [showDropdown, setShowDropdown] = useState(false);
+
     const formatDate = (dateString) => {
         const date = new Date(dateString);
         const now = new Date();
@@ -163,15 +304,41 @@ const SecretDocCard = ({ doc, onClick }) => {
         return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
     };
 
+    const handleBadgeClick = (e) => {
+        e.stopPropagation();
+        setShowDropdown(!showDropdown);
+    };
+
+    const handleCategoryChange = async (e, newCategory) => {
+        e.stopPropagation();
+        setShowDropdown(false);
+        if (onCategoryChange && newCategory !== doc.category) {
+            await onCategoryChange(doc.id, newCategory);
+        }
+    };
+
+    const categories = [
+        { value: 'financial', label: '금융' },
+        { value: 'personal', label: '개인' },
+        { value: 'work', label: '업무' },
+        { value: 'diary', label: '일기' }
+    ];
+
     return (
-        <Card onClick={() => onClick(doc)}>
+        <Card onClick={() => !showDropdown && onClick(doc)}>
             <CardHeader>
                 <TitleRow>
+                    {doc.isImportant && (
+                        <ImportantIcon viewBox="0 0 16 16" fill="none">
+                            <circle cx="8" cy="8" r="7" fill="#ff6b6b" stroke="#ff4444" strokeWidth="1"/>
+                            <text x="8" y="12" fontSize="11" fontWeight="bold" fill="white" textAnchor="middle">!</text>
+                        </ImportantIcon>
+                    )}
                     {doc.hasPassword && <LockIcon>🔒</LockIcon>}
                     <Title>{doc.title || '제목 없음'}</Title>
                 </TitleRow>
                 {doc.category && (
-                    <CategoryBadge $category={doc.category}>
+                    <CategoryBadge $category={doc.category} onClick={handleBadgeClick}>
                         {doc.category === 'financial' && '💰 금융'}
                         {doc.category === 'personal' && '👤 개인'}
                         {doc.category === 'work' && '💼 업무'}
@@ -194,8 +361,37 @@ const SecretDocCard = ({ doc, onClick }) => {
                 ) : (
                     <div></div>
                 )}
-                <Date>{formatDate(doc.updatedAt || doc.createdAt)}</Date>
+                <DateText>{formatDate(doc.updatedAt || doc.createdAt)}</DateText>
             </CardFooter>
+
+            {showDropdown && (
+                <CategoryModal onClick={(e) => e.stopPropagation()}>
+                    <ModalHeader>
+                        <ModalTitle>카테고리 변경</ModalTitle>
+                        <CloseButton
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setShowDropdown(false);
+                            }}
+                        >
+                            ✕
+                        </CloseButton>
+                    </ModalHeader>
+                    <CategoryGrid>
+                        {categories.map(category => (
+                            <CategoryOptionBadge
+                                key={category.value}
+                                $category={category.value}
+                                $active={doc.category === category.value}
+                                onClick={(e) => handleCategoryChange(e, category.value)}
+                            >
+                                {doc.category === category.value && <ActiveDot />}
+                                {category.label}
+                            </CategoryOptionBadge>
+                        ))}
+                    </CategoryGrid>
+                </CategoryModal>
+            )}
         </Card>
     );
 };
