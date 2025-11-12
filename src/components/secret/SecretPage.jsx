@@ -33,13 +33,12 @@ const InnerContent = styled.div`
 `;
 
 const SearchBar = styled.div`
-    margin-bottom: 20px;
-    display: flex;
-    gap: 12px;
+    margin-bottom: 16px;
+    width: 100%;
 `;
 
 const SearchInput = styled.input`
-    flex: 1;
+    width: 100%;
     padding: 12px 16px;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -47,6 +46,7 @@ const SearchInput = styled.input`
     color: #ffffff;
     font-size: 14px;
     transition: all 0.2s;
+    box-sizing: border-box;
 
     &:focus {
         outline: none;
@@ -60,24 +60,77 @@ const SearchInput = styled.input`
     }
 `;
 
+const FilterBar = styled.div`
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    width: 100%;
+`;
+
 const FilterButton = styled.button`
-    padding: 12px 16px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: ${props => props.$active
-        ? 'linear-gradient(135deg, rgba(240, 147, 251, 0.2), rgba(245, 87, 108, 0.2))'
-        : 'rgba(255, 255, 255, 0.05)'
-    };
-    color: ${props => props.$active ? '#f093fb' : '#d0d0d0'};
-    font-size: 14px;
-    font-weight: 600;
+    padding: 8px 4px;
+    border-radius: 6px;
+    border: 1px solid ${props => {
+        if (!props.$active) return 'rgba(255, 255, 255, 0.15)';
+        switch(props.$category) {
+            case 'all': return '#7fa3ff';
+            case 'financial': return '#4caf50';
+            case 'personal': return '#ff9800';
+            case 'work': return '#2196f3';
+            case 'diary': return '#9c27b0';
+            default: return 'rgba(255, 255, 255, 0.15)';
+        }
+    }};
+    background: ${props => {
+        if (!props.$active) return 'rgba(255, 255, 255, 0.05)';
+        switch(props.$category) {
+            case 'all': return '#7fa3ff';
+            case 'financial': return '#4caf50';
+            case 'personal': return '#ff9800';
+            case 'work': return '#2196f3';
+            case 'diary': return '#9c27b0';
+            default: return 'rgba(255, 255, 255, 0.05)';
+        }
+    }};
+    color: ${props => props.$active ? '#ffffff' : '#b0b0b0'};
+    font-size: 13px;
+    font-weight: ${props => props.$active ? '700' : '500'};
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     &:hover {
-        background: linear-gradient(135deg, rgba(240, 147, 251, 0.15), rgba(245, 87, 108, 0.15));
-        border-color: rgba(240, 147, 251, 0.3);
+        background: ${props => {
+            if (props.$active) {
+                switch(props.$category) {
+                    case 'all': return '#7fa3ff';
+                    case 'financial': return '#4caf50';
+                    case 'personal': return '#ff9800';
+                    case 'work': return '#2196f3';
+                    case 'diary': return '#9c27b0';
+                    default: return 'rgba(255, 255, 255, 0.05)';
+                }
+            }
+            return 'rgba(255, 255, 255, 0.08)';
+        }};
+        border-color: ${props => {
+            if (props.$active) {
+                switch(props.$category) {
+                    case 'all': return '#7fa3ff';
+                    case 'financial': return '#4caf50';
+                    case 'personal': return '#ff9800';
+                    case 'work': return '#2196f3';
+                    case 'diary': return '#9c27b0';
+                    default: return 'rgba(255, 255, 255, 0.15)';
+                }
+            }
+            return 'rgba(255, 255, 255, 0.25)';
+        }};
     }
 `;
 
@@ -112,25 +165,43 @@ const AddButton = styled.button`
     position: fixed;
     bottom: 84px;
     right: 24px;
-    width: 56px;
-    height: 56px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, rgba(240, 147, 251, 0.8), rgba(245, 87, 108, 0.8));
+    width: 80px;
+    height: 80px;
     border: none;
-    color: white;
-    font-size: 24px;
-    cursor: pointer;
-    box-shadow: 0 4px 16px rgba(240, 147, 251, 0.4);
-    transition: all 0.2s;
+    background: transparent;
+    cursor: grab;
     z-index: 100;
+    user-select: none;
+    touch-action: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
 
-    &:hover {
-        transform: scale(1.1);
-        box-shadow: 0 6px 20px rgba(240, 147, 251, 0.6);
-    }
+    ${props => props.$isDragging && `
+        transform: translateY(${props.$offsetY}px) !important;
+        cursor: grabbing;
+    `}
+
+    ${props => !props.$isDragging && props.$hasBeenDragged && `
+        transform: translateY(${props.$offsetY}px);
+        transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+    `}
 
     &:active {
-        transform: scale(0.95);
+        cursor: grabbing;
+    }
+`;
+
+const MaskIcon = styled.svg`
+    width: 70px;
+    height: 70px;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3));
+    transition: all 0.2s;
+
+    &:hover {
+        filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.4));
+        transform: scale(1.05);
     }
 `;
 
@@ -155,6 +226,13 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     });
     const [isConfirmingPin, setIsConfirmingPin] = useState(false);
     const [firstPin, setFirstPin] = useState('');
+
+    // 드래그 상태 관리
+    const [isDragging, setIsDragging] = useState(false);
+    const [offsetY, setOffsetY] = useState(0);
+    const [hasBeenDragged, setHasBeenDragged] = useState(false);
+    const dragStartY = useRef(0);
+    const dragStartOffsetY = useRef(0);
 
     // 자동 잠금 타이머
     const autoLockTimerRef = useRef(null);
@@ -389,6 +467,35 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         setSelectedCategory('all');
     };
 
+    // 드래그 핸들러
+    const MAX_DRAG_UP = -150;
+    const MIN_DRAG_DOWN = 0;
+
+    const handleDragStart = (e) => {
+        const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+        dragStartY.current = clientY;
+        dragStartOffsetY.current = offsetY;
+        setIsDragging(true);
+    };
+
+    const handleDragMove = (e) => {
+        if (!isDragging) return;
+        const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+        const deltaY = clientY - dragStartY.current;
+        let newOffsetY = dragStartOffsetY.current + deltaY;
+
+        // 범위 제한
+        if (newOffsetY < MAX_DRAG_UP) newOffsetY = MAX_DRAG_UP;
+        if (newOffsetY > MIN_DRAG_DOWN) newOffsetY = MIN_DRAG_DOWN;
+
+        setOffsetY(newOffsetY);
+        setHasBeenDragged(true);
+    };
+
+    const handleDragEnd = () => {
+        setIsDragging(false);
+    };
+
     // PIN 복구 (이메일 전송)
     const handleForgotPin = () => {
         if (!profile?.email) {
@@ -427,43 +534,69 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         <Container>
             <InnerContent>
             <SearchBar>
-                    <SearchInput
-                        type="text"
-                        placeholder="검색..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                    <FilterButton
-                        $active={selectedCategory === 'all'}
-                        onClick={() => setSelectedCategory('all')}
-                    >
-                        전체
-                    </FilterButton>
-                    <FilterButton
-                        $active={selectedCategory === 'financial'}
-                        onClick={() => setSelectedCategory('financial')}
-                    >
-                        💰
-                    </FilterButton>
-                    <FilterButton
-                        $active={selectedCategory === 'personal'}
-                        onClick={() => setSelectedCategory('personal')}
-                    >
-                        👤
-                    </FilterButton>
-                    <FilterButton
-                        $active={selectedCategory === 'work'}
-                        onClick={() => setSelectedCategory('work')}
-                    >
-                        💼
-                    </FilterButton>
-                    <FilterButton
-                        $active={selectedCategory === 'diary'}
-                        onClick={() => setSelectedCategory('diary')}
-                    >
-                        📔
-                    </FilterButton>
-                </SearchBar>
+                <SearchInput
+                    type="text"
+                    placeholder="검색..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
+            </SearchBar>
+
+            <FilterBar>
+                <FilterButton
+                    $active={selectedCategory === 'all'}
+                    $category="all"
+                    onClick={() => setSelectedCategory('all')}
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
+                        <circle cx="12" cy="12" r="10"/>
+                    </svg>
+                    전체
+                </FilterButton>
+                <FilterButton
+                    $active={selectedCategory === 'financial'}
+                    $category="financial"
+                    onClick={() => setSelectedCategory('financial')}
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
+                    금융
+                </FilterButton>
+                <FilterButton
+                    $active={selectedCategory === 'personal'}
+                    $category="personal"
+                    onClick={() => setSelectedCategory('personal')}
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    개인
+                </FilterButton>
+                <FilterButton
+                    $active={selectedCategory === 'work'}
+                    $category="work"
+                    onClick={() => setSelectedCategory('work')}
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
+                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                    </svg>
+                    업무
+                </FilterButton>
+                <FilterButton
+                    $active={selectedCategory === 'diary'}
+                    $category="diary"
+                    onClick={() => setSelectedCategory('diary')}
+                >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    </svg>
+                    일기
+                </FilterButton>
+            </FilterBar>
 
                 {filteredDocs.length === 0 ? (
                     <EmptyState>
@@ -487,11 +620,70 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                 )}
             </InnerContent>
 
-            <AddButton onClick={() => {
-                setEditingDoc(null);
-                setIsEditorOpen(true);
-            }}>
-                +
+            <AddButton
+                $isDragging={isDragging}
+                $offsetY={offsetY}
+                $hasBeenDragged={hasBeenDragged}
+                onMouseDown={handleDragStart}
+                onMouseMove={handleDragMove}
+                onMouseUp={handleDragEnd}
+                onMouseLeave={handleDragEnd}
+                onTouchStart={handleDragStart}
+                onTouchMove={handleDragMove}
+                onTouchEnd={handleDragEnd}
+                onClick={(e) => {
+                    if (!hasBeenDragged || Math.abs(offsetY - dragStartOffsetY.current) < 5) {
+                        setEditingDoc(null);
+                        setIsEditorOpen(true);
+                    }
+                }}
+            >
+                <MaskIcon viewBox="0 0 640 480" xmlns="http://www.w3.org/2000/svg">
+                    {/* 외곽선 */}
+                    <path
+                        d="M 100 240 Q 80 200, 80 160 Q 80 100, 120 60 Q 160 20, 220 20 Q 260 20, 280 50 Q 290 70, 290 100 Q 290 160, 250 200 Q 210 220, 170 230 Q 130 240, 100 240 Z"
+                        fill="none"
+                        stroke="#1a1a1a"
+                        strokeWidth="8"
+                    />
+                    <path
+                        d="M 540 240 Q 560 200, 560 160 Q 560 100, 520 60 Q 480 20, 420 20 Q 380 20, 360 50 Q 350 70, 350 100 Q 350 160, 390 200 Q 430 220, 470 230 Q 510 240, 540 240 Z"
+                        fill="none"
+                        stroke="#1a1a1a"
+                        strokeWidth="8"
+                    />
+
+                    {/* 마스크 본체 - 왼쪽 */}
+                    <path
+                        d="M 100 240 Q 80 200, 80 160 Q 80 100, 120 60 Q 160 20, 220 20 Q 260 20, 280 50 Q 290 70, 290 100 Q 290 160, 250 200 Q 210 220, 170 230 Q 130 240, 100 240 Z"
+                        fill="#f0f0f0"
+                    />
+
+                    {/* 마스크 본체 - 오른쪽 */}
+                    <path
+                        d="M 540 240 Q 560 200, 560 160 Q 560 100, 520 60 Q 480 20, 420 20 Q 380 20, 360 50 Q 350 70, 350 100 Q 350 160, 390 200 Q 430 220, 470 230 Q 510 240, 540 240 Z"
+                        fill="#f0f0f0"
+                    />
+
+                    {/* 중앙 연결부 */}
+                    <ellipse cx="320" cy="240" rx="40" ry="20" fill="#f0f0f0" stroke="#1a1a1a" strokeWidth="6"/>
+
+                    {/* 왼쪽 눈 구멍 */}
+                    <ellipse cx="180" cy="140" rx="40" ry="50" fill="#1a1a1a"/>
+                    <ellipse cx="180" cy="140" rx="38" ry="48" fill="#2a2a2a"/>
+
+                    {/* 오른쪽 눈 구멍 */}
+                    <ellipse cx="460" cy="140" rx="40" ry="50" fill="#1a1a1a"/>
+                    <ellipse cx="460" cy="140" rx="38" ry="48" fill="#2a2a2a"/>
+
+                    {/* 장식 라인들 */}
+                    <path d="M 150 80 Q 160 70, 170 65" stroke="#c0c0c0" strokeWidth="3" fill="none"/>
+                    <path d="M 490 80 Q 480 70, 470 65" stroke="#c0c0c0" strokeWidth="3" fill="none"/>
+
+                    {/* 반짝이는 포인트 */}
+                    <circle cx="140" cy="100" r="8" fill="#ffffff" opacity="0.8"/>
+                    <circle cx="500" cy="100" r="8" fill="#ffffff" opacity="0.8"/>
+                </MaskIcon>
             </AddButton>
 
             {isEditorOpen && (
