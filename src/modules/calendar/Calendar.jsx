@@ -2315,7 +2315,7 @@ const Calendar = ({
                             {scheduleText ? (
                                 <span style={{
                                     whiteSpace: 'pre-wrap',
-                                    color: '#4a5568',
+                                    color: '#c0c0c0',
                                     display: 'block',
                                     paddingBottom: '12px',
                                     padding: '0 5px 12px 5px'   // ✅ 위0, 오른쪽5, 아래12, 왼쪽5

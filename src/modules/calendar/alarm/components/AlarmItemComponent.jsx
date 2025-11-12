@@ -175,7 +175,7 @@ const BadgeIcon = styled.div`
 
 const TitleText = styled.div`
   font-size: 15px;
-  color: ${props => props.$isAnniversary ? ALARM_COLORS.primary : '#d0d0d0'};
+  color: ${props => props.$isAnniversary ? '#7fa3ff' : '#d0d0d0'}; // 기념일은 더 밝은 푸른색
   word-break: break-all;
   line-height: 1.3;
   max-width: 8em;
@@ -224,7 +224,7 @@ const ModifiedBadge = styled.div`
 
 const RepeatText = styled.div`
   font-size: 12px;
-  color: #808080;
+  color: #b0b0b0; // 밝은 회색으로 변경
   text-align: center;
   padding: 8px 0;
 `;
@@ -338,7 +338,7 @@ const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, onEdit })
         <TimeInfo>
           {alarm.isAnniversary ? (
             // 기념일 알람
-            <>
+            <div style={{ color: '#b0b0b0' }}>
               <div>등록일 {format(isRepeated && alarm.originalDate ? alarm.originalDate : alarm.calculatedTime, 'yyyy년 MM월 dd일')}</div>
               <div>
                 알람시간 {format(alarm.calculatedTime, 'HH:mm')}
@@ -353,11 +353,11 @@ const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, onEdit })
                   <RepeatLabel> (직접등록)</RepeatLabel>
                 ) : null}
               </div>
-            </>
+            </div>
           ) : (
             // 일반 알람
             <>
-              {format(alarm.calculatedTime, 'HH시 mm분')}
+              <span style={{ color: '#b0b0b0' }}>알람시간 {format(alarm.calculatedTime, 'HH시 mm분')}</span>
               {/* 시간 경과 시에만 "종료" 및 자동삭제 표시 (토글 상태 무관) */}
               {isExpired && (
                 <>

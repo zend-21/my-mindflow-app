@@ -632,10 +632,10 @@ const ResetButton = styled.button`
 const StartStopButton = styled.button`
     background: ${props => props.$isRunning
         ? 'rgba(0, 0, 0, 0.08)'
-        : 'linear-gradient(135deg, rgba(240, 147, 251, 0.3), rgba(245, 87, 108, 0.3))'};
+        : '#4a4a4a'};
     border: 1px solid ${props => props.$isRunning
         ? 'rgba(0, 0, 0, 0.12)'
-        : 'rgba(240, 147, 251, 0.5)'};
+        : '#3a3a3a'};
     color: ${props => props.$isRunning ? '#333333' : '#ffffff'};
     font-size: 22px;
     font-weight: 700;
@@ -645,17 +645,17 @@ const StartStopButton = styled.button`
     user-select: none;
     box-shadow: ${props => props.$isRunning
         ? '0 2px 8px rgba(0, 0, 0, 0.1)'
-        : '0 2px 8px rgba(240, 147, 251, 0.2)'};
+        : '0 2px 8px rgba(0, 0, 0, 0.3)'};
     min-width: 200px;
     transition: all 0.2s;
 
     &:hover:not(:disabled) {
         background: ${props => props.$isRunning
             ? 'rgba(0, 0, 0, 0.1)'
-            : 'linear-gradient(135deg, rgba(240, 147, 251, 0.4), rgba(245, 87, 108, 0.4))'};
+            : '#5a5a5a'};
         box-shadow: ${props => props.$isRunning
             ? '0 4px 12px rgba(0, 0, 0, 0.15)'
-            : '0 4px 12px rgba(240, 147, 251, 0.3)'};
+            : '0 4px 12px rgba(0, 0, 0, 0.4)'};
     }
 
     &:disabled {
