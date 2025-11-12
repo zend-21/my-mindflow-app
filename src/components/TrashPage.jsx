@@ -852,7 +852,9 @@ const TrashPage = ({ showToast }) => {
                                         삭제일 - {format(new Date(item.deletedAt), 'yyyy.MM.dd HH:mm', { locale: ko })}
                                     </DeleteInfo>
                                 </ItemHeader>
-                                <ItemContent>{item.content}</ItemContent>
+                                <ItemContent>
+                                    {item.type === 'secret' ? '*********************' : item.content}
+                                </ItemContent>
                                 <DaysLeft $days={daysLeft}>
                                     {daysLeft > 0
                                         ? `${daysLeft}일 후 자동 삭제`
@@ -928,7 +930,9 @@ const TrashPage = ({ showToast }) => {
                             </DetailModalHeader>
 
                             <DetailModalContent>
-                                {selectedItem.originalData?.content || selectedItem.content}
+                                {selectedItem.type === 'secret'
+                                    ? '*********************'
+                                    : (selectedItem.originalData?.content || selectedItem.content)}
                             </DetailModalContent>
 
                             <DetailModalActions>

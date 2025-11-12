@@ -256,7 +256,8 @@ const SideMenu = ({
     onSync,
     onOpenFortune,
     onOpenTimer,  // ⏱️ 타이머 기능 추가
-    onOpenTrash   // 🗑️ 휴지통 기능 추가
+    onOpenTrash,  // 🗑️ 휴지통 기능 추가
+    onOpenSecret  // 🔒 시크릿 페이지 추가
 }) => {
     const fileInputRef = useRef(null);
     const [imageError, setImageError] = useState(false); // ✅ 추가: 이미지 로드 오류 상태
@@ -322,6 +323,12 @@ const SideMenu = ({
                                     if (onOpenTimer) onOpenTimer();
                                 }}>
                                     <span className="icon">⏱️</span> 타이머
+                                </MenuItem>
+                                <MenuItem onClick={() => {
+                                    onClose();
+                                    if (onOpenSecret) onOpenSecret();
+                                }}>
+                                    <span className="icon">🔒</span> 시크릿
                                 </MenuItem>
                             </MenuGroup>
 

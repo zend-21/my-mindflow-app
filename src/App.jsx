@@ -40,6 +40,7 @@ import Timer from './components/Timer.jsx';
 import { TrashProvider } from './contexts/TrashContext';
 import TrashPage from './components/TrashPage.jsx';
 import AppContent from './components/AppContent.jsx';
+import SecretPage from './components/secret/SecretPage.jsx';
 
 // ★★★ 토스트 메시지 스타일 ★★★
 const fadeIn = keyframes`
@@ -343,6 +344,7 @@ function App() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isFortuneFlowOpen, setIsFortuneFlowOpen] = useState(false);
     const [isTimerOpen, setIsTimerOpen] = useState(false);
+    const [isSecretPageOpen, setIsSecretPageOpen] = useState(false);
     const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
     const [restoreType, setRestoreType] = useState('phone'); // 'phone' or 'google'
     const [pendingRestoreFile, setPendingRestoreFile] = useState(null);
@@ -1127,7 +1129,11 @@ function App() {
     ];
 
     const handleSwitchTab = (tab) => {
-        setActiveTab(tab);
+        if (tab === 'secret') {
+            setIsSecretPageOpen(true);
+        } else {
+            setActiveTab(tab);
+        }
     };
 
     const handleFloatingButtonClick = () => {
@@ -1855,7 +1861,6 @@ if (isLoading) {
                                 onRequestDeleteSelectedMemos={requestDeleteSelectedMemos}
                             />
                         }
-                        {activeTab === 'secret' && <div>시크릿 페이지</div>}
                         {activeTab === 'review' && <div>리뷰 페이지</div>}
                         {activeTab === 'todo' && <div>할 일 페이지</div>}
                         {activeTab === 'recent-detail' && <div>최근 활동 상세 페이지</div>}
@@ -1884,6 +1889,7 @@ if (isLoading) {
                             setIsMenuOpen(false);
                             setActiveTab('trash');
                         }}
+                        onOpenSecret={() => setIsSecretPageOpen(true)}
                     />
                 </>
             </Screen>
@@ -2035,6 +2041,15 @@ if (isLoading) {
                     onSnooze={snoozeAlarm}
                     currentSnoozeCount={currentAlarm.snoozeCount || 0}
                     maxSnoozeCount={3}
+                />
+            )}
+
+            {/* 🔒 시크릿 페이지 */}
+            {isSecretPageOpen && (
+                <SecretPage
+                    onClose={() => setIsSecretPageOpen(false)}
+                    profile={profile}
+                    showToast={showToast}
                 />
             )}
             </AppContent>
