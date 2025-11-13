@@ -39,7 +39,10 @@ const Card = styled.div`
     }
 
     &:hover {
-        background: linear-gradient(135deg, rgba(240, 147, 251, 0.15), rgba(245, 87, 108, 0.15));
+        background: ${props => props.$isSelected
+            ? 'linear-gradient(135deg, rgba(240, 147, 251, 0.2) 0%, rgba(245, 87, 108, 0.2) 100%)'
+            : 'linear-gradient(135deg, rgba(240, 147, 251, 0.15), rgba(245, 87, 108, 0.15))'
+        };
         border-color: rgba(240, 147, 251, 0.3);
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(240, 147, 251, 0.2);

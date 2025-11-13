@@ -532,6 +532,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     const [selectionMode, setSelectionMode] = useState(false);
     const [selectedDocs, setSelectedDocs] = useState([]);
     const [showCategoryModal, setShowCategoryModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     // 개별 카드 카테고리 모달 상태 (전역 추적)
     const [openCategoryDropdownId, setOpenCategoryDropdownId] = useState(null);
@@ -921,12 +922,12 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     };
 
     // 일괄 삭제
-    const handleBulkDelete = async () => {
+    const handleBulkDelete = () => {
         if (selectedDocs.length === 0) return;
+        setShowDeleteModal(true);
+    };
 
-        const confirmDelete = window.confirm(`${selectedDocs.length}개의 문서를 삭제하시겠습니까?`);
-        if (!confirmDelete) return;
-
+    const confirmBulkDelete = async () => {
         try {
             for (const docId of selectedDocs) {
                 const doc = docs.find(d => d.id === docId);
@@ -948,10 +949,12 @@ const SecretPage = ({ onClose, profile, showToast }) => {
 
             await loadDocs(currentPin);
             showToast?.(`${selectedDocs.length}개의 문서가 삭제되었습니다.`);
+            setShowDeleteModal(false);
             exitSelectionMode();
         } catch (error) {
             console.error('일괄 삭제 오류:', error);
             showToast?.('문서 삭제에 실패했습니다.');
+            setShowDeleteModal(false);
         }
     };
 
@@ -1352,15 +1355,15 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                 <BulkActionBar>
                     <BulkActionButton $type="category" onClick={() => setShowCategoryModal(true)}>
                         📁
-                        <span>카테고리</span>
+                        <span>카테고리 이동</span>
                     </BulkActionButton>
                     <BulkActionButton $type="importance" onClick={handleBulkImportanceToggle}>
                         ⭐
-                        <span>중요도</span>
+                        <span>중요도 지정/해제</span>
                     </BulkActionButton>
                     <BulkActionButton $type="delete" onClick={handleBulkDelete}>
                         🗑️
-                        <span>삭제</span>
+                        <span>일괄 삭제</span>
                     </BulkActionButton>
                 </BulkActionBar>
             )}
@@ -1414,6 +1417,39 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                         <ModalCancelButton onClick={() => setShowCategoryModal(false)}>
                             취소
                         </ModalCancelButton>
+                    </CategoryModalContent>
+                </CategoryModal>
+            )}
+
+            {showDeleteModal && (
+                <CategoryModal onClick={() => setShowDeleteModal(false)}>
+                    <CategoryModalContent onClick={(e) => e.stopPropagation()}>
+                        <CategoryModalTitle>일괄 삭제</CategoryModalTitle>
+                        <div style={{
+                            color: '#d0d0d0',
+                            fontSize: '14px',
+                            textAlign: 'center',
+                            margin: '20px 0',
+                            lineHeight: '1.6'
+                        }}>
+                            선택한 <span style={{ color: '#f093fb', fontWeight: 'bold' }}>{selectedDocs.length}개</span>의 문서를<br/>
+                            삭제하시겠습니까?
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <ModalCancelButton onClick={() => setShowDeleteModal(false)}>
+                                취소
+                            </ModalCancelButton>
+                            <ModalCancelButton
+                                onClick={confirmBulkDelete}
+                                style={{
+                                    background: 'rgba(255, 107, 107, 0.2)',
+                                    borderColor: 'rgba(255, 107, 107, 0.3)',
+                                    color: '#ff6b6b'
+                                }}
+                            >
+                                삭제
+                            </ModalCancelButton>
+                        </div>
                     </CategoryModalContent>
                 </CategoryModal>
             )}
