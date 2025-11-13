@@ -699,9 +699,9 @@ const DateCell = styled.div`
     
     ${props => props.$isSelected && !props.$isToday ? `
         background-color: transparent !important;
-        border: 2px solid red !important;
+        box-shadow: inset 0 0 0 2px red !important;
         font-weight: 700;
-        
+
         &:nth-child(7n) {
         color: ${props.$isCurrentMonth ? '#3399ff' : 'rgba(51, 153, 255, 0.4)'} !important;
         }
