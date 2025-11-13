@@ -436,8 +436,8 @@ const ModalCancelButton = styled.button`
 `;
 
 const AddButton = styled.div`
-    width: 80px;
-    height: 80px;
+    width: 70px;
+    height: 70px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -445,8 +445,8 @@ const AddButton = styled.div`
     border: none;
 
     position: absolute;
-    bottom: 104px;
-    right: 24px;
+    bottom: 109px;
+    right: 29px;
     z-index: 10000;
 
     user-select: none;
