@@ -16,6 +16,8 @@ const Overlay = styled.div`
     display: flex;
     justify-content: center;
     align-items: center;
+    touch-action: none;
+    overscroll-behavior: contain;
 `;
 
 const Modal = styled.div`

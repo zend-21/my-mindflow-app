@@ -452,6 +452,8 @@ const AddButton = styled.div`
 
     user-select: none;
     touch-action: none;
+    pointer-events: auto;
+    isolation: isolate;
 
     ${props => props.$isDragging && `
         animation: none !important;
@@ -476,7 +478,6 @@ const MaskImage = styled.img`
     object-fit: contain;
     filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3)) drop-shadow(0 0 0 2px #8B0000);
     transition: all 0.2s;
-    pointer-events: none;
 
     &:hover {
         filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.4)) drop-shadow(0 0 0 2px #8B0000);
@@ -496,7 +497,6 @@ const PlusIcon = styled.div`
     display: flex;
     align-items: center;
     justify-content: center;
-    pointer-events: none;
 
     &::before,
     &::after {

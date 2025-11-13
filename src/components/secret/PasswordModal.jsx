@@ -16,6 +16,8 @@ const Overlay = styled.div`
     display: flex;
     justify-content: center;
     align-items: center;
+    touch-action: none;
+    overscroll-behavior: contain;
 `;
 
 const Modal = styled.div`
@@ -207,7 +209,12 @@ const PasswordModal = ({ onSubmit, onCancel, onForgotPassword }) => {
 
     return (
         <Portal>
-            <Overlay onClick={onCancel}>
+            <Overlay
+                onClick={onCancel}
+                onTouchStart={(e) => e.stopPropagation()}
+                onTouchMove={(e) => { e.stopPropagation(); e.preventDefault(); }}
+                onTouchEnd={(e) => e.stopPropagation()}
+            >
                 <Modal onClick={(e) => e.stopPropagation()}>
                     <Header>
                         <Title>문서 비밀번호 입력</Title>
