@@ -196,6 +196,227 @@ const EmptyText = styled.p`
     margin: 0 0 24px 0;
 `;
 
+const SelectionModeBar = styled.div`
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(240, 147, 251, 0.3);
+`;
+
+const SelectionInfo = styled.div`
+    color: white;
+    font-size: 15px;
+    font-weight: 600;
+`;
+
+const SelectionActions = styled.div`
+    display: flex;
+    gap: 8px;
+`;
+
+const SelectionButton = styled.button`
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
+`;
+
+const BulkActionBar = styled.div`
+    position: fixed;
+    bottom: 60px;
+    left: 0;
+    right: 0;
+    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 12px 24px;
+    display: flex;
+    gap: 8px;
+    justify-content: space-around;
+    z-index: 9999;
+    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+`;
+
+const BulkActionButton = styled.button`
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid ${props => {
+        switch(props.$type) {
+            case 'delete': return 'rgba(255, 107, 107, 0.3)';
+            case 'category': return 'rgba(100, 181, 246, 0.3)';
+            case 'importance': return 'rgba(255, 193, 7, 0.3)';
+            default: return 'rgba(255, 255, 255, 0.15)';
+        }
+    }};
+    background: ${props => {
+        switch(props.$type) {
+            case 'delete': return 'rgba(255, 107, 107, 0.1)';
+            case 'category': return 'rgba(100, 181, 246, 0.1)';
+            case 'importance': return 'rgba(255, 193, 7, 0.1)';
+            default: return 'rgba(255, 255, 255, 0.05)';
+        }
+    }};
+    color: ${props => {
+        switch(props.$type) {
+            case 'delete': return '#ff6b6b';
+            case 'category': return '#64b5f6';
+            case 'importance': return '#ffc107';
+            default: return '#ffffff';
+        }
+    }};
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+
+    &:hover {
+        background: ${props => {
+            switch(props.$type) {
+                case 'delete': return 'rgba(255, 107, 107, 0.2)';
+                case 'category': return 'rgba(100, 181, 246, 0.2)';
+                case 'importance': return 'rgba(255, 193, 7, 0.2)';
+                default: return 'rgba(255, 255, 255, 0.08)';
+            }
+        }};
+        border-color: ${props => {
+            switch(props.$type) {
+                case 'delete': return 'rgba(255, 107, 107, 0.5)';
+                case 'category': return 'rgba(100, 181, 246, 0.5)';
+                case 'importance': return 'rgba(255, 193, 7, 0.5)';
+                default: return 'rgba(255, 255, 255, 0.25)';
+            }
+        }};
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
+`;
+
+const CategoryModal = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    padding: 20px;
+`;
+
+const CategoryModalContent = styled.div`
+    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 400px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const CategoryModalTitle = styled.h3`
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+    text-align: center;
+`;
+
+const CategoryGrid = styled.div`
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+`;
+
+const CategoryOption = styled.button`
+    padding: 16px;
+    border-radius: 12px;
+    border: 2px solid ${props => {
+        switch(props.$category) {
+            case 'financial': return '#4caf50';
+            case 'personal': return '#ff9800';
+            case 'work': return '#2196f3';
+            case 'diary': return '#9c27b0';
+            default: return 'rgba(255, 255, 255, 0.15)';
+        }
+    }};
+    background: ${props => {
+        switch(props.$category) {
+            case 'financial': return 'rgba(76, 175, 80, 0.1)';
+            case 'personal': return 'rgba(255, 152, 0, 0.1)';
+            case 'work': return 'rgba(33, 150, 243, 0.1)';
+            case 'diary': return 'rgba(156, 39, 176, 0.1)';
+            default: return 'rgba(255, 255, 255, 0.05)';
+        }
+    }};
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
+`;
+
+const ModalCancelButton = styled.button`
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.05);
+    color: #d0d0d0;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    &:active {
+        transform: scale(0.98);
+    }
+`;
+
 const AddButton = styled.button`
     position: fixed;
     bottom: 104px;
@@ -301,6 +522,14 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     const [sortBy, setSortBy] = useState('date'); // 'date' or 'importance'
     const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
     const [showPinRecovery, setShowPinRecovery] = useState(false);
+
+    // 다중 선택 모드 상태
+    const [selectionMode, setSelectionMode] = useState(false);
+    const [selectedDocs, setSelectedDocs] = useState([]);
+    const [showCategoryModal, setShowCategoryModal] = useState(false);
+
+    // 개별 카드 카테고리 모달 상태 (전역 추적)
+    const [openCategoryDropdownId, setOpenCategoryDropdownId] = useState(null);
 
     // 드래그 상태 관리
     const [isDragging, setIsDragging] = useState(false);
@@ -647,6 +876,116 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         setFilteredDocs([]);
         setSearchQuery('');
         setSelectedCategory('all');
+        setSelectionMode(false);
+        setSelectedDocs([]);
+    };
+
+    // 다중 선택 모드 헬퍼 함수들
+    const toggleSelection = (docId) => {
+        setSelectedDocs(prev => {
+            if (prev.includes(docId)) {
+                return prev.filter(id => id !== docId);
+            } else {
+                return [...prev, docId];
+            }
+        });
+    };
+
+    const selectAll = () => {
+        const allDocIds = filteredDocs.map(doc => doc.id);
+        setSelectedDocs(allDocIds);
+    };
+
+    const clearSelection = () => {
+        setSelectedDocs([]);
+    };
+
+    const exitSelectionMode = () => {
+        setSelectionMode(false);
+        setSelectedDocs([]);
+    };
+
+    const enterSelectionMode = (initialDocId = null) => {
+        setSelectionMode(true);
+        if (initialDocId) {
+            setSelectedDocs([initialDocId]);
+        }
+    };
+
+    // 일괄 삭제
+    const handleBulkDelete = async () => {
+        if (selectedDocs.length === 0) return;
+
+        const confirmDelete = window.confirm(`${selectedDocs.length}개의 문서를 삭제하시겠습니까?`);
+        if (!confirmDelete) return;
+
+        try {
+            for (const docId of selectedDocs) {
+                const doc = docs.find(d => d.id === docId);
+                if (doc) {
+                    // 휴지통으로 이동 이벤트 발생
+                    const event = new CustomEvent('moveToTrash', {
+                        detail: {
+                            id: doc.id,
+                            type: 'secret',
+                            content: doc.title || '제목 없음',
+                            originalData: doc
+                        }
+                    });
+                    window.dispatchEvent(event);
+
+                    await deleteSecretDoc(currentPin, docId);
+                }
+            }
+
+            await loadDocs(currentPin);
+            showToast?.(`${selectedDocs.length}개의 문서가 삭제되었습니다.`);
+            exitSelectionMode();
+        } catch (error) {
+            console.error('일괄 삭제 오류:', error);
+            showToast?.('문서 삭제에 실패했습니다.');
+        }
+    };
+
+    // 일괄 카테고리 변경
+    const handleBulkCategoryChange = async (newCategory) => {
+        if (selectedDocs.length === 0) return;
+
+        try {
+            for (const docId of selectedDocs) {
+                await updateSecretDoc(currentPin, docId, { category: newCategory });
+            }
+
+            await loadDocs(currentPin);
+            showToast?.(`${selectedDocs.length}개의 문서 카테고리가 변경되었습니다.`);
+            exitSelectionMode();
+        } catch (error) {
+            console.error('일괄 카테고리 변경 오류:', error);
+            showToast?.('카테고리 변경에 실패했습니다.');
+        }
+    };
+
+    // 일괄 중요도 토글
+    const handleBulkImportanceToggle = async () => {
+        if (selectedDocs.length === 0) return;
+
+        try {
+            // 선택된 문서 중 하나라도 중요하지 않으면 모두 중요로, 모두 중요하면 모두 해제
+            const selectedDocObjects = docs.filter(d => selectedDocs.includes(d.id));
+            const allImportant = selectedDocObjects.every(d => d.isImportant);
+            const newImportance = !allImportant;
+
+            for (const docId of selectedDocs) {
+                await updateSecretDoc(currentPin, docId, { isImportant: newImportance });
+            }
+
+            await loadDocs(currentPin);
+            showToast?.(`${selectedDocs.length}개의 문서가 ${newImportance ? '중요 표시' : '중요 해제'}되었습니다.`);
+            exitSelectionMode();
+        } catch (error) {
+            console.error('일괄 중요도 변경 오류:', error);
+            showToast?.('중요도 변경에 실패했습니다.');
+        }
     };
 
     // 드래그 핸들러 (Pointer API 사용 - FloatingButton과 동일한 로직)
@@ -867,6 +1206,22 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                 </SortButton>
             </SortBar>
 
+            {selectionMode && (
+                <SelectionModeBar>
+                    <SelectionInfo>
+                        {selectedDocs.length}개 선택됨
+                    </SelectionInfo>
+                    <SelectionActions>
+                        <SelectionButton onClick={selectAll}>
+                            전체선택
+                        </SelectionButton>
+                        <SelectionButton onClick={exitSelectionMode}>
+                            취소
+                        </SelectionButton>
+                    </SelectionActions>
+                </SelectionModeBar>
+            )}
+
                 {filteredDocs.length === 0 ? (
                     <EmptyState>
                         <EmptyIcon>🔒</EmptyIcon>
@@ -882,8 +1237,13 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                             <SecretDocCard
                                 key={doc.id}
                                 doc={doc}
-                                onClick={handleDocClick}
+                                onClick={selectionMode ? () => toggleSelection(doc.id) : handleDocClick}
                                 onCategoryChange={handleCategoryChange}
+                                onLongPress={() => enterSelectionMode(doc.id)}
+                                selectionMode={selectionMode}
+                                isSelected={selectedDocs.includes(doc.id)}
+                                openCategoryDropdownId={openCategoryDropdownId}
+                                setOpenCategoryDropdownId={setOpenCategoryDropdownId}
                             />
                         ))}
                     </DocsGrid>
@@ -976,6 +1336,76 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                         </button>
                     </div>
                 </div>
+            )}
+
+            {selectionMode && selectedDocs.length > 0 && (
+                <BulkActionBar>
+                    <BulkActionButton $type="category" onClick={() => setShowCategoryModal(true)}>
+                        📁
+                        <span>카테고리</span>
+                    </BulkActionButton>
+                    <BulkActionButton $type="importance" onClick={handleBulkImportanceToggle}>
+                        ⭐
+                        <span>중요도</span>
+                    </BulkActionButton>
+                    <BulkActionButton $type="delete" onClick={handleBulkDelete}>
+                        🗑️
+                        <span>삭제</span>
+                    </BulkActionButton>
+                </BulkActionBar>
+            )}
+
+            {showCategoryModal && (
+                <CategoryModal onClick={() => setShowCategoryModal(false)}>
+                    <CategoryModalContent onClick={(e) => e.stopPropagation()}>
+                        <CategoryModalTitle>카테고리 선택</CategoryModalTitle>
+                        <CategoryGrid>
+                            <CategoryOption
+                                $category="financial"
+                                onClick={() => {
+                                    handleBulkCategoryChange('financial');
+                                    setShowCategoryModal(false);
+                                }}
+                            >
+                                💰
+                                <span>금융</span>
+                            </CategoryOption>
+                            <CategoryOption
+                                $category="personal"
+                                onClick={() => {
+                                    handleBulkCategoryChange('personal');
+                                    setShowCategoryModal(false);
+                                }}
+                            >
+                                👤
+                                <span>개인</span>
+                            </CategoryOption>
+                            <CategoryOption
+                                $category="work"
+                                onClick={() => {
+                                    handleBulkCategoryChange('work');
+                                    setShowCategoryModal(false);
+                                }}
+                            >
+                                💼
+                                <span>업무</span>
+                            </CategoryOption>
+                            <CategoryOption
+                                $category="diary"
+                                onClick={() => {
+                                    handleBulkCategoryChange('diary');
+                                    setShowCategoryModal(false);
+                                }}
+                            >
+                                📔
+                                <span>일기</span>
+                            </CategoryOption>
+                        </CategoryGrid>
+                        <ModalCancelButton onClick={() => setShowCategoryModal(false)}>
+                            취소
+                        </ModalCancelButton>
+                    </CategoryModalContent>
+                </CategoryModal>
             )}
         </Container>
     );

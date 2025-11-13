@@ -1,12 +1,18 @@
 // src/components/secret/SecretDocCard.jsx
 // 시크릿 문서 카드 컴포넌트
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
 
 const Card = styled.div`
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: ${props => props.$isSelected
+        ? 'linear-gradient(135deg, rgba(240, 147, 251, 0.2) 0%, rgba(245, 87, 108, 0.2) 100%)'
+        : 'linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 100%)'
+    };
+    border: 1px solid ${props => props.$isSelected
+        ? 'rgba(240, 147, 251, 0.5)'
+        : 'rgba(255, 255, 255, 0.1)'
+    };
     border-radius: 12px;
     padding: 16px;
     cursor: pointer;
@@ -39,6 +45,38 @@ const Card = styled.div`
     }
 `;
 
+const Checkbox = styled.div`
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: 2px solid ${props => props.$checked ? '#f093fb' : 'rgba(255, 255, 255, 0.3)'};
+    background: ${props => props.$checked ? 'linear-gradient(135deg, #f093fb, #f5576c)' : 'rgba(0, 0, 0, 0.3)'};
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 10;
+    cursor: pointer;
+
+    &::after {
+        content: '✓';
+        color: white;
+        font-size: 14px;
+        font-weight: bold;
+        opacity: ${props => props.$checked ? 1 : 0};
+        transform: scale(${props => props.$checked ? 1 : 0.5});
+        transition: all 0.2s;
+    }
+
+    &:hover {
+        border-color: #f093fb;
+        transform: scale(1.1);
+    }
+`;
+
 const CardHeader = styled.div`
     display: flex;
     justify-content: space-between;
@@ -46,6 +84,7 @@ const CardHeader = styled.div`
     margin-bottom: 12px;
     position: relative;
     z-index: 1;
+    ${props => props.$selectionMode && 'margin-left: 32px;'}
 `;
 
 const TitleRow = styled.div`
@@ -288,8 +327,15 @@ const DateText = styled.span`
     white-space: nowrap;
 `;
 
-const SecretDocCard = ({ doc, onClick, onCategoryChange }) => {
-    const [showDropdown, setShowDropdown] = useState(false);
+const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionMode, isSelected, openCategoryDropdownId, setOpenCategoryDropdownId }) => {
+    const longPressTimerRef = useRef(null);
+    const isLongPressRef = useRef(false);
+
+    // 로컬 state 대신 전역 state 사용
+    const showDropdown = openCategoryDropdownId === doc.id;
+    const setShowDropdown = (show) => {
+        setOpenCategoryDropdownId(show ? doc.id : null);
+    };
 
     const formatDate = (dateString) => {
         const date = new Date(dateString);
@@ -306,14 +352,62 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange }) => {
 
     const handleBadgeClick = (e) => {
         e.stopPropagation();
+        e.preventDefault();
+
+        // 다중 선택 모드에서는 카테고리 변경 불가
+        if (selectionMode) return;
+
+        // 길게 누르기 타이머 취소
+        clearTimeout(longPressTimerRef.current);
+        isLongPressRef.current = false;
         setShowDropdown(!showDropdown);
     };
 
     const handleCategoryChange = async (e, newCategory) => {
         e.stopPropagation();
-        setShowDropdown(false);
-        if (onCategoryChange && newCategory !== doc.category) {
+
+        // 카테고리 변경 실행
+        if (onCategoryChange) {
             await onCategoryChange(doc.id, newCategory);
+        }
+
+        // 변경 후 모달 닫기
+        setShowDropdown(false);
+    };
+
+    const handlePointerDown = (e) => {
+        if (selectionMode) return; // 다중 선택 모드에서는 길게 누르기 비활성화
+
+        isLongPressRef.current = false;
+        longPressTimerRef.current = setTimeout(() => {
+            isLongPressRef.current = true;
+            if (onLongPress) {
+                onLongPress();
+            }
+        }, 500); // 0.5초
+    };
+
+    const handlePointerUp = (e) => {
+        clearTimeout(longPressTimerRef.current);
+
+        if (!isLongPressRef.current && onClick) {
+            // 길게 누르지 않았으면 일반 클릭
+            // (모달 닫기는 전역 핸들러가 처리)
+            onClick(doc);
+        }
+
+        isLongPressRef.current = false;
+    };
+
+    const handlePointerCancel = () => {
+        clearTimeout(longPressTimerRef.current);
+        isLongPressRef.current = false;
+    };
+
+    const handleCheckboxClick = (e) => {
+        e.stopPropagation();
+        if (onClick) {
+            onClick(doc);
         }
     };
 
@@ -325,8 +419,20 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange }) => {
     ];
 
     return (
-        <Card onClick={() => !showDropdown && onClick(doc)}>
-            <CardHeader>
+        <Card
+            onClick={selectionMode ? handleCheckboxClick : undefined}
+            onPointerDown={handlePointerDown}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            $isSelected={isSelected}
+        >
+            {selectionMode && (
+                <Checkbox
+                    $checked={isSelected}
+                    onClick={handleCheckboxClick}
+                />
+            )}
+            <CardHeader $selectionMode={selectionMode}>
                 <TitleRow>
                     {doc.isImportant && (
                         <ImportantIcon viewBox="0 0 16 16" fill="none">
@@ -338,7 +444,15 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange }) => {
                     <Title>{doc.title || '제목 없음'}</Title>
                 </TitleRow>
                 {doc.category && (
-                    <CategoryBadge $category={doc.category} onClick={handleBadgeClick}>
+                    <CategoryBadge
+                        $category={doc.category}
+                        onClick={handleBadgeClick}
+                        onPointerDown={(e) => {
+                            e.stopPropagation();
+                            clearTimeout(longPressTimerRef.current);
+                        }}
+                        onPointerUp={(e) => e.stopPropagation()}
+                    >
                         {doc.category === 'financial' && '💰 금융'}
                         {doc.category === 'personal' && '👤 개인'}
                         {doc.category === 'work' && '💼 업무'}
@@ -365,7 +479,16 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange }) => {
             </CardFooter>
 
             {showDropdown && (
-                <CategoryModal onClick={(e) => e.stopPropagation()}>
+                <CategoryModal
+                    onClick={(e) => {
+                        e.stopPropagation();
+                    }}
+                    onPointerDown={(e) => {
+                        e.stopPropagation();
+                        clearTimeout(longPressTimerRef.current);
+                    }}
+                    onPointerUp={(e) => e.stopPropagation()}
+                >
                     <ModalHeader>
                         <ModalTitle>카테고리 변경</ModalTitle>
                         <CloseButton
