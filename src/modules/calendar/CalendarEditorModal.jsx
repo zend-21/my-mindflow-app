@@ -457,8 +457,8 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
             {/* 날짜 */}
             <TitleRow>
               {modalDate
-                ? `${format(modalDate, "yyyy년 M월 d일", { locale: ko })} 스케줄 편집창`
-                : "스케줄 편집창"}
+                ? `${format(modalDate, "yyyy년 M월 d일", { locale: ko })} 스케줄 등록창`
+                : "스케줄 등록창"}
             </TitleRow>
 
             {/* 등록 버튼 + 자판 숨김 */}
@@ -502,10 +502,6 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
               </SmallNote>
           )}
 
-              <SmallNote style={{ marginTop: -8, marginBottom: 5, textAlign: 'left' }}>
-                · 입력창을 두 번 탭하여 등록(수정)하거나 창을 닫을 수 있습니다.
-              </SmallNote>              
-
           {/* 본문 입력 */}
           <Textarea
             ref={textareaRef}
@@ -530,8 +526,8 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
             }}
             onFocus={() => setIsKeyboardActive(true)}
             onBlur={() => setIsKeyboardActive(false)}
-            onDoubleClick={handleDoubleClick} 
-            placeholder="스케줄을 입력하세요..."
+            onDoubleClick={handleDoubleClick}
+            placeholder={`스케줄을 입력하세요...\n\n입력창을 두 번 탭하여 등록(수정)하거나 창을 닫을 수 있습니다.`}
           />
         </ModalContent>
       </Overlay>
