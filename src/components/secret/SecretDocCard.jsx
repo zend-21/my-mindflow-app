@@ -409,9 +409,8 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
     const handlePointerUp = (e) => {
         clearTimeout(longPressTimerRef.current);
 
-        if (!isLongPressRef.current && onClick) {
-            // 길게 누르지 않았으면 일반 클릭
-            // (모달 닫기는 전역 핸들러가 처리)
+        // selectionMode가 아닐 때만 클릭으로 문서 열기
+        if (!isLongPressRef.current && !selectionMode && onClick) {
             onClick(doc);
         }
 
@@ -421,6 +420,13 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
     const handlePointerCancel = () => {
         clearTimeout(longPressTimerRef.current);
         isLongPressRef.current = false;
+    };
+
+    const handleCardClick = (e) => {
+        // selectionMode일 때만 클릭으로 선택/해제
+        if (selectionMode && onClick) {
+            onClick(doc);
+        }
     };
 
     const handleCheckboxClick = (e) => {
@@ -439,7 +445,7 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
 
     return (
         <Card
-            onClick={selectionMode ? handleCheckboxClick : undefined}
+            onClick={handleCardClick}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}

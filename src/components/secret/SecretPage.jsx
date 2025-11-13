@@ -173,6 +173,7 @@ const DocsGrid = styled.div`
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 16px;
+    padding-bottom: ${props => props.$selectionMode ? '80px' : '20px'};
 
     @media (max-width: 768px) {
         grid-template-columns: 1fr;
@@ -241,17 +242,20 @@ const SelectionButton = styled.button`
 
 const BulkActionBar = styled.div`
     position: fixed;
-    bottom: 60px;
+    bottom: 86px;
     left: 0;
     right: 0;
     background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 12px 24px;
+    padding: 8px 24px;
     display: flex;
     gap: 8px;
     justify-content: space-around;
+    align-items: center;
     z-index: 9999;
     box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+    touch-action: none;
+    pointer-events: auto;
 `;
 
 const BulkActionButton = styled.button`
@@ -289,6 +293,7 @@ const BulkActionButton = styled.button`
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 4px;
 
     &:hover {
@@ -891,13 +896,16 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         });
     };
 
-    const selectAll = () => {
+    const toggleSelectAll = () => {
+        // 현재 필터된 문서가 모두 선택되어 있으면 해제, 아니면 전체 선택
         const allDocIds = filteredDocs.map(doc => doc.id);
-        setSelectedDocs(allDocIds);
-    };
+        const allSelected = allDocIds.length > 0 && allDocIds.every(id => selectedDocs.includes(id));
 
-    const clearSelection = () => {
-        setSelectedDocs([]);
+        if (allSelected) {
+            setSelectedDocs([]);
+        } else {
+            setSelectedDocs(allDocIds);
+        }
     };
 
     const exitSelectionMode = () => {
@@ -1212,8 +1220,10 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                         {selectedDocs.length}개 선택됨
                     </SelectionInfo>
                     <SelectionActions>
-                        <SelectionButton onClick={selectAll}>
-                            전체선택
+                        <SelectionButton onClick={toggleSelectAll}>
+                            {filteredDocs.length > 0 && filteredDocs.every(doc => selectedDocs.includes(doc.id))
+                                ? '전체해제'
+                                : '전체선택'}
                         </SelectionButton>
                         <SelectionButton onClick={exitSelectionMode}>
                             취소
@@ -1232,7 +1242,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                         </EmptyText>
                     </EmptyState>
                 ) : (
-                    <DocsGrid>
+                    <DocsGrid $selectionMode={selectionMode}>
                         {filteredDocs.map(doc => (
                             <SecretDocCard
                                 key={doc.id}
