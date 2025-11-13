@@ -444,7 +444,7 @@ const AddButton = styled.div`
     cursor: grab;
     border: none;
 
-    position: absolute;
+    position: fixed;
     bottom: 109px;
     right: 29px;
     z-index: 10000;
@@ -1151,6 +1151,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     }
 
     return (
+        <>
         <Container>
             <InnerContent>
             <SearchBar>
@@ -1284,30 +1285,6 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                     </DocsGrid>
                 )}
             </InnerContent>
-
-            <AddButton
-                ref={addButtonRef}
-                role="button"
-                tabIndex="0"
-                $isDragging={isDragging}
-                $offsetY={offsetY}
-                $hasBeenDragged={hasBeenDragged}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerUp}
-                onTouchStart={(e) => e.stopPropagation()}
-                onTouchMove={(e) => e.stopPropagation()}
-                onTouchEnd={(e) => e.stopPropagation()}
-                onContextMenu={(e) => e.preventDefault()}
-                draggable="false"
-            >
-                <MaskImage
-                    src="/images/secret/mask-gray.svg"
-                    alt="Add Secret Document"
-                />
-                <PlusIcon />
-            </AddButton>
 
             {isEditorOpen && (
                 <SecretDocEditor
@@ -1485,6 +1462,31 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                 </CategoryModal>
             )}
         </Container>
+
+        <AddButton
+            ref={addButtonRef}
+            role="button"
+            tabIndex="0"
+            $isDragging={isDragging}
+            $offsetY={offsetY}
+            $hasBeenDragged={hasBeenDragged}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+            onContextMenu={(e) => e.preventDefault()}
+            draggable="false"
+        >
+            <MaskImage
+                src="/images/secret/mask-gray.svg"
+                alt="Add Secret Document"
+            />
+            <PlusIcon />
+        </AddButton>
+        </>
     );
 };
 
