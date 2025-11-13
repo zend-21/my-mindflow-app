@@ -197,6 +197,19 @@ const EmptyText = styled.p`
     margin: 0 0 24px 0;
 `;
 
+const GuidanceMessage = styled.div`
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(240, 147, 251, 0.3);
+    padding: 10px 24px;
+    text-align: center;
+    margin-top: -10px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+    font-weight: 300;
+`;
+
 const SelectionModeBar = styled.div`
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     padding: 12px 24px;
@@ -422,31 +435,31 @@ const ModalCancelButton = styled.button`
     }
 `;
 
-const AddButton = styled.button`
-    position: fixed;
-    bottom: 104px;
-    right: 24px;
+const AddButton = styled.div`
     width: 80px;
     height: 80px;
-    border: none;
-    background: transparent;
-    cursor: grab;
-    z-index: 10000;
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: none;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 0;
-    isolation: isolate;
+    cursor: grab;
+    border: none;
+
+    position: absolute;
+    bottom: 104px;
+    right: 24px;
+    z-index: 10000;
+
+    user-select: none;
+    touch-action: none;
 
     ${props => props.$isDragging && `
+        animation: none !important;
         transform: translateY(${props.$offsetY}px) !important;
         cursor: grabbing;
     `}
 
     ${props => !props.$isDragging && props.$hasBeenDragged && `
+        animation: none !important;
         transform: translateY(${props.$offsetY}px);
         transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
     `}
@@ -462,6 +475,7 @@ const MaskImage = styled.img`
     object-fit: contain;
     filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3)) drop-shadow(0 0 0 2px #8B0000);
     transition: all 0.2s;
+    pointer-events: none;
 
     &:hover {
         filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.4)) drop-shadow(0 0 0 2px #8B0000);
@@ -1217,6 +1231,12 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                 </SortButton>
             </SortBar>
 
+            {!selectionMode && docs.length > 0 && (
+                <GuidanceMessage>
+                    하단의 카드를 길게 누르면 다중 선택 모드가 활성화됩니다
+                </GuidanceMessage>
+            )}
+
             {selectionMode && (
                 <SelectionModeBar>
                     <SelectionInfo>
@@ -1354,15 +1374,24 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             {selectionMode && selectedDocs.length > 0 && (
                 <BulkActionBar>
                     <BulkActionButton $type="category" onClick={() => setShowCategoryModal(true)}>
-                        📁
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                        </svg>
                         <span>카테고리 이동</span>
                     </BulkActionButton>
                     <BulkActionButton $type="importance" onClick={handleBulkImportanceToggle}>
-                        ⭐
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                        </svg>
                         <span>중요도 지정/해제</span>
                     </BulkActionButton>
                     <BulkActionButton $type="delete" onClick={handleBulkDelete}>
-                        🗑️
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            <line x1="10" y1="11" x2="10" y2="17"/>
+                            <line x1="14" y1="11" x2="14" y2="17"/>
+                        </svg>
                         <span>일괄 삭제</span>
                     </BulkActionButton>
                 </BulkActionBar>

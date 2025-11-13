@@ -19,7 +19,6 @@ const Card = styled.div`
     transition: all 0.2s;
     position: relative;
     overflow: hidden;
-    touch-action: none;
 
     &::before {
         content: '';
@@ -36,16 +35,6 @@ const Card = styled.div`
             rgba(0, 0, 0, 0.02) 4px
         );
         pointer-events: none;
-    }
-
-    &:hover {
-        background: ${props => props.$isSelected
-            ? 'linear-gradient(135deg, rgba(240, 147, 251, 0.2) 0%, rgba(245, 87, 108, 0.2) 100%)'
-            : 'linear-gradient(135deg, rgba(240, 147, 251, 0.15), rgba(245, 87, 108, 0.15))'
-        };
-        border-color: rgba(240, 147, 251, 0.3);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(240, 147, 251, 0.2);
     }
 `;
 
@@ -99,9 +88,11 @@ const TitleRow = styled.div`
     min-width: 0;
 `;
 
-const LockIcon = styled.span`
-    font-size: 14px;
-    opacity: 0.7;
+const LockIcon = styled.svg`
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    opacity: 0.8;
 `;
 
 const ImportantIcon = styled.svg`
@@ -128,6 +119,8 @@ const CategoryBadge = styled.button`
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
     background: ${props => {
         switch (props.$category) {
             case 'financial': return 'rgba(255, 215, 0, 0.2)';
@@ -155,11 +148,6 @@ const CategoryBadge = styled.button`
             default: return 'rgba(255, 255, 255, 0.2)';
         }
     }};
-
-    &:hover {
-        transform: scale(1.05);
-        opacity: 0.8;
-    }
 `;
 
 const CategoryModal = styled.div`
@@ -412,8 +400,13 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
     const handlePointerUp = (e) => {
         clearTimeout(longPressTimerRef.current);
 
-        // selectionMode가 아닐 때만 클릭으로 문서 열기
-        if (!isLongPressRef.current && !selectionMode && onClick) {
+        // 실제로 움직임이 있었는지 확인 (스크롤 방지)
+        const deltaX = Math.abs(e.clientX - startPosRef.current.x);
+        const deltaY = Math.abs(e.clientY - startPosRef.current.y);
+        const hasMoved = deltaX > 5 || deltaY > 5;
+
+        // selectionMode가 아니고, 롱프레스가 아니며, 움직임이 없었을 때만 클릭으로 문서 열기
+        if (!isLongPressRef.current && !selectionMode && !hasMoved && onClick) {
             onClick(doc);
         }
 
@@ -464,12 +457,16 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
             <CardHeader $selectionMode={selectionMode}>
                 <TitleRow>
                     {doc.isImportant && (
-                        <ImportantIcon viewBox="0 0 16 16" fill="none">
-                            <circle cx="8" cy="8" r="7" fill="#ff6b6b" stroke="#ff4444" strokeWidth="1"/>
-                            <text x="8" y="12" fontSize="11" fontWeight="bold" fill="white" textAnchor="middle">!</text>
+                        <ImportantIcon viewBox="0 0 24 24" fill="#ff6b6b" stroke="#ff4444" strokeWidth="1.5">
+                            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                         </ImportantIcon>
                     )}
-                    {doc.hasPassword && <LockIcon>🔒</LockIcon>}
+                    {doc.hasPassword && (
+                        <LockIcon viewBox="0 0 24 24" fill="none" stroke="#ffc107" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </LockIcon>
+                    )}
                     <Title>{doc.title || '제목 없음'}</Title>
                 </TitleRow>
                 {doc.category && (
@@ -482,10 +479,41 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
                         }}
                         onPointerUp={(e) => e.stopPropagation()}
                     >
-                        {doc.category === 'financial' && '💰 금융'}
-                        {doc.category === 'personal' && '👤 개인'}
-                        {doc.category === 'work' && '💼 업무'}
-                        {doc.category === 'diary' && '📔 일기'}
+                        {doc.category === 'financial' && (
+                            <>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
+                                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                                </svg>
+                                금융
+                            </>
+                        )}
+                        {doc.category === 'personal' && (
+                            <>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="12" cy="7" r="4"/>
+                                </svg>
+                                개인
+                            </>
+                        )}
+                        {doc.category === 'work' && (
+                            <>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
+                                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
+                                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                                </svg>
+                                업무
+                            </>
+                        )}
+                        {doc.category === 'diary' && (
+                            <>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
+                                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                                </svg>
+                                일기
+                            </>
+                        )}
                         {!['financial', 'personal', 'work', 'diary'].includes(doc.category) && doc.category}
                     </CategoryBadge>
                 )}
