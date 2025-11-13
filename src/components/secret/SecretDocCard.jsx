@@ -19,6 +19,7 @@ const Card = styled.div`
     transition: all 0.2s;
     position: relative;
     overflow: hidden;
+    touch-action: none;
 
     &::before {
         content: '';
@@ -330,6 +331,7 @@ const DateText = styled.span`
 const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionMode, isSelected, openCategoryDropdownId, setOpenCategoryDropdownId }) => {
     const longPressTimerRef = useRef(null);
     const isLongPressRef = useRef(false);
+    const startPosRef = useRef({ x: 0, y: 0 });
 
     // 로컬 state 대신 전역 state 사용
     const showDropdown = openCategoryDropdownId === doc.id;
@@ -378,6 +380,12 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
     const handlePointerDown = (e) => {
         if (selectionMode) return; // 다중 선택 모드에서는 길게 누르기 비활성화
 
+        // 시작 위치 저장
+        startPosRef.current = {
+            x: e.clientX,
+            y: e.clientY
+        };
+
         isLongPressRef.current = false;
         longPressTimerRef.current = setTimeout(() => {
             isLongPressRef.current = true;
@@ -385,6 +393,17 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
                 onLongPress();
             }
         }, 500); // 0.5초
+    };
+
+    const handlePointerMove = (e) => {
+        // 움직임이 10px 이상이면 타이머 취소 (스크롤 등)
+        const deltaX = Math.abs(e.clientX - startPosRef.current.x);
+        const deltaY = Math.abs(e.clientY - startPosRef.current.y);
+
+        if (deltaX > 10 || deltaY > 10) {
+            clearTimeout(longPressTimerRef.current);
+            isLongPressRef.current = false;
+        }
     };
 
     const handlePointerUp = (e) => {
@@ -422,6 +441,7 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
         <Card
             onClick={selectionMode ? handleCheckboxClick : undefined}
             onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerCancel}
             $isSelected={isSelected}
