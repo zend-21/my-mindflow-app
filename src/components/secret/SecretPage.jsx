@@ -2,6 +2,7 @@
 // 시크릿 페이지 메인 컴포넌트
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import PinInput from './PinInput';
 import SecretDocCard from './SecretDocCard';
@@ -1047,6 +1048,9 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     };
 
     const handlePointerMove = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+
         const deltaY = e.clientY - dragStartY.current;
         let newY = dragStartOffsetY.current + deltaY;
 
@@ -1463,29 +1467,29 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             )}
         </Container>
 
-        <AddButton
-            ref={addButtonRef}
-            role="button"
-            tabIndex="0"
-            $isDragging={isDragging}
-            $offsetY={offsetY}
-            $hasBeenDragged={hasBeenDragged}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            onTouchStart={(e) => e.stopPropagation()}
-            onTouchMove={(e) => e.stopPropagation()}
-            onTouchEnd={(e) => e.stopPropagation()}
-            onContextMenu={(e) => e.preventDefault()}
-            draggable="false"
-        >
-            <MaskImage
-                src="/images/secret/mask-gray.svg"
-                alt="Add Secret Document"
-            />
-            <PlusIcon />
-        </AddButton>
+        {createPortal(
+            <AddButton
+                ref={addButtonRef}
+                role="button"
+                tabIndex="0"
+                $isDragging={isDragging}
+                $offsetY={offsetY}
+                $hasBeenDragged={hasBeenDragged}
+                onPointerDown={handlePointerDown}
+                onPointerMove={handlePointerMove}
+                onPointerUp={handlePointerUp}
+                onPointerCancel={handlePointerUp}
+                onContextMenu={(e) => e.preventDefault()}
+                draggable="false"
+            >
+                <MaskImage
+                    src="/images/secret/mask-gray.svg"
+                    alt="Add Secret Document"
+                />
+                <PlusIcon />
+            </AddButton>,
+            document.body
+        )}
         </>
     );
 };
