@@ -1026,6 +1026,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
 
     const handlePointerDown = (e) => {
         e.stopPropagation();
+        e.preventDefault();
 
         clearTimeout(longPressTimerRef.current);
         isLongPressSuccessful.current = false;
@@ -1084,6 +1085,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
 
     const handlePointerUp = (e) => {
         e.stopPropagation();
+        e.preventDefault();
 
         clearTimeout(longPressTimerRef.current);
 
