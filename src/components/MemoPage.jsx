@@ -161,11 +161,13 @@ const ActionButton = styled.button`
 const SearchBar = styled.div`
     margin-bottom: 16px;
     width: 100%;
+    position: relative;
 `;
 
 const SearchInput = styled.input`
     width: 100%;
     padding: 12px 16px;
+    padding-right: ${props => props.$hasValue ? '40px' : '16px'};
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(255, 255, 255, 0.05);
@@ -183,6 +185,35 @@ const SearchInput = styled.input`
 
     &::placeholder {
         color: #808080;
+    }
+`;
+
+const ClearSearchButton = styled.button`
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    color: #b0b0b0;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    padding: 0;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.2);
+        color: #ffffff;
+    }
+
+    &:active {
+        transform: translateY(-50%) scale(0.95);
     }
 `;
 
@@ -748,7 +779,16 @@ const MemoPage = ({
                             placeholder="메모 검색..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
+                            $hasValue={searchQuery.length > 0}
                         />
+                        {searchQuery && (
+                            <ClearSearchButton
+                                onClick={() => setSearchQuery('')}
+                                title="검색어 지우기"
+                            >
+                                ×
+                            </ClearSearchButton>
+                        )}
                     </SearchBar>
 
                     <SortBar>

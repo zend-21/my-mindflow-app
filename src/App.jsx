@@ -1179,6 +1179,11 @@ function App() {
 
     const handleSwitchTab = (tab) => {
         setActiveTab(tab);
+        // 탭 전환 시 다중선택 모드 해제
+        if (isSelectionMode) {
+            setIsSelectionMode(false);
+            setSelectedMemoIds(new Set());
+        }
     };
 
     const handleFloatingButtonClick = () => {
