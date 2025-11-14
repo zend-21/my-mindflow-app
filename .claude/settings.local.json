@@ -11,7 +11,9 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(\"E:\\React test\\my-mindflow-app\\public\\images\\secret\\mask-gray.svg\")",
-      "Bash(nul)"
+      "Bash(nul)",
+      "Bash(cat:*)",
+      "Bash(findstr:*)"
     ],
     "deny": [],
     "ask": []

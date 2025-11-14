@@ -48,7 +48,7 @@ const PlusCircleIcon = styled.div`
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, calc(-50% - 5px));
+    transform: translate(-50%, calc(-50% + 0px));
     width: 24px;
     height: 24px;
     background: linear-gradient(135deg, #4a90e2, #667eea);
@@ -280,7 +280,7 @@ const FloatingButton = ({ activeTab, onClick }) => {
         >
             <NoteIconContainer>
                 <NoteSvgImg
-                    src="/images/memo/symbol-2444431_640.svg"
+                    src="/images/memo/symbol-2444431.svg"
                     alt="메모 아이콘"
                 />
                 <PlusCircleIcon />
