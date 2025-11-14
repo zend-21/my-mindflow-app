@@ -40,7 +40,7 @@ const NoteIconContainer = styled.div`
 const NoteSvgImg = styled.img`
     width: 70px;
     height: 70px;
-    filter: drop-shadow(0 2px 4px rgba(15, 35, 50, 0.3));
+    filter: invert(1) drop-shadow(0 2px 4px rgba(15, 35, 50, 0.3));
     pointer-events: none;
 `;
 
