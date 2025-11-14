@@ -469,7 +469,7 @@ const ImportantIndicator = styled.span`
 `;
 const StarIcon = styled.span`
     display: inline-block;
-    transform: translateY(1px);
+    transform: translate(1px, -3px);
 `;
 const EmptyMessage = styled.p`
     color: #b0b0b0;
