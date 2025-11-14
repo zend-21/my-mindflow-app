@@ -83,13 +83,14 @@ const FloatingButtonContainer = styled.div`
     justify-content: center;
     cursor: grab;
     border: none;
-    
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
+
     /* ★★★ 수정: position을 absolute로 변경하여 앱 컨테이너 내부에 고정 ★★★ */
     position: absolute;
     bottom: 90px;
     right: 24px;
     z-index: 1000;
-    
+
     user-select: none;
     touch-action: none; 
     

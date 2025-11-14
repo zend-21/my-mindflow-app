@@ -50,6 +50,8 @@ const Overlay = styled.div`
   align-items: center;
   z-index: 11000;
   animation: ${fadeIn} 0.2s ease-out;
+  touch-action: none;
+  overscroll-behavior: contain;
 `;
 
 const ModalContent = styled.div`

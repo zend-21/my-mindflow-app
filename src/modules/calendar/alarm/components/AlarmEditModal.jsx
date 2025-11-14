@@ -34,6 +34,8 @@ const Overlay = styled.div`
   justify-content: center;
   align-items: center;
   z-index: 12000;
+  touch-action: none;
+  overscroll-behavior: contain;
 `;
 
 const ModalContent = styled.div`
