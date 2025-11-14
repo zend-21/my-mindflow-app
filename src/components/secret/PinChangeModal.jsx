@@ -211,12 +211,16 @@ const PinChangeModal = ({ onClose, onConfirm, pinLength = 6 }) => {
             newErrors.currentPin = '기존 PIN을 입력해주세요.';
         } else if (currentPin.length !== pinLength) {
             newErrors.currentPin = `PIN은 ${pinLength}자리 숫자여야 합니다.`;
+        } else if (!/^\d+$/.test(currentPin)) {
+            newErrors.currentPin = 'PIN은 숫자만 입력 가능합니다.';
         }
 
         if (!newPin) {
             newErrors.newPin = '새 PIN을 입력해주세요.';
         } else if (newPin.length !== pinLength) {
             newErrors.newPin = `PIN은 ${pinLength}자리여야 합니다.`;
+        } else if (!/^\d+$/.test(newPin)) {
+            newErrors.newPin = 'PIN은 숫자만 입력 가능합니다.';
         }
 
         if (!confirmPin) {
@@ -256,10 +260,12 @@ const PinChangeModal = ({ onClose, onConfirm, pinLength = 6 }) => {
                             <Label>기존 PIN 번호 입력</Label>
                             <Input
                                 type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 maxLength={pinLength}
                                 value={currentPin}
                                 onChange={(e) => {
-                                    const value = e.target.value.slice(0, pinLength);
+                                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, pinLength);
                                     setCurrentPin(value);
                                     setErrors(prev => ({ ...prev, currentPin: '' }));
                                 }}
@@ -274,10 +280,12 @@ const PinChangeModal = ({ onClose, onConfirm, pinLength = 6 }) => {
                             <Label>새 PIN 번호 입력</Label>
                             <Input
                                 type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 maxLength={pinLength}
                                 value={newPin}
                                 onChange={(e) => {
-                                    const value = e.target.value.slice(0, pinLength);
+                                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, pinLength);
                                     setNewPin(value);
                                     setErrors(prev => ({ ...prev, newPin: '' }));
                                 }}
@@ -286,17 +294,19 @@ const PinChangeModal = ({ onClose, onConfirm, pinLength = 6 }) => {
                                 $error={errors.newPin}
                             />
                             {errors.newPin && <ErrorText>{errors.newPin}</ErrorText>}
-                            {!errors.newPin && <HelperText>숫자와 특수문자(#) {pinLength}자리를 입력해주세요</HelperText>}
+                            {!errors.newPin && <HelperText>숫자 {pinLength}자리를 입력해주세요</HelperText>}
                         </FormGroup>
 
                         <FormGroup>
                             <Label>새 PIN 번호 입력 (확인용)</Label>
                             <Input
                                 type="text"
+                                inputMode="numeric"
+                                pattern="[0-9]*"
                                 maxLength={pinLength}
                                 value={confirmPin}
                                 onChange={(e) => {
-                                    const value = e.target.value.slice(0, pinLength);
+                                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, pinLength);
                                     setConfirmPin(value);
                                     setErrors(prev => ({ ...prev, confirmPin: '' }));
                                 }}

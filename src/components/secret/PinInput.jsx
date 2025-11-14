@@ -277,6 +277,13 @@ const PinInput = ({
         setError('');
     };
 
+    const handleClear = () => {
+        if (isLocked) return;
+        playBackspaceSound();
+        setPin('');
+        setError('');
+    };
+
     const handleConfirm = async (pinToSubmit = pin) => {
         if (isLocked) return;
         if (pinToSubmit.length !== pinLength) {
@@ -342,6 +349,7 @@ const PinInput = ({
             <PinPad
                 onNumberClick={handleNumberClick}
                 onBackspace={handleBackspace}
+                onClear={handleClear}
                 disabled={isLocked}
             />
 

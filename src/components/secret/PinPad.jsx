@@ -31,8 +31,8 @@ const KeyButton = styled.button`
     };
     border-radius: 16px;
     color: #ffffff;
-    font-size: 28px;
-    font-weight: 600;
+    font-size: ${props => props.$isDelButton ? '18px' : '28px'};
+    font-weight: ${props => props.$isDelButton ? '700' : '600'};
     cursor: pointer;
     transition: all 0.15s;
     display: flex;
@@ -43,6 +43,7 @@ const KeyButton = styled.button`
         : '0 2px 8px rgba(0, 0, 0, 0.2)'
     };
     transform: ${props => props.$isPressed ? 'scale(0.92)' : 'scale(1)'};
+    letter-spacing: ${props => props.$isDelButton ? '0.5px' : 'normal'};
 
     &:hover:not(:disabled) {
         background: ${props => props.$isSpecial
@@ -61,7 +62,7 @@ const KeyButton = styled.button`
     }
 `;
 
-const PinPad = ({ onNumberClick, onBackspace, disabled }) => {
+const PinPad = ({ onNumberClick, onBackspace, onClear, disabled }) => {
     const [pressedKey, setPressedKey] = useState(null);
     const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9];
 
@@ -82,6 +83,20 @@ const PinPad = ({ onNumberClick, onBackspace, disabled }) => {
 
         setPressedKey('backspace');
         onBackspace();
+
+        // 150ms 후 눌림 효과 해제
+        setTimeout(() => {
+            setPressedKey(null);
+        }, 150);
+    };
+
+    const handleClearPress = () => {
+        if (disabled) return;
+
+        setPressedKey('clear');
+        if (onClear) {
+            onClear();
+        }
 
         // 150ms 후 눌림 효과 해제
         setTimeout(() => {
@@ -121,12 +136,14 @@ const PinPad = ({ onNumberClick, onBackspace, disabled }) => {
             </KeyButton>
 
             <KeyButton
-                onClick={() => handleKeyPress('#')}
+                $isSpecial
+                $isDelButton
+                onClick={handleClearPress}
                 disabled={disabled}
-                title="특수문자"
-                $isPressed={pressedKey === '#'}
+                title="전체 삭제"
+                $isPressed={pressedKey === 'clear'}
             >
-                #
+                Del
             </KeyButton>
         </KeypadContainer>
     );
