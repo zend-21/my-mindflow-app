@@ -1,7 +1,7 @@
 // src/components/secret/SecretDocEditor.jsx
 // 시크릿 문서 작성/편집 모달
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import Portal from '../Portal';
 
@@ -448,6 +448,8 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+    const textareaRef = useRef(null);
+
     useEffect(() => {
         // 에디터가 열릴 때마다 에러 상태 초기화
         setValidationError('');
@@ -468,6 +470,15 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
                 setPasswordConfirm(doc.password);
             }
         }
+
+        // 자동 포커스 방지
+        setTimeout(() => {
+            if (textareaRef.current) {
+                textareaRef.current.blur();
+            }
+            // 모든 input 요소에서도 포커스 제거
+            document.activeElement?.blur();
+        }, 0);
     }, [doc]);
 
     const handleChange = (field, value) => {
@@ -586,6 +597,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
                                 }
                             }}
                             maxLength={25}
+                            autoFocus={false}
                         />
                     </FormGroup>
 
@@ -603,9 +615,11 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
                             </ImportanceCheckbox>
                         </LabelRow>
                         <TextArea
+                            ref={textareaRef}
                             placeholder="내용을 입력하세요"
                             value={formData.content}
                             onChange={(e) => handleChange('content', e.target.value)}
+                            autoFocus={false}
                         />
                     </FormGroup>
 
