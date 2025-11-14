@@ -673,8 +673,8 @@ function App() {
             return;
         }
 
-        // 스케줄 관련은 25글자, 나머지는 20글자
-        const maxLength = type.includes('스케줄') ? 25 : 20;
+        // 스케줄 관련은 23글자, 나머지는 20글자
+        const maxLength = type.includes('스케줄') ? 23 : 20;
 
         // 이모지를 올바르게 카운트
         const chars = [...description];
