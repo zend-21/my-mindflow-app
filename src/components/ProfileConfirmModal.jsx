@@ -28,9 +28,33 @@ const Modal = styled.div`
     width: 100%;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     border: 1px solid rgba(255, 255, 255, 0.1);
+    position: relative;
 
     @media (min-width: 768px) {
         padding: 40px 36px;
+    }
+`;
+
+const CloseButton = styled.button`
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #e0e0e0;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: scale(1.1);
     }
 `;
 
@@ -227,6 +251,7 @@ const ProfileConfirmModal = ({ profile, onConfirm, onEdit, onClose, userName, ha
     return (
         <Overlay>
             <Modal>
+                <CloseButton onClick={onClose}>&times;</CloseButton>
                 <Title>정보 확인</Title>
                 <Subtitle>저장된 정보로 운세를 확인하시겠습니까?</Subtitle>
 
