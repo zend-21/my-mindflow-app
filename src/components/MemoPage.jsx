@@ -399,15 +399,15 @@ const DateText = styled.span`
 `;
 const DeleteButton = styled.button`
     position: absolute;
-    top: 9px;  /* 6px + 3px = 9px (아래로 3픽셀) */
-    right: 8px;  /* 7px + 1px = 8px (왼쪽으로 1픽셀 더) */
+    top: 9px;
+    right: 8px;
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #4a4a4a;
+    border: none;
     font-size: 18px;
-    color: #b0b0b0;
+    color: #ffffff;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -417,9 +417,8 @@ const DeleteButton = styled.button`
     z-index: 5;
 
     &:hover {
-        background: rgba(245, 87, 108, 0.15);
-        border-color: rgba(245, 87, 108, 0.4);
-        color: #f5576c;
+        background: #f5576c;
+        color: #ffffff;
         transform: scale(1.1);
     }
 
