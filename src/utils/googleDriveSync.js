@@ -1,6 +1,7 @@
 // src/utils/googleDriveSync.js
 
 const FOLDER_NAME = 'MemoApp_Backup';
+const BACKUP_FOLDER_NAME = 'MindFlow_Backups';
 const FILE_NAME = 'app_data.json';
 const PROFILE_PICTURE_FILE_NAME = 'profile_picture.json';
 

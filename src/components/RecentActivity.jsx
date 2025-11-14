@@ -45,6 +45,9 @@ const ActivityText = styled.p`
     font-size: 14px;
     color: #e0e0e0;
     margin: 0;
+    padding-right: 35px; /* X 버튼 영역(28px) + 여유 공간(7px) */
+    word-wrap: break-word;
+    word-break: break-word;
 `;
 
 // 추가: 활동 날짜 스타일

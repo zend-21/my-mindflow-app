@@ -6,6 +6,7 @@ import { GlobalStyle } from './styles.js';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import { initializeGapiClient, setAccessToken, syncToGoogleDrive, loadFromGoogleDrive, loadProfilePictureFromGoogleDrive, syncProfilePictureToGoogleDrive } from './utils/googleDriveSync';
+import { backupToGoogleDrive } from './utils/googleDriveBackup';
 import { DndContext, closestCenter, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -946,7 +947,7 @@ function App() {
         }, 1000); // 1초로 단축
     };
     
-    const handleDataExport = () => {
+    const handleDataExport = async () => {
         // 전체 데이터 백업 (운세 제외)
         const dataToExport = {
             version: '1.0',
@@ -961,9 +962,29 @@ function App() {
                 trashedItems: JSON.parse(localStorage.getItem('trashedItems_shared') || '[]')
             }
         };
+
+        // 1. 휴대폰에 파일 다운로드 (모든 사용자)
         exportData('mindflow_backup', dataToExport);
-        addActivity('백업', '전체 데이터 백업 (휴대폰)');
-        // 백업 완료 토스트 제거 - 브라우저 다운로드 UI가 이미 피드백을 제공함
+
+        // 2. 로그인 사용자는 Google Drive에도 백업
+        if (profile && accessToken) {
+            try {
+                const result = await backupToGoogleDrive(dataToExport);
+                if (result.success) {
+                    addActivity('백업', '휴대폰 및 Google Drive에 백업 완료');
+                    showToast('✓ 휴대폰과 Google Drive에 백업되었습니다');
+                } else {
+                    addActivity('백업', '휴대폰에 백업 완료 (Drive 실패)');
+                    showToast('✓ 휴대폰에 백업되었습니다');
+                }
+            } catch (error) {
+                console.error('Google Drive 백업 실패:', error);
+                addActivity('백업', '휴대폰에 백업 완료');
+                showToast('✓ 휴대폰에 백업되었습니다');
+            }
+        } else {
+            addActivity('백업', '휴대폰에 백업 완료');
+        }
     };
 
     const handleDataImport = (event) => {
