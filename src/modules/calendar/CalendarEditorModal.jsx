@@ -375,11 +375,27 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
   const handleSaveClick = () => {
     if (isClosing || isPristine) return;
 
-    setIsClosing(true);
-    setTimeout(() => {
-      doSaveOrClose();
-      setIsClosing(false);
-    }, 300);
+    // 확인 모달 띄우기
+    const confirmMessage = isEditingExisting
+        ? "변경된 대로 수정할까요?"
+        : "입력한 내용으로 등록하시겠습니까?";
+
+    setConfirmModalState({
+      isOpen: true,
+      message: confirmMessage,
+      onConfirm: () => {
+        // '예'를 선택한 경우
+        setIsClosing(true);
+        setTimeout(() => {
+          doSaveOrClose();
+          setIsClosing(false);
+        }, 300);
+      },
+      onCancel: () => {
+        // '아니요'를 선택한 경우
+        setConfirmModalState({ isOpen: false });
+      },
+    });
   };
 
   const handleDoubleClick = () => {
