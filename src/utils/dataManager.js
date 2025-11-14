@@ -37,7 +37,13 @@ const decrypt = (encryptedData) => {
 export const exportData = async (dataType, data) => {
     const encryptedData = encrypt(data);
     const blob = new Blob([encryptedData], { type: 'application/json' });
-    const filename = `${dataType}_${new Date().toISOString().slice(0, 10)}.json`;
+
+    // 현지 시간대를 사용하여 날짜 생성 (UTC가 아닌)
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const filename = `${dataType}_${year}-${month}-${day}.json`;
 
     // 모바일에서 Share API 지원 여부 확인
     if (navigator.canShare && navigator.canShare({ files: [new File([blob], filename)] })) {
