@@ -42,8 +42,8 @@ const FortuneFlow = ({ onClose, profile }) => {
     const [fortuneResult, setFortuneResult] = useState(null);
     const [fortuneData, setFortuneData] = useState(null);
 
-    // 사용자 이름 결정 (로그인 여부에 따라)
-    const userName = profile?.name || profile?.email?.split('@')[0] || '게스트';
+    // 사용자 이름 결정 (닉네임 우선, 로그인 여부에 따라)
+    const userName = profile?.nickname || profile?.name || profile?.email?.split('@')[0] || '게스트';
 
     // 🎬 Step 0: 초기화 - 안내 모달 표시 여부 확인
     useEffect(() => {
