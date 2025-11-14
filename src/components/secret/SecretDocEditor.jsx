@@ -471,14 +471,12 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
             }
         }
 
-        // 자동 포커스 방지
+        // 자동 포커스 방지 - textarea만 blur
         setTimeout(() => {
-            if (textareaRef.current) {
+            if (textareaRef.current && document.activeElement === textareaRef.current) {
                 textareaRef.current.blur();
             }
-            // 모든 input 요소에서도 포커스 제거
-            document.activeElement?.blur();
-        }, 0);
+        }, 100);
     }, [doc]);
 
     const handleChange = (field, value) => {
