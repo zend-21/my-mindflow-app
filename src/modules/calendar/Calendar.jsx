@@ -601,7 +601,7 @@ const DateCell = styled.div`
     font-weight: 500;
     transition: all 0.2s ease;
     position: relative;
-    border: 2px solid transparent;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     box-sizing: border-box;
     padding: 2px;
     overflow: visible;
