@@ -389,6 +389,7 @@ const MemoText = styled.p`
     margin: 0;
     white-space: pre-wrap;
     word-break: break-word;
+    padding-right: 2px;
 `;
 const DateText = styled.span`
     font-size: 12px;
@@ -397,6 +398,9 @@ const DateText = styled.span`
     display: block;
 `;
 const DeleteButton = styled.button`
+    position: absolute;
+    top: 9px;  /* 6px + 3px = 9px (아래로 3픽셀) */
+    right: 8px;  /* 7px + 1px = 8px (왼쪽으로 1픽셀 더) */
     width: 24px;
     height: 24px;
     border-radius: 50%;
@@ -405,12 +409,12 @@ const DeleteButton = styled.button`
     font-size: 18px;
     color: #b0b0b0;
     cursor: pointer;
-    margin-left: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
     flex-shrink: 0;
+    z-index: 5;
 
     &:hover {
         background: rgba(245, 87, 108, 0.15);
@@ -447,29 +451,22 @@ const ToastBox = styled.div`
 `;
 const ImportantIndicator = styled.span`
     position: absolute;
-    top: -8px; 
-    right: -8px; 
+    top: -10px;
+    left: ${props => props.$hasNew ? '40px' : '-8px'}; /* NEW가 있으면 오른쪽으로, 없으면 NEW 자리에 */
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: #ff4d4f;
+    background-color: #ff4444;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
     display: flex;
     justify-content: center;
     align-items: center;
-    color: white;
-    font-size: 14px;
-    font-weight: 900;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    z-index: 10;
     opacity: ${props => props.$isImportant ? 1 : 0};
-    transition: opacity 0.3s ease;
-    z-index: 10; 
-
-    ${props => props.$layoutView === 'grid' && `
-        top: -12px; 
-        right: 5px;
-        left: auto;
-        transform: none;
-    `}
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 `;
 const EmptyMessage = styled.p`
     color: #b0b0b0;
@@ -558,7 +555,7 @@ const LeftHeaderGroup = styled.div`
 `;
 const CheckboxContainer = styled.div`
     position: absolute;
-    top: 19px;
+    top: 14px;
     right: 10px;
     font-size: 24px;
     color: ${props => props.$isSelected ? '#4a90e2' : '#a0aec0'};
@@ -570,7 +567,7 @@ const CheckboxContainer = styled.div`
     justify-content: center;
     width: 24px;
     height: 24px;
-    
+
     ${props => !props.$isVisible && `
         display: none;
     `}
@@ -875,8 +872,8 @@ const MemoPage = ({
                                 <CheckboxContainer $isVisible={isSelectionMode} $isSelected={isSelected}>
                                     {isSelected ? <StyledCheckIcon /> : <BsCircle />}
                                 </CheckboxContainer>
-                                {isNew && <NewBadge>NEW</NewBadge>} 
-                                <ImportantIndicator $isImportant={memo.isImportant} $layoutView={layoutView}>!</ImportantIndicator>
+                                {isNew && <NewBadge>NEW</NewBadge>}
+                                <ImportantIndicator $isImportant={memo.isImportant} $hasNew={isNew}>★</ImportantIndicator>
                                 <MemoHeader>
                                     <MemoText>
                                         {memo.content || ''}
