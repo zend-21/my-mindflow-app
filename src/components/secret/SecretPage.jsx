@@ -623,6 +623,25 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         }
     }, [isUnlocked]);
 
+    // 백그라운드 전환 시 자동 잠금
+    useEffect(() => {
+        if (!isUnlocked) return;
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                // 백그라운드로 전환되면 즉시 잠금
+                handleLock();
+                console.log('🔒 백그라운드 전환으로 인한 자동 잠금');
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [isUnlocked]);
+
     // 컴포넌트 언마운트 시 타이머 및 rAF 정리
     useEffect(() => {
         return () => {
