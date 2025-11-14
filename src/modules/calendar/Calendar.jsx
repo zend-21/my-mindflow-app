@@ -708,7 +708,7 @@ const DateCell = styled.div`
     ` : ''}
 
     ${props => props.$isToday && !props.$isSelected ? `
-        background-color: transparent !important;
+        background-color: rgba(70, 179, 255, 0.08) !important;
         border: 1px solid #70b3ffff !important;
         font-weight: 700;
     ` : ''}
