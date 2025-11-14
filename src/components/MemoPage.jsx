@@ -676,6 +676,16 @@ const MemoPage = ({
                 } else {
                     return aImportant - bImportant || (a.date || 0) - (b.date || 0);
                 }
+            } else if (sortOrder === 'updated') {
+                // 수정순 정렬 (updatedAt이 없으면 createdAt 사용)
+                const aUpdated = a.updatedAt || a.createdAt || a.date || 0;
+                const bUpdated = b.updatedAt || b.createdAt || b.date || 0;
+
+                if (sortDirection === 'desc') {
+                    return bUpdated - aUpdated;
+                } else {
+                    return aUpdated - bUpdated;
+                }
             } else {
                 // 등록순 정렬
                 if (sortDirection === 'desc') {
@@ -796,7 +806,13 @@ const MemoPage = ({
                             $active={sortOrder === 'date'}
                             onClick={() => handleSortToggle('date')}
                         >
-                            등록순 {sortOrder === 'date' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                            등록일순 {sortOrder === 'date' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                        </SortButton>
+                        <SortButton
+                            $active={sortOrder === 'updated'}
+                            onClick={() => handleSortToggle('updated')}
+                        >
+                            수정일순 {sortOrder === 'updated' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
                         </SortButton>
                         <SortButton
                             $active={sortOrder === 'importance'}
@@ -869,7 +885,29 @@ const MemoPage = ({
                                         &times;
                                     </DeleteButton>
                                 </MemoHeader>
-                                <DateText>{memo.displayDate || '날짜 없음'}</DateText>
+                                <DateText>
+                                    {memo.updatedAt && memo.createdAt && memo.updatedAt !== memo.createdAt ? (
+                                        <>수정일: {new Date(memo.updatedAt).toLocaleString('ko-KR', {
+                                            year: 'numeric',
+                                            month: '2-digit',
+                                            day: '2-digit',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            second: '2-digit',
+                                            hour12: false
+                                        }).replace(/\. /g, '. ').replace(/\.$/, '')}</>
+                                    ) : (
+                                        <>등록일: {new Date(memo.createdAt || memo.date).toLocaleString('ko-KR', {
+                                            year: 'numeric',
+                                            month: '2-digit',
+                                            day: '2-digit',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            second: '2-digit',
+                                            hour12: false
+                                        }).replace(/\. /g, '. ').replace(/\.$/, '')}</>
+                                    )}
+                                </DateText>
                             </MemoCard>
                         );
                     })

@@ -1014,6 +1014,8 @@ function App() {
                 id: newId,
                 content: newMemoContent,
                 date: now,
+                createdAt: now,
+                updatedAt: now,
                 displayDate: new Date(now).toLocaleString(),
                 isImportant: isImportant
             };
@@ -1026,13 +1028,21 @@ function App() {
 
     const handleEditMemo = (id, newContent, isImportant) => {
             const now = Date.now();
-            const editedMemo = { id, content: newContent, date: now, displayDate: new Date(now).toLocaleString(), isImportant };
             setMemos(prevMemos =>
-                prevMemos.map(memo =>
-                    memo.id === id
-                        ? editedMemo
-                        : memo
-                )
+                prevMemos.map(memo => {
+                    if (memo.id === id) {
+                        return {
+                            ...memo,
+                            content: newContent,
+                            date: now,
+                            createdAt: memo.createdAt || now, // 기존 createdAt 유지, 없으면 현재 시간
+                            updatedAt: now,
+                            displayDate: new Date(now).toLocaleString(),
+                            isImportant: isImportant
+                        };
+                    }
+                    return memo;
+                })
             );
             addActivity('메모 수정', newContent, id);
             setIsDetailModalOpen(false);

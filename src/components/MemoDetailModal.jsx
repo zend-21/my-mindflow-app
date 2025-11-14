@@ -541,7 +541,33 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
 
                         {/* 우측: 저장 기록 */}
                         <DateText>
-                            {memo.displayDate}에 저장됨
+                            {memo.createdAt && (
+                                <>
+                                    최초 등록일: {new Date(memo.createdAt).toLocaleString('ko-KR', {
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        second: '2-digit',
+                                        hour12: false
+                                    }).replace(/\. /g, '. ').replace(/\.$/, '')}
+                                    <br />
+                                </>
+                            )}
+                            {memo.updatedAt && memo.createdAt && memo.updatedAt !== memo.createdAt && (
+                                <>
+                                    최종 수정일: {new Date(memo.updatedAt).toLocaleString('ko-KR', {
+                                        year: 'numeric',
+                                        month: '2-digit',
+                                        day: '2-digit',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        second: '2-digit',
+                                        hour12: false
+                                    }).replace(/\. /g, '. ').replace(/\.$/, '')}
+                                </>
+                            )}
                         </DateText>
                     </SecondRowContainer>
 
