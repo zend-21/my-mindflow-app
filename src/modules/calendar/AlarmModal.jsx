@@ -935,149 +935,146 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   과거 날짜
                 </div>
                 <div style={{ fontSize: '13px', color: '#b0b0b0' }}>
-                  기념일 알람은 과거 시간으로도 설정 가능합니다.
+                  기념일 알람만 등록 가능합니다.
                 </div>
               </div>
             )}
 
             {/* 1. 알람 타이틀 */}
-            {!isPastDate && (
-              <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
-                <SectionTitle>
-                  <TitleIcon />
-                  알람 타이틀<span style={{ color: ALARM_COLORS.danger, fontWeight: 'normal' }}>(필수항목)</span>
-                </SectionTitle>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <Input
-                    type="text"
-                    placeholder="예: 수빈이 생일"
-                    value={alarmTitle}
-                    onChange={handleTitleChange}
-                    disabled={isDisabled}
-                    style={{ flex: 1 }}
-                  />
-                  <div style={{ fontSize: '11px', color: '#808080', whiteSpace: 'nowrap' }}>
-                    {Array.from(alarmTitle).reduce((acc, char) => acc + (char.charCodeAt(0) > 127 ? 2 : 1), 0)}/20
-                  </div>
+            <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
+              <SectionTitle>
+                <TitleIcon />
+                알람 타이틀<span style={{ color: ALARM_COLORS.danger, fontWeight: 'normal' }}>(필수항목)</span>
+              </SectionTitle>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Input
+                  type="text"
+                  placeholder="예: 수빈이 생일"
+                  value={alarmTitle}
+                  onChange={handleTitleChange}
+                  disabled={isDisabled}
+                  style={{ flex: 1 }}
+                />
+                <div style={{ fontSize: '11px', color: '#808080', whiteSpace: 'nowrap' }}>
+                  {Array.from(alarmTitle).reduce((acc, char) => acc + (char.charCodeAt(0) > 127 ? 2 : 1), 0)}/20
                 </div>
-              </Section>
-            )}
+              </div>
+            </Section>
 
             {/* 2. 기념일 체크박스 + 알람주기 + 알람시기 */}
-            {!isPastDate && (
-              <Section style={{ marginTop: '-8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: isAnniversary ? '16px' : '0' }}>
-                  <input
-                    type="checkbox"
-                    checked={isAnniversary}
-                    onChange={(e) => setIsAnniversary(e.target.checked)}
-                    style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                  />
-                  <span
-                    style={{ fontSize: '14px', color: '#e0e0e0', cursor: 'pointer' }}
-                    onClick={() => setIsAnniversary(!isAnniversary)}
-                  >
-                    기념일로 등록
-                  </span>
-                </div>
+            <Section style={{ marginTop: '-8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: isAnniversary ? '16px' : '0' }}>
+                <input
+                  type="checkbox"
+                  checked={isAnniversary}
+                  onChange={(e) => setIsAnniversary(e.target.checked)}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                  disabled={isPastDate}
+                />
+                <span
+                  style={{ fontSize: '14px', color: '#e0e0e0', cursor: isPastDate ? 'default' : 'pointer', opacity: isPastDate ? 0.5 : 1 }}
+                  onClick={() => !isPastDate && setIsAnniversary(!isAnniversary)}
+                >
+                  기념일로 등록 {isPastDate && '(필수)'}
+                </span>
+              </div>
 
-                {/* 기념일 설정 */}
-                {isAnniversary && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                    {/* 알림주기 */}
-                    <div>
-                      <div style={{ fontSize: '13px', color: '#e0e0e0', marginBottom: '8px' }}>
-                        알림주기 <span style={{ color: ALARM_COLORS.danger, fontWeight: 'normal' }}>(필수항목)</span>
-                      </div>
-                      <RadioGroup style={{ flexDirection: 'row', gap: '8px' }}>
-                        <RadioOption $checked={anniversaryRepeat === 'daily'} onClick={() => setAnniversaryRepeat('daily')}>
-                          <input type="radio" name="anniversaryRepeat" value="daily" checked={anniversaryRepeat === 'daily'} onChange={() => {}} />
-                          <span>매일</span>
-                        </RadioOption>
-                        <RadioOption $checked={anniversaryRepeat === 'weekly'} onClick={() => setAnniversaryRepeat('weekly')}>
-                          <input type="radio" name="anniversaryRepeat" value="weekly" checked={anniversaryRepeat === 'weekly'} onChange={() => {}} />
-                          <span>매주</span>
-                        </RadioOption>
-                        <RadioOption $checked={anniversaryRepeat === 'monthly'} onClick={() => setAnniversaryRepeat('monthly')}>
-                          <input type="radio" name="anniversaryRepeat" value="monthly" checked={anniversaryRepeat === 'monthly'} onChange={() => {}} />
-                          <span>매달</span>
-                        </RadioOption>
-                        <RadioOption $checked={anniversaryRepeat === 'yearly'} onClick={() => setAnniversaryRepeat('yearly')}>
-                          <input type="radio" name="anniversaryRepeat" value="yearly" checked={anniversaryRepeat === 'yearly'} onChange={() => {}} />
-                          <span>매년</span>
-                        </RadioOption>
-                      </RadioGroup>
-                      <div style={{ marginTop: '8px', fontSize: '11px', color: '#808080', lineHeight: '1.4' }}>
-                        * 매일 주기는 등록일 이후의 날짜에는 점표시 되지 않습니다
-                      </div>
+              {/* 기념일 설정 */}
+              {isAnniversary && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {/* 알림주기 */}
+                  <div>
+                    <div style={{ fontSize: '13px', color: '#e0e0e0', marginBottom: '8px' }}>
+                      알림주기 <span style={{ color: ALARM_COLORS.danger, fontWeight: 'normal' }}>(필수항목)</span>
                     </div>
+                    <RadioGroup style={{ flexDirection: 'row', gap: '8px' }}>
+                      <RadioOption $checked={anniversaryRepeat === 'daily'} onClick={() => setAnniversaryRepeat('daily')}>
+                        <input type="radio" name="anniversaryRepeat" value="daily" checked={anniversaryRepeat === 'daily'} onChange={() => {}} />
+                        <span>매일</span>
+                      </RadioOption>
+                      <RadioOption $checked={anniversaryRepeat === 'weekly'} onClick={() => setAnniversaryRepeat('weekly')}>
+                        <input type="radio" name="anniversaryRepeat" value="weekly" checked={anniversaryRepeat === 'weekly'} onChange={() => {}} />
+                        <span>매주</span>
+                      </RadioOption>
+                      <RadioOption $checked={anniversaryRepeat === 'monthly'} onClick={() => setAnniversaryRepeat('monthly')}>
+                        <input type="radio" name="anniversaryRepeat" value="monthly" checked={anniversaryRepeat === 'monthly'} onChange={() => {}} />
+                        <span>매달</span>
+                      </RadioOption>
+                      <RadioOption $checked={anniversaryRepeat === 'yearly'} onClick={() => setAnniversaryRepeat('yearly')}>
+                        <input type="radio" name="anniversaryRepeat" value="yearly" checked={anniversaryRepeat === 'yearly'} onChange={() => {}} />
+                        <span>매년</span>
+                      </RadioOption>
+                    </RadioGroup>
+                    <div style={{ marginTop: '8px', fontSize: '11px', color: '#808080', lineHeight: '1.4' }}>
+                      * 매일 주기는 등록일 이후의 날짜에는 점표시 되지 않습니다
+                    </div>
+                  </div>
 
-                    {/* 알림시기 */}
-                    <div>
-                      <div style={{ fontSize: '13px', color: '#e0e0e0', marginBottom: '8px' }}>
-                        알림시기 <span style={{ color: ALARM_COLORS.danger, fontWeight: 'normal' }}>(필수항목)</span>
+                  {/* 알림시기 */}
+                  <div>
+                    <div style={{ fontSize: '13px', color: '#e0e0e0', marginBottom: '8px' }}>
+                      알림시기 <span style={{ color: ALARM_COLORS.danger, fontWeight: 'normal' }}>(필수항목)</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="radio"
+                          id="timing-today"
+                          name="anniversaryTiming"
+                          value="today"
+                          checked={anniversaryTiming === 'today'}
+                          onChange={() => setAnniversaryTiming('today')}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        <label htmlFor="timing-today" style={{ fontSize: '14px', color: '#e0e0e0', cursor: 'pointer' }}>
+                          당일
+                        </label>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <input
-                            type="radio"
-                            id="timing-today"
-                            name="anniversaryTiming"
-                            value="today"
-                            checked={anniversaryTiming === 'today'}
-                            onChange={() => setAnniversaryTiming('today')}
-                            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                          />
-                          <label htmlFor="timing-today" style={{ fontSize: '14px', color: '#e0e0e0', cursor: 'pointer' }}>
-                            당일
-                          </label>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <input
-                            type="radio"
-                            id="timing-before"
-                            name="anniversaryTiming"
-                            value="before"
-                            checked={anniversaryTiming === 'before'}
-                            onChange={() => {
-                              setAnniversaryTiming('before');
-                              setTimeout(() => anniversaryDaysInputRef.current?.focus(), 0);
-                            }}
-                            style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                          />
-                          <label htmlFor="timing-before" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#e0e0e0', cursor: 'pointer' }}>
-                            <TimeInput
-                              ref={anniversaryDaysInputRef}
-                              type="number"
-                              min="1"
-                              max="30"
-                              value={anniversaryDaysBefore || ''}
-                              placeholder="1-30"
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 30)) {
-                                  setAnniversaryTiming('before');
-                                  setAnniversaryDaysBefore(val === '' ? '' : parseInt(val));
-                                }
-                              }}
-                              onFocus={() => {
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="radio"
+                          id="timing-before"
+                          name="anniversaryTiming"
+                          value="before"
+                          checked={anniversaryTiming === 'before'}
+                          onChange={() => {
+                            setAnniversaryTiming('before');
+                            setTimeout(() => anniversaryDaysInputRef.current?.focus(), 0);
+                          }}
+                          style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                        />
+                        <label htmlFor="timing-before" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#e0e0e0', cursor: 'pointer' }}>
+                          <TimeInput
+                            ref={anniversaryDaysInputRef}
+                            type="number"
+                            min="1"
+                            max="30"
+                            value={anniversaryDaysBefore || ''}
+                            placeholder="1-30"
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '' || (parseInt(val) >= 1 && parseInt(val) <= 30)) {
                                 setAnniversaryTiming('before');
-                              }}
-                              style={{
-                                width: '60px',
-                                padding: '6px',
-                                fontSize: '14px'
-                              }}
-                            />
-                            <span>일 전</span>
-                          </label>
-                        </div>
+                                setAnniversaryDaysBefore(val === '' ? '' : parseInt(val));
+                              }
+                            }}
+                            onFocus={() => {
+                              setAnniversaryTiming('before');
+                            }}
+                            style={{
+                              width: '60px',
+                              padding: '6px',
+                              fontSize: '14px'
+                            }}
+                          />
+                          <span>일 전</span>
+                        </label>
                       </div>
                     </div>
                   </div>
-                )}
-              </Section>
-            )}
+                </div>
+              )}
+            </Section>
 
             {/* 3. 알람 시간 */}
             <Section style={{ opacity: isDisabled ? 0.5 : 1, pointerEvents: isDisabled ? 'none' : 'auto' }}>
@@ -1186,41 +1183,62 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
             )}
 
             {/* 5. 등록된 알람 (일반 알람만 표시, 시간순 정렬) */}
-            {!isPastDate && (
-              <Section>
-                <div style={{
-                  height: '1px',
-                  background: '#dee2e6',
-                  margin: '0 0 16px 0'
-                }} />
-                <SectionTitle>
-                  <BellIcon />
-                  등록된 알람 ({alarms.filter(alarm => !alarm.isAnniversary).length}개)
-                </SectionTitle>
-                <AlarmBox>
-                  <AlarmList>
-                    {alarms
-                      .filter(alarm => !alarm.isAnniversary)
-                      .slice()
-                      .sort((a, b) => {
-                        const timeA = new Date(a.calculatedTime).getTime();
-                        const timeB = new Date(b.calculatedTime).getTime();
-                        return timeA - timeB;
-                      })
-                      .map((alarm) => (
+            <Section>
+              <div style={{
+                height: '1px',
+                background: '#dee2e6',
+                margin: '0 0 16px 0'
+              }} />
+              <SectionTitle>
+                <BellIcon />
+                등록된 알람 ({alarms.filter(alarm => !alarm.isAnniversary).length}개)
+              </SectionTitle>
+              <AlarmBox>
+                <AlarmList>
+                  {alarms
+                    .filter(alarm => !alarm.isAnniversary)
+                    .slice()
+                    .sort((a, b) => {
+                      const timeA = new Date(a.calculatedTime).getTime();
+                      const timeB = new Date(b.calculatedTime).getTime();
+                      return timeA - timeB;
+                    })
+                    .map((alarm) => (
+                      <div
+                        key={alarm.id}
+                        style={{
+                          opacity: isPastDate ? 0.5 : 1,
+                          position: 'relative'
+                        }}
+                      >
                         <AlarmItemComponent
-                          key={alarm.id}
                           alarm={alarm}
                           scheduleData={scheduleData}
                           onToggle={handleToggleAlarm}
                           onDelete={handleDeleteAlarm}
-                          onEdit={handleEditAlarm}
+                          onEdit={isPastDate ? null : handleEditAlarm}
+                          isPastNormalAlarm={isPastDate}
                         />
-                      ))}
-                  </AlarmList>
-                </AlarmBox>
-              </Section>
-            )}
+                        {isPastDate && (
+                          <div style={{
+                            position: 'absolute',
+                            top: '8px',
+                            right: '8px',
+                            fontSize: '11px',
+                            color: '#dc3545',
+                            fontWeight: '600',
+                            background: 'rgba(220, 53, 69, 0.1)',
+                            padding: '2px 8px',
+                            borderRadius: '4px'
+                          }}>
+                            종료, 0일후 삭제
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </AlarmList>
+              </AlarmBox>
+            </Section>
 
             {/* 6. 기본 알람옵션 (접기/펴기 가능) */}
             {!isPastDate && (

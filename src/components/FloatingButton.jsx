@@ -28,63 +28,54 @@ const verticalShake = keyframes`
   }
 `;
 
-const DocumentIcon = styled.div`
+const NoteIconContainer = styled.div`
     position: relative;
-    width: 35.5px;
-    height: 42px;
-    background: white;
-    border-radius: 3px;
+    width: 70px;
+    height: 70px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 30px;
-    font-weight: 300;
-    color: #f5576c;
-    padding-top: 5px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    
-    /* 텍스트 라인 흉내 (::after 사용) */
-    &::after {
-        content: '';
-        position: absolute;
-        left: 5px;
-        bottom: 5px;
-        right: 5px;
-        height: 14px;
-        background-image: repeating-linear-gradient(to bottom, #bebebeff 0, #bebebeff 2px, transparent 2px, transparent 6px);
-        background-size: 100% 6px;
-        z-index: 0; /* + 기호보다 뒤에 위치 */
-    }
 `;
 
-const PlusIcon = styled.div`
+const NoteSvgImg = styled.img`
+    width: auto;
+    height: 70px;
+    filter: drop-shadow(0 2px 4px rgba(15, 35, 50, 0.3)) hue-rotate(200deg) saturate(1.2);
+    pointer-events: none;
+`;
+
+const PlusCircleIcon = styled.div`
     position: absolute;
-    top: 13.5px; // 문서 아이콘 위로 살짝 이동
-    left: 9.6px; // 문서 아이콘 오른쪽으로 살짝 이동
-    width: 16px;
-    height: 16px;
-    /* 참고: 버튼 배경색(그라데이션) 대신 가독성을 위해 단색을 사용합니다. */
-    background-color: #4a90e2; 
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, calc(-50% - 5px));
+    width: 24px;
+    height: 24px;
+    background: linear-gradient(135deg, #4a90e2, #667eea);
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px; // + 기호 크기
     color: white;
+    font-size: 18px;
     font-weight: bold;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); // 작은 그림자 추가
-    
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    border: 2px solid white;
+    line-height: 1;
+
     &::before {
         content: '+';
-        line-height: 1; // 텍스트 중앙 정렬
+        display: block;
+        margin-top: -4px;
+        margin-left: 2px;
     }
 `;
 
 const FloatingButtonContainer = styled.div`
-    width: 64px;
-    height: 64px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #f093fb, #f5576c);
+    background: transparent;
     color: white;
     font-size: 36px;
     display: flex;
@@ -113,12 +104,8 @@ const FloatingButtonContainer = styled.div`
     ${props => !props.$isDragging && props.$hasBeenDragged && `
         animation: none !important;
         transform: translateY(${props.$offsetY}px);
-        transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.25s ease-in-out;
+        transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
     `}
-    
-    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
-
-    transition: box-shadow 0.25s ease-in-out;
 
     &:active {
         cursor: grabbing;
@@ -130,16 +117,6 @@ const FloatingButtonContainer = styled.div`
         display: inline-block;
     }
 
-    &::after {
-        content: '';
-        position: absolute;
-        width: 100%;
-        height: 100%;
-        border-radius: 50%;
-        border: 3px solid rgba(255, 204, 231, 0.7); 
-        opacity: 0;
-        z-index: 1001;
-    }
 `;
 
 const LONG_PRESS_DURATION = 500; // 0.5초
@@ -301,11 +278,13 @@ const FloatingButton = ({ activeTab, onClick }) => {
             $isDragging={isDragging}
             $hasBeenDragged={hasBeenDragged} // ★ CSS를 위해 이 prop이 반드시 필요합니다.
         >
-            {/* 텍스트(아이콘)를 span으로 감싸서 z-index를 줍니다 */}
-            <span>
-                <DocumentIcon />
-                <PlusIcon />
-            </span>
+            <NoteIconContainer>
+                <NoteSvgImg
+                    src="/images/memo/paper-153317_640.svg"
+                    alt="메모 아이콘"
+                />
+                <PlusCircleIcon />
+            </NoteIconContainer>
         </FloatingButtonContainer>
     );
 };

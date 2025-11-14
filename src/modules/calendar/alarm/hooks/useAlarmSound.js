@@ -12,6 +12,7 @@ export const useAlarmSound = () => {
   const [notificationType, setNotificationType] = useState('sound');
   const [snoozeEnabled, setSnoozeEnabled] = useState(false);
   const [snoozeMinutes, setSnoozeMinutes] = useState(0);
+  const [uploadError, setUploadError] = useState('');
 
   // 파일 input ref
   const soundFileInputRef = useRef(null);
@@ -62,13 +63,13 @@ export const useAlarmSound = () => {
 
     // 파일 타입 검증
     if (!file.type.startsWith('audio/')) {
-      alert('오디오 파일만 업로드 가능합니다.');
+      setUploadError('오디오 파일만 업로드 가능합니다.');
       return;
     }
 
     // 파일 크기 검증 (10MB 제한)
     if (file.size > 10 * 1024 * 1024) {
-      alert('파일 크기는 10MB 이하여야 합니다.');
+      setUploadError('파일 크기는 10MB 이하여야 합니다.');
       return;
     }
 
@@ -85,7 +86,7 @@ export const useAlarmSound = () => {
       reader.readAsDataURL(file);
     } catch (error) {
       console.error('사운드 파일 업로드 실패:', error);
-      alert('사운드 파일 업로드에 실패했습니다.');
+      setUploadError('사운드 파일 업로드에 실패했습니다.');
     }
   };
 
@@ -123,6 +124,7 @@ export const useAlarmSound = () => {
     snoozeEnabled,
     snoozeMinutes,
     soundFileInputRef,
+    uploadError,
 
     // Setters
     setSoundFile,
@@ -131,6 +133,7 @@ export const useAlarmSound = () => {
     setNotificationType,
     setSnoozeEnabled,
     setSnoozeMinutes,
+    setUploadError,
 
     // 핸들러
     handleSoundFileChange,

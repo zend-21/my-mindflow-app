@@ -249,7 +249,7 @@ const RepeatLabel = styled.span`
   color: #808080;
 `;
 
-const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, onEdit }) => {
+const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, onEdit, isPastNormalAlarm }) => {
   // 반복 표시인지 확인 (getRepeatedAnniversaries에서 추가한 플래그)
   const isRepeated = alarm.isRepeated === true;
 

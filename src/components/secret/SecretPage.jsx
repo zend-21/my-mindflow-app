@@ -8,10 +8,12 @@ import PinInput from './PinInput';
 import SecretDocCard from './SecretDocCard';
 import SecretDocEditor from './SecretDocEditor';
 import PasswordModal from './PasswordModal';
+import PinChangeModal from './PinChangeModal';
 import {
     hasPinSet,
     setPin,
     verifyPin,
+    changePin,
     getAllSecretDocs,
     addSecretDoc,
     updateSecretDoc,
@@ -542,6 +544,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     const [sortBy, setSortBy] = useState('date'); // 'date' or 'importance'
     const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
     const [showPinRecovery, setShowPinRecovery] = useState(false);
+    const [showPinChangeModal, setShowPinChangeModal] = useState(false);
 
     // 다중 선택 모드 상태
     const [selectionMode, setSelectionMode] = useState(false);
@@ -865,13 +868,20 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             const doc = docs.find(d => d.id === docId);
             if (!doc) return;
 
+            // 개별 비밀번호 제거 (휴지통으로 이동 시 리셋)
+            const docWithoutPassword = {
+                ...doc,
+                hasPassword: false,
+                passwordHash: undefined
+            };
+
             // 휴지통으로 이동 이벤트 발생
             const event = new CustomEvent('moveToTrash', {
                 detail: {
                     id: doc.id,
                     type: 'secret',
                     content: doc.title || '제목 없음',
-                    originalData: doc
+                    originalData: docWithoutPassword // 비밀번호 없는 버전으로 저장
                 }
             });
             window.dispatchEvent(event);
@@ -947,13 +957,20 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             for (const docId of selectedDocs) {
                 const doc = docs.find(d => d.id === docId);
                 if (doc) {
+                    // 개별 비밀번호 제거 (휴지통으로 이동 시 리셋)
+                    const docWithoutPassword = {
+                        ...doc,
+                        hasPassword: false,
+                        passwordHash: undefined
+                    };
+
                     // 휴지통으로 이동 이벤트 발생
                     const event = new CustomEvent('moveToTrash', {
                         detail: {
                             id: doc.id,
                             type: 'secret',
                             content: doc.title || '제목 없음',
-                            originalData: doc
+                            originalData: docWithoutPassword // 비밀번호 없는 버전으로 저장
                         }
                     });
                     window.dispatchEvent(event);
@@ -1130,27 +1147,58 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         showToast?.(`임시 PIN이 ${profile.email}로 전송되었습니다. (준비 중)`);
     };
 
+    const handleChangePinClick = () => {
+        setShowPinChangeModal(true);
+    };
+
+    const handlePinChange = async ({ currentPin, newPin }) => {
+        try {
+            const result = await changePin(currentPin, newPin);
+
+            if (result.success) {
+                showToast?.('PIN이 성공적으로 변경되었습니다.');
+                setShowPinChangeModal(false);
+            } else {
+                showToast?.(result.message || 'PIN 변경에 실패했습니다.');
+            }
+        } catch (error) {
+            console.error('PIN 변경 오류:', error);
+            showToast?.('PIN 변경 중 오류가 발생했습니다.');
+        }
+    };
+
     if (!isUnlocked) {
         return (
-            <Container>
-                <InnerContent>
-                    <PinInput
+            <>
+                <Container>
+                    <InnerContent>
+                        <PinInput
+                            pinLength={settings.pinLength}
+                            title={hasPinSet()
+                                ? 'PIN 입력'
+                                : (isConfirmingPin ? 'PIN 확인' : 'PIN 설정')
+                            }
+                            subtitle={hasPinSet()
+                                ? '시크릿 페이지에 접근하려면 PIN을 입력하세요'
+                                : (isConfirmingPin
+                                    ? '동일한 PIN을 한 번 더 입력해주세요'
+                                    : '시크릿 페이지를 보호할 PIN을 설정하세요')
+                            }
+                            onSubmit={handlePinSubmit}
+                            onForgotPin={profile?.email ? handleForgotPin : null}
+                            onChangePin={hasPinSet() ? handleChangePinClick : null}
+                        />
+                    </InnerContent>
+                </Container>
+
+                {showPinChangeModal && (
+                    <PinChangeModal
+                        onClose={() => setShowPinChangeModal(false)}
+                        onConfirm={handlePinChange}
                         pinLength={settings.pinLength}
-                        title={hasPinSet()
-                            ? 'PIN 입력'
-                            : (isConfirmingPin ? 'PIN 확인' : 'PIN 설정')
-                        }
-                        subtitle={hasPinSet()
-                            ? '시크릿 페이지에 접근하려면 PIN을 입력하세요'
-                            : (isConfirmingPin
-                                ? '동일한 PIN을 한 번 더 입력해주세요'
-                                : '시크릿 페이지를 보호할 PIN을 설정하세요')
-                        }
-                        onSubmit={handlePinSubmit}
-                        onForgotPin={profile?.email ? handleForgotPin : null}
                     />
-                </InnerContent>
-            </Container>
+                )}
+            </>
         );
     }
 
@@ -1366,7 +1414,13 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                         </svg>
-                        <span>중요도 지정/해제</span>
+                        <span>
+                            {(() => {
+                                const selectedDocObjects = docs.filter(d => selectedDocs.includes(d.id));
+                                const allImportant = selectedDocObjects.every(d => d.isImportant);
+                                return allImportant ? '중요도 해제' : '중요도 지정';
+                            })()}
+                        </span>
                     </BulkActionButton>
                     <BulkActionButton $type="delete" onClick={handleBulkDelete}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

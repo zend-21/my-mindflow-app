@@ -38,52 +38,194 @@ const SectionHeader = styled.div`
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
 `;
-const SelectionHeader = styled.div`
+
+const SelectionModeBar = styled.div`
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    padding: 12px 24px;
+    margin-bottom: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(240, 147, 251, 0.3);
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background-color: #2a2d35; /* 다크 배경 */
-    padding: 10px 20px;
-    animation: ${fadeIn} 0.3s ease-out;
-    transform: translateY(-5px);
-    border-radius: 12px;
+    gap: 12px;
 `;
-const HeaderButton = styled.button`
-    background-color: #333842;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    font-size: 16px;
-    color: #f093fb;
-    cursor: pointer;
+
+const SelectionInfo = styled.div`
+    color: white;
+    font-size: 15px;
     font-weight: 600;
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
-    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    flex-shrink: 0;
+    white-space: nowrap;
+`;
+
+const SelectionButtonsContainer = styled.div`
+    flex: 1;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+`;
+
+const SelectionButton = styled.button`
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
 
     &:disabled {
-        background-color: #2a2d35;
-        box-shadow: none;
-        color: #606060;
+        opacity: 0.5;
         cursor: not-allowed;
     }
+`;
 
-    &:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 12px rgba(240, 147, 251, 0.3);
+const ActionButtonsBar = styled.div`
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+`;
+
+const ActionButton = styled.button`
+    background: ${props => {
+        switch(props.$type) {
+            case 'delete': return 'rgba(255, 107, 107, 0.1)';
+            case 'importance': return 'rgba(255, 193, 7, 0.1)';
+            default: return 'rgba(255, 255, 255, 0.05)';
+        }
+    }};
+    border: 1px solid ${props => {
+        switch(props.$type) {
+            case 'delete': return 'rgba(255, 107, 107, 0.3)';
+            case 'importance': return 'rgba(255, 193, 7, 0.3)';
+            default: return 'rgba(255, 255, 255, 0.15)';
+        }
+    }};
+    color: ${props => {
+        switch(props.$type) {
+            case 'delete': return '#ff6b6b';
+            case 'importance': return '#ffc107';
+            default: return '#e0e0e0';
+        }
+    }};
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex: 1;
+    white-space: nowrap;
+
+    &:hover {
+        background: ${props => {
+            switch(props.$type) {
+                case 'delete': return 'rgba(255, 107, 107, 0.2)';
+                case 'importance': return 'rgba(255, 193, 7, 0.2)';
+                default: return 'rgba(255, 255, 255, 0.08)';
+            }
+        }};
+        border-color: ${props => {
+            switch(props.$type) {
+                case 'delete': return 'rgba(255, 107, 107, 0.5)';
+                case 'importance': return 'rgba(255, 193, 7, 0.5)';
+                default: return 'rgba(255, 255, 255, 0.25)';
+            }
+        }};
+    }
+
+    &:active {
+        transform: scale(0.98);
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
     }
 `;
-const SelectionCount = styled.span`
-    font-size: 20px;
-    font-weight: bold;
-    color: #f093fb;
-    margin-top: 0px; /* 오타 수정 및 정렬을 위해 margin-top 사용 */
+
+const SearchBar = styled.div`
+    margin-bottom: 16px;
+    width: 100%;
+`;
+
+const SearchInput = styled.input`
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+    font-size: 14px;
+    transition: all 0.2s;
+    box-sizing: border-box;
+
+    &:focus {
+        outline: none;
+        border-color: rgba(74, 144, 226, 0.5);
+        background: rgba(255, 255, 255, 0.08);
+        box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+    }
+
+    &::placeholder {
+        color: #808080;
+    }
+`;
+
+const SortBar = styled.div`
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    width: 100%;
+`;
+
+const SortButton = styled.button`
+    padding: 8px 12px;
+    border-radius: 6px;
+    border: 1px solid ${props => props.$active ? 'rgba(74, 144, 226, 0.5)' : 'rgba(255, 255, 255, 0.15)'};
+    background: ${props => props.$active ? 'rgba(74, 144, 226, 0.2)' : 'rgba(255, 255, 255, 0.05)'};
+    color: ${props => props.$active ? '#4a90e2' : '#b0b0b0'};
+    font-size: 13px;
+    font-weight: ${props => props.$active ? '600' : '500'};
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+
+    &:hover {
+        background: ${props => props.$active ? 'rgba(74, 144, 226, 0.25)' : 'rgba(255, 255, 255, 0.08)'};
+        border-color: ${props => props.$active ? 'rgba(74, 144, 226, 0.6)' : 'rgba(255, 255, 255, 0.25)'};
+    }
+`;
+
+const GuidanceMessage = styled.div`
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(74, 144, 226, 0.3);
+    padding: 10px 16px;
+    text-align: center;
+    margin-bottom: 16px;
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+    font-weight: 300;
 `;
 const SectionTitleWrapper = styled.div`
     display: flex;
@@ -224,16 +366,28 @@ const DateText = styled.span`
     display: block;
 `;
 const DeleteButton = styled.button`
-    background: none;
-    border: none;
-    font-size: 20px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 18px;
     color: #b0b0b0;
     cursor: pointer;
     margin-left: 10px;
-    transition: color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+
     &:hover {
+        background: rgba(245, 87, 108, 0.15);
+        border-color: rgba(245, 87, 108, 0.4);
         color: #f5576c;
+        transform: scale(1.1);
     }
+
     ${props => props.$isSelectionMode && `
         display: none;
     `}
@@ -395,19 +549,23 @@ const StyledCheckIcon = styled(BsCheckCircleFill)`
 `;
 // --- (모든 스타일 끝) ---
 
-const MemoPage = ({ 
-    memos, 
-    onOpenNewMemo, 
-    onOpenDetailMemo, 
+const MemoPage = ({
+    memos,
+    onOpenNewMemo,
+    onOpenDetailMemo,
     onDeleteMemoRequest,
     isSelectionMode,
     selectedMemoIds,
     onStartSelectionMode,
     onToggleMemoSelection,
     onExitSelectionMode,
+    onToggleSelectedMemosImportance,
     onRequestDeleteSelectedMemos
 }) => {
-    const [layoutView, setLayoutView] = useLocalStorage('memoLayoutView', 'list'); 
+    const [layoutView, setLayoutView] = useLocalStorage('memoLayoutView', 'list');
+    const [searchQuery, setSearchQuery] = React.useState('');
+    const [sortOrder, setSortOrder] = React.useState('date'); // 'date' 또는 'importance'
+    const [sortDirection, setSortDirection] = React.useState('desc'); // 'asc' 또는 'desc'
     const longPressTimer = useRef(null);
     const PRESS_DURATION = 500;
 
@@ -454,12 +612,47 @@ const MemoPage = ({
         onDeleteMemoRequest(id);
     };
 
-    let sortedMemos = [];
+    const handleSortToggle = (type) => {
+        if (sortOrder === type) {
+            // 같은 정렬 기준이면 방향만 토글
+            setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc');
+        } else {
+            // 다른 정렬 기준이면 해당 기준으로 변경하고 내림차순으로 설정
+            setSortOrder(type);
+            setSortDirection('desc');
+        }
+    };
+
+    // 검색 및 정렬 로직
+    let filteredAndSortedMemos = [];
     if (memos && Array.isArray(memos)) {
-        sortedMemos = [...memos].sort((a, b) => {
-            const aImportant = a.isImportant ? 1 : 0;
-            const bImportant = b.isImportant ? 1 : 0;
-            return bImportant - aImportant || (b.date || 0) - (a.date || 0);
+        // 1. 검색 필터링
+        filteredAndSortedMemos = memos.filter(memo => {
+            if (!searchQuery.trim()) return true;
+            const query = searchQuery.toLowerCase();
+            return memo.content?.toLowerCase().includes(query);
+        });
+
+        // 2. 정렬
+        filteredAndSortedMemos = [...filteredAndSortedMemos].sort((a, b) => {
+            if (sortOrder === 'importance') {
+                // 중요도순 정렬
+                const aImportant = a.isImportant ? 1 : 0;
+                const bImportant = b.isImportant ? 1 : 0;
+
+                if (sortDirection === 'desc') {
+                    return bImportant - aImportant || (b.date || 0) - (a.date || 0);
+                } else {
+                    return aImportant - bImportant || (a.date || 0) - (b.date || 0);
+                }
+            } else {
+                // 등록순 정렬
+                if (sortDirection === 'desc') {
+                    return (b.date || 0) - (a.date || 0);
+                } else {
+                    return (a.date || 0) - (b.date || 0);
+                }
+            }
         });
     }
 
@@ -468,38 +661,120 @@ const MemoPage = ({
     return (
         <MemoContainer>
             {isSelectionMode ? (
-                <SelectionHeader>
-                    <HeaderButton onClick={onExitSelectionMode}>취소</HeaderButton>
-                    <SelectionCount>{selectedCount}개 선택됨</SelectionCount>
-                    <HeaderButton onClick={onRequestDeleteSelectedMemos} disabled={selectedCount === 0}>
-                        삭제
-                    </HeaderButton>
-                </SelectionHeader>
+                <>
+                    <SelectionModeBar>
+                        <SelectionInfo>
+                            {selectedCount}개 선택됨
+                        </SelectionInfo>
+                        <SelectionButtonsContainer>
+                            <SelectionButton onClick={() => {
+                                // 전체선택/해제 로직: SecretPage와 동일
+                                const allFilteredIds = filteredAndSortedMemos.map(memo => memo.id);
+                                const allSelected = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedMemoIds.has(id));
+
+                                if (allSelected) {
+                                    // 모두 선택된 상태면 전체 해제
+                                    allFilteredIds.forEach(id => {
+                                        if (selectedMemoIds.has(id)) {
+                                            onToggleMemoSelection(id);
+                                        }
+                                    });
+                                } else {
+                                    // 일부만 선택되었거나 아무것도 선택 안 된 경우 전체 선택
+                                    allFilteredIds.forEach(id => {
+                                        if (!selectedMemoIds.has(id)) {
+                                            onToggleMemoSelection(id);
+                                        }
+                                    });
+                                }
+                            }}>
+                                {filteredAndSortedMemos.length > 0 && filteredAndSortedMemos.every(memo => selectedMemoIds.has(memo.id))
+                                    ? '전체해제'
+                                    : '전체선택'}
+                            </SelectionButton>
+                            <SelectionButton onClick={onExitSelectionMode}>
+                                취소
+                            </SelectionButton>
+                        </SelectionButtonsContainer>
+                    </SelectionModeBar>
+
+                    <ActionButtonsBar>
+                        <ActionButton
+                            $type="importance"
+                            onClick={onToggleSelectedMemosImportance}
+                            disabled={selectedCount === 0}
+                        >
+                            {(() => {
+                                if (selectedCount === 0) return '중요도 지정/해제';
+                                const selectedMemos = memos.filter(memo => selectedMemoIds.has(memo.id));
+                                const allImportant = selectedMemos.every(memo => memo.isImportant);
+                                return allImportant ? '중요도 해제' : '중요도 지정';
+                            })()}
+                        </ActionButton>
+                        <ActionButton
+                            $type="delete"
+                            onClick={onRequestDeleteSelectedMemos}
+                            disabled={selectedCount === 0}
+                        >
+                            삭제
+                        </ActionButton>
+                    </ActionButtonsBar>
+                </>
             ) : (
-                <SectionHeader>
-                    <LeftHeaderGroup>
-                        <SectionTitleWrapper>
-                            <SectionTitle>📝  메모장 <MemoCount>({memos?.length || 0})</MemoCount></SectionTitle>
-                        </SectionTitleWrapper>
-                        <AddMemoButton onClick={handleAddMemoClick}>+</AddMemoButton>
-                    </LeftHeaderGroup>
-                    
-                    <HeaderButtonWrapper>
-                        <LayoutButtonSet>
-                            <LayoutToggleButton $isActive={layoutView === 'list'} onClick={() => setLayoutView('list')}>
-                                <ListIcon />
-                            </LayoutToggleButton>
-                            <LayoutToggleButton $isActive={layoutView === 'grid'} onClick={() => setLayoutView('grid')}>
-                                <GridIcon />
-                            </LayoutToggleButton>
-                        </LayoutButtonSet>
-                    </HeaderButtonWrapper>
-                </SectionHeader>
+                <>
+                    <SectionHeader>
+                        <LeftHeaderGroup>
+                            <SectionTitleWrapper>
+                                <SectionTitle>📝  메모장 <MemoCount>({memos?.length || 0})</MemoCount></SectionTitle>
+                            </SectionTitleWrapper>
+                            <AddMemoButton onClick={handleAddMemoClick}>+</AddMemoButton>
+                        </LeftHeaderGroup>
+
+                        <HeaderButtonWrapper>
+                            <LayoutButtonSet>
+                                <LayoutToggleButton $isActive={layoutView === 'list'} onClick={() => setLayoutView('list')}>
+                                    <ListIcon />
+                                </LayoutToggleButton>
+                                <LayoutToggleButton $isActive={layoutView === 'grid'} onClick={() => setLayoutView('grid')}>
+                                    <GridIcon />
+                                </LayoutToggleButton>
+                            </LayoutButtonSet>
+                        </HeaderButtonWrapper>
+                    </SectionHeader>
+
+                    <SearchBar>
+                        <SearchInput
+                            type="text"
+                            placeholder="메모 검색..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                    </SearchBar>
+
+                    <SortBar>
+                        <SortButton
+                            $active={sortOrder === 'date'}
+                            onClick={() => handleSortToggle('date')}
+                        >
+                            등록순 {sortOrder === 'date' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                        </SortButton>
+                        <SortButton
+                            $active={sortOrder === 'importance'}
+                            onClick={() => handleSortToggle('importance')}
+                        >
+                            중요도순 {sortOrder === 'importance' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                        </SortButton>
+                    </SortBar>
+
+                    <GuidanceMessage>
+                        하단의 목록창을 길게 누르면 다중 선택 모드가 활성화 됩니다.
+                    </GuidanceMessage>
+                </>
             )}
 
             <MemoList $layoutView={layoutView}>
-                {sortedMemos.length > 0 ? (
-                    sortedMemos.map(memo => {
+                {filteredAndSortedMemos.length > 0 ? (
+                    filteredAndSortedMemos.map(memo => {
                         if (!memo || !memo.id) {
                             return null;
                         }
@@ -559,7 +834,9 @@ const MemoPage = ({
                         );
                     })
                 ) : (
-                    <EmptyMessage>작성된 메모가 없습니다.</EmptyMessage>
+                    <EmptyMessage>
+                        {searchQuery ? '검색 결과가 없습니다.' : '작성된 메모가 없습니다.'}
+                    </EmptyMessage>
                 )}
             </MemoList>
         </MemoContainer>

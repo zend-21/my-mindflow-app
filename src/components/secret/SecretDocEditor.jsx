@@ -446,6 +446,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
     const [validationError, setValidationError] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     useEffect(() => {
         // 에디터가 열릴 때마다 에러 상태 초기화
@@ -716,11 +717,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
                 <Footer>
                     {doc && onDelete && (
                         <Button
-                            onClick={() => {
-                                if (window.confirm('이 문서를 삭제하시겠습니까?')) {
-                                    onDelete(doc.id);
-                                }
-                            }}
+                            onClick={() => setShowDeleteConfirm(true)}
                             style={{ marginRight: 'auto', borderColor: '#ff6b6b', color: '#ff6b6b' }}
                         >
                             삭제
@@ -740,6 +737,38 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
                         <ErrorModalButton onClick={() => setValidationError('')}>
                             확인
                         </ErrorModalButton>
+                    </ErrorModal>
+                )}
+
+                {showDeleteConfirm && (
+                    <ErrorModal onClick={(e) => e.stopPropagation()}>
+                        <ErrorModalTitle>
+                            🗑️ 문서 삭제
+                        </ErrorModalTitle>
+                        <ErrorModalMessage>이 문서를 삭제하시겠습니까?</ErrorModalMessage>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <ErrorModalButton
+                                onClick={() => setShowDeleteConfirm(false)}
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.1)',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                                }}
+                            >
+                                취소
+                            </ErrorModalButton>
+                            <ErrorModalButton
+                                onClick={() => {
+                                    setShowDeleteConfirm(false);
+                                    onDelete(doc.id);
+                                }}
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(255, 107, 107, 0.3), rgba(255, 107, 107, 0.5))',
+                                    border: '1px solid rgba(255, 107, 107, 0.5)'
+                                }}
+                            >
+                                삭제
+                            </ErrorModalButton>
+                        </div>
                     </ErrorModal>
                 )}
             </Overlay>

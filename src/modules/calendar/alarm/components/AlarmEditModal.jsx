@@ -24,6 +24,7 @@ import {
   PlayButton,
 } from '../';
 import { saveAudioFile, loadAudioFile } from '../../../../utils/audioStorage';
+import { Toast } from './Toast';
 
 const Overlay = styled.div`
   position: fixed;
@@ -246,6 +247,10 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
   const editSoundFileInputRef = useRef(null);
   const audioRef = useRef(null);
 
+  // Toast 상태
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
+
   // alarm이 변경될 때마다 폼 초기화
   useEffect(() => {
     if (alarm && isOpen) {
@@ -293,6 +298,12 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
 
   if (!isOpen || !alarm) return null;
 
+  // Toast 표시 헬퍼 함수
+  const showToastMessage = (message) => {
+    setToastMessage(message);
+    setShowToast(true);
+  };
+
   // Play sound preview
   const handlePlaySound = async () => {
     if (audioRef.current) {
@@ -307,7 +318,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
         if (audioData) {
           audioRef.current.src = audioData;
         } else {
-          alert('저장된 알람 소리를 찾을 수 없습니다.');
+          showToastMessage('저장된 알람 소리를 찾을 수 없습니다.');
           return;
         }
       }
@@ -319,11 +330,11 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
   const handleSave = () => {
     // 유효성 검사
     if (!editTitle.trim()) {
-      alert('알람 타이틀을 입력해주세요.');
+      showToastMessage('알람 타이틀을 입력해주세요.');
       return;
     }
     if (editHourInput === '' || editMinuteInput === '') {
-      alert('알람 시간을 입력해주세요.');
+      showToastMessage('알람 시간을 입력해주세요.');
       return;
     }
 
@@ -652,7 +663,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                       // 파일 크기 체크 (500KB 제한 - 알람음은 짧을수록 좋음)
                       const maxSize = 500 * 1024; // 500KB
                       if (file.size > maxSize) {
-                        alert('알람 소리는 500KB 이하여야 합니다.\n짧은 알람음(3-5초) 사용을 권장합니다.');
+                        showToastMessage('알람 소리는 500KB 이하여야 합니다.\n짧은 알람음(3-5초) 사용을 권장합니다.');
                         return;
                       }
 
@@ -669,7 +680,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                           console.log('✅ 개별 알람 소리 저장 완료:', file.name);
                         } catch (error) {
                           console.error('❌ 알람 소리 저장 실패:', error);
-                          alert('알람 소리 저장에 실패했습니다.');
+                          showToastMessage('알람 소리 저장에 실패했습니다.');
                         }
                       };
                       reader.readAsDataURL(file);
@@ -772,6 +783,11 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
           </Footer>
         </ModalContent>
       </Overlay>
+      <Toast
+        message={toastMessage}
+        isOpen={showToast}
+        onClose={() => setShowToast(false)}
+      />
     </Portal>
   );
 };

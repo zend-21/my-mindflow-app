@@ -7,6 +7,7 @@ import { ko } from 'date-fns/locale';
 import { useTrashContext } from '../contexts/TrashContext';
 import ConfirmationModal from './ConfirmationModal';
 import Portal from './Portal';
+import { verifyPassword } from '../utils/encryption';
 
 const PageContainer = styled.div`
     padding: 0;
@@ -160,6 +161,8 @@ const SearchInput = styled.input`
 
     &::placeholder {
         color: #808080;
+        font-size: 12px;
+        line-height: 1.4;
     }
 `;
 
@@ -191,9 +194,40 @@ const FilterRow = styled.div`
 `;
 
 const FilterButton = styled.button`
-    background: ${props => props.$active ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : '#333842'};
-    color: ${props => props.$active ? 'white' : '#e0e0e0'};
-    border: 1px solid ${props => props.$active ? 'transparent' : 'rgba(255, 255, 255, 0.1)'};
+    flex: 1;
+    background: ${props => {
+        if (!props.$active) return 'rgba(255, 255, 255, 0.05)';
+        switch (props.$type) {
+            case 'all': return 'rgba(102, 126, 234, 0.2)';
+            case 'memo': return 'rgba(139, 92, 246, 0.2)';
+            case 'schedule': return 'rgba(236, 72, 153, 0.2)';
+            case 'secret': return 'rgba(59, 130, 246, 0.2)';
+            case 'review': return 'rgba(168, 85, 247, 0.2)';
+            default: return 'rgba(102, 126, 234, 0.2)';
+        }
+    }};
+    color: ${props => {
+        if (!props.$active) return '#b0b0b0';
+        switch (props.$type) {
+            case 'all': return '#667eea';
+            case 'memo': return '#a78bfa';
+            case 'schedule': return '#ec4899';
+            case 'secret': return '#3b82f6';
+            case 'review': return '#a855f7';
+            default: return '#667eea';
+        }
+    }};
+    border: 1px solid ${props => {
+        if (!props.$active) return 'rgba(255, 255, 255, 0.1)';
+        switch (props.$type) {
+            case 'all': return 'rgba(102, 126, 234, 0.5)';
+            case 'memo': return 'rgba(139, 92, 246, 0.5)';
+            case 'schedule': return 'rgba(236, 72, 153, 0.5)';
+            case 'secret': return 'rgba(59, 130, 246, 0.5)';
+            case 'review': return 'rgba(168, 85, 247, 0.5)';
+            default: return 'rgba(102, 126, 234, 0.5)';
+        }
+    }};
     padding: 8px 14px;
     border-radius: 8px;
     font-size: 13px;
@@ -204,14 +238,14 @@ const FilterButton = styled.button`
 
     &:hover {
         ${props => !props.$active && `
-            border-color: #667eea;
-            color: #667eea;
-            background: #3d4250;
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.2);
         `}
     }
 `;
 
 const SortButton = styled.button`
+    width: 100%;
     background: #333842;
     color: #e0e0e0;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -223,8 +257,8 @@ const SortButton = styled.button`
     transition: all 0.2s;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 4px;
-    margin-left: auto;
 
     &:hover {
         border-color: #667eea;
@@ -291,15 +325,31 @@ const DetailTypeLabel = styled.span`
     font-weight: 600;
     background: ${props => {
         switch (props.$type) {
-            case 'memo': return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-            case 'schedule': return 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
-            case 'secret': return 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)';
-            case 'review': return 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)';
-            default: return '#f5f5f5';
+            case 'memo': return 'rgba(139, 92, 246, 0.2)';
+            case 'schedule': return 'rgba(236, 72, 153, 0.2)';
+            case 'secret': return 'rgba(59, 130, 246, 0.2)';
+            case 'review': return 'rgba(168, 85, 247, 0.2)';
+            default: return 'rgba(255, 255, 255, 0.05)';
         }
     }};
-    color: white;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    border: 1px solid ${props => {
+        switch (props.$type) {
+            case 'memo': return 'rgba(139, 92, 246, 0.5)';
+            case 'schedule': return 'rgba(236, 72, 153, 0.5)';
+            case 'secret': return 'rgba(59, 130, 246, 0.5)';
+            case 'review': return 'rgba(168, 85, 247, 0.5)';
+            default: return 'rgba(255, 255, 255, 0.1)';
+        }
+    }};
+    color: ${props => {
+        switch (props.$type) {
+            case 'memo': return '#a78bfa';
+            case 'schedule': return '#ec4899';
+            case 'secret': return '#3b82f6';
+            case 'review': return '#a855f7';
+            default: return '#e0e0e0';
+        }
+    }};
     margin-bottom: 8px;
 `;
 
@@ -341,11 +391,6 @@ const DetailModalContent = styled.div`
     overflow-y: auto;
     overflow-x: hidden;
     padding: 24px;
-    font-size: 15px;
-    line-height: 1.8;
-    color: #e0e0e0;
-    white-space: pre-wrap;
-    word-break: break-word;
     min-height: 0; /* Flexbox에서 스크롤을 위해 필요 */
     -webkit-overflow-scrolling: touch; /* iOS 부드러운 스크롤 */
     overscroll-behavior: contain; /* 모달 밖으로 스크롤 방지 */
@@ -368,6 +413,39 @@ const DetailModalContent = styled.div`
     &::-webkit-scrollbar-thumb:hover {
         background: #5a5d65;
     }
+`;
+
+const SecretDocTitle = styled.h2`
+    font-size: 20px;
+    font-weight: 600;
+    color: #e0e0e0;
+    margin: 0 0 12px 0;
+    word-break: break-word;
+`;
+
+const SecretDocMeta = styled.div`
+    font-size: 12px;
+    color: #b0b0b0;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    line-height: 1.6;
+`;
+
+const SecretDocContent = styled.div`
+    font-size: 15px;
+    line-height: 1.8;
+    color: #e0e0e0;
+    white-space: pre-wrap;
+    word-break: break-word;
+`;
+
+const NormalDocContent = styled.div`
+    font-size: 15px;
+    line-height: 1.8;
+    color: #d0d0d0;
+    white-space: pre-wrap;
+    word-break: break-word;
 `;
 
 const DetailModalActions = styled.div`
@@ -467,10 +545,10 @@ const TrashItem = styled.div`
         width: 4px;
         background: ${props => {
             switch (props.$type) {
-                case 'memo': return 'linear-gradient(180deg, #667eea 0%, #764ba2 100%)';
-                case 'schedule': return 'linear-gradient(180deg, #f093fb 0%, #f5576c 100%)';
-                case 'secret': return 'linear-gradient(180deg, #fbc2eb 0%, #a6c1ee 100%)';
-                case 'review': return 'linear-gradient(180deg, #a8edea 0%, #fed6e3 100%)';
+                case 'memo': return '#a78bfa';
+                case 'schedule': return '#ec4899';
+                case 'secret': return '#3b82f6';
+                case 'review': return '#a855f7';
                 default: return 'rgba(255, 255, 255, 0.1)';
             }
         }};
@@ -527,15 +605,31 @@ const ItemType = styled.span`
     font-weight: 600;
     background: ${props => {
         switch (props.$type) {
-            case 'memo': return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-            case 'schedule': return 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
-            case 'secret': return 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)';
-            case 'review': return 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)';
-            default: return '#f5f5f5';
+            case 'memo': return 'rgba(139, 92, 246, 0.2)';
+            case 'schedule': return 'rgba(236, 72, 153, 0.2)';
+            case 'secret': return 'rgba(59, 130, 246, 0.2)';
+            case 'review': return 'rgba(168, 85, 247, 0.2)';
+            default: return 'rgba(255, 255, 255, 0.05)';
         }
     }};
-    color: white;
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    border: 1px solid ${props => {
+        switch (props.$type) {
+            case 'memo': return 'rgba(139, 92, 246, 0.5)';
+            case 'schedule': return 'rgba(236, 72, 153, 0.5)';
+            case 'secret': return 'rgba(59, 130, 246, 0.5)';
+            case 'review': return 'rgba(168, 85, 247, 0.5)';
+            default: return 'rgba(255, 255, 255, 0.1)';
+        }
+    }};
+    color: ${props => {
+        switch (props.$type) {
+            case 'memo': return '#a78bfa';
+            case 'schedule': return '#ec4899';
+            case 'secret': return '#3b82f6';
+            case 'review': return '#a855f7';
+            default: return '#e0e0e0';
+        }
+    }};
     white-space: nowrap;
 `;
 
@@ -576,6 +670,129 @@ const DaysLeft = styled.div`
     }
 `;
 
+// PIN 입력 모달 스타일
+const PinModalOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 30001;
+    padding: 20px;
+    touch-action: none;
+`;
+
+const PinModalContainer = styled.div`
+    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
+    border-radius: 20px;
+    width: 100%;
+    max-width: 400px;
+    padding: 32px 24px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const PinModalTitle = styled.h3`
+    font-size: 20px;
+    font-weight: 600;
+    color: #e0e0e0;
+    margin: 0 0 8px 0;
+    text-align: center;
+`;
+
+const PinModalSubtitle = styled.p`
+    font-size: 13px;
+    color: #b0b0b0;
+    margin: 0 0 24px 0;
+    text-align: center;
+    line-height: 1.5;
+`;
+
+const PinInputContainer = styled.div`
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    margin-bottom: 24px;
+`;
+
+const PinDigit = styled.div`
+    width: 48px;
+    height: 56px;
+    border: 2px solid ${props => props.$filled ? '#3b82f6' : 'rgba(255, 255, 255, 0.15)'};
+    border-radius: 12px;
+    background: ${props => props.$filled ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255, 255, 255, 0.05)'};
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: #e0e0e0;
+    font-weight: 600;
+    transition: all 0.2s;
+`;
+
+const PinKeypad = styled.div`
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+`;
+
+const PinKey = styled.button`
+    height: 56px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #e0e0e0;
+    font-size: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(59, 130, 246, 0.5);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
+
+    ${props => props.$span2 && `
+        grid-column: span 2;
+    `}
+`;
+
+const PinErrorMessage = styled.div`
+    color: #ff6b6b;
+    font-size: 13px;
+    text-align: center;
+    margin-top: -16px;
+    margin-bottom: 16px;
+    min-height: 20px;
+`;
+
+const PinCancelButton = styled.button`
+    width: 100%;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: #e0e0e0;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+`;
+
 
 const TrashPage = ({ showToast }) => {
     const {
@@ -598,6 +815,13 @@ const TrashPage = ({ showToast }) => {
     const [selectedItem, setSelectedItem] = useState(null);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
+    // PIN 입력 모달 상태
+    const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+    const [pinInput, setPinInput] = useState('');
+    const [pinError, setPinError] = useState('');
+    const [pendingSecretItem, setPendingSecretItem] = useState(null);
+    const [decryptedSecretContent, setDecryptedSecretContent] = useState({});
+
     const handleToggleSelect = (id) => {
         setSelectedIds(prev => {
             const newSet = new Set(prev);
@@ -611,10 +835,97 @@ const TrashPage = ({ showToast }) => {
     };
 
     const handleItemClick = (item, event) => {
-        // 항상 상세보기 모달 열기 (라디오 버튼은 별도 처리)
         event.stopPropagation();
-        setSelectedItem(item);
-        setIsDetailModalOpen(true);
+
+        // 시크릿 문서인 경우
+        if (item.type === 'secret') {
+            // 이미 복호화된 경우 바로 표시
+            if (decryptedSecretContent[item.id]) {
+                setSelectedItem(item);
+                setIsDetailModalOpen(true);
+            } else {
+                // PIN 입력 모달 열기
+                setPendingSecretItem(item);
+                setIsPinModalOpen(true);
+                setPinInput('');
+                setPinError('');
+            }
+        } else {
+            // 일반 문서는 바로 표시
+            setSelectedItem(item);
+            setIsDetailModalOpen(true);
+        }
+    };
+
+    const handlePinKeyPress = (key) => {
+        if (key === 'backspace') {
+            setPinInput(prev => prev.slice(0, -1));
+            setPinError('');
+        } else if (pinInput.length < 6) {
+            const newPin = pinInput + key;
+            setPinInput(newPin);
+            setPinError('');
+
+            // 6자리가 되면 자동으로 검증
+            if (newPin.length === 6) {
+                handlePinSubmit(newPin);
+            }
+        }
+    };
+
+    const handlePinSubmit = async (pin) => {
+        try {
+            // PIN 검증
+            const storedHash = localStorage.getItem('secretPagePin');
+            if (!storedHash) {
+                setPinError('PIN이 설정되지 않았습니다');
+                setPinInput('');
+                return;
+            }
+
+            const isValid = await verifyPassword(pin, storedHash);
+            if (!isValid) {
+                setPinError('PIN이 올바르지 않습니다');
+                setPinInput('');
+                return;
+            }
+
+            // PIN 검증 성공 - 시크릿 문서 표시
+            // (originalData는 이미 복호화된 상태로 저장되어 있음)
+            if (pendingSecretItem && pendingSecretItem.originalData) {
+                // 검증 완료 표시 (필요시 나중에 재검증 방지용)
+                setDecryptedSecretContent(prev => ({
+                    ...prev,
+                    [pendingSecretItem.id]: true
+                }));
+
+                // 상세보기 모달 열기
+                setSelectedItem(pendingSecretItem);
+                setIsDetailModalOpen(true);
+                setIsPinModalOpen(false);
+                setPendingSecretItem(null);
+                setPinInput('');
+                setPinError('');
+            }
+        } catch (error) {
+            console.error('PIN 검증 오류:', error);
+            setPinError('PIN 검증 중 오류가 발생했습니다');
+            setPinInput('');
+        }
+    };
+
+    const handleCloseDetailModal = () => {
+        // 시크릿 문서 검증 상태 초기화 (모달을 닫을 때마다 다시 PIN 입력하도록)
+        if (selectedItem && selectedItem.type === 'secret') {
+            setDecryptedSecretContent(prev => {
+                const newContent = { ...prev };
+                delete newContent[selectedItem.id];
+                return newContent;
+            });
+        }
+
+        setIsDetailModalOpen(false);
+        setSelectedItem(null);
     };
 
     const handleRestoreFromDetail = () => {
@@ -622,6 +933,16 @@ const TrashPage = ({ showToast }) => {
 
         restoreFromTrash([selectedItem.id]);
         showToast('항목이 복원되었습니다 ✅');
+
+        // 시크릿 문서 검증 상태 초기화
+        if (selectedItem.type === 'secret') {
+            setDecryptedSecretContent(prev => {
+                const newContent = { ...prev };
+                delete newContent[selectedItem.id];
+                return newContent;
+            });
+        }
+
         setIsDetailModalOpen(false);
         setSelectedItem(null);
     };
@@ -631,6 +952,16 @@ const TrashPage = ({ showToast }) => {
 
         permanentDelete([selectedItem.id]);
         showToast('항목이 영구 삭제되었습니다 🔥');
+
+        // 시크릿 문서 검증 상태 초기화
+        if (selectedItem.type === 'secret') {
+            setDecryptedSecretContent(prev => {
+                const newContent = { ...prev };
+                delete newContent[selectedItem.id];
+                return newContent;
+            });
+        }
+
         setIsDetailModalOpen(false);
         setSelectedItem(null);
     };
@@ -678,12 +1009,16 @@ const TrashPage = ({ showToast }) => {
             items = items.filter(item => item.type === filterType);
         }
 
-        // 2. 검색어 필터링
+        // 2. 검색어 필터링 (시크릿 문서 제외)
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
-            items = items.filter(item =>
-                item.content.toLowerCase().includes(query)
-            );
+            items = items.filter(item => {
+                // 시크릿 문서는 검색에서 제외
+                if (item.type === 'secret') {
+                    return false;
+                }
+                return item.content.toLowerCase().includes(query);
+            });
         }
 
         // 3. 정렬
@@ -763,7 +1098,7 @@ const TrashPage = ({ showToast }) => {
                 <SearchBox>
                     <SearchInput
                         type="text"
-                        placeholder="휴지통 검색..."
+                        placeholder="휴지통 검색...&#10;시크릿 문서는 검색에서 제외됩니다"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                     />
@@ -777,37 +1112,44 @@ const TrashPage = ({ showToast }) => {
                 <FilterRow>
                     <FilterButton
                         $active={filterType === 'all'}
+                        $type="all"
                         onClick={() => setFilterType('all')}
                     >
                         전체
                     </FilterButton>
                     <FilterButton
                         $active={filterType === 'memo'}
+                        $type="memo"
                         onClick={() => setFilterType('memo')}
                     >
                         메모
                     </FilterButton>
                     <FilterButton
                         $active={filterType === 'schedule'}
+                        $type="schedule"
                         onClick={() => setFilterType('schedule')}
                     >
                         스케줄
                     </FilterButton>
                     <FilterButton
                         $active={filterType === 'secret'}
+                        $type="secret"
                         onClick={() => setFilterType('secret')}
                     >
                         시크릿
                     </FilterButton>
                     <FilterButton
                         $active={filterType === 'review'}
+                        $type="review"
                         onClick={() => setFilterType('review')}
                     >
                         리뷰
                     </FilterButton>
+                </FilterRow>
 
+                <FilterRow style={{ marginTop: '8px' }}>
                     <SortButton onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')}>
-                        {sortOrder === 'newest' ? '↓ 최신순' : '↑ 오래된 순'}
+                        {sortOrder === 'newest' ? '삭제순 ↓' : '삭제순 ↑'}
                     </SortButton>
                 </FilterRow>
             </SearchAndFilterSection>
@@ -911,7 +1253,7 @@ const TrashPage = ({ showToast }) => {
             {/* 상세보기 모달 */}
             {isDetailModalOpen && selectedItem && (
                 <Portal>
-                    <DetailModalOverlay onClick={() => setIsDetailModalOpen(false)}>
+                    <DetailModalOverlay onClick={handleCloseDetailModal}>
                         <DetailModalContainer onClick={(e) => e.stopPropagation()}>
                             <DetailModalHeader>
                                 <DetailModalTitle>
@@ -927,15 +1269,33 @@ const TrashPage = ({ showToast }) => {
                                             : '곧 자동 삭제됨'}
                                     </DetailDaysLeft>
                                 </DetailModalTitle>
-                                <CloseIconButton onClick={() => setIsDetailModalOpen(false)}>
+                                <CloseIconButton onClick={handleCloseDetailModal}>
                                     ×
                                 </CloseIconButton>
                             </DetailModalHeader>
 
                             <DetailModalContent>
-                                {selectedItem.type === 'secret'
-                                    ? '*********************'
-                                    : (selectedItem.originalData?.content || selectedItem.content)}
+                                {selectedItem.type === 'secret' ? (
+                                    <>
+                                        <SecretDocTitle>
+                                            {selectedItem.originalData?.title || '제목 없음'}
+                                        </SecretDocTitle>
+                                        {selectedItem.originalData?.createdAt && (
+                                            <SecretDocMeta>
+                                                작성일: {format(new Date(selectedItem.originalData.createdAt), 'yyyy년 M월 d일 HH:mm', { locale: ko })}
+                                                <br />
+                                                수정일: {format(new Date(selectedItem.originalData.updatedAt || selectedItem.originalData.createdAt), 'yyyy년 M월 d일 HH:mm', { locale: ko })}
+                                            </SecretDocMeta>
+                                        )}
+                                        <SecretDocContent>
+                                            {selectedItem.originalData?.content || '내용 없음'}
+                                        </SecretDocContent>
+                                    </>
+                                ) : (
+                                    <NormalDocContent>
+                                        {selectedItem.originalData?.content || selectedItem.originalData?.text || selectedItem.content}
+                                    </NormalDocContent>
+                                )}
                             </DetailModalContent>
 
                             <DetailModalActions>
@@ -954,6 +1314,61 @@ const TrashPage = ({ showToast }) => {
                             </DetailModalActions>
                         </DetailModalContainer>
                     </DetailModalOverlay>
+                </Portal>
+            )}
+
+            {/* PIN 입력 모달 */}
+            {isPinModalOpen && (
+                <Portal>
+                    <PinModalOverlay onClick={() => {
+                        setIsPinModalOpen(false);
+                        setPendingSecretItem(null);
+                        setPinInput('');
+                        setPinError('');
+                    }}>
+                        <PinModalContainer onClick={(e) => e.stopPropagation()}>
+                            <PinModalTitle>시크릿 문서 확인</PinModalTitle>
+                            <PinModalSubtitle>
+                                시크릿 문서를 보려면 PIN을 입력하세요
+                            </PinModalSubtitle>
+
+                            <PinInputContainer>
+                                {[0, 1, 2, 3, 4, 5].map((index) => (
+                                    <PinDigit key={index} $filled={index < pinInput.length}>
+                                        {index < pinInput.length ? '●' : ''}
+                                    </PinDigit>
+                                ))}
+                            </PinInputContainer>
+
+                            <PinErrorMessage>{pinError}</PinErrorMessage>
+
+                            <PinKeypad>
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                                    <PinKey key={num} onClick={() => handlePinKeyPress(num.toString())}>
+                                        {num}
+                                    </PinKey>
+                                ))}
+                                <PinKey onClick={() => handlePinKeyPress('backspace')}>
+                                    ←
+                                </PinKey>
+                                <PinKey onClick={() => handlePinKeyPress('0')}>
+                                    0
+                                </PinKey>
+                                <PinKey onClick={() => handlePinKeyPress('#')}>
+                                    #
+                                </PinKey>
+                            </PinKeypad>
+
+                            <PinCancelButton onClick={() => {
+                                setIsPinModalOpen(false);
+                                setPendingSecretItem(null);
+                                setPinInput('');
+                                setPinError('');
+                            }}>
+                                취소
+                            </PinCancelButton>
+                        </PinModalContainer>
+                    </PinModalOverlay>
                 </Portal>
             )}
         </PageContainer>

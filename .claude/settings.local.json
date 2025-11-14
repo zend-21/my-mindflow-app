@@ -10,7 +10,8 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(\"E:\\React test\\my-mindflow-app\\public\\images\\secret\\mask-gray.svg\")"
+      "Bash(\"E:\\React test\\my-mindflow-app\\public\\images\\secret\\mask-gray.svg\")",
+      "Bash(nul)"
     ],
     "deny": [],
     "ask": []

@@ -69,3 +69,4 @@ venv/
 ENV/
 env/
 .venv
+nul

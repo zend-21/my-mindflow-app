@@ -1075,9 +1075,8 @@ function App() {
             } else {
                 newIds.add(memoId);
             }
-            if (newIds.size === 0) {
-                setIsSelectionMode(false);
-            }
+            // 전체해제 시에도 선택 모드는 유지되어야 함
+            // 사용자가 명시적으로 "취소" 버튼을 눌러야만 선택 모드 종료
             return newIds;
         });
     };
@@ -1085,6 +1084,29 @@ function App() {
     const handleExitSelectionMode = () => {
         setIsSelectionMode(false);
         setSelectedMemoIds(new Set());
+    };
+
+    const handleToggleSelectedMemosImportance = () => {
+        if (selectedMemoIds.size === 0) return;
+
+        // 선택된 메모 객체들 가져오기
+        const selectedMemoObjects = memos.filter(memo => selectedMemoIds.has(memo.id));
+
+        // 선택된 메모 중 하나라도 중요하지 않으면 모두 중요로, 모두 중요하면 모두 해제
+        const allImportant = selectedMemoObjects.every(memo => memo.isImportant);
+        const newImportance = !allImportant;
+
+        // 메모 업데이트
+        setMemos(prevMemos =>
+            prevMemos.map(memo =>
+                selectedMemoIds.has(memo.id)
+                    ? { ...memo, isImportant: newImportance }
+                    : memo
+            )
+        );
+
+        showToast(`${selectedMemoIds.size}개의 메모가 ${newImportance ? '중요 표시' : '중요 해제'}되었습니다.`);
+        handleExitSelectionMode();
     };
 
     const requestDeleteSelectedMemos = () => {
@@ -1874,7 +1896,7 @@ if (isLoading) {
                             <MemoPage
                                 memos={memos}
                                 onDeleteMemoRequest={requestDeleteConfirmation}
-                                onOpenNewMemo={handleOpenNewMemoFromPage} 
+                                onOpenNewMemo={handleOpenNewMemoFromPage}
                                 onOpenDetailMemo={handleOpenDetailMemo}
                                 showToast={showToast}
                                 isSelectionMode={isSelectionMode}
@@ -1882,6 +1904,7 @@ if (isLoading) {
                                 onStartSelectionMode={handleStartSelectionMode}
                                 onToggleMemoSelection={handleToggleMemoSelection}
                                 onExitSelectionMode={handleExitSelectionMode}
+                                onToggleSelectedMemosImportance={handleToggleSelectedMemosImportance}
                                 onRequestDeleteSelectedMemos={requestDeleteSelectedMemos}
                             />
                         }

@@ -100,7 +100,6 @@ const ForgotPinButton = styled.button`
     text-decoration: underline;
     cursor: pointer;
     margin-top: 8px;
-    margin-bottom: 40px;
     padding: 8px;
     transition: all 0.2s;
 
@@ -109,12 +108,37 @@ const ForgotPinButton = styled.button`
     }
 `;
 
+const ChangePinButton = styled.button`
+    background: none;
+    border: none;
+    color: rgba(100, 181, 246, 0.8);
+    font-size: 14px;
+    text-decoration: underline;
+    cursor: pointer;
+    margin-top: 4px;
+    margin-bottom: 40px;
+    padding: 8px;
+    transition: all 0.2s;
+
+    &:hover {
+        color: rgba(100, 181, 246, 1);
+    }
+`;
+
+const ButtonContainer = styled.div`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+`;
+
 const PinInput = ({
     pinLength = 4,
     title = 'PIN 입력',
     subtitle = '',
     onSubmit,
     onForgotPin,
+    onChangePin,
     maxAttempts = 5
 }) => {
     const [pin, setPin] = useState('');
@@ -321,10 +345,19 @@ const PinInput = ({
                 disabled={isLocked}
             />
 
-            {onForgotPin && !isLocked && (
-                <ForgotPinButton onClick={onForgotPin}>
-                    PIN을 잊으셨나요?
-                </ForgotPinButton>
+            {!isLocked && (onForgotPin || onChangePin) && (
+                <ButtonContainer>
+                    {onForgotPin && (
+                        <ForgotPinButton onClick={onForgotPin}>
+                            PIN을 잊으셨나요?
+                        </ForgotPinButton>
+                    )}
+                    {onChangePin && (
+                        <ChangePinButton onClick={onChangePin}>
+                            PIN 변경
+                        </ChangePinButton>
+                    )}
+                </ButtonContainer>
             )}
         </Container>
     );
