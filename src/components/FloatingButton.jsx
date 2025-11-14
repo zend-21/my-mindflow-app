@@ -66,8 +66,8 @@ const PlusCircleIcon = styled.div`
     &::before {
         content: '+';
         display: block;
-        margin-top: -4px;
-        margin-left: 2px;
+        margin-top: -1px;
+        margin-left: 1px;
     }
 `;
 
