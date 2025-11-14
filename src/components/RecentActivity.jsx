@@ -45,7 +45,7 @@ const ActivityText = styled.p`
     font-size: 14px;
     color: #e0e0e0;
     margin: 0;
-    padding-right: 35px; /* X 버튼 영역(28px) + 여유 공간(7px) */
+    padding-right: 10px; /* X 버튼 영역과의 최소 간격 */
     word-wrap: break-word;
     word-break: break-word;
 `;
