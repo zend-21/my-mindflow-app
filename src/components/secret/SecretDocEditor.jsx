@@ -447,6 +447,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [isInputEnabled, setIsInputEnabled] = useState(false);
 
     const textareaRef = useRef(null);
 
@@ -454,6 +455,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
         // 에디터가 열릴 때마다 에러 상태 초기화
         setValidationError('');
         setPasswordError('');
+        setIsInputEnabled(false);
 
         if (doc) {
             setFormData({
@@ -471,12 +473,12 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
             }
         }
 
-        // 자동 포커스 방지 - textarea만 blur
-        setTimeout(() => {
-            if (textareaRef.current && document.activeElement === textareaRef.current) {
-                textareaRef.current.blur();
-            }
-        }, 100);
+        // 모달 열림 후 300ms 후에 입력 활성화 (터치 이벤트 전파 방지)
+        const timer = setTimeout(() => {
+            setIsInputEnabled(true);
+        }, 300);
+
+        return () => clearTimeout(timer);
     }, [doc]);
 
     const handleChange = (field, value) => {
@@ -596,6 +598,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
                             }}
                             maxLength={25}
                             autoFocus={false}
+                            style={{ pointerEvents: isInputEnabled ? 'auto' : 'none' }}
                         />
                     </FormGroup>
 
@@ -618,6 +621,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
                             value={formData.content}
                             onChange={(e) => handleChange('content', e.target.value)}
                             autoFocus={false}
+                            style={{ pointerEvents: isInputEnabled ? 'auto' : 'none' }}
                         />
                     </FormGroup>
 
