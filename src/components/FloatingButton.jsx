@@ -38,9 +38,9 @@ const NoteIconContainer = styled.div`
 `;
 
 const NoteSvgImg = styled.img`
-    width: auto;
+    width: 70px;
     height: 70px;
-    filter: drop-shadow(0 2px 4px rgba(15, 35, 50, 0.3)) hue-rotate(200deg) saturate(1.2);
+    filter: drop-shadow(0 2px 4px rgba(15, 35, 50, 0.3));
     pointer-events: none;
 `;
 
@@ -280,7 +280,7 @@ const FloatingButton = ({ activeTab, onClick }) => {
         >
             <NoteIconContainer>
                 <NoteSvgImg
-                    src="/images/memo/paper-153317_640.svg"
+                    src="/images/memo/symbol-2444431_640.svg"
                     alt="메모 아이콘"
                 />
                 <PlusCircleIcon />
