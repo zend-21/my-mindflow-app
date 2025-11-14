@@ -466,12 +466,10 @@ const ImportantIndicator = styled.span`
     opacity: ${props => props.$isImportant ? 1 : 0};
     transition: all 0.3s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-
-    /* 별 모양만 위로 2픽셀 이동 */
-    & {
-        line-height: 1;
-        padding-bottom: 2px;
-    }
+`;
+const StarIcon = styled.span`
+    display: inline-block;
+    transform: translateY(1px);
 `;
 const EmptyMessage = styled.p`
     color: #b0b0b0;
@@ -878,7 +876,9 @@ const MemoPage = ({
                                     {isSelected ? <StyledCheckIcon /> : <BsCircle />}
                                 </CheckboxContainer>
                                 {isNew && <NewBadge>NEW</NewBadge>}
-                                <ImportantIndicator $isImportant={memo.isImportant} $hasNew={isNew}>★</ImportantIndicator>
+                                <ImportantIndicator $isImportant={memo.isImportant} $hasNew={isNew}>
+                                    <StarIcon>★</StarIcon>
+                                </ImportantIndicator>
                                 <MemoHeader>
                                     <MemoText>
                                         {memo.content || ''}
