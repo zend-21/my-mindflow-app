@@ -1209,8 +1209,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                       <div
                         key={alarm.id}
                         style={{
-                          opacity: isPastDate ? 0.5 : 1,
-                          position: 'relative'
+                          opacity: isPastDate ? 0.5 : 1
                         }}
                       >
                         <AlarmItemComponent
@@ -1221,21 +1220,6 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                           onEdit={isPastDate ? null : handleEditAlarm}
                           isPastNormalAlarm={isPastDate}
                         />
-                        {isPastDate && (
-                          <div style={{
-                            position: 'absolute',
-                            top: '8px',
-                            right: '8px',
-                            fontSize: '11px',
-                            color: '#dc3545',
-                            fontWeight: '600',
-                            background: 'rgba(220, 53, 69, 0.1)',
-                            padding: '2px 8px',
-                            borderRadius: '4px'
-                          }}>
-                            종료, 0일후 삭제
-                          </div>
-                        )}
                       </div>
                     ))}
                 </AlarmList>

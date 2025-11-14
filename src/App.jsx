@@ -672,7 +672,15 @@ function App() {
             return;
         }
 
-        const trimmedDescription = description.length > 18 ? description.substring(0, 18) + '...' : description;
+        // 스케줄 관련은 25글자, 나머지는 20글자
+        const maxLength = type.includes('스케줄') ? 25 : 20;
+
+        // 이모지를 올바르게 카운트
+        const chars = [...description];
+        const trimmedDescription = chars.length > maxLength
+            ? chars.slice(0, maxLength).join('') + '...'
+            : description;
+
         const formattedDescription = `${type} - ${trimmedDescription}`;
 
         setRecentActivities(prevActivities => {

@@ -512,9 +512,13 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
 
           {data?.createdAt && (
               <SmallNote>
-                  · 처음 작성일: {format(new Date(data.createdAt), 'yyyy년 M월 d일 HH:mm', { locale: ko })}
-                  <br />
-                  · 마지막 수정일: {format(new Date(data.updatedAt), 'yyyy년 M월 d일 HH:mm', { locale: ko })}
+                  · 최초 등록일: {format(new Date(data.createdAt), 'yyyy년 M월 d일 HH:mm', { locale: ko })}
+                  {data?.updatedAt && data.updatedAt !== data.createdAt && (
+                      <>
+                          <br />
+                          · 최종 수정일: {format(new Date(data.updatedAt), 'yyyy년 M월 d일 HH:mm', { locale: ko })}
+                      </>
+                  )}
               </SmallNote>
           )}
 

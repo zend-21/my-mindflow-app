@@ -292,6 +292,7 @@ const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, onEdit, i
               type="checkbox"
               checked={alarm.enabled !== false}
               onChange={() => onToggle && onToggle(alarm.id)}
+              disabled={isPastNormalAlarm}
             />
             <span className="slider"></span>
           </ToggleSwitch>

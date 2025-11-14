@@ -2362,8 +2362,13 @@ const Calendar = ({
                         {/* 일정 텍스트가 있을 때만 작성일/수정일 표시 */}
                         {currentEntry.text && currentEntry.text.trim() && (
                             <>
-                            · 처음 작성일: {formatTs(currentEntry?.createdAt)} <br />
-                            · 마지막 수정일: {formatTs(currentEntry?.updatedAt)}
+                            · 최초 등록일: {formatTs(currentEntry?.createdAt)}
+                            {currentEntry?.updatedAt && currentEntry.updatedAt !== currentEntry.createdAt && (
+                                <>
+                                    {' '}<br />
+                                    · 최종 수정일: {formatTs(currentEntry?.updatedAt)}
+                                </>
+                            )}
                             </>
                         )}
                         </>
