@@ -232,7 +232,6 @@ const PasswordModal = ({ onSubmit, onCancel, onForgotPassword }) => {
                                     setError('');
                                 }}
                                 onKeyDown={handleKeyDown}
-                                autoFocus
                             />
                             <ShowPasswordButton
                                 type="button"

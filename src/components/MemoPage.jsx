@@ -834,7 +834,7 @@ const MemoPage = ({
                         if (!memo || !memo.id) {
                             return null;
                         }
-                        const isNew = (Date.now() - memo.date) < (5 * 60 * 60 * 1000);
+                        const isNew = (Date.now() - memo.date) < (24 * 60 * 60 * 1000);
                         const isSelected = selectedMemoIds.has(memo.id);
                         
                         return (

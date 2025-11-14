@@ -458,7 +458,6 @@ const NewMemoModal = ({ isOpen, onSave, onCancel, openSource }) => {
                         onTouchStart={handleDoubleTapSave}
                         onBlur={handleTextareaBlur}
                         onDoubleClick={handleDoubleClick}
-                        autoFocus
                     />
                     
                 </ModalContent>

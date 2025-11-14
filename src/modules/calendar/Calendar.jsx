@@ -1695,16 +1695,10 @@ const Calendar = ({
         if (!isHolidayText) {
             setIsEditing(true);
             setOriginalTextOnEdit(scheduleText ?? '');
-            setTimeout(() => {
-                if (textareaRef.current) textareaRef.current.focus();
-            }, 0);
         } else {
             setIsEditing(true);
             setScheduleText("");
             setIsHolidayText(false);
-            setTimeout(() => {
-                if (textareaRef.current) textareaRef.current.focus();
-            }, 0);
         }
     };
 

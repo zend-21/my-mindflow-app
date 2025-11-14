@@ -1228,7 +1228,6 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 placeholder="예: 서울, Paris, つくば"
                                 value={modalCityQuery}
                                 onChange={(e) => setModalCityQuery(e.target.value)}
-                                autoFocus
                                 autoComplete="off"
                             />
                             <CitySearchResultsList>
