@@ -1,0 +1,23 @@
+This file tracks the zodiac animal redesign progress.
+
+사용자가 원하는 스타일: 심플하고 귀여운 디자인
+- 기본 원형 몸통과 머리
+- 간단한 스트로크 (#6C7A89 등)
+- 최소한의 디테일
+- 귀여운 표정
+
+✅ ALL 12 animals - COMPLETED! All animals redesigned with simple, cute style
+
+Updated animals:
+✅ 1. Rat (쥐) - Simple gray circles, big ears, cute teeth
+✅ 2. Ox (소) - White with pink nose, golden horns, grass
+✅ 3. Tiger (호랑이) - Orange with stripes, 왕 pattern
+✅ 4. Rabbit (토끼) - White with long ears using rect elements
+✅ 5. Dragon (용) - Blue with clouds, golden horns, whiskers
+✅ 6. Snake (뱀) - Green wavy body, vertical pupils, forked tongue
+✅ 7. Horse (말) - Brown with wavy mane, simple features
+✅ 8. Goat (양) - White with curved horns, horizontal pupils, beard
+✅ 9. Monkey (원숭이) - Brown with banana, simple face
+✅ 10. Rooster (닭) - White with colorful tail feathers, red comb
+✅ 11. Dog (개) - Tan with droopy ears, simple snout
+✅ 12. Pig (돼지) - Pink with big nose, curly tail
