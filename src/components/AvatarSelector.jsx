@@ -304,6 +304,165 @@ const CustomColorIcon = styled.div`
     pointer-events: none;
 `;
 
+const CustomColorModal = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 11001;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: ${fadeIn} 0.2s ease-out;
+`;
+
+const CustomColorPanel = styled.div`
+    background: linear-gradient(180deg, #2a2d35 0%, #1a1d24 100%);
+    border-radius: 16px;
+    padding: 24px;
+    width: 90vw;
+    max-width: 400px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const CustomColorTitle = styled.h3`
+    font-size: 18px;
+    font-weight: 600;
+    color: #ffffff;
+    margin: 0 0 16px 0;
+    text-align: center;
+`;
+
+const HexInputWrapper = styled.div`
+    margin-bottom: 20px;
+`;
+
+const HexInputLabel = styled.label`
+    display: block;
+    font-size: 14px;
+    color: #b0b0b0;
+    margin-bottom: 8px;
+`;
+
+const HexInput = styled.input`
+    width: 100%;
+    padding: 12px 16px;
+    background: #333842;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 16px;
+    font-family: monospace;
+    text-transform: uppercase;
+
+    &:focus {
+        outline: none;
+        border-color: rgba(240, 147, 251, 0.5);
+        box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
+    }
+
+    &::placeholder {
+        color: #666;
+    }
+`;
+
+const PresetColorsWrapper = styled.div`
+    margin-bottom: 20px;
+`;
+
+const PresetColorsLabel = styled.label`
+    display: block;
+    font-size: 14px;
+    color: #b0b0b0;
+    margin-bottom: 8px;
+`;
+
+const PresetColorsGrid = styled.div`
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+`;
+
+const PresetColorButton = styled.button`
+    aspect-ratio: 1;
+    border-radius: 8px;
+    border: 2px solid ${props => props.$isSelected ? 'rgba(240, 147, 251, 0.8)' : 'rgba(255, 255, 255, 0.1)'};
+    background: ${props => props.$color};
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-height: 44px;
+
+    &:hover {
+        transform: scale(1.1);
+        border-color: rgba(240, 147, 251, 0.6);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
+`;
+
+const ColorPickerWrapper = styled.div`
+    margin-bottom: 20px;
+`;
+
+const ColorPickerLabel = styled.label`
+    display: block;
+    font-size: 14px;
+    color: #b0b0b0;
+    margin-bottom: 8px;
+`;
+
+const NativeColorPicker = styled.input`
+    width: 100%;
+    height: 50px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    background: transparent;
+`;
+
+const CustomColorActions = styled.div`
+    display: flex;
+    gap: 12px;
+`;
+
+const CustomColorButton = styled.button`
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+
+    &.confirm {
+        background: linear-gradient(135deg, rgba(240, 147, 251, 0.8), rgba(245, 87, 108, 0.8));
+        color: #ffffff;
+
+        &:hover {
+            background: linear-gradient(135deg, rgba(240, 147, 251, 1), rgba(245, 87, 108, 1));
+        }
+    }
+
+    &.cancel {
+        background: rgba(255, 255, 255, 0.1);
+        color: #d0d0d0;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+    }
+
+    &:active {
+        transform: scale(0.98);
+    }
+`;
+
 const SectionTitle = styled.h3`
     font-size: 16px;
     font-weight: 600;
@@ -433,6 +592,51 @@ const BACKGROUND_COLORS = [
     { id: 'custom', name: '사용자정의', color: 'custom' },
 ];
 
+// 프리셋 컬러 팔레트 (더 많은 선택지 제공)
+const PRESET_COLORS = [
+    '#FF1493', // Deep Pink
+    '#FF69B4', // Hot Pink
+    '#FF6B9D', // Light Pink
+    '#FFB6C1', // Pastel Pink
+    '#FFC0CB', // Pink
+    '#FFE4E1', // Misty Rose
+
+    '#FF4500', // Orange Red
+    '#FF6347', // Tomato
+    '#FF7F50', // Coral
+    '#FFA500', // Orange
+    '#FFD700', // Gold
+    '#FFFF00', // Yellow
+
+    '#00FF00', // Lime
+    '#32CD32', // Lime Green
+    '#00FA9A', // Medium Spring Green
+    '#00CED1', // Dark Turquoise
+    '#48D1CC', // Medium Turquoise
+    '#40E0D0', // Turquoise
+
+    '#00BFFF', // Deep Sky Blue
+    '#1E90FF', // Dodger Blue
+    '#4169E1', // Royal Blue
+    '#0000FF', // Blue
+    '#8A2BE2', // Blue Violet
+    '#9370DB', // Medium Purple
+
+    '#DA70D6', // Orchid
+    '#EE82EE', // Violet
+    '#DDA0DD', // Plum
+    '#BA55D3', // Medium Orchid
+    '#9932CC', // Dark Orchid
+    '#8B008B', // Dark Magenta
+
+    '#DC143C', // Crimson
+    '#C71585', // Medium Violet Red
+    '#DB7093', // Pale Violet Red
+    '#F08080', // Light Coral
+    '#CD5C5C', // Indian Red
+    '#A52A2A', // Brown
+];
+
 const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear, birthMonth, birthDay }) => {
     const [selectedId, setSelectedId] = useState(currentAvatarId || null);
     const [recommendedZodiacAvatar, setRecommendedZodiacAvatar] = useState(null);
@@ -440,6 +644,9 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
     const [userName, setUserName] = useState('');
     const [selectedBgColor, setSelectedBgColor] = useState(localStorage.getItem('avatarBgColor') || 'none');
     const [customColor, setCustomColor] = useState(localStorage.getItem('avatarCustomColor') || '#FF1493');
+    const [showCustomColorModal, setShowCustomColorModal] = useState(false);
+    const [tempCustomColor, setTempCustomColor] = useState('#FF1493');
+    const [hexInputValue, setHexInputValue] = useState('');
     const scrollRef = React.useRef(null);
 
     useEffect(() => {
@@ -494,14 +701,59 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
         window.dispatchEvent(new CustomEvent('avatarBgColorChanged', { detail: colorId }));
     };
 
-    const handleCustomColorChange = (e) => {
+    const handleCustomColorClick = () => {
+        // 현재 customColor를 임시 색상으로 설정
+        setTempCustomColor(customColor);
+        setHexInputValue(customColor);
+        setShowCustomColorModal(true);
+    };
+
+    const handlePresetColorSelect = (color) => {
+        setTempCustomColor(color);
+        setHexInputValue(color);
+    };
+
+    const handleNativeColorChange = (e) => {
         const newColor = e.target.value;
-        setCustomColor(newColor);
-        localStorage.setItem('avatarCustomColor', newColor);
-        setSelectedBgColor('custom');
-        localStorage.setItem('avatarBgColor', 'custom');
-        // 배경색 변경 이벤트 발생
-        window.dispatchEvent(new CustomEvent('avatarBgColorChanged', { detail: 'custom' }));
+        setTempCustomColor(newColor);
+        setHexInputValue(newColor);
+    };
+
+    const handleHexInputChange = (e) => {
+        let value = e.target.value.trim().toUpperCase();
+
+        // '#' 자동 추가
+        if (!value.startsWith('#')) {
+            value = '#' + value;
+        }
+
+        setHexInputValue(value);
+
+        // 유효한 hex 색상인지 확인 (#RGB 또는 #RRGGBB 형식)
+        const hexRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+        if (hexRegex.test(value)) {
+            setTempCustomColor(value);
+        }
+    };
+
+    const handleCustomColorConfirm = () => {
+        // 유효한 hex 색상인지 확인
+        const hexRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+        if (hexRegex.test(tempCustomColor)) {
+            setCustomColor(tempCustomColor);
+            localStorage.setItem('avatarCustomColor', tempCustomColor);
+            setSelectedBgColor('custom');
+            localStorage.setItem('avatarBgColor', 'custom');
+            // 배경색 변경 이벤트 발생
+            window.dispatchEvent(new CustomEvent('avatarBgColorChanged', { detail: 'custom' }));
+            setShowCustomColorModal(false);
+        } else {
+            alert('유효한 색상 코드를 입력해주세요. (예: #FF1493)');
+        }
+    };
+
+    const handleCustomColorCancel = () => {
+        setShowCustomColorModal(false);
     };
 
     const handleApply = () => {
@@ -600,18 +852,11 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
                                     $color={color.id === 'custom' ? customColor : color.color}
                                     $isSelected={selectedBgColor === color.id}
                                     $isCustom={color.id === 'custom'}
-                                    onClick={() => color.id !== 'custom' && handleBgColorSelect(color.id)}
+                                    onClick={() => color.id === 'custom' ? handleCustomColorClick() : handleBgColorSelect(color.id)}
                                     title={color.name}
                                 >
                                     {color.id === 'custom' && (
-                                        <>
-                                            <CustomColorIcon>🎨</CustomColorIcon>
-                                            <ColorPickerInput
-                                                type="color"
-                                                value={customColor}
-                                                onChange={handleCustomColorChange}
-                                            />
-                                        </>
+                                        <CustomColorIcon>🎨</CustomColorIcon>
                                     )}
                                 </ColorOption>
                             ))}
@@ -695,6 +940,63 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
                     )}
                 </ModalBody>
             </ModalContainer>
+
+            {/* 사용자 정의 색상 선택 모달 */}
+            {showCustomColorModal && (
+                <CustomColorModal onClick={handleCustomColorCancel}>
+                    <CustomColorPanel onClick={(e) => e.stopPropagation()}>
+                        <CustomColorTitle>사용자 정의 색상</CustomColorTitle>
+
+                        {/* Hex 값 직접 입력 */}
+                        <HexInputWrapper>
+                            <HexInputLabel>색상 코드 입력</HexInputLabel>
+                            <HexInput
+                                type="text"
+                                value={hexInputValue}
+                                onChange={handleHexInputChange}
+                                placeholder="#FF1493"
+                                maxLength={7}
+                            />
+                        </HexInputWrapper>
+
+                        {/* 프리셋 색상 팔레트 */}
+                        <PresetColorsWrapper>
+                            <PresetColorsLabel>프리셋 색상</PresetColorsLabel>
+                            <PresetColorsGrid>
+                                {PRESET_COLORS.map((color, index) => (
+                                    <PresetColorButton
+                                        key={index}
+                                        $color={color}
+                                        $isSelected={tempCustomColor === color}
+                                        onClick={() => handlePresetColorSelect(color)}
+                                        title={color}
+                                    />
+                                ))}
+                            </PresetColorsGrid>
+                        </PresetColorsWrapper>
+
+                        {/* 네이티브 컬러 피커 (보조 수단) */}
+                        <ColorPickerWrapper>
+                            <ColorPickerLabel>색상 선택기</ColorPickerLabel>
+                            <NativeColorPicker
+                                type="color"
+                                value={tempCustomColor}
+                                onChange={handleNativeColorChange}
+                            />
+                        </ColorPickerWrapper>
+
+                        {/* 확인/취소 버튼 */}
+                        <CustomColorActions>
+                            <CustomColorButton className="cancel" onClick={handleCustomColorCancel}>
+                                취소
+                            </CustomColorButton>
+                            <CustomColorButton className="confirm" onClick={handleCustomColorConfirm}>
+                                확인
+                            </CustomColorButton>
+                        </CustomColorActions>
+                    </CustomColorPanel>
+                </CustomColorModal>
+            )}
         </Overlay>
     );
 };
