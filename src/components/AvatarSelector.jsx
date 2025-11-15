@@ -253,7 +253,7 @@ const ColorOption = styled.div`
     background: ${props => props.$color};
     cursor: pointer;
     transition: all 0.2s ease;
-    border: 3px solid ${props => props.$isSelected ? '#f093fb' : 'transparent'};
+    border: 3px solid ${props => props.$isSelected ? '#f093fb' : (props.$isNone ? 'rgba(255, 255, 255, 0.2)' : 'transparent')};
     box-shadow: ${props => props.$isSelected
         ? '0 0 0 2px rgba(240, 147, 251, 0.3), 0 4px 12px rgba(0, 0, 0, 0.3)'
         : '0 2px 8px rgba(0, 0, 0, 0.2)'
@@ -273,6 +273,26 @@ const ColorOption = styled.div`
         transform: scale(0.95);
     }
 
+    /* 투명 배경 표시용 사선 패턴 */
+    ${props => props.$isNone && `
+        &::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%),
+                linear-gradient(-45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.1) 75%),
+                linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.1) 75%);
+            background-size: 8px 8px;
+            background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
+            border-radius: 50%;
+        }
+    `}
+
     ${props => props.$isSelected && !props.$isCustom && `
         &::after {
             content: '✓';
@@ -280,10 +300,11 @@ const ColorOption = styled.div`
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: white;
+            color: ${props.$isNone ? 'rgba(255, 255, 255, 0.8)' : 'white'};
             font-size: 20px;
             font-weight: bold;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+            z-index: 1;
         }
     `}
 `;
@@ -852,6 +873,7 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
                                     $color={color.id === 'custom' ? customColor : color.color}
                                     $isSelected={selectedBgColor === color.id}
                                     $isCustom={color.id === 'custom'}
+                                    $isNone={color.id === 'none'}
                                     onClick={() => color.id === 'custom' ? handleCustomColorClick() : handleBgColorSelect(color.id)}
                                     title={color.name}
                                 >
