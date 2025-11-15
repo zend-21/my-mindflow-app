@@ -118,11 +118,12 @@ const RecommendationBanner = styled.div`
     margin-bottom: 20px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 6px;
 `;
 
 const RecommendationIcon = styled.div`
     font-size: 24px;
+    color: #FFD700;
 `;
 
 const RecommendationText = styled.div`
@@ -241,9 +242,10 @@ const BackgroundColorTitle = styled.h4`
 `;
 
 const ColorPalette = styled.div`
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(5, 48px);
     gap: 12px;
-    flex-wrap: wrap;
+    justify-content: center;
 `;
 
 const ColorOption = styled.div`
@@ -597,20 +599,18 @@ const AvatarName = styled.div`
 `;
 
 const BACKGROUND_COLORS = [
-    // 상단: 그라데이션 6개
+    // 첫 줄: 5개
     { id: 'none', name: '없음', color: 'transparent' },
     { id: 'lavender', name: '라벤더', color: 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)' },
     { id: 'peach', name: '피치', color: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)' },
     { id: 'mint', name: '민트', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)' },
-    { id: 'sunset', name: '석양', color: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)' },
     { id: 'ocean', name: '오션', color: 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)' },
-    // 하단: 비비드한 단색 5개 + 사용자 정의 1개
+    // 둘째 줄: 5개
+    { id: 'custom', name: '사용자정의', color: 'custom' },
     { id: 'pink', name: '핑크', color: '#FF69B4' },
     { id: 'blue', name: '블루', color: '#4169E1' },
     { id: 'yellow', name: '옐로우', color: '#FFD700' },
     { id: 'green', name: '그린', color: '#32CD32' },
-    { id: 'purple', name: '퍼플', color: '#9370DB' },
-    { id: 'custom', name: '사용자정의', color: 'custom' },
 ];
 
 // 프리셋 컬러 팔레트 (더 많은 선택지 제공)
@@ -826,7 +826,7 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
                 <ModalBody ref={scrollRef}>
                     {(recommendedZodiacAvatar || recommendedSignAvatar) && (
                         <RecommendationBanner>
-                            <RecommendationIcon>⭐</RecommendationIcon>
+                            <RecommendationIcon>•</RecommendationIcon>
                             <RecommendationText>
                                 {recommendedZodiacAvatar && recommendedSignAvatar ? (
                                     <>
