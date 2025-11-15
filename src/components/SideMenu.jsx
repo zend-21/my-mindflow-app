@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
+import { avatarList } from './avatars/AvatarIcons';
 
 // 문제를 단순화하기 위해, 일단 Roulette 컴포넌트는 잠시 제외했습니다.
 // 이 코드로 오류가 사라진다면, 문제는 Roulette.jsx 파일에 있을 수 있습니다.
@@ -111,6 +112,23 @@ const PlaceholderIcon = styled.div`
     color: #9ca3af;
     flex-shrink: 0;
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+`;
+
+const AvatarIconWrapper = styled.div`
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: ${props => props.$bgColor || 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)'};
+
+    svg {
+        width: 100%;
+        height: 100%;
+    }
 `;
 
 const ProfileInfo = styled.div`
@@ -243,6 +261,23 @@ const MenuGroup = styled.div`
     }
 `;
 
+const BACKGROUND_COLORS = {
+    // 그라데이션
+    'none': 'transparent',
+    'lavender': 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+    'peach': 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+    'mint': 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+    'sunset': 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+    'ocean': 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+    // 비비드한 단색
+    'pink': '#FF69B4',
+    'blue': '#4169E1',
+    'yellow': '#FFD700',
+    'green': '#32CD32',
+    'purple': '#9370DB',
+    'custom': () => localStorage.getItem('avatarCustomColor') || '#FF1493',
+};
+
 const SideMenu = ({
     isOpen,
     onClose,
@@ -260,16 +295,50 @@ const SideMenu = ({
 }) => {
     const fileInputRef = useRef(null);
     const [imageError, setImageError] = useState(false); // ✅ 추가: 이미지 로드 오류 상태
+    const [profileImageType, setProfileImageType] = useState('avatar');
+    const [selectedAvatarId, setSelectedAvatarId] = useState(null);
+    const [avatarBgColor, setAvatarBgColor] = useState('none');
 
     const handleError = () => { // 에러 발생 시 상태 변경
         setImageError(true);
     };
 
-    React.useEffect(() => { // 메뉴 열릴 때 상태 초기화
+    React.useEffect(() => { // 메뉴 열릴 때 상태 초기화 및 아바타 설정 로드
         if (isOpen) {
             setImageError(false);
+            setProfileImageType(localStorage.getItem('profileImageType') || 'avatar');
+            setSelectedAvatarId(localStorage.getItem('selectedAvatarId') || null);
+            setAvatarBgColor(localStorage.getItem('avatarBgColor') || 'none');
         }
     }, [isOpen]);
+
+    // 배경색 변경 이벤트 리스너
+    React.useEffect(() => {
+        const handleBgColorChange = (e) => {
+            setAvatarBgColor(e.detail);
+        };
+        window.addEventListener('avatarBgColorChanged', handleBgColorChange);
+        return () => window.removeEventListener('avatarBgColorChanged', handleBgColorChange);
+    }, []);
+
+    // 아바타 변경 이벤트 리스너
+    React.useEffect(() => {
+        const handleAvatarChange = (e) => {
+            setSelectedAvatarId(e.detail);
+            setProfileImageType('avatar');
+        };
+        window.addEventListener('avatarChanged', handleAvatarChange);
+        return () => window.removeEventListener('avatarChanged', handleAvatarChange);
+    }, []);
+
+    // 아바타 렌더링 함수
+    const renderAvatarIcon = () => {
+        if (!selectedAvatarId) return null;
+        const avatar = avatarList.find(a => a.id === selectedAvatarId);
+        if (!avatar) return null;
+        const AvatarComponent = avatar.component;
+        return <AvatarComponent />;
+    };
 
     const handleImportClick = () => {
         if (fileInputRef.current) {
@@ -285,14 +354,32 @@ const SideMenu = ({
                     <MenuContainer $isOpen={isOpen}>
                         <MenuHeader>
                             <ProfileCluster onClick={profile ? onProfileClick : onLoginClick}>
-                                {profile && !imageError ? ( // ✅ 조건 수정: imageError가 아닐 때만 이미지 표시
-                                    <ProfileImage
-                                        src={profile.customPicture || profile.picture}
-                                        alt={profile.name || "Profile"}
-                                        onError={handleError} // ✅ 추가: 에러 발생 시 handleError 호출
-                                        crossOrigin={profile.customPicture ? undefined : "anonymous"}
-                                    />
-                                ) : ( // ✅ 수정: profile이 없거나 이미지 로드 에러 시 PlaceholderIcon 표시
+                                {profile ? (
+                                    profileImageType === 'avatar' ? (
+                                        selectedAvatarId ? (
+                                            <AvatarIconWrapper $bgColor={typeof BACKGROUND_COLORS[avatarBgColor] === 'function' ? BACKGROUND_COLORS[avatarBgColor]() : BACKGROUND_COLORS[avatarBgColor]}>
+                                                {renderAvatarIcon()}
+                                            </AvatarIconWrapper>
+                                        ) : (
+                                            <PlaceholderIcon>
+                                                {(profile.nickname || profile.name)?.charAt(0).toUpperCase() || '?'}
+                                            </PlaceholderIcon>
+                                        )
+                                    ) : (
+                                        (profile.customPicture || profile.picture) && !imageError ? (
+                                            <ProfileImage
+                                                src={profile.customPicture || profile.picture}
+                                                alt={profile.name || "Profile"}
+                                                onError={handleError}
+                                                crossOrigin={profile.customPicture ? undefined : "anonymous"}
+                                            />
+                                        ) : (
+                                            <PlaceholderIcon>
+                                                {(profile.nickname || profile.name)?.charAt(0).toUpperCase() || '?'}
+                                            </PlaceholderIcon>
+                                        )
+                                    )
+                                ) : (
                                     <PlaceholderIcon>
                                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>

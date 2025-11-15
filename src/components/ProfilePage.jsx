@@ -200,7 +200,7 @@ const AvatarIconWrapper = styled.div`
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+    background: ${props => props.$bgColor || 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)'};
     overflow: hidden;
     box-shadow: 0 4px 16px rgba(240, 147, 251, 0.3);
 
@@ -645,6 +645,23 @@ const NicknameInput = styled.input`
 
 // 🎯 Main Component
 
+const BACKGROUND_COLORS = {
+    // 그라데이션
+    'none': 'transparent',
+    'lavender': 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+    'peach': 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+    'mint': 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+    'sunset': 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+    'ocean': 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+    // 비비드한 단색
+    'pink': '#FF69B4',
+    'blue': '#4169E1',
+    'yellow': '#FFD700',
+    'green': '#32CD32',
+    'purple': '#9370DB',
+    'custom': () => localStorage.getItem('avatarCustomColor') || '#FF1493',
+};
+
 const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) => {
     const [isFortuneExpanded, setIsFortuneExpanded] = useState(false);
     const [isEditingNickname, setIsEditingNickname] = useState(false);
@@ -659,6 +676,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     const [profileImageType, setProfileImageType] = useState(localStorage.getItem('profileImageType') || 'avatar'); // 'avatar' | 'photo'
     const [selectedAvatarId, setSelectedAvatarId] = useState(localStorage.getItem('selectedAvatarId') || null);
     const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
+    const [avatarBgColor, setAvatarBgColor] = useState(localStorage.getItem('avatarBgColor') || 'none');
 
     // 생년월일 마스킹 관련 상태
     const [isBirthDateRevealed, setIsBirthDateRevealed] = useState(false);
@@ -756,6 +774,15 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                 clearTimeout(birthDateTimerRef.current);
             }
         };
+    }, []);
+
+    // 배경색 변경 이벤트 리스너
+    useEffect(() => {
+        const handleBgColorChange = (e) => {
+            setAvatarBgColor(e.detail);
+        };
+        window.addEventListener('avatarBgColorChanged', handleBgColorChange);
+        return () => window.removeEventListener('avatarBgColorChanged', handleBgColorChange);
     }, []);
 
     // 생년월일 마스킹 함수
@@ -1017,19 +1044,25 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                 <Section>
                     <ProfileHeader>
                         <ProfileImageWrapper onClick={handleProfileImageClick}>
-                            {profileImageType === 'avatar' && selectedAvatarId ? (
-                                <AvatarIconWrapper>
-                                    {renderAvatarIcon()}
-                                </AvatarIconWrapper>
-                            ) : profileImageType === 'photo' && (profile?.customPicture || profile?.picture) && !imageError ? (
-                                <ProfileImage
-                                    src={profile.customPicture || profile.picture}
-                                    alt="Profile"
-                                    onError={handleImageError}
-                                    crossOrigin={profile.customPicture ? undefined : "anonymous"}
-                                />
+                            {profileImageType === 'avatar' ? (
+                                selectedAvatarId ? (
+                                    <AvatarIconWrapper $bgColor={typeof BACKGROUND_COLORS[avatarBgColor] === 'function' ? BACKGROUND_COLORS[avatarBgColor]() : BACKGROUND_COLORS[avatarBgColor]}>
+                                        {renderAvatarIcon()}
+                                    </AvatarIconWrapper>
+                                ) : (
+                                    <DefaultProfileIcon>{profileInitial}</DefaultProfileIcon>
+                                )
                             ) : (
-                                <DefaultProfileIcon>{profileInitial}</DefaultProfileIcon>
+                                (profile?.customPicture || profile?.picture) && !imageError ? (
+                                    <ProfileImage
+                                        src={profile.customPicture || profile.picture}
+                                        alt="Profile"
+                                        onError={handleImageError}
+                                        crossOrigin={profile.customPicture ? undefined : "anonymous"}
+                                    />
+                                ) : (
+                                    <DefaultProfileIcon>{profileInitial}</DefaultProfileIcon>
+                                )
                             )}
                             <EditOverlay className="edit-overlay">변경</EditOverlay>
                         </ProfileImageWrapper>

@@ -139,6 +139,17 @@ const FortuneFlow = ({ onClose, profile }) => {
         // Save fortune
         saveTodayFortune(result);
 
+        // 운세 결과에서 별자리 정보를 프로필에 업데이트
+        // 별자리가 변경되었거나 없는 경우 업데이트
+        if (result.zodiacSign && result.zodiacSign !== userProfile.zodiacSign) {
+            const updatedProfile = {
+                ...userProfile,
+                zodiacSign: result.zodiacSign
+            };
+            saveUserProfile(updatedProfile);
+            setUserProfile(updatedProfile);
+        }
+
         // Show result
         setFortuneResult(result);
         setFlowState('result');

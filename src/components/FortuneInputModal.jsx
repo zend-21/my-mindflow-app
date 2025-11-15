@@ -5,7 +5,7 @@ import styled from 'styled-components';
 import { getCountries, getCities } from '../utils/timeZoneData';
 import { convertSolarToLunar, formatLunarDate } from '../utils/lunarConverter';
 import { searchCity, getTimezoneFromCoords } from '../utils/geocoding';
-import { calculateZodiacAnimal } from '../utils/fortuneLogic';
+import { calculateZodiacAnimal, calculateZodiacSign } from '../utils/fortuneLogic';
 
 // 🎨 Styled Components
 
@@ -114,7 +114,7 @@ const Input = styled.input`
     }
 
     &::placeholder {
-        color: #808080;
+        color: #999999;
     }
 `;
 
@@ -631,6 +631,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
     // 음력 날짜 표시용
     const [lunarDate, setLunarDate] = useState(initialData?.lunarDate || '');
     const [zodiacAnimal, setZodiacAnimal] = useState(initialData?.zodiacAnimal || '');
+    const [zodiacSign, setZodiacSign] = useState(initialData?.zodiacSign || '');
     const [isLoadingLunar, setIsLoadingLunar] = useState(false);
     const [cooldownSeconds, setCooldownSeconds] = useState(0);
 
@@ -876,6 +877,12 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
 
     // 최종 제출
     const handleSubmit = () => {
+        // 별자리 계산
+        const calculatedZodiacSign = calculateZodiacSign({
+            birthMonth: parseInt(birthMonth),
+            birthDay: parseInt(birthDay)
+        });
+
         // 데이터 구성
         const userData = {
             name: userName,
@@ -884,7 +891,8 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
             birthDay: parseInt(birthDay),
             gender,
             lunarDate: lunarDate, // 음력 날짜 문자열 저장
-            zodiacAnimal: zodiacAnimal // 띠 저장
+            zodiacAnimal: zodiacAnimal, // 띠 저장
+            zodiacSign: calculatedZodiacSign // 별자리 저장
         };
 
         // 출생 시간 추가 (선택 - 값이 있으면)
@@ -959,7 +967,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                             maxLength={4}
                                             style={{ width: '220px' }}
                                         />
-                                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '24px' }}>년</span>
+                                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#b0b0b0', minWidth: '24px' }}>년</span>
                                     </div>
                                 </div>
 
@@ -977,7 +985,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                             max="12"
                                             style={{ width: '80px' }}
                                         />
-                                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '24px' }}>월</span>
+                                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#b0b0b0', minWidth: '24px' }}>월</span>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                         <Input
@@ -991,7 +999,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                             max="31"
                                             style={{ width: '80px' }}
                                         />
-                                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#333', minWidth: '24px' }}>일</span>
+                                        <span style={{ fontSize: '16px', fontWeight: '600', color: '#b0b0b0', minWidth: '24px' }}>일</span>
                                     </div>
                                 </div>
 
@@ -1085,11 +1093,11 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 </InfoText>
                                 <Input
                                     type="text"
-                                    placeholder="서울, Paris, つくば"
+                                    placeholder="예: 서울, Paris, つくば"
                                     value={cityQuery}
                                     onClick={handleOpenCitySearchModal}
                                     readOnly
-                                    style={{ cursor: 'pointer', background: '#f9fafb' }}
+                                    style={{ cursor: 'pointer', background: '#333842' }}
                                 />
                                 {city && country && (
                                     <InfoText style={{ marginTop: '4px', color: '#667eea' }}>

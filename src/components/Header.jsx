@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { getDailyGreeting } from '../utils/greetingMessages';
+import { avatarList } from './avatars/AvatarIcons';
 
 const HeaderWrapper = styled.header`
   background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
@@ -71,6 +72,28 @@ const PlaceholderIcon = styled.div`
     }
 `;
 
+const AvatarIconWrapper = styled.div`
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s;
+    background: ${props => props.$bgColor || 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)'};
+
+    &:hover {
+        transform: scale(1.1);
+    }
+
+    svg {
+        width: 100%;
+        height: 100%;
+    }
+`;
+
 const ProfileNameContainer = styled.div`
     display: flex;
     align-items: baseline;
@@ -111,15 +134,66 @@ const ActionButton = styled.button`
     }
 `;
 
+const BACKGROUND_COLORS = {
+    // 그라데이션
+    'none': 'transparent',
+    'lavender': 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+    'peach': 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+    'mint': 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+    'sunset': 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+    'ocean': 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+    // 비비드한 단색
+    'pink': '#FF69B4',
+    'blue': '#4169E1',
+    'yellow': '#FFD700',
+    'green': '#32CD32',
+    'purple': '#9370DB',
+    'custom': () => localStorage.getItem('avatarCustomColor') || '#FF1493',
+};
+
 // Header 컴포넌트
 const Header = ({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, onProfileClick }) => {
     const [imageError, setImageError] = useState(false);
     const [greeting, setGreeting] = useState('');
+    const [profileImageType, setProfileImageType] = useState('avatar');
+    const [selectedAvatarId, setSelectedAvatarId] = useState(null);
+    const [avatarBgColor, setAvatarBgColor] = useState('none');
 
-    // profile이 변경될 때마다 imageError 초기화
+    // profile이 변경될 때마다 imageError 초기화 및 아바타 설정 로드
     useEffect(() => {
         setImageError(false);
+        setProfileImageType(localStorage.getItem('profileImageType') || 'avatar');
+        setSelectedAvatarId(localStorage.getItem('selectedAvatarId') || null);
+        setAvatarBgColor(localStorage.getItem('avatarBgColor') || 'none');
     }, [profile]);
+
+    // 배경색 변경 이벤트 리스너
+    useEffect(() => {
+        const handleBgColorChange = (e) => {
+            setAvatarBgColor(e.detail);
+        };
+        window.addEventListener('avatarBgColorChanged', handleBgColorChange);
+        return () => window.removeEventListener('avatarBgColorChanged', handleBgColorChange);
+    }, []);
+
+    // 아바타 변경 이벤트 리스너
+    useEffect(() => {
+        const handleAvatarChange = (e) => {
+            setSelectedAvatarId(e.detail);
+            setProfileImageType('avatar');
+        };
+        window.addEventListener('avatarChanged', handleAvatarChange);
+        return () => window.removeEventListener('avatarChanged', handleAvatarChange);
+    }, []);
+
+    // 아바타 렌더링 함수
+    const renderAvatarIcon = () => {
+        if (!selectedAvatarId) return null;
+        const avatar = avatarList.find(a => a.id === selectedAvatarId);
+        if (!avatar) return null;
+        const AvatarComponent = avatar.component;
+        return <AvatarComponent />;
+    };
 
     // 하루에 한 번 인사말 업데이트
     useEffect(() => {
@@ -154,19 +228,31 @@ const Header = ({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, o
         <HeaderWrapper $isHidden={isHidden}>
             <LeftContainer onClick={profile ? onProfileClick : onLoginClick}>
                 {profile ? (
-                    // 로그인 상태: 프로필 사진과 이름
+                    // 로그인 상태: 아바타 또는 프로필 사진과 이름
                     <>
-                        {!imageError ? (
-                            <ProfileImage
-                                src={profile.customPicture || profile.picture}
-                                alt={profile.name}
-                                onError={handleImageError}
-                                crossOrigin={profile.customPicture ? undefined : "anonymous"}
-                            />
+                        {profileImageType === 'avatar' ? (
+                            selectedAvatarId ? (
+                                <AvatarIconWrapper $bgColor={typeof BACKGROUND_COLORS[avatarBgColor] === 'function' ? BACKGROUND_COLORS[avatarBgColor]() : BACKGROUND_COLORS[avatarBgColor]}>
+                                    {renderAvatarIcon()}
+                                </AvatarIconWrapper>
+                            ) : (
+                                <PlaceholderIcon>
+                                    {(profile.nickname || profile.name)?.charAt(0).toUpperCase() || '?'}
+                                </PlaceholderIcon>
+                            )
                         ) : (
-                            <PlaceholderIcon>
-                                {(profile.nickname || profile.name) ? (profile.nickname || profile.name).charAt(0).toUpperCase() : '?'}
-                            </PlaceholderIcon>
+                            (profile.customPicture || profile.picture) && !imageError ? (
+                                <ProfileImage
+                                    src={profile.customPicture || profile.picture}
+                                    alt={profile.name}
+                                    onError={handleImageError}
+                                    crossOrigin={profile.customPicture ? undefined : "anonymous"}
+                                />
+                            ) : (
+                                <PlaceholderIcon>
+                                    {(profile.nickname || profile.name)?.charAt(0).toUpperCase() || '?'}
+                                </PlaceholderIcon>
+                            )
                         )}
                         <ProfileNameContainer>
                         <ProfileName>
