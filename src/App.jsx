@@ -1832,9 +1832,9 @@ function App() {
     useEffect(() => {
         const handleRestore = (event) => {
             const restoredItems = event.detail;
-            
+
             console.log('♻️ 복원 이벤트 수신:', restoredItems);
-            
+
             restoredItems.forEach(item => {
                 if (item.type === 'memo') {
                     // 메모 복원
@@ -1851,9 +1851,17 @@ function App() {
                     }));
                     addActivity('스케줄 복원', item.content);
                     console.log('✅ 스케줄 복원됨:', { key, scheduleData });
+                } else if (item.type === 'secret') {
+                    // 비밀글 복원 - SecretPage에 이벤트 전달
+                    const restoreSecretEvent = new CustomEvent('restoreSecret', {
+                        detail: item.originalData
+                    });
+                    window.dispatchEvent(restoreSecretEvent);
+                    addActivity('비밀글 복원', item.content);
+                    console.log('✅ 비밀글 복원 이벤트 발송:', item.originalData);
                 }
             });
-            
+
             quietSync();
         };
 

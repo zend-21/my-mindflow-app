@@ -50,19 +50,19 @@ const CategoryIcon = styled.div`
     border-radius: 12px;
     background: ${props => {
         switch(props.$category) {
-            case 'financial': return 'rgba(76, 175, 80, 0.2)';
-            case 'personal': return 'rgba(255, 152, 0, 0.2)';
-            case 'work': return 'rgba(33, 150, 243, 0.2)';
-            case 'diary': return 'rgba(156, 39, 176, 0.2)';
+            case 'financial': return 'rgba(255, 215, 0, 0.2)';
+            case 'personal': return 'rgba(167, 139, 250, 0.2)';
+            case 'work': return 'rgba(96, 165, 250, 0.2)';
+            case 'diary': return 'rgba(244, 114, 182, 0.2)';
             default: return 'rgba(255, 255, 255, 0.1)';
         }
     }};
     border: 2px solid ${props => {
         switch(props.$category) {
-            case 'financial': return '#4caf50';
-            case 'personal': return '#ff9800';
-            case 'work': return '#2196f3';
-            case 'diary': return '#9c27b0';
+            case 'financial': return 'rgba(255, 215, 0, 0.5)';
+            case 'personal': return 'rgba(167, 139, 250, 0.5)';
+            case 'work': return 'rgba(96, 165, 250, 0.5)';
+            case 'diary': return 'rgba(244, 114, 182, 0.5)';
             default: return 'rgba(255, 255, 255, 0.2)';
         }
     }};

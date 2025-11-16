@@ -317,17 +317,62 @@ const CategoryButtons = styled.div`
 const CategoryButton = styled.button`
     padding: 10px 12px;
     border-radius: 8px;
-    border: 1px solid ${props => props.$active ? 'rgba(240, 147, 251, 0.5)' : 'rgba(255, 255, 255, 0.1)'};
-    background: ${props => props.$active ? 'rgba(240, 147, 251, 0.2)' : 'rgba(255, 255, 255, 0.05)'};
-    color: ${props => props.$active ? '#f093fb' : '#d0d0d0'};
+    border: 1px solid ${props => {
+        if (!props.$active) return 'rgba(255, 255, 255, 0.1)';
+        switch(props.$category) {
+            case 'financial': return 'rgba(255, 215, 0, 0.5)';
+            case 'personal': return 'rgba(167, 139, 250, 0.5)';
+            case 'work': return 'rgba(96, 165, 250, 0.5)';
+            case 'diary': return 'rgba(244, 114, 182, 0.5)';
+            default: return 'rgba(255, 255, 255, 0.1)';
+        }
+    }};
+    background: ${props => {
+        if (!props.$active) return 'rgba(255, 255, 255, 0.05)';
+        switch(props.$category) {
+            case 'financial': return 'rgba(255, 215, 0, 0.2)';
+            case 'personal': return 'rgba(167, 139, 250, 0.2)';
+            case 'work': return 'rgba(96, 165, 250, 0.2)';
+            case 'diary': return 'rgba(244, 114, 182, 0.2)';
+            default: return 'rgba(255, 255, 255, 0.05)';
+        }
+    }};
+    color: ${props => {
+        if (!props.$active) return '#d0d0d0';
+        switch(props.$category) {
+            case 'financial': return '#FFD700';
+            case 'personal': return '#A78BFA';
+            case 'work': return '#60A5FA';
+            case 'diary': return '#F472B6';
+            default: return '#ffffff';
+        }
+    }};
     font-size: 14px;
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
 
     &:hover {
-        background: ${props => props.$active ? 'rgba(240, 147, 251, 0.25)' : 'rgba(255, 255, 255, 0.08)'};
-        border-color: ${props => props.$active ? 'rgba(240, 147, 251, 0.6)' : 'rgba(255, 255, 255, 0.2)'};
+        background: ${props => {
+            if (!props.$active) return 'rgba(255, 255, 255, 0.08)';
+            switch(props.$category) {
+                case 'financial': return 'rgba(255, 215, 0, 0.3)';
+                case 'personal': return 'rgba(167, 139, 250, 0.3)';
+                case 'work': return 'rgba(96, 165, 250, 0.3)';
+                case 'diary': return 'rgba(244, 114, 182, 0.3)';
+                default: return 'rgba(255, 255, 255, 0.08)';
+            }
+        }};
+        border-color: ${props => {
+            if (!props.$active) return 'rgba(255, 255, 255, 0.2)';
+            switch(props.$category) {
+                case 'financial': return 'rgba(255, 215, 0, 0.6)';
+                case 'personal': return 'rgba(167, 139, 250, 0.6)';
+                case 'work': return 'rgba(96, 165, 250, 0.6)';
+                case 'diary': return 'rgba(244, 114, 182, 0.6)';
+                default: return 'rgba(255, 255, 255, 0.2)';
+            }
+        }};
     }
 `;
 
@@ -447,7 +492,11 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
     const [showPassword, setShowPassword] = useState(false);
     const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showSaveConfirm, setShowSaveConfirm] = useState(false);
     const [isInputEnabled, setIsInputEnabled] = useState(false);
+
+    // 원본 데이터 저장 (변경사항 감지용)
+    const [initialData, setInitialData] = useState(null);
 
     const textareaRef = useRef(null);
 
@@ -457,20 +506,30 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
         setPasswordError('');
         setIsInputEnabled(false);
 
-        if (doc) {
-            setFormData({
-                title: doc.title || '',
-                content: doc.content || '',
-                category: doc.category || '',
-                tags: doc.tags || [],
-                hasPassword: doc.hasPassword || false,
-                password: doc.password || '',
-                isImportant: doc.isImportant || false
-            });
-            // 기존 비밀번호가 있으면 확인 필드도 동일하게 설정
-            if (doc.hasPassword && doc.password) {
-                setPasswordConfirm(doc.password);
-            }
+        const initialFormData = doc ? {
+            title: doc.title || '',
+            content: doc.content || '',
+            category: doc.category || 'diary',
+            tags: doc.tags || [],
+            hasPassword: doc.hasPassword || false,
+            password: doc.password || '',
+            isImportant: doc.isImportant || false
+        } : {
+            title: '',
+            content: '',
+            category: 'diary',
+            tags: [],
+            hasPassword: false,
+            password: '',
+            isImportant: false
+        };
+
+        setFormData(initialFormData);
+        setInitialData(initialFormData); // 원본 데이터 저장
+
+        // 기존 비밀번호가 있으면 확인 필드도 동일하게 설정
+        if (doc?.hasPassword && doc.password) {
+            setPasswordConfirm(doc.password);
         }
 
         // 모달 열림 후 300ms 후에 입력 활성화 (터치 이벤트 전파 방지)
@@ -523,6 +582,31 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
         handleChange('tags', formData.tags.filter(tag => tag !== tagToRemove));
     };
 
+    // 변경사항 감지 함수
+    const hasChanges = () => {
+        if (!initialData) return false;
+
+        // 각 필드 비교 (공백 포함)
+        return (
+            formData.title !== initialData.title ||
+            formData.content !== initialData.content ||
+            formData.category !== initialData.category ||
+            formData.isImportant !== initialData.isImportant ||
+            formData.hasPassword !== initialData.hasPassword ||
+            formData.password !== initialData.password ||
+            JSON.stringify(formData.tags.sort()) !== JSON.stringify(initialData.tags.sort())
+        );
+    };
+
+    const handleSaveClick = () => {
+        // 수정 모드이고 변경사항이 있으면 확인 모달 표시
+        if (doc && hasChanges()) {
+            setShowSaveConfirm(true);
+        } else {
+            handleSave();
+        }
+    };
+
     const handleSave = () => {
         if (!formData.content.trim()) {
             setValidationError('내용을 입력해주세요.');
@@ -572,6 +656,9 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
             title: finalTitle,
             preview: formData.content.substring(0, 100)
         });
+
+        // 확인 모달 닫기
+        setShowSaveConfirm(false);
     };
 
     return (
@@ -631,6 +718,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                             <CategoryButton
                                 type="button"
                                 $active={formData.category === 'financial'}
+                                $category="financial"
                                 onClick={() => handleChange('category', 'financial')}
                             >
                                 {settings?.categoryNames?.financial || '금융'}
@@ -638,6 +726,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                             <CategoryButton
                                 type="button"
                                 $active={formData.category === 'personal'}
+                                $category="personal"
                                 onClick={() => handleChange('category', 'personal')}
                             >
                                 {settings?.categoryNames?.personal || '개인'}
@@ -645,6 +734,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                             <CategoryButton
                                 type="button"
                                 $active={formData.category === 'work'}
+                                $category="work"
                                 onClick={() => handleChange('category', 'work')}
                             >
                                 {settings?.categoryNames?.work || '업무'}
@@ -652,6 +742,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                             <CategoryButton
                                 type="button"
                                 $active={formData.category === 'diary'}
+                                $category="diary"
                                 onClick={() => handleChange('category', 'diary')}
                             >
                                 {settings?.categoryNames?.diary || '일기'}
@@ -760,7 +851,13 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                         </Button>
                     )}
                     <Button onClick={onClose}>취소</Button>
-                    <Button $primary onClick={handleSave}>{doc ? '수정' : '저장'}</Button>
+                    <Button
+                        $primary
+                        onClick={handleSaveClick}
+                        disabled={doc && !hasChanges()}
+                    >
+                        {doc ? '수정' : '저장'}
+                    </Button>
                 </Footer>
                 </Modal>
 
@@ -773,6 +870,35 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                         <ErrorModalButton onClick={() => setValidationError('')}>
                             확인
                         </ErrorModalButton>
+                    </ErrorModal>
+                )}
+
+                {showSaveConfirm && (
+                    <ErrorModal onClick={(e) => e.stopPropagation()}>
+                        <ErrorModalTitle>
+                            ✏️ 문서 수정
+                        </ErrorModalTitle>
+                        <ErrorModalMessage>변경된 내용대로 수정할까요?</ErrorModalMessage>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <ErrorModalButton
+                                onClick={() => setShowSaveConfirm(false)}
+                                style={{
+                                    background: 'rgba(255, 255, 255, 0.1)',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                                }}
+                            >
+                                취소
+                            </ErrorModalButton>
+                            <ErrorModalButton
+                                onClick={handleSave}
+                                style={{
+                                    background: 'linear-gradient(135deg, rgba(240, 147, 251, 0.3), rgba(245, 87, 108, 0.5))',
+                                    border: '1px solid rgba(240, 147, 251, 0.5)'
+                                }}
+                            >
+                                수정
+                            </ErrorModalButton>
+                        </div>
                     </ErrorModal>
                 )}
 

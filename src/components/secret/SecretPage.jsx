@@ -116,10 +116,10 @@ const FilterButton = styled.button`
         if (!props.$active) return 'rgba(255, 255, 255, 0.15)';
         switch(props.$category) {
             case 'all': return '#7fa3ff';
-            case 'financial': return '#4caf50';
-            case 'personal': return '#ff9800';
-            case 'work': return '#2196f3';
-            case 'diary': return '#9c27b0';
+            case 'financial': return 'rgba(255, 215, 0, 0.5)';
+            case 'personal': return 'rgba(167, 139, 250, 0.5)';
+            case 'work': return 'rgba(96, 165, 250, 0.5)';
+            case 'diary': return 'rgba(244, 114, 182, 0.5)';
             default: return 'rgba(255, 255, 255, 0.15)';
         }
     }};
@@ -127,14 +127,24 @@ const FilterButton = styled.button`
         if (!props.$active) return 'rgba(255, 255, 255, 0.05)';
         switch(props.$category) {
             case 'all': return '#7fa3ff';
-            case 'financial': return '#4caf50';
-            case 'personal': return '#ff9800';
-            case 'work': return '#2196f3';
-            case 'diary': return '#9c27b0';
+            case 'financial': return 'rgba(255, 215, 0, 0.2)';
+            case 'personal': return 'rgba(167, 139, 250, 0.2)';
+            case 'work': return 'rgba(96, 165, 250, 0.2)';
+            case 'diary': return 'rgba(244, 114, 182, 0.2)';
             default: return 'rgba(255, 255, 255, 0.05)';
         }
     }};
-    color: ${props => props.$active ? '#ffffff' : '#b0b0b0'};
+    color: ${props => {
+        if (!props.$active) return '#b0b0b0';
+        switch(props.$category) {
+            case 'all': return '#ffffff';
+            case 'financial': return '#FFD700';
+            case 'personal': return '#A78BFA';
+            case 'work': return '#60A5FA';
+            case 'diary': return '#F472B6';
+            default: return '#ffffff';
+        }
+    }};
     font-size: 13px;
     font-weight: ${props => props.$active ? '700' : '500'};
     cursor: pointer;
@@ -151,10 +161,10 @@ const FilterButton = styled.button`
             if (props.$active) {
                 switch(props.$category) {
                     case 'all': return '#7fa3ff';
-                    case 'financial': return '#4caf50';
-                    case 'personal': return '#ff9800';
-                    case 'work': return '#2196f3';
-                    case 'diary': return '#9c27b0';
+                    case 'financial': return 'rgba(255, 215, 0, 0.3)';
+                    case 'personal': return 'rgba(167, 139, 250, 0.3)';
+                    case 'work': return 'rgba(96, 165, 250, 0.3)';
+                    case 'diary': return 'rgba(244, 114, 182, 0.3)';
                     default: return 'rgba(255, 255, 255, 0.05)';
                 }
             }
@@ -164,10 +174,10 @@ const FilterButton = styled.button`
             if (props.$active) {
                 switch(props.$category) {
                     case 'all': return '#7fa3ff';
-                    case 'financial': return '#4caf50';
-                    case 'personal': return '#ff9800';
-                    case 'work': return '#2196f3';
-                    case 'diary': return '#9c27b0';
+                    case 'financial': return 'rgba(255, 215, 0, 0.6)';
+                    case 'personal': return 'rgba(167, 139, 250, 0.6)';
+                    case 'work': return 'rgba(96, 165, 250, 0.6)';
+                    case 'diary': return 'rgba(244, 114, 182, 0.6)';
                     default: return 'rgba(255, 255, 255, 0.15)';
                 }
             }
@@ -384,23 +394,31 @@ const CategoryOption = styled.button`
     border-radius: 12px;
     border: 2px solid ${props => {
         switch(props.$category) {
-            case 'financial': return '#4caf50';
-            case 'personal': return '#ff9800';
-            case 'work': return '#2196f3';
-            case 'diary': return '#9c27b0';
+            case 'financial': return 'rgba(255, 215, 0, 0.5)';
+            case 'personal': return 'rgba(167, 139, 250, 0.5)';
+            case 'work': return 'rgba(96, 165, 250, 0.5)';
+            case 'diary': return 'rgba(244, 114, 182, 0.5)';
             default: return 'rgba(255, 255, 255, 0.15)';
         }
     }};
     background: ${props => {
         switch(props.$category) {
-            case 'financial': return 'rgba(76, 175, 80, 0.1)';
-            case 'personal': return 'rgba(255, 152, 0, 0.1)';
-            case 'work': return 'rgba(33, 150, 243, 0.1)';
-            case 'diary': return 'rgba(156, 39, 176, 0.1)';
+            case 'financial': return 'rgba(255, 215, 0, 0.1)';
+            case 'personal': return 'rgba(167, 139, 250, 0.1)';
+            case 'work': return 'rgba(96, 165, 250, 0.1)';
+            case 'diary': return 'rgba(244, 114, 182, 0.1)';
             default: return 'rgba(255, 255, 255, 0.05)';
         }
     }};
-    color: #ffffff;
+    color: ${props => {
+        switch(props.$category) {
+            case 'financial': return '#FFD700';
+            case 'personal': return '#A78BFA';
+            case 'work': return '#60A5FA';
+            case 'diary': return '#F472B6';
+            default: return '#ffffff';
+        }
+    }};
     font-size: 15px;
     font-weight: 600;
     cursor: pointer;
@@ -609,6 +627,36 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             }
         };
     }, [isUnlocked, settings.autoLockMinutes]);
+
+    // 휴지통에서 비밀글 복원 이벤트 리스너
+    useEffect(() => {
+        const handleRestoreSecret = async (event) => {
+            const restoredDoc = event.detail;
+
+            if (!isUnlocked || !currentPin) {
+                console.warn('⚠️ 비밀글 복원 실패: 잠금 상태');
+                return;
+            }
+
+            try {
+                console.log('♻️ 비밀글 복원:', restoredDoc);
+
+                // 복원된 문서를 secretStorage에 추가
+                await addSecretDoc(currentPin, restoredDoc);
+
+                // 문서 목록 새로고침
+                await loadDocs(currentPin);
+
+                showToast?.('비밀글이 복원되었습니다.');
+            } catch (error) {
+                console.error('비밀글 복원 오류:', error);
+                showToast?.('비밀글 복원에 실패했습니다.');
+            }
+        };
+
+        window.addEventListener('restoreSecret', handleRestoreSecret);
+        return () => window.removeEventListener('restoreSecret', handleRestoreSecret);
+    }, [isUnlocked, currentPin]);
 
     // 사용자 활동 감지
     const handleActivity = () => {
