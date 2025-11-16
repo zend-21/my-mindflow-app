@@ -100,7 +100,7 @@ def update_csv():
     """Update Tarot.csv with correct image filenames"""
     import os
 
-    csv_path = os.path.join(os.path.dirname(__file__), 'public', 'fortune_data', 'Tarot.csv')
+    csv_path = os.path.join(os.path.dirname(__file__), 'src', 'fortune_data', 'Tarot.csv')
 
     with open(csv_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()

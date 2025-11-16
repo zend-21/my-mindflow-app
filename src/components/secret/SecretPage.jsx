@@ -9,6 +9,7 @@ import SecretDocCard from './SecretDocCard';
 import SecretDocEditor from './SecretDocEditor';
 import PasswordInputPage from './PasswordInputPage';
 import PinChangeModal from './PinChangeModal';
+import CategoryNameEditModal from './CategoryNameEditModal';
 import {
     hasPinSet,
     setPin,
@@ -558,6 +559,14 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     // 개별 카드 카테고리 모달 상태 (전역 추적)
     const [openCategoryDropdownId, setOpenCategoryDropdownId] = useState(null);
 
+    // 카테고리 이름 변경 모달
+    const [showCategoryNameEdit, setShowCategoryNameEdit] = useState(false);
+    const [editingCategory, setEditingCategory] = useState(null);
+
+    // 필터 버튼 길게 누르기
+    const filterLongPressTimer = useRef(null);
+    const filterLongPressCategory = useRef(null);
+
     // 드래그 상태 관리
     const [isDragging, setIsDragging] = useState(false);
     const [offsetY, setOffsetY] = useState(0);
@@ -827,6 +836,38 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         } else {
             return { success: false, message: '잘못된 PIN입니다.' };
         }
+    };
+
+    // 필터 버튼 길게 누르기 핸들러
+    const handleFilterPointerDown = (category) => {
+        if (category === 'all') return; // '전체'는 수정 불가
+
+        filterLongPressCategory.current = category;
+        filterLongPressTimer.current = setTimeout(() => {
+            setEditingCategory(category);
+            setShowCategoryNameEdit(true);
+        }, 500); // 0.5초 길게 누르기
+    };
+
+    const handleFilterPointerUp = () => {
+        clearTimeout(filterLongPressTimer.current);
+        filterLongPressCategory.current = null;
+    };
+
+    // 카테고리 이름 저장
+    const handleSaveCategoryName = (newName) => {
+        const updatedSettings = {
+            ...settings,
+            categoryNames: {
+                ...settings.categoryNames,
+                [editingCategory]: newName
+            }
+        };
+        setSettings(updatedSettings);
+        saveSettings(updatedSettings);
+        setShowCategoryNameEdit(false);
+        setEditingCategory(null);
+        showToast?.('카테고리 이름이 변경되었습니다.');
     };
 
     // 정렬 버튼 클릭
@@ -1269,44 +1310,60 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                     $active={selectedCategory === 'financial'}
                     $category="financial"
                     onClick={() => setSelectedCategory('financial')}
+                    onPointerDown={() => handleFilterPointerDown('financial')}
+                    onPointerUp={handleFilterPointerUp}
+                    onPointerCancel={handleFilterPointerUp}
+                    onPointerLeave={handleFilterPointerUp}
                 >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
                         <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                     </svg>
-                    금융
+                    {settings.categoryNames.financial}
                 </FilterButton>
                 <FilterButton
                     $active={selectedCategory === 'personal'}
                     $category="personal"
                     onClick={() => setSelectedCategory('personal')}
+                    onPointerDown={() => handleFilterPointerDown('personal')}
+                    onPointerUp={handleFilterPointerUp}
+                    onPointerCancel={handleFilterPointerUp}
+                    onPointerLeave={handleFilterPointerUp}
                 >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                         <circle cx="12" cy="7" r="4"/>
                     </svg>
-                    개인
+                    {settings.categoryNames.personal}
                 </FilterButton>
                 <FilterButton
                     $active={selectedCategory === 'work'}
                     $category="work"
                     onClick={() => setSelectedCategory('work')}
+                    onPointerDown={() => handleFilterPointerDown('work')}
+                    onPointerUp={handleFilterPointerUp}
+                    onPointerCancel={handleFilterPointerUp}
+                    onPointerLeave={handleFilterPointerUp}
                 >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
                         <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
                         <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
                     </svg>
-                    업무
+                    {settings.categoryNames.work}
                 </FilterButton>
                 <FilterButton
                     $active={selectedCategory === 'diary'}
                     $category="diary"
                     onClick={() => setSelectedCategory('diary')}
+                    onPointerDown={() => handleFilterPointerDown('diary')}
+                    onPointerUp={handleFilterPointerUp}
+                    onPointerCancel={handleFilterPointerUp}
+                    onPointerLeave={handleFilterPointerUp}
                 >
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
                         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
                         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
                     </svg>
-                    일기
+                    {settings.categoryNames.diary}
                 </FilterButton>
             </FilterBar>
 
@@ -1364,6 +1421,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                             <SecretDocCard
                                 key={doc.id}
                                 doc={doc}
+                                settings={settings}
                                 onClick={selectionMode ? () => toggleSelection(doc.id) : handleDocClick}
                                 onCategoryChange={handleCategoryChange}
                                 onLongPress={() => enterSelectionMode(doc.id)}
@@ -1381,6 +1439,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                 <SecretDocEditor
                     doc={editingDoc}
                     existingDocs={docs}
+                    settings={settings}
                     onClose={() => {
                         setIsEditorOpen(false);
                         setEditingDoc(null);
@@ -1487,7 +1546,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                                 }}
                             >
                                 💰
-                                <span>금융</span>
+                                <span>{settings.categoryNames.financial}</span>
                             </CategoryOption>
                             <CategoryOption
                                 $category="personal"
@@ -1497,7 +1556,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                                 }}
                             >
                                 👤
-                                <span>개인</span>
+                                <span>{settings.categoryNames.personal}</span>
                             </CategoryOption>
                             <CategoryOption
                                 $category="work"
@@ -1507,7 +1566,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                                 }}
                             >
                                 💼
-                                <span>업무</span>
+                                <span>{settings.categoryNames.work}</span>
                             </CategoryOption>
                             <CategoryOption
                                 $category="diary"
@@ -1517,7 +1576,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                                 }}
                             >
                                 📔
-                                <span>일기</span>
+                                <span>{settings.categoryNames.diary}</span>
                             </CategoryOption>
                         </CategoryGrid>
                         <ModalCancelButton onClick={() => setShowCategoryModal(false)}>
@@ -1525,6 +1584,18 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                         </ModalCancelButton>
                     </CategoryModalContent>
                 </CategoryModal>
+            )}
+
+            {showCategoryNameEdit && editingCategory && (
+                <CategoryNameEditModal
+                    category={editingCategory}
+                    currentName={settings.categoryNames[editingCategory]}
+                    onSave={handleSaveCategoryName}
+                    onClose={() => {
+                        setShowCategoryNameEdit(false);
+                        setEditingCategory(null);
+                    }}
+                />
             )}
 
             {showDeleteModal && (

@@ -54,7 +54,7 @@ horoscopes = {
 # 각 별자리당 20개씩...
 
 # 파일 읽기
-with open('e:\\React test\\my-mindflow-app\\public\\fortune_data\\horoscope.csv', 'r', encoding='utf-8') as f:
+with open('e:\\React test\\my-mindflow-app\\src\\fortune_data\\horoscope.csv', 'r', encoding='utf-8') as f:
     existing_content = f.read()
 
 # 새로운 내용 생성
@@ -65,7 +65,7 @@ for sign, fortunes in horoscopes.items():
         new_lines.append(line)
 
 # 파일에 추가
-with open('e:\\React test\\my-mindflow-app\\public\\fortune_data\\horoscope.csv', 'a', encoding='utf-8') as f:
+with open('e:\\React test\\my-mindflow-app\\src\\fortune_data\\horoscope.csv', 'a', encoding='utf-8') as f:
     f.write('\n'.join(new_lines))
 
 print(f"Added {len(new_lines)} fortune entries!")

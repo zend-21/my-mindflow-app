@@ -429,7 +429,7 @@ const ErrorModalButton = styled.button`
     }
 `;
 
-const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) => {
+const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], settings }) => {
     const [formData, setFormData] = useState({
         title: '',
         content: '',
@@ -633,28 +633,28 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [] }) 
                                 $active={formData.category === 'financial'}
                                 onClick={() => handleChange('category', 'financial')}
                             >
-                                금융
+                                {settings?.categoryNames?.financial || '금융'}
                             </CategoryButton>
                             <CategoryButton
                                 type="button"
                                 $active={formData.category === 'personal'}
                                 onClick={() => handleChange('category', 'personal')}
                             >
-                                개인
+                                {settings?.categoryNames?.personal || '개인'}
                             </CategoryButton>
                             <CategoryButton
                                 type="button"
                                 $active={formData.category === 'work'}
                                 onClick={() => handleChange('category', 'work')}
                             >
-                                업무
+                                {settings?.categoryNames?.work || '업무'}
                             </CategoryButton>
                             <CategoryButton
                                 type="button"
                                 $active={formData.category === 'diary'}
                                 onClick={() => handleChange('category', 'diary')}
                             >
-                                일기
+                                {settings?.categoryNames?.diary || '일기'}
                             </CategoryButton>
                         </CategoryButtons>
                     </FormGroup>

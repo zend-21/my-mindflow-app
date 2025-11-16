@@ -3,9 +3,9 @@
 // fortune.csv 파일을 raw string으로 import (Vite의 ?raw 쿼리 사용)
 import rawCsvData from './fortune.csv?raw';
 // Tarot.csv 파일을 raw string으로 import
-import rawTarotData from '../../public/fortune_data/Tarot.csv?raw';
+import rawTarotData from '../fortune_data/Tarot.csv?raw';
 // Horoscope.csv 파일을 raw string으로 import
-import rawHoroscopeData from '../../public/fortune_data/horoscope.csv?raw'; 
+import rawHoroscopeData from '../fortune_data/horoscope.csv?raw'; 
 
 // CSV 파일을 파싱하는 간단한 유틸리티 함수 (실제 라이브러리 대체 가능)
 const parseCsv = (csvString) => {

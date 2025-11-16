@@ -62,10 +62,26 @@ export const getSettings = () => {
         return {
             pinLength: 6,
             autoLockMinutes: 5,
-            emailNotifications: false
+            emailNotifications: false,
+            categoryNames: {
+                financial: '금융',
+                personal: '개인',
+                work: '업무',
+                diary: '일기'
+            }
         };
     }
-    return JSON.parse(settings);
+    const parsed = JSON.parse(settings);
+    // 기존 설정에 categoryNames가 없으면 기본값 추가
+    if (!parsed.categoryNames) {
+        parsed.categoryNames = {
+            financial: '금융',
+            personal: '개인',
+            work: '업무',
+            diary: '일기'
+        };
+    }
+    return parsed;
 };
 
 /**

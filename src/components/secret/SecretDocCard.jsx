@@ -319,7 +319,7 @@ const DateText = styled.span`
     white-space: nowrap;
 `;
 
-const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionMode, isSelected, openCategoryDropdownId, setOpenCategoryDropdownId }) => {
+const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionMode, isSelected, openCategoryDropdownId, setOpenCategoryDropdownId, settings }) => {
     const longPressTimerRef = useRef(null);
     const isLongPressRef = useRef(false);
     const startPosRef = useRef({ x: 0, y: 0 });
@@ -433,10 +433,10 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
     };
 
     const categories = [
-        { value: 'financial', label: '금융' },
-        { value: 'personal', label: '개인' },
-        { value: 'work', label: '업무' },
-        { value: 'diary', label: '일기' }
+        { value: 'financial', label: settings?.categoryNames?.financial || '금융' },
+        { value: 'personal', label: settings?.categoryNames?.personal || '개인' },
+        { value: 'work', label: settings?.categoryNames?.work || '업무' },
+        { value: 'diary', label: settings?.categoryNames?.diary || '일기' }
     ];
 
     return (
@@ -484,7 +484,7 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
                                     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
                                 </svg>
-                                금융
+                                {settings?.categoryNames?.financial || '금융'}
                             </>
                         )}
                         {doc.category === 'personal' && (
@@ -493,7 +493,7 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
                                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                                     <circle cx="12" cy="7" r="4"/>
                                 </svg>
-                                개인
+                                {settings?.categoryNames?.personal || '개인'}
                             </>
                         )}
                         {doc.category === 'work' && (
@@ -502,7 +502,7 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
                                     <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
                                     <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
                                 </svg>
-                                업무
+                                {settings?.categoryNames?.work || '업무'}
                             </>
                         )}
                         {doc.category === 'diary' && (
@@ -511,7 +511,7 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
                                     <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
                                     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
                                 </svg>
-                                일기
+                                {settings?.categoryNames?.diary || '일기'}
                             </>
                         )}
                         {!['financial', 'personal', 'work', 'diary'].includes(doc.category) && doc.category}
