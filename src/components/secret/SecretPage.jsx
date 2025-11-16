@@ -9,6 +9,7 @@ import SecretDocCard from './SecretDocCard';
 import SecretDocEditor from './SecretDocEditor';
 import PasswordInputPage from './PasswordInputPage';
 import PinChangeModal from './PinChangeModal';
+import EmailConfirmModal from './EmailConfirmModal';
 import CategoryNameEditModal from './CategoryNameEditModal';
 import { ALL_ICONS } from './categoryIcons';
 import {
@@ -16,6 +17,7 @@ import {
     setPin,
     verifyPin,
     changePin,
+    resetPin,
     getAllSecretDocs,
     addSecretDoc,
     updateSecretDoc,
@@ -26,6 +28,7 @@ import {
     getSettings,
     saveSettings
 } from '../../utils/secretStorage';
+import { sendTempPinEmail } from '../../utils/emailService';
 
 const Container = styled.div`
     width: 100%;
@@ -48,12 +51,25 @@ const InnerContent = styled.div`
 const SearchBar = styled.div`
     margin-bottom: 16px;
     width: 100%;
+    position: relative;
+`;
+
+const SearchIcon = styled.div`
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #808080;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
 `;
 
 const SearchInput = styled.input`
     width: 100%;
-    padding: 12px 16px;
-    border-radius: 8px;
+    padding: 12px 16px 12px 44px;
+    border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(255, 255, 255, 0.05);
     color: #ffffff;
@@ -568,6 +584,9 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
     const [showPinRecovery, setShowPinRecovery] = useState(false);
     const [showPinChangeModal, setShowPinChangeModal] = useState(false);
+    const [isTempPinLogin, setIsTempPinLogin] = useState(false); // 임시 PIN 로그인 플래그
+    const [showEmailConfirmModal, setShowEmailConfirmModal] = useState(false);
+    const [pendingEmailData, setPendingEmailData] = useState(null);
 
     // 다중 선택 모드 상태
     const [selectionMode, setSelectionMode] = useState(false);
@@ -758,16 +777,64 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                 }
             }
 
-            // PIN 검증
+            // 정규 PIN 검증
             const isValid = await verifyPin(pin);
             if (isValid) {
                 setCurrentPin(pin);
                 setIsUnlocked(true);
                 await loadDocs(pin);
                 return { success: true };
-            } else {
-                return { success: false, message: '잘못된 PIN입니다.' };
             }
+
+            // 임시 PIN 검증
+            if (profile?.email) {
+                const tempPinKey = `tempPin_${profile.email}`;
+                const tempPinDataStr = localStorage.getItem(tempPinKey);
+
+                if (tempPinDataStr) {
+                    const tempPinData = JSON.parse(tempPinDataStr);
+                    const now = Date.now();
+
+                    // 시간 만료 확인
+                    if (now > tempPinData.expiresAt) {
+                        // 만료된 임시 PIN 삭제
+                        localStorage.removeItem(tempPinKey);
+                        return { success: false, message: '임시 PIN이 만료되었습니다.\n다시 요청해주세요.' };
+                    }
+
+                    // PIN 일치 확인
+                    if (pin === tempPinData.pin) {
+                        // 임시 PIN으로 로그인 성공
+                        // 임시 PIN을 currentPin으로 설정 (문서 로드용)
+                        setCurrentPin(pin);
+                        setIsUnlocked(true);
+                        setIsTempPinLogin(true); // 임시 PIN 로그인 플래그 설정
+
+                        // 실제 PIN으로 문서 로드 시도 (임시 PIN으로는 문서가 암호화되지 않았을 수 있음)
+                        try {
+                            await loadDocs(pin);
+                        } catch (error) {
+                            console.error('문서 로드 오류 (임시 PIN):', error);
+                        }
+
+                        // 임시 PIN은 PIN 변경 완료 후에 삭제 (여기서는 삭제하지 않음)
+
+                        // 임시 PIN 발송 플래그 제거 (안내 메시지 숨김)
+                        localStorage.removeItem('tempPinSent');
+                        window.dispatchEvent(new Event('tempPinStatusChanged'));
+
+                        // PIN 변경 모달 표시
+                        showToast?.('임시 PIN으로 로그인되었습니다.\n새로운 PIN을 설정해주세요.');
+                        setTimeout(() => {
+                            setShowPinChangeModal(true);
+                        }, 1000);
+
+                        return { success: true };
+                    }
+                }
+            }
+
+            return { success: false, message: '잘못된 PIN입니다.' };
         } catch (error) {
             console.error('PIN 처리 오류:', error);
             return { success: false, message: '오류가 발생했습니다.' };
@@ -1279,13 +1346,107 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     };
 
     // PIN 복구 (이메일 전송)
-    const handleForgotPin = () => {
+    const handleForgotPin = async () => {
         if (!profile?.email) {
             showToast?.('이메일 정보가 없습니다.');
             return;
         }
 
-        showToast?.(`임시 PIN이 ${profile.email}로 전송되었습니다. (준비 중)`);
+        // 하루 1회 제한 체크 (임시 PIN 발송 제한)
+        const ENABLE_RATE_LIMIT = false; // TODO: 배포 시 true로 변경
+        const lastSentKey = `tempPin_lastSent_${profile.email}`;
+
+        if (ENABLE_RATE_LIMIT) {
+            const lastSentTime = localStorage.getItem(lastSentKey);
+
+            if (lastSentTime) {
+                const now = Date.now();
+                const timeSinceLastSent = now - parseInt(lastSentTime, 10);
+                const oneDay = 24 * 60 * 60 * 1000; // 24시간 (밀리초)
+
+                if (timeSinceLastSent < oneDay) {
+                    const remainingTime = oneDay - timeSinceLastSent;
+                    const remainingHours = Math.ceil(remainingTime / (60 * 60 * 1000));
+                    showToast?.(`임시 PIN은 하루에 한 번만 요청할 수 있습니다.\n약 ${remainingHours}시간 후 다시 시도해주세요.`);
+                    return;
+                }
+            }
+        }
+
+        // 마스킹된 이메일 표시
+        const maskedEmail = profile.email.replace(/(.{3})(.*)(@.*)/, (_, start, middle, domain) => {
+            return start + '*'.repeat(Math.min(middle.length, 7)) + domain;
+        });
+
+        // 이메일 데이터 저장 및 모달 표시
+        setPendingEmailData({ email: profile.email, maskedEmail, lastSentKey });
+        setShowEmailConfirmModal(true);
+    };
+
+    // 이메일 전송 확인 핸들러
+    const handleEmailConfirm = async () => {
+        setShowEmailConfirmModal(false);
+
+        if (!pendingEmailData) return;
+
+        const { email, maskedEmail, lastSentKey } = pendingEmailData;
+
+        // 임시 PIN 생성 (6자리)
+        const tempPin = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // 24시간 유효 시간 설정
+        const now = Date.now();
+        const expiresAt = now + (24 * 60 * 60 * 1000); // 24시간 후
+
+        // 기존 PIN 리셋 (임시 PIN 발급 시 기존 PIN은 무효화)
+        resetPin();
+
+        // localStorage에 임시 PIN 저장
+        const tempPinKey = `tempPin_${email}`;
+        localStorage.setItem(tempPinKey, JSON.stringify({
+            pin: tempPin,
+            createdAt: now,
+            expiresAt: expiresAt
+        }));
+
+        // 마지막 발송 시간 저장
+        localStorage.setItem(lastSentKey, now.toString());
+
+        // 이메일 발송
+        showToast?.('임시 PIN을 생성하는 중입니다...');
+
+        const emailResult = await sendTempPinEmail(email, tempPin, expiresAt);
+
+        if (emailResult.success) {
+            // 30분 잠금 해제 (임시 PIN으로 로그인 가능하도록)
+            localStorage.removeItem('secretPageLock');
+            // 커스텀 이벤트 발생 (PinInput 컴포넌트에 알림)
+            window.dispatchEvent(new Event('localStorageChanged'));
+
+            // 임시 PIN 발송 플래그 설정
+            localStorage.setItem('tempPinSent', 'true');
+            window.dispatchEvent(new Event('tempPinStatusChanged'));
+
+            // 개발 모드 메시지 확인
+            const isDev = emailResult.message.includes('개발 모드');
+            if (isDev) {
+                alert(`✅ 임시 PIN이 생성되었습니다!\n\n콘솔(F12)을 열어서 임시 PIN 번호를 확인하세요.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📧 [개발 모드] 임시 PIN 이메일 발송 시뮬레이션\n━━━━━━━━━━━━━━━━━━━━━━━\n\n위 메시지를 찾아서 🔑 임시 PIN 번호를 확인하세요.`);
+            } else {
+                showToast?.(`✅ 임시 PIN이 ${maskedEmail}로 전송되었습니다.\n\n이메일을 확인해주세요.`, 5000);
+            }
+        } else {
+            // 이메일 발송 실패
+            alert(`⚠️ 이메일 발송에 실패했습니다.\n\n에러: ${emailResult.message}\n\n관리자에게 문의하세요.`);
+        }
+
+        // 데이터 정리
+        setPendingEmailData(null);
+    };
+
+    // 이메일 전송 취소 핸들러
+    const handleEmailCancel = () => {
+        setShowEmailConfirmModal(false);
+        setPendingEmailData(null);
     };
 
     const handleChangePinClick = () => {
@@ -1297,6 +1458,13 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             const result = await changePin(currentPin, newPin);
 
             if (result.success) {
+                // 임시 PIN 로그인 모드였다면 임시 PIN 삭제
+                if (isTempPinLogin && profile?.email) {
+                    const tempPinKey = `tempPin_${profile.email}`;
+                    localStorage.removeItem(tempPinKey);
+                    setIsTempPinLogin(false);
+                }
+
                 showToast?.('PIN이 성공적으로 변경되었습니다.');
                 setShowPinChangeModal(false);
             } else {
@@ -1337,6 +1505,16 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                         onClose={() => setShowPinChangeModal(false)}
                         onConfirm={handlePinChange}
                         pinLength={settings.pinLength}
+                        forcedMode={isTempPinLogin} // 임시 PIN 로그인 시 강제 모드
+                    />
+                )}
+
+                {showEmailConfirmModal && pendingEmailData && (
+                    <EmailConfirmModal
+                        email={pendingEmailData.email}
+                        maskedEmail={pendingEmailData.maskedEmail}
+                        onConfirm={handleEmailConfirm}
+                        onCancel={handleEmailCancel}
                     />
                 )}
             </>
@@ -1348,6 +1526,12 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         <Container>
             <InnerContent>
             <SearchBar>
+                <SearchIcon>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.35-4.35"/>
+                    </svg>
+                </SearchIcon>
                 <SearchInput
                     type="text"
                     placeholder="검색..."

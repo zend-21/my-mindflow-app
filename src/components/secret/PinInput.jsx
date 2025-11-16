@@ -83,6 +83,16 @@ const AttemptsWarning = styled.div`
     margin-top: 10px;
 `;
 
+const TempPinInfoMessage = styled.div`
+    color: #4da6ff;
+    font-size: 14px;
+    text-align: center;
+    height: 20px;
+    line-height: 20px;
+    margin-top: 10px;
+    font-weight: 500;
+`;
+
 const MessageContainer = styled.div`
     height: 50px;
     margin-bottom: -14px;
@@ -146,21 +156,80 @@ const PinInput = ({
     const [shake, setShake] = useState(false);
     const [attempts, setAttempts] = useState(0);
     const [isLocked, setIsLocked] = useState(false);
+    const [showTempPinInfo, setShowTempPinInfo] = useState(false);
     const audioContextRef = React.useRef(null);
 
     useEffect(() => {
-        // 잠금 상태 확인
-        const lockData = localStorage.getItem('secretPageLock');
-        if (lockData) {
-            const { lockedUntil } = JSON.parse(lockData);
-            if (Date.now() < lockedUntil) {
-                setIsLocked(true);
-                const remainingTime = Math.ceil((lockedUntil - Date.now()) / 1000 / 60);
-                setError(`너무 많이 실패했습니다. ${remainingTime}분 후에 다시 시도하세요.`);
+        // 잠금 상태 확인 함수
+        const checkLockStatus = () => {
+            const lockData = localStorage.getItem('secretPageLock');
+            if (lockData) {
+                const { lockedUntil } = JSON.parse(lockData);
+                if (Date.now() < lockedUntil) {
+                    setIsLocked(true);
+                    const remainingTime = Math.ceil((lockedUntil - Date.now()) / 1000 / 60);
+                    setError(`너무 많이 실패했습니다. ${remainingTime}분 후에 다시 시도하거나,\n"PIN 번호를 잊으셨나요?"를 클릭하여 임시 PIN을 이메일로 받으세요.`);
+                } else {
+                    localStorage.removeItem('secretPageLock');
+                }
             } else {
-                localStorage.removeItem('secretPageLock');
+                // 잠금이 해제된 경우
+                if (isLocked) {
+                    setIsLocked(false);
+                    setError('');
+                    setAttempts(0);
+                }
             }
-        }
+        };
+
+        // 초기 확인
+        checkLockStatus();
+
+        // storage 이벤트 리스너 (다른 탭/창에서의 변경 감지)
+        const handleStorageChange = (e) => {
+            if (e.key === 'secretPageLock') {
+                checkLockStatus();
+            }
+        };
+
+        // 커스텀 이벤트 리스너 (같은 페이지 내에서의 변경 감지)
+        const handleCustomStorageChange = () => {
+            checkLockStatus();
+        };
+
+        window.addEventListener('storage', handleStorageChange);
+        window.addEventListener('localStorageChanged', handleCustomStorageChange);
+
+        return () => {
+            window.removeEventListener('storage', handleStorageChange);
+            window.removeEventListener('localStorageChanged', handleCustomStorageChange);
+        };
+    }, [isLocked]);
+
+    // 임시 PIN 발송 상태 확인
+    useEffect(() => {
+        const checkTempPinStatus = () => {
+            const tempPinSentFlag = localStorage.getItem('tempPinSent');
+            if (tempPinSentFlag === 'true') {
+                setShowTempPinInfo(true);
+            } else {
+                setShowTempPinInfo(false);
+            }
+        };
+
+        // 초기 확인
+        checkTempPinStatus();
+
+        // 커스텀 이벤트 리스너
+        const handleTempPinChange = () => {
+            checkTempPinStatus();
+        };
+
+        window.addEventListener('tempPinStatusChanged', handleTempPinChange);
+
+        return () => {
+            window.removeEventListener('tempPinStatusChanged', handleTempPinChange);
+        };
     }, []);
 
     // 숫자/스마일 클릭 효과음 (타이머 "톡" 소리)
@@ -308,7 +377,7 @@ const PinInput = ({
                     const lockedUntil = Date.now() + (30 * 60 * 1000);
                     localStorage.setItem('secretPageLock', JSON.stringify({ lockedUntil }));
                     setIsLocked(true);
-                    setError('너무 많이 실패했습니다. 30분 후에 다시 시도하세요.');
+                    setError('너무 많이 실패했습니다. 30분 후에 다시 시도하거나,\n"PIN 번호를 잊으셨나요?"를 클릭하여 임시 PIN을 이메일로 받으세요.');
                 } else {
                     setError(result.message || '잘못된 PIN입니다.');
                     setShake(true);
@@ -339,10 +408,16 @@ const PinInput = ({
             <MessageContainer>
                 <ErrorMessage>{error}</ErrorMessage>
 
-                {attempts > 0 && attempts < maxAttempts && !isLocked && (
+                {attempts > 0 && attempts < maxAttempts && !isLocked && !showTempPinInfo && (
                     <AttemptsWarning>
                         ⚠️ {maxAttempts - attempts}번의 시도가 남았습니다.
                     </AttemptsWarning>
+                )}
+
+                {showTempPinInfo && !isLocked && (
+                    <TempPinInfoMessage>
+                        📧 메일로 안내드린 임시 PIN 번호를 입력하세요.
+                    </TempPinInfoMessage>
                 )}
             </MessageContainer>
 

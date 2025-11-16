@@ -147,6 +147,28 @@ const HelperText = styled.div`
     line-height: 1.4;
 `;
 
+const WarningBox = styled.div`
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+`;
+
+const WarningIcon = styled.div`
+    font-size: 20px;
+    flex-shrink: 0;
+`;
+
+const WarningText = styled.div`
+    color: #ffc107;
+    font-size: 13px;
+    line-height: 1.5;
+`;
+
 const Footer = styled.div`
     padding: 16px 24px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -197,7 +219,7 @@ const Button = styled.button`
     `}
 `;
 
-const PinChangeModal = ({ onClose, onConfirm, pinLength = 6 }) => {
+const PinChangeModal = ({ onClose, onConfirm, pinLength = 6, forcedMode = false }) => {
     const [currentPin, setCurrentPin] = useState('');
     const [newPin, setNewPin] = useState('');
     const [confirmPin, setConfirmPin] = useState('');
@@ -248,14 +270,24 @@ const PinChangeModal = ({ onClose, onConfirm, pinLength = 6 }) => {
 
     return (
         <Portal>
-            <Overlay onClick={onClose}>
+            <Overlay onClick={forcedMode ? null : onClose}>
                 <Modal onClick={(e) => e.stopPropagation()}>
                     <Header>
-                        <Title>PIN 변경</Title>
-                        <CloseButton onClick={onClose}>×</CloseButton>
+                        <Title>{forcedMode ? 'PIN 재설정 (필수)' : 'PIN 변경'}</Title>
+                        {!forcedMode && <CloseButton onClick={onClose}>×</CloseButton>}
                     </Header>
 
                     <Body>
+                        {forcedMode && (
+                            <WarningBox>
+                                <WarningIcon>⚠️</WarningIcon>
+                                <WarningText>
+                                    임시 PIN으로 로그인하셨습니다.<br/>
+                                    보안을 위해 새로운 PIN을 설정해주세요.
+                                </WarningText>
+                            </WarningBox>
+                        )}
+
                         <FormGroup>
                             <Label>기존 PIN 번호 입력</Label>
                             <Input
@@ -319,9 +351,9 @@ const PinChangeModal = ({ onClose, onConfirm, pinLength = 6 }) => {
                     </Body>
 
                     <Footer>
-                        <Button onClick={onClose}>취소</Button>
+                        {!forcedMode && <Button onClick={onClose}>취소</Button>}
                         <Button $primary onClick={handleSubmit}>
-                            PIN 변경
+                            {forcedMode ? 'PIN 재설정' : 'PIN 변경'}
                         </Button>
                     </Footer>
                 </Modal>

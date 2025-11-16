@@ -3,6 +3,7 @@
 
 import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
+import { ALL_ICONS } from './categoryIcons';
 
 const Card = styled.div`
     background: ${props => props.$isSelected
@@ -121,6 +122,9 @@ const CategoryBadge = styled.button`
     transition: all 0.2s;
     display: flex;
     align-items: center;
+    min-width: 60px;
+    min-height: 24px;
+    justify-content: center;
     background: ${props => {
         switch (props.$category) {
             case 'financial': return 'rgba(255, 215, 0, 0.2)';
@@ -495,42 +499,22 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
                             clearTimeout(badgeLongPressTimerRef.current);
                         }}
                     >
-                        {doc.category === 'financial' && (
-                            <>
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
-                                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-                                </svg>
-                                {settings?.categoryNames?.financial || '금융'}
-                            </>
-                        )}
-                        {doc.category === 'personal' && (
-                            <>
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                    <circle cx="12" cy="7" r="4"/>
-                                </svg>
-                                {settings?.categoryNames?.personal || '개인'}
-                            </>
-                        )}
-                        {doc.category === 'work' && (
-                            <>
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
-                                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-                                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
-                                </svg>
-                                {settings?.categoryNames?.work || '업무'}
-                            </>
-                        )}
-                        {doc.category === 'diary' && (
-                            <>
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
-                                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                                </svg>
-                                {settings?.categoryNames?.diary || '일기'}
-                            </>
-                        )}
-                        {!['financial', 'personal', 'work', 'diary'].includes(doc.category) && doc.category}
+                        {doc.category && (() => {
+                            const categoryIconId = settings?.categoryIcons?.[doc.category];
+                            const iconData = ALL_ICONS.find(icon => icon.id === categoryIconId);
+                            const categoryName = settings?.categoryNames?.[doc.category] || doc.category;
+
+                            return (
+                                <>
+                                    {iconData && (
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
+                                            <path d={iconData.svg} />
+                                        </svg>
+                                    )}
+                                    {categoryName}
+                                </>
+                            );
+                        })()}
                     </CategoryBadge>
                 )}
             </CardHeader>

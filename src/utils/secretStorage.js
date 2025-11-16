@@ -53,6 +53,14 @@ export const changePin = async (oldPin, newPin) => {
 };
 
 /**
+ * PIN 리셋 (임시 PIN 발급 시 사용)
+ * @returns {void}
+ */
+export const resetPin = () => {
+    localStorage.removeItem(SECRET_PIN_KEY);
+};
+
+/**
  * 설정 가져오기
  * @returns {object}
  */
