@@ -386,11 +386,6 @@ export const ALL_ICONS = [
         id: 'bluetooth',
         name: '블루투스',
         svg: 'M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11'
-    },
-    {
-        id: 'volume',
-        name: '볼륨',
-        svg: 'M11 5L6 9H2v6h4l5 4V5zM19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07'
     }
 ];
 
