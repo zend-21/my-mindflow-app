@@ -1561,7 +1561,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             )}
         </Container>
 
-        {createPortal(
+        {!isEditorOpen && !showPasswordInputPage && createPortal(
             <AddButton
                 ref={addButtonRef}
                 role="button"
