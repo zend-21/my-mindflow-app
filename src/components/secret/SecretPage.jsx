@@ -10,7 +10,7 @@ import SecretDocEditor from './SecretDocEditor';
 import PasswordInputPage from './PasswordInputPage';
 import PinChangeModal from './PinChangeModal';
 import CategoryNameEditModal from './CategoryNameEditModal';
-import { CATEGORY_ICON_SETS } from './categoryIcons';
+import { ALL_ICONS } from './categoryIcons';
 import {
     hasPinSet,
     setPin,
@@ -601,11 +601,9 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     // 카테고리 아이콘 SVG 경로 가져오기
     const getCategoryIconPath = (category) => {
         const iconId = settings?.categoryIcons?.[category];
-        const iconSet = CATEGORY_ICON_SETS[category];
-        if (!iconSet) return null;
-        if (!iconId) return iconSet[0]?.svg; // iconId가 없으면 첫 번째 아이콘 사용
-        const icon = iconSet.find(i => i.id === iconId);
-        return icon?.svg || iconSet[0]?.svg;
+        if (!iconId) return ALL_ICONS[0]?.svg; // iconId가 없으면 첫 번째 아이콘 사용
+        const icon = ALL_ICONS.find(i => i.id === iconId);
+        return icon?.svg || ALL_ICONS[0]?.svg;
     };
 
     // PIN 설정 초기 확인

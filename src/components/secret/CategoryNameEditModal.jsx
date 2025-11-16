@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
-import { CATEGORY_ICON_SETS, DEFAULT_ICONS } from './categoryIcons';
+import { ALL_ICONS, DEFAULT_ICONS } from './categoryIcons';
 
 const Overlay = styled.div`
     position: fixed;
@@ -150,11 +150,37 @@ const Button = styled.button`
     }
 `;
 
+const TabContainer = styled.div`
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const Tab = styled.button`
+    flex: 1;
+    padding: 10px 8px;
+    background: ${props => props.$active ? 'rgba(240, 147, 251, 0.2)' : 'transparent'};
+    border: none;
+    border-bottom: 2px solid ${props => props.$active ? '#f093fb' : 'transparent'};
+    color: ${props => props.$active ? '#f093fb' : '#808080'};
+    font-size: 12px;
+    font-weight: ${props => props.$active ? '600' : '500'};
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        color: ${props => props.$active ? '#f093fb' : '#d0d0d0'};
+        background: rgba(240, 147, 251, 0.1);
+    }
+`;
+
 const IconGrid = styled.div`
     display: grid;
     grid-template-columns: repeat(5, 1fr);
     gap: 8px;
     margin-bottom: 20px;
+    padding: 4px;
 `;
 
 const IconButton = styled.button`
@@ -202,6 +228,7 @@ const CategoryNameEditModal = ({ category, currentName, currentIcon, onSave, onC
     const [name, setName] = useState(currentName);
     const [selectedIcon, setSelectedIcon] = useState(currentIcon);
     const [error, setError] = useState('');
+    const [activeTab, setActiveTab] = useState(1);
     const inputRef = useRef(null);
 
     useEffect(() => {
@@ -281,15 +308,21 @@ const CategoryNameEditModal = ({ category, currentName, currentIcon, onSave, onC
     const maxLength = getMaxLength(name);
     const isMax = currentLength >= maxLength;
 
-    // 현재 카테고리의 아이콘 목록 가져오기
-    const iconSet = CATEGORY_ICON_SETS[category] || [];
+    // 탭별로 아이콘 필터링 (각 탭당 15개씩)
+    const getFilteredIcons = () => {
+        const startIndex = (activeTab - 1) * 15;
+        const endIndex = startIndex + 15;
+        return ALL_ICONS.slice(startIndex, endIndex);
+    };
+
+    const filteredIcons = getFilteredIcons();
 
     return (
         <Overlay onClick={onClose}>
             <ModalContent onClick={(e) => e.stopPropagation()}>
                 <CategoryIcon $category={category}>
                     <SvgIcon viewBox="0 0 24 24" $selected={false}>
-                        <path d={iconSet.find(icon => icon.id === selectedIcon)?.svg || iconSet[0]?.svg} />
+                        <path d={ALL_ICONS.find(icon => icon.id === selectedIcon)?.svg || ALL_ICONS[0]?.svg} />
                     </SvgIcon>
                 </CategoryIcon>
 
@@ -299,8 +332,27 @@ const CategoryNameEditModal = ({ category, currentName, currentIcon, onSave, onC
                 </Subtitle>
 
                 <IconLabel>아이콘 선택</IconLabel>
+
+                <TabContainer>
+                    <Tab $active={activeTab === 1} onClick={() => setActiveTab(1)}>
+                        1
+                    </Tab>
+                    <Tab $active={activeTab === 2} onClick={() => setActiveTab(2)}>
+                        2
+                    </Tab>
+                    <Tab $active={activeTab === 3} onClick={() => setActiveTab(3)}>
+                        3
+                    </Tab>
+                    <Tab $active={activeTab === 4} onClick={() => setActiveTab(4)}>
+                        4
+                    </Tab>
+                    <Tab $active={activeTab === 5} onClick={() => setActiveTab(5)}>
+                        5
+                    </Tab>
+                </TabContainer>
+
                 <IconGrid>
-                    {iconSet.map(icon => (
+                    {filteredIcons.map(icon => (
                         <IconButton
                             key={icon.id}
                             $selected={selectedIcon === icon.id}

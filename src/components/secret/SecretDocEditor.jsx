@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import Portal from '../Portal';
-import { CATEGORY_ICON_SETS } from './categoryIcons';
+import { ALL_ICONS } from './categoryIcons';
 
 const Overlay = styled.div`
     position: fixed;
@@ -508,11 +508,9 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
     // 카테고리 아이콘 SVG 경로 가져오기
     const getCategoryIconPath = (category) => {
         const iconId = settings?.categoryIcons?.[category];
-        const iconSet = CATEGORY_ICON_SETS[category];
-        if (!iconSet) return null;
-        if (!iconId) return iconSet[0]?.svg; // iconId가 없으면 첫 번째 아이콘 사용
-        const icon = iconSet.find(i => i.id === iconId);
-        return icon?.svg || iconSet[0]?.svg;
+        if (!iconId) return ALL_ICONS[0]?.svg; // iconId가 없으면 첫 번째 아이콘 사용
+        const icon = ALL_ICONS.find(i => i.id === iconId);
+        return icon?.svg || ALL_ICONS[0]?.svg;
     };
 
     useEffect(() => {
