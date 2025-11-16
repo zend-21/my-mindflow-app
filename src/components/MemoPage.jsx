@@ -481,9 +481,10 @@ const EmptyMessage = styled.p`
 const MemoList = styled.div`
     display: flex;
     flex-direction: column;
-    gap: 16px; 
+    gap: 16px;
     width: 100%;
     margin-top: 35px;
+    padding-bottom: 20px;
 
     & ${MemoText} {
         white-space: nowrap; 
