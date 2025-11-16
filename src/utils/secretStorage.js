@@ -68,6 +68,12 @@ export const getSettings = () => {
                 personal: '개인',
                 work: '업무',
                 diary: '일기'
+            },
+            categoryIcons: {
+                financial: 'dollar',
+                personal: 'user',
+                work: 'briefcase',
+                diary: 'book'
             }
         };
     }
@@ -79,6 +85,15 @@ export const getSettings = () => {
             personal: '개인',
             work: '업무',
             diary: '일기'
+        };
+    }
+    // 기존 설정에 categoryIcons가 없으면 기본값 추가 (icon ID 사용)
+    if (!parsed.categoryIcons) {
+        parsed.categoryIcons = {
+            financial: 'dollar',
+            personal: 'user',
+            work: 'briefcase',
+            diary: 'book'
         };
     }
     return parsed;

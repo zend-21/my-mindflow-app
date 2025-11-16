@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import Portal from '../Portal';
+import { CATEGORY_ICON_SETS } from './categoryIcons';
 
 const Overlay = styled.div`
     position: fixed;
@@ -351,6 +352,10 @@ const CategoryButton = styled.button`
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
 
     &:hover {
         background: ${props => {
@@ -499,6 +504,16 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
     const [initialData, setInitialData] = useState(null);
 
     const textareaRef = useRef(null);
+
+    // 카테고리 아이콘 SVG 경로 가져오기
+    const getCategoryIconPath = (category) => {
+        const iconId = settings?.categoryIcons?.[category];
+        const iconSet = CATEGORY_ICON_SETS[category];
+        if (!iconSet) return null;
+        if (!iconId) return iconSet[0]?.svg; // iconId가 없으면 첫 번째 아이콘 사용
+        const icon = iconSet.find(i => i.id === iconId);
+        return icon?.svg || iconSet[0]?.svg;
+    };
 
     useEffect(() => {
         // 에디터가 열릴 때마다 에러 상태 초기화
@@ -721,6 +736,9 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                 $category="financial"
                                 onClick={() => handleChange('category', 'financial')}
                             >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d={getCategoryIconPath('financial')}/>
+                                </svg>
                                 {settings?.categoryNames?.financial || '금융'}
                             </CategoryButton>
                             <CategoryButton
@@ -729,6 +747,9 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                 $category="personal"
                                 onClick={() => handleChange('category', 'personal')}
                             >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d={getCategoryIconPath('personal')}/>
+                                </svg>
                                 {settings?.categoryNames?.personal || '개인'}
                             </CategoryButton>
                             <CategoryButton
@@ -737,6 +758,9 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                 $category="work"
                                 onClick={() => handleChange('category', 'work')}
                             >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d={getCategoryIconPath('work')}/>
+                                </svg>
                                 {settings?.categoryNames?.work || '업무'}
                             </CategoryButton>
                             <CategoryButton
@@ -745,6 +769,9 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                 $category="diary"
                                 onClick={() => handleChange('category', 'diary')}
                             >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d={getCategoryIconPath('diary')}/>
+                                </svg>
                                 {settings?.categoryNames?.diary || '일기'}
                             </CategoryButton>
                         </CategoryButtons>

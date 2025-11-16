@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
+import { CATEGORY_ICON_SETS, DEFAULT_ICONS } from './categoryIcons';
 
 const Overlay = styled.div`
     position: fixed;
@@ -149,15 +150,57 @@ const Button = styled.button`
     }
 `;
 
-const CATEGORY_ICONS = {
-    financial: '💰',
-    personal: '👤',
-    work: '💼',
-    diary: '📔'
-};
+const IconGrid = styled.div`
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+`;
 
-const CategoryNameEditModal = ({ category, currentName, onSave, onClose }) => {
+const IconButton = styled.button`
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    border: 2px solid ${props => props.$selected ? 'rgba(240, 147, 251, 0.8)' : 'rgba(255, 255, 255, 0.2)'};
+    background: ${props => props.$selected ? 'rgba(240, 147, 251, 0.2)' : 'rgba(255, 255, 255, 0.05)'};
+    font-size: 24px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+        background: ${props => props.$selected ? 'rgba(240, 147, 251, 0.3)' : 'rgba(255, 255, 255, 0.1)'};
+        border-color: ${props => props.$selected ? 'rgba(240, 147, 251, 1)' : 'rgba(255, 255, 255, 0.4)'};
+        transform: scale(1.05);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
+`;
+
+const IconLabel = styled.div`
+    text-align: center;
+    font-size: 12px;
+    color: #808080;
+    margin-bottom: 12px;
+`;
+
+const SvgIcon = styled.svg`
+    width: 24px;
+    height: 24px;
+    stroke: ${props => props.$selected ? '#f093fb' : '#d0d0d0'};
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+`;
+
+const CategoryNameEditModal = ({ category, currentName, currentIcon, onSave, onClose }) => {
     const [name, setName] = useState(currentName);
+    const [selectedIcon, setSelectedIcon] = useState(currentIcon);
     const [error, setError] = useState('');
     const inputRef = useRef(null);
 
@@ -221,7 +264,7 @@ const CategoryNameEditModal = ({ category, currentName, onSave, onClose }) => {
             return;
         }
 
-        onSave(trimmedName);
+        onSave(trimmedName, selectedIcon);
     };
 
     const handleKeyPress = (e) => {
@@ -238,18 +281,38 @@ const CategoryNameEditModal = ({ category, currentName, onSave, onClose }) => {
     const maxLength = getMaxLength(name);
     const isMax = currentLength >= maxLength;
 
+    // 현재 카테고리의 아이콘 목록 가져오기
+    const iconSet = CATEGORY_ICON_SETS[category] || [];
+
     return (
         <Overlay onClick={onClose}>
             <ModalContent onClick={(e) => e.stopPropagation()}>
                 <CategoryIcon $category={category}>
-                    {CATEGORY_ICONS[category] || '📁'}
+                    <SvgIcon viewBox="0 0 24 24" $selected={false}>
+                        <path d={iconSet.find(icon => icon.id === selectedIcon)?.svg || iconSet[0]?.svg} />
+                    </SvgIcon>
                 </CategoryIcon>
 
-                <Title>카테고리 이름 변경</Title>
+                <Title>카테고리 편집</Title>
                 <Subtitle>
-                    한글 최대 2글자, 영문/숫자 최대 4글자<br/>
-                    (공백 포함)
+                    이름과 아이콘을 변경할 수 있습니다
                 </Subtitle>
+
+                <IconLabel>아이콘 선택</IconLabel>
+                <IconGrid>
+                    {iconSet.map(icon => (
+                        <IconButton
+                            key={icon.id}
+                            $selected={selectedIcon === icon.id}
+                            onClick={() => setSelectedIcon(icon.id)}
+                            title={icon.name}
+                        >
+                            <SvgIcon viewBox="0 0 24 24" $selected={selectedIcon === icon.id}>
+                                <path d={icon.svg} />
+                            </SvgIcon>
+                        </IconButton>
+                    ))}
+                </IconGrid>
 
                 <InputWrapper>
                     <Input
@@ -265,7 +328,7 @@ const CategoryNameEditModal = ({ category, currentName, onSave, onClose }) => {
                 </InputWrapper>
 
                 <CharCount $isMax={isMax}>
-                    {currentLength} / {maxLength}
+                    {currentLength} / {maxLength} (한글 최대 2글자, 영문/숫자 최대 4글자)
                 </CharCount>
 
                 <ErrorMessage>{error}</ErrorMessage>

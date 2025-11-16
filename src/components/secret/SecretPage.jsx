@@ -10,6 +10,7 @@ import SecretDocEditor from './SecretDocEditor';
 import PasswordInputPage from './PasswordInputPage';
 import PinChangeModal from './PinChangeModal';
 import CategoryNameEditModal from './CategoryNameEditModal';
+import { CATEGORY_ICON_SETS } from './categoryIcons';
 import {
     hasPinSet,
     setPin,
@@ -597,6 +598,16 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     const autoLockTimerRef = useRef(null);
     const lastActivityRef = useRef(Date.now());
 
+    // 카테고리 아이콘 SVG 경로 가져오기
+    const getCategoryIconPath = (category) => {
+        const iconId = settings?.categoryIcons?.[category];
+        const iconSet = CATEGORY_ICON_SETS[category];
+        if (!iconSet) return null;
+        if (!iconId) return iconSet[0]?.svg; // iconId가 없으면 첫 번째 아이콘 사용
+        const icon = iconSet.find(i => i.id === iconId);
+        return icon?.svg || iconSet[0]?.svg;
+    };
+
     // PIN 설정 초기 확인
     useEffect(() => {
         if (!profile) {
@@ -902,20 +913,24 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         filterLongPressCategory.current = null;
     };
 
-    // 카테고리 이름 저장
-    const handleSaveCategoryName = (newName) => {
+    // 카테고리 이름 및 아이콘 저장
+    const handleSaveCategoryName = (newName, newIcon) => {
         const updatedSettings = {
             ...settings,
             categoryNames: {
                 ...settings.categoryNames,
                 [editingCategory]: newName
+            },
+            categoryIcons: {
+                ...settings.categoryIcons,
+                [editingCategory]: newIcon
             }
         };
         setSettings(updatedSettings);
         saveSettings(updatedSettings);
         setShowCategoryNameEdit(false);
         setEditingCategory(null);
-        showToast?.('카테고리 이름이 변경되었습니다.');
+        showToast?.('카테고리가 변경되었습니다.');
     };
 
     // 정렬 버튼 클릭
@@ -1363,8 +1378,8 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                     onPointerCancel={handleFilterPointerUp}
                     onPointerLeave={handleFilterPointerUp}
                 >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
-                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+                        <path d={getCategoryIconPath('financial')}/>
                     </svg>
                     {settings.categoryNames.financial}
                 </FilterButton>
@@ -1377,9 +1392,8 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                     onPointerCancel={handleFilterPointerUp}
                     onPointerLeave={handleFilterPointerUp}
                 >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                        <circle cx="12" cy="7" r="4"/>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+                        <path d={getCategoryIconPath('personal')}/>
                     </svg>
                     {settings.categoryNames.personal}
                 </FilterButton>
@@ -1392,9 +1406,8 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                     onPointerCancel={handleFilterPointerUp}
                     onPointerLeave={handleFilterPointerUp}
                 >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
-                        <rect x="2" y="7" width="20" height="14" rx="2" ry="2"/>
-                        <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+                        <path d={getCategoryIconPath('work')}/>
                     </svg>
                     {settings.categoryNames.work}
                 </FilterButton>
@@ -1407,9 +1420,8 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                     onPointerCancel={handleFilterPointerUp}
                     onPointerLeave={handleFilterPointerUp}
                 >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '4px' }}>
-                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '4px' }}>
+                        <path d={getCategoryIconPath('diary')}/>
                     </svg>
                     {settings.categoryNames.diary}
                 </FilterButton>
@@ -1638,6 +1650,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                 <CategoryNameEditModal
                     category={editingCategory}
                     currentName={settings.categoryNames[editingCategory]}
+                    currentIcon={settings.categoryIcons[editingCategory]}
                     onSave={handleSaveCategoryName}
                     onClose={() => {
                         setShowCategoryNameEdit(false);
