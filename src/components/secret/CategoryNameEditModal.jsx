@@ -2,6 +2,7 @@
 // 카테고리 이름 수정 모달
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import { ALL_ICONS, DEFAULT_ICONS } from './categoryIcons';
 
@@ -319,7 +320,7 @@ const CategoryNameEditModal = ({ category, currentName, currentIcon, onSave, onC
 
     const filteredIcons = getFilteredIcons();
 
-    return (
+    return createPortal(
         <Overlay onClick={onClose}>
             <ModalContent onClick={(e) => e.stopPropagation()}>
                 <CategoryIcon $category={category}>
@@ -396,7 +397,8 @@ const CategoryNameEditModal = ({ category, currentName, currentIcon, onSave, onC
                     </Button>
                 </ButtonGroup>
             </ModalContent>
-        </Overlay>
+        </Overlay>,
+        document.body
     );
 };
 
