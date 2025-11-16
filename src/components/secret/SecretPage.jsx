@@ -33,6 +33,9 @@ const Container = styled.div`
     overflow-y: auto;
     overflow-x: hidden;
     position: relative;
+    /* 터치 스크롤 최적화 */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
 `;
 
 const InnerContent = styled.div`
@@ -642,12 +645,16 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         };
     }, [isUnlocked]);
 
-    // 컴포넌트 언마운트 시 타이머 및 rAF 정리
+    // 컴포넌트 언마운트 시 타이머 및 rAF 정리, 스크롤 복원
     useEffect(() => {
         return () => {
             clearTimeout(longPressTimerRef.current);
             if (rafRef.current) {
                 cancelAnimationFrame(rafRef.current);
+            }
+            // 언마운트 시 body 스크롤 복원
+            if (document.body) {
+                document.body.style.overflow = '';
             }
         };
     }, []);
@@ -1062,8 +1069,14 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     const latestDragY = useRef(0);
 
     const handlePointerDown = (e) => {
+        // 이벤트 전파 차단 - 배경 스크롤 방지
         e.stopPropagation();
         e.preventDefault();
+
+        // 추가: 드래그 중일 때 body의 스크롤 방지
+        if (document.body) {
+            document.body.style.overflow = 'hidden';
+        }
 
         clearTimeout(longPressTimerRef.current);
         isLongPressSuccessful.current = false;
@@ -1084,6 +1097,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     };
 
     const handlePointerMove = (e) => {
+        // 이벤트 전파 차단 - 배경 스크롤 방지
         e.stopPropagation();
         e.preventDefault();
 
@@ -1124,8 +1138,14 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     };
 
     const handlePointerUp = (e) => {
+        // 이벤트 전파 차단 - 배경 스크롤 방지
         e.stopPropagation();
         e.preventDefault();
+
+        // body 스크롤 복원
+        if (document.body) {
+            document.body.style.overflow = '';
+        }
 
         clearTimeout(longPressTimerRef.current);
 
