@@ -144,7 +144,7 @@ const SearchBox = styled.div`
 
 const SearchInput = styled.input`
     width: 100%;
-    padding: 12px 40px 12px 16px;
+    padding: 12px 40px 12px 44px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     font-size: 14px;
@@ -184,6 +184,18 @@ const ClearButton = styled.button`
     &:hover {
         color: #e0e0e0;
     }
+`;
+
+const SearchIcon = styled.div`
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #808080;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
 `;
 
 const FilterRow = styled.div`
@@ -1096,6 +1108,12 @@ const TrashPage = ({ showToast }) => {
             {/* 검색 및 필터 섹션 */}
             <SearchAndFilterSection>
                 <SearchBox>
+                    <SearchIcon>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="m21 21-4.35-4.35"/>
+                        </svg>
+                    </SearchIcon>
                     <SearchInput
                         type="text"
                         placeholder="휴지통 검색...&#10;시크릿 문서는 검색에서 제외됩니다"
