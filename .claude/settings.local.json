@@ -13,7 +13,8 @@
       "Bash(\"E:\\React test\\my-mindflow-app\\public\\images\\secret\\mask-gray.svg\")",
       "Bash(nul)",
       "Bash(cat:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

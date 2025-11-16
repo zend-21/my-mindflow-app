@@ -7,7 +7,7 @@ import styled from 'styled-components';
 import PinInput from './PinInput';
 import SecretDocCard from './SecretDocCard';
 import SecretDocEditor from './SecretDocEditor';
-import PasswordModal from './PasswordModal';
+import PasswordInputPage from './PasswordInputPage';
 import PinChangeModal from './PinChangeModal';
 import {
     hasPinSet,
@@ -542,7 +542,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     });
     const [isConfirmingPin, setIsConfirmingPin] = useState(false);
     const [firstPin, setFirstPin] = useState('');
-    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [showPasswordInputPage, setShowPasswordInputPage] = useState(false);
     const [pendingDoc, setPendingDoc] = useState(null);
     const [sortBy, setSortBy] = useState('date'); // 'date' or 'importance'
     const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
@@ -770,14 +770,14 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     const handleDocClick = async (doc) => {
         if (doc.hasPassword) {
             setPendingDoc(doc);
-            setShowPasswordModal(true);
+            setShowPasswordInputPage(true);
         } else {
             setEditingDoc(doc);
             setIsEditorOpen(true);
         }
     };
 
-    // 비밀번호 모달 제출
+    // 비밀번호 페이지 제출
     const handlePasswordSubmit = async (password) => {
         if (!pendingDoc) return false;
 
@@ -785,7 +785,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         if (result.success) {
             setEditingDoc({ ...pendingDoc, content: result.content });
             setIsEditorOpen(true);
-            setShowPasswordModal(false);
+            setShowPasswordInputPage(false);
             setPendingDoc(null);
             return true;
         } else {
@@ -794,15 +794,15 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         }
     };
 
-    // 비밀번호 모달 취소
+    // 비밀번호 페이지 취소
     const handlePasswordCancel = () => {
-        setShowPasswordModal(false);
+        setShowPasswordInputPage(false);
         setPendingDoc(null);
     };
 
     // 비밀번호 복구 (PIN 재입력)
     const handleForgotPassword = () => {
-        setShowPasswordModal(false);
+        setShowPasswordInputPage(false);
         setShowPinRecovery(true);
     };
 
@@ -1390,8 +1390,9 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                 />
             )}
 
-            {showPasswordModal && (
-                <PasswordModal
+            {showPasswordInputPage && pendingDoc && (
+                <PasswordInputPage
+                    document={pendingDoc}
                     onSubmit={handlePasswordSubmit}
                     onCancel={handlePasswordCancel}
                     onForgotPassword={handleForgotPassword}
@@ -1422,7 +1423,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                         <button
                             onClick={() => {
                                 setShowPinRecovery(false);
-                                setShowPasswordModal(true);
+                                setShowPasswordInputPage(true);
                             }}
                             style={{
                                 marginTop: '20px',

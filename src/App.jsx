@@ -1730,10 +1730,15 @@ function App() {
     };
     
     const handleTouchStart = (e) => {
+        // SecretPage에서는 Pull-to-refresh 비활성화
+        if (activeTab === 'secret') return;
         handlePullStart(e.touches[0].clientY);
     };
 
     const handleTouchMove = (e) => {
+        // SecretPage에서는 Pull-to-refresh 비활성화
+        if (activeTab === 'secret') return;
+
         if (isDragging && contentAreaRef.current?.scrollTop === 0) {
             // 스크롤 최상단에서 드래그 중일 때만 기본 동작 방지
             e.preventDefault();
@@ -1742,32 +1747,44 @@ function App() {
     };
 
     const handleTouchEnd = async () => {
+        // SecretPage에서는 Pull-to-refresh 비활성화
+        if (activeTab === 'secret') return;
         await handlePullEnd();
     };
 
     const handleTouchCancel = async () => {
+        // SecretPage에서는 Pull-to-refresh 비활성화
+        if (activeTab === 'secret') return;
         // 터치가 취소되어도 handlePullEnd 호출 (드래그 종료)
         await handlePullEnd();
     };
 
     // 마우스 이벤트 핸들러 (PC 지원)
     const handleMouseDown = (e) => {
+        // SecretPage에서는 Pull-to-refresh 비활성화
+        if (activeTab === 'secret') return;
         handlePullStart(e.clientY);
     };
 
     const handleMouseMove = (e) => {
+        // SecretPage에서는 Pull-to-refresh 비활성화
+        if (activeTab === 'secret') return;
         if (isDragging) {
             handlePullMove(e.clientY);
         }
     };
 
     const handleMouseUp = async () => {
+        // SecretPage에서는 Pull-to-refresh 비활성화
+        if (activeTab === 'secret') return;
         if (isDragging) {
             await handlePullEnd();
         }
     };
 
     const handleMouseLeave = async () => {
+        // SecretPage에서는 Pull-to-refresh 비활성화
+        if (activeTab === 'secret') return;
         if (isDragging) {
             await handlePullEnd();
         }
