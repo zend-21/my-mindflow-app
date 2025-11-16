@@ -321,6 +321,7 @@ const DateText = styled.span`
 
 const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionMode, isSelected, openCategoryDropdownId, setOpenCategoryDropdownId, settings }) => {
     const longPressTimerRef = useRef(null);
+    const badgeLongPressTimerRef = useRef(null);
     const isLongPressRef = useRef(false);
     const startPosRef = useRef({ x: 0, y: 0 });
 
@@ -476,8 +477,23 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
                         onPointerDown={(e) => {
                             e.stopPropagation();
                             clearTimeout(longPressTimerRef.current);
+
+                            // 뱃지 길게 누르기 시작
+                            if (selectionMode) return;
+                            badgeLongPressTimerRef.current = setTimeout(() => {
+                                setShowDropdown(true);
+                            }, 500); // 0.5초
                         }}
-                        onPointerUp={(e) => e.stopPropagation()}
+                        onPointerUp={(e) => {
+                            e.stopPropagation();
+                            clearTimeout(badgeLongPressTimerRef.current);
+                        }}
+                        onPointerLeave={(e) => {
+                            clearTimeout(badgeLongPressTimerRef.current);
+                        }}
+                        onPointerCancel={(e) => {
+                            clearTimeout(badgeLongPressTimerRef.current);
+                        }}
                     >
                         {doc.category === 'financial' && (
                             <>

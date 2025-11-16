@@ -404,7 +404,7 @@ const Button = styled.button`
         border: 1px solid rgba(240, 147, 251, 0.5);
         box-shadow: 0 2px 8px rgba(240, 147, 251, 0.2);
 
-        &:hover {
+        &:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(240, 147, 251, 0.4);
             background: linear-gradient(135deg, rgba(240, 147, 251, 0.4), rgba(245, 87, 108, 0.4));
@@ -414,14 +414,23 @@ const Button = styled.button`
         color: #d0d0d0;
         border: 1px solid rgba(255, 255, 255, 0.1);
 
-        &:hover {
+        &:hover:not(:disabled) {
             background: rgba(255, 255, 255, 0.08);
             border-color: rgba(255, 255, 255, 0.2);
         }
     `}
 
-    &:active {
+    &:active:not(:disabled) {
         transform: translateY(0);
+    }
+
+    &:disabled {
+        opacity: 0.3;
+        cursor: not-allowed;
+        background: rgba(255, 255, 255, 0.03);
+        color: #606060;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow: none;
     }
 `;
 
