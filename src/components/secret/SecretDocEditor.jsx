@@ -554,10 +554,10 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
             setPasswordConfirm(doc.password);
         }
 
-        // 모달 열림 후 300ms 후에 입력 활성화 (터치 이벤트 전파 방지)
+        // 모달 열림 후 400ms 후에 입력 활성화 (터치 이벤트 전파 방지)
         const timer = setTimeout(() => {
             setIsInputEnabled(true);
-        }, 300);
+        }, 400);
 
         return () => clearTimeout(timer);
     }, [doc]);
@@ -621,6 +621,9 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
     };
 
     const handleSaveClick = () => {
+        // 입력이 활성화되지 않았으면 무시 (의도치 않은 클릭 방지)
+        if (!isInputEnabled) return;
+
         // 수정 모드이고 변경사항이 있으면 확인 모달 표시
         if (doc && hasChanges()) {
             setShowSaveConfirm(true);
@@ -630,6 +633,9 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
     };
 
     const handleSave = () => {
+        // 입력이 활성화되지 않았으면 무시 (의도치 않은 클릭 방지)
+        if (!isInputEnabled) return;
+
         if (!formData.content.trim()) {
             setValidationError('내용을 입력해주세요.');
             return;
@@ -878,7 +884,11 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                 <Footer>
                     {doc && onDelete && (
                         <Button
-                            onClick={() => setShowDeleteConfirm(true)}
+                            onClick={() => {
+                                // 입력이 활성화되지 않았으면 무시 (의도치 않은 클릭 방지)
+                                if (!isInputEnabled) return;
+                                setShowDeleteConfirm(true);
+                            }}
                             style={{ marginRight: 'auto', borderColor: '#ff6b6b', color: '#ff6b6b' }}
                         >
                             삭제

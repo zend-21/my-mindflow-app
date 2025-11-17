@@ -19,17 +19,22 @@ const slideUp = keyframes`
 `;
 
 // --- (스타일 정의) ---
-const NewBadge = styled.span`
+const BadgeContainer = styled.div`
     position: absolute;
     top: -8px;
     left: -8px;
+    display: flex;
+    gap: 8px;
+    z-index: 10;
+`;
+
+const NewBadge = styled.span`
     background-color: #5ebe26ff;
     color: white;
     font-size: 10px;
     font-weight: bold;
     padding: 4px 8px;
     border-radius: 12px;
-    z-index: 10;
 `;
 const MemoContainer = styled.div`
     padding: 0px 0px;
@@ -105,6 +110,7 @@ const ActionButton = styled.button`
         switch(props.$type) {
             case 'delete': return 'rgba(255, 107, 107, 0.1)';
             case 'importance': return 'rgba(255, 193, 7, 0.1)';
+            case 'stealth': return 'rgba(96, 165, 250, 0.1)';
             default: return 'rgba(255, 255, 255, 0.05)';
         }
     }};
@@ -112,6 +118,7 @@ const ActionButton = styled.button`
         switch(props.$type) {
             case 'delete': return 'rgba(255, 107, 107, 0.3)';
             case 'importance': return 'rgba(255, 193, 7, 0.3)';
+            case 'stealth': return 'rgba(96, 165, 250, 0.3)';
             default: return 'rgba(255, 255, 255, 0.15)';
         }
     }};
@@ -119,6 +126,7 @@ const ActionButton = styled.button`
         switch(props.$type) {
             case 'delete': return '#ff6b6b';
             case 'importance': return '#ffc107';
+            case 'stealth': return '#60a5fa';
             default: return '#e0e0e0';
         }
     }};
@@ -136,6 +144,7 @@ const ActionButton = styled.button`
             switch(props.$type) {
                 case 'delete': return 'rgba(255, 107, 107, 0.2)';
                 case 'importance': return 'rgba(255, 193, 7, 0.2)';
+                case 'stealth': return 'rgba(96, 165, 250, 0.2)';
                 default: return 'rgba(255, 255, 255, 0.08)';
             }
         }};
@@ -143,6 +152,7 @@ const ActionButton = styled.button`
             switch(props.$type) {
                 case 'delete': return 'rgba(255, 107, 107, 0.5)';
                 case 'importance': return 'rgba(255, 193, 7, 0.5)';
+                case 'stealth': return 'rgba(96, 165, 250, 0.5)';
                 default: return 'rgba(255, 255, 255, 0.25)';
             }
         }};
@@ -449,9 +459,6 @@ const ToastBox = styled.div`
   animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
 `;
 const ImportantIndicator = styled.span`
-    position: absolute;
-    top: -10px;
-    left: ${props => props.$hasNew ? '40px' : '-8px'}; /* NEW가 있으면 오른쪽으로, 없으면 NEW 자리에 */
     width: 24px;
     height: 24px;
     border-radius: 50%;
@@ -462,14 +469,24 @@ const ImportantIndicator = styled.span`
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 10;
-    opacity: ${props => props.$isImportant ? 1 : 0};
-    transition: all 0.3s ease;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 `;
+
 const StarIcon = styled.span`
     display: inline-block;
     transform: translate(0px, -1px);
+`;
+
+const StealthBadge = styled.span`
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #60a5fa;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 `;
 const EmptyMessage = styled.p`
     color: #b0b0b0;
@@ -517,10 +534,11 @@ const MemoList = styled.div`
             overflow: hidden;
             text-overflow: ellipsis;
             display: -webkit-box;
-            -webkit-line-clamp: 6; 
+            -webkit-line-clamp: 6;
             -webkit-box-orient: vertical;
             word-break: break-word;
             flex-grow: 0;
+            padding-top: 10px;
         }
         
          & ${DateText} {
@@ -592,6 +610,7 @@ const MemoPage = ({
     onToggleMemoSelection,
     onExitSelectionMode,
     onToggleSelectedMemosImportance,
+    onToggleSelectedMemosStealth,
     onRequestDeleteSelectedMemos
 }) => {
     const [layoutView, setLayoutView] = useLocalStorage('memoLayoutView', 'list');
@@ -742,6 +761,18 @@ const MemoPage = ({
 
                     <ActionButtonsBar>
                         <ActionButton
+                            $type="stealth"
+                            onClick={onToggleSelectedMemosStealth}
+                            disabled={selectedCount === 0}
+                        >
+                            {(() => {
+                                if (selectedCount === 0) return '스텔스 설정/해제';
+                                const selectedMemos = memos.filter(memo => selectedMemoIds.has(memo.id));
+                                const allStealth = selectedMemos.every(memo => memo.isStealth);
+                                return allStealth ? '스텔스 해제' : '스텔스 설정';
+                            })()}
+                        </ActionButton>
+                        <ActionButton
                             $type="importance"
                             onClick={onToggleSelectedMemosImportance}
                             disabled={selectedCount === 0}
@@ -876,13 +907,32 @@ const MemoPage = ({
                                 <CheckboxContainer $isVisible={isSelectionMode} $isSelected={isSelected}>
                                     {isSelected ? <StyledCheckIcon /> : <BsCircle />}
                                 </CheckboxContainer>
-                                {isNew && <NewBadge>NEW</NewBadge>}
-                                <ImportantIndicator $isImportant={memo.isImportant} $hasNew={isNew}>
-                                    <StarIcon>★</StarIcon>
-                                </ImportantIndicator>
+
+                                {/* 뱃지 컨테이너: NEW → 중요도 → 스텔스 순서로 자동 정렬 */}
+                                <BadgeContainer>
+                                    {isNew && <NewBadge>NEW</NewBadge>}
+                                    {memo.isImportant && (
+                                        <ImportantIndicator>
+                                            <StarIcon>★</StarIcon>
+                                        </ImportantIndicator>
+                                    )}
+                                    {memo.isStealth && (
+                                        <StealthBadge>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                {/* 고스트 몸통 */}
+                                                <path d="M12 2C7.58 2 4 5.58 4 10V18C4 18.55 4.45 19 5 19C5.55 19 6 18.55 6 18V17C6 16.45 6.45 16 7 16C7.55 16 8 16.45 8 17V18.5C8 19.05 8.45 19.5 9 19.5C9.55 19.5 10 19.05 10 18.5V17C10 16.45 10.45 16 11 16C11.55 16 12 16.45 12 17V18.5C12 19.05 12.45 19.5 13 19.5C13.55 19.5 14 19.05 14 18.5V17C14 16.45 14.45 16 15 16C15.55 16 16 16.45 16 17V18.5C16 19.05 16.45 19.5 17 19.5C17.55 19.5 18 19.05 18 18.5V17C18 16.45 18.45 16 19 16C19.55 16 20 16.45 20 17V18C20 18.55 19.55 19 19 19C18.45 19 18 18.55 18 18V10C18 5.58 14.42 2 12 2Z"
+                                                      fill="white"
+                                                      opacity="0.9"/>
+                                                {/* 눈 */}
+                                                <circle cx="9" cy="9" r="1.5" fill="#667eea"/>
+                                                <circle cx="15" cy="9" r="1.5" fill="#667eea"/>
+                                            </svg>
+                                        </StealthBadge>
+                                    )}
+                                </BadgeContainer>
                                 <MemoHeader>
                                     <MemoText>
-                                        {memo.content || ''}
+                                        {memo.isStealth ? (memo.stealthPhrase || '비공개 메모') : (memo.content || '')}
                                     </MemoText>
                                     <DeleteButton onClick={(e) => handleDeleteClick(e, memo.id)} $isSelectionMode={isSelectionMode}>
                                         &times;

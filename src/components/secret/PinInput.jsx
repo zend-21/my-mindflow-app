@@ -149,7 +149,8 @@ const PinInput = ({
     onSubmit,
     onForgotPin,
     onChangePin,
-    maxAttempts = 5
+    maxAttempts = 5,
+    isSettingNewPin = false // 새 PIN 설정 모드 (시도 횟수 표시 안함)
 }) => {
     const [pin, setPin] = useState('');
     const [error, setError] = useState('');
@@ -408,7 +409,7 @@ const PinInput = ({
             <MessageContainer>
                 <ErrorMessage>{error}</ErrorMessage>
 
-                {attempts > 0 && attempts < maxAttempts && !isLocked && !showTempPinInfo && (
+                {!isSettingNewPin && attempts > 0 && attempts < maxAttempts && !isLocked && !showTempPinInfo && (
                     <AttemptsWarning>
                         ⚠️ {maxAttempts - attempts}번의 시도가 남았습니다.
                     </AttemptsWarning>

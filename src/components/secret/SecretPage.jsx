@@ -11,6 +11,7 @@ import PasswordInputPage from './PasswordInputPage';
 import PinChangeModal from './PinChangeModal';
 import EmailConfirmModal from './EmailConfirmModal';
 import CategoryNameEditModal from './CategoryNameEditModal';
+import TempPinDisplayModal from './TempPinDisplayModal';
 import { ALL_ICONS } from './categoryIcons';
 import {
     hasPinSet,
@@ -585,8 +586,12 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     const [showPinRecovery, setShowPinRecovery] = useState(false);
     const [showPinChangeModal, setShowPinChangeModal] = useState(false);
     const [isTempPinLogin, setIsTempPinLogin] = useState(false); // 임시 PIN 로그인 플래그
+    const [isSettingNewPin, setIsSettingNewPin] = useState(false); // 임시 PIN 입력 후 새 PIN 설정 중
+    const [tempPinValue, setTempPinValue] = useState(''); // 임시 PIN 값 저장
     const [showEmailConfirmModal, setShowEmailConfirmModal] = useState(false);
     const [pendingEmailData, setPendingEmailData] = useState(null);
+    const [showTempPinModal, setShowTempPinModal] = useState(false); // 임시 PIN 표시 모달
+    const [displayTempPin, setDisplayTempPin] = useState(''); // 모달에 표시할 임시 PIN
 
     // 다중 선택 모드 상태
     const [selectionMode, setSelectionMode] = useState(false);
@@ -747,6 +752,53 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     // PIN 검증 및 문서 로드
     const handlePinSubmit = async (pin) => {
         try {
+            // 임시 PIN 입력 후 새 PIN 설정 중
+            if (isSettingNewPin) {
+                if (pin.length !== settings.pinLength) {
+                    return { success: false, message: `${settings.pinLength}자리 PIN을 입력해주세요.` };
+                }
+
+                // 임시 PIN과 동일한지 확인
+                if (pin === tempPinValue) {
+                    return { success: false, message: '임시 PIN과 다른 번호를 입력해주세요.' };
+                }
+
+                if (!isConfirmingPin) {
+                    // 첫 번째 새 PIN 입력
+                    setFirstPin(pin);
+                    setIsConfirmingPin(true);
+                    return { success: true };
+                } else {
+                    // 두 번째 새 PIN 입력 - 일치 확인
+                    if (firstPin !== pin) {
+                        setIsConfirmingPin(false);
+                        setFirstPin('');
+                        return { success: false, message: 'PIN이 일치하지 않습니다. 다시 설정해주세요.' };
+                    }
+
+                    // 새 PIN 저장
+                    await setPin(pin);
+                    setCurrentPin(pin);
+
+                    // 임시 PIN 데이터 삭제
+                    if (profile?.email) {
+                        const tempPinKey = `tempPin_${profile.email}`;
+                        localStorage.removeItem(tempPinKey);
+                    }
+
+                    // 시크릿 페이지 진입
+                    setIsUnlocked(true);
+                    setIsSettingNewPin(false);
+                    setIsConfirmingPin(false);
+                    setFirstPin('');
+                    setTempPinValue('');
+
+                    await loadDocs(pin);
+                    showToast?.('새로운 PIN이 설정되었습니다.');
+                    return { success: true };
+                }
+            }
+
             if (!hasPinSet()) {
                 // 첫 PIN 설정 - 2번 입력 확인
                 if (pin.length !== settings.pinLength) {
@@ -777,16 +829,7 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                 }
             }
 
-            // 정규 PIN 검증
-            const isValid = await verifyPin(pin);
-            if (isValid) {
-                setCurrentPin(pin);
-                setIsUnlocked(true);
-                await loadDocs(pin);
-                return { success: true };
-            }
-
-            // 임시 PIN 검증
+            // 임시 PIN 만료 체크 (정규 PIN 검증 전에)
             if (profile?.email) {
                 const tempPinKey = `tempPin_${profile.email}`;
                 const tempPinDataStr = localStorage.getItem(tempPinKey);
@@ -797,41 +840,52 @@ const SecretPage = ({ onClose, profile, showToast }) => {
 
                     // 시간 만료 확인
                     if (now > tempPinData.expiresAt) {
-                        // 만료된 임시 PIN 삭제
+                        // 만료된 임시 PIN 삭제 및 PIN 리셋
                         localStorage.removeItem(tempPinKey);
-                        return { success: false, message: '임시 PIN이 만료되었습니다.\n다시 요청해주세요.' };
-                    }
-
-                    // PIN 일치 확인
-                    if (pin === tempPinData.pin) {
-                        // 임시 PIN으로 로그인 성공
-                        // 임시 PIN을 currentPin으로 설정 (문서 로드용)
-                        setCurrentPin(pin);
-                        setIsUnlocked(true);
-                        setIsTempPinLogin(true); // 임시 PIN 로그인 플래그 설정
-
-                        // 실제 PIN으로 문서 로드 시도 (임시 PIN으로는 문서가 암호화되지 않았을 수 있음)
-                        try {
-                            await loadDocs(pin);
-                        } catch (error) {
-                            console.error('문서 로드 오류 (임시 PIN):', error);
-                        }
-
-                        // 임시 PIN은 PIN 변경 완료 후에 삭제 (여기서는 삭제하지 않음)
-
-                        // 임시 PIN 발송 플래그 제거 (안내 메시지 숨김)
                         localStorage.removeItem('tempPinSent');
                         window.dispatchEvent(new Event('tempPinStatusChanged'));
-
-                        // PIN 변경 모달 표시
-                        showToast?.('임시 PIN으로 로그인되었습니다.\n새로운 PIN을 설정해주세요.');
-                        setTimeout(() => {
-                            setShowPinChangeModal(true);
-                        }, 1000);
-
-                        return { success: true };
+                        resetPin();
+                        return {
+                            success: false,
+                            message: '임시 PIN이 24시간 경과로 만료되어 사용할 수 없습니다.\n\n하단의 "PIN 번호를 분실하셨나요?" 버튼을 눌러\n새로운 임시 PIN을 발급받고,\n발급받은 임시 PIN을 24시간 이내에 입력해주세요.'
+                        };
                     }
                 }
+            }
+
+            // 정규 PIN 검증
+            const isValid = await verifyPin(pin);
+            if (isValid) {
+                // 임시 PIN인지 확인
+                if (profile?.email) {
+                    const tempPinKey = `tempPin_${profile.email}`;
+                    const tempPinDataStr = localStorage.getItem(tempPinKey);
+
+                    if (tempPinDataStr) {
+                        const tempPinData = JSON.parse(tempPinDataStr);
+
+                        // 입력한 PIN이 임시 PIN과 일치하면
+                        if (pin === tempPinData.pin) {
+                            // 임시 PIN 발송 플래그 제거
+                            localStorage.removeItem('tempPinSent');
+                            window.dispatchEvent(new Event('tempPinStatusChanged'));
+
+                            // 새 PIN 설정 모드로 전환 (시크릿 페이지 진입 X)
+                            setTempPinValue(pin);
+                            setIsSettingNewPin(true);
+                            setIsConfirmingPin(false);
+                            setFirstPin('');
+
+                            return { success: true };
+                        }
+                    }
+                }
+
+                // 일반 PIN 로그인 (임시 PIN이 아님)
+                setCurrentPin(pin);
+                setIsUnlocked(true);
+                await loadDocs(pin);
+                return { success: true };
             }
 
             return { success: false, message: '잘못된 PIN입니다.' };
@@ -1398,10 +1452,13 @@ const SecretPage = ({ onClose, profile, showToast }) => {
         const now = Date.now();
         const expiresAt = now + (24 * 60 * 60 * 1000); // 24시간 후
 
-        // 기존 PIN 리셋 (임시 PIN 발급 시 기존 PIN은 무효화)
+        // 기존 PIN 리셋
         resetPin();
 
-        // localStorage에 임시 PIN 저장
+        // 임시 PIN을 실제 PIN으로 설정
+        await setPin(tempPin);
+
+        // localStorage에 임시 PIN 만료 정보 저장 (만료 체크용)
         const tempPinKey = `tempPin_${email}`;
         localStorage.setItem(tempPinKey, JSON.stringify({
             pin: tempPin,
@@ -1430,7 +1487,9 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             // 개발 모드 메시지 확인
             const isDev = emailResult.message.includes('개발 모드');
             if (isDev) {
-                alert(`✅ 임시 PIN이 생성되었습니다!\n\n콘솔(F12)을 열어서 임시 PIN 번호를 확인하세요.\n\n━━━━━━━━━━━━━━━━━━━━━━━\n📧 [개발 모드] 임시 PIN 이메일 발송 시뮬레이션\n━━━━━━━━━━━━━━━━━━━━━━━\n\n위 메시지를 찾아서 🔑 임시 PIN 번호를 확인하세요.`);
+                // 테스트 모드: 화면 모달로 임시 PIN 표시
+                setDisplayTempPin(tempPin);
+                setShowTempPinModal(true);
             } else {
                 showToast?.(`✅ 임시 PIN이 ${maskedEmail}로 전송되었습니다.\n\n이메일을 확인해주세요.`, 5000);
             }
@@ -1458,10 +1517,12 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             const result = await changePin(currentPin, newPin);
 
             if (result.success) {
-                // 임시 PIN 로그인 모드였다면 임시 PIN 삭제
+                // 임시 PIN 로그인 모드였다면 임시 PIN 및 관련 데이터 삭제
                 if (isTempPinLogin && profile?.email) {
                     const tempPinKey = `tempPin_${profile.email}`;
                     localStorage.removeItem(tempPinKey);
+                    localStorage.removeItem('tempPinSent');
+                    window.dispatchEvent(new Event('tempPinStatusChanged'));
                     setIsTempPinLogin(false);
                 }
 
@@ -1483,19 +1544,26 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                     <InnerContent>
                         <PinInput
                             pinLength={settings.pinLength}
-                            title={hasPinSet()
-                                ? 'PIN 입력'
-                                : (isConfirmingPin ? 'PIN 확인' : 'PIN 설정')
+                            title={isSettingNewPin
+                                ? (isConfirmingPin ? '새 PIN 확인' : '새 PIN 설정')
+                                : (hasPinSet()
+                                    ? 'PIN 입력'
+                                    : (isConfirmingPin ? 'PIN 확인' : 'PIN 설정'))
                             }
-                            subtitle={hasPinSet()
-                                ? '시크릿 페이지에 접근하려면 PIN을 입력하세요'
-                                : (isConfirmingPin
+                            subtitle={isSettingNewPin
+                                ? (isConfirmingPin
                                     ? '동일한 PIN을 한 번 더 입력해주세요'
-                                    : '시크릿 페이지를 보호할 PIN을 설정하세요')
+                                    : '임시 PIN과 다른 새로운 PIN을 설정하세요')
+                                : (hasPinSet()
+                                    ? '시크릿 페이지에 접근하려면 PIN을 입력하세요'
+                                    : (isConfirmingPin
+                                        ? '동일한 PIN을 한 번 더 입력해주세요'
+                                        : '시크릿 페이지를 보호할 PIN을 설정하세요'))
                             }
                             onSubmit={handlePinSubmit}
-                            onForgotPin={profile?.email ? handleForgotPin : null}
-                            onChangePin={hasPinSet() ? handleChangePinClick : null}
+                            onForgotPin={profile?.email && !isSettingNewPin ? handleForgotPin : null}
+                            onChangePin={hasPinSet() && !isSettingNewPin ? handleChangePinClick : null}
+                            isSettingNewPin={isSettingNewPin}
                         />
                     </InnerContent>
                 </Container>
@@ -1515,6 +1583,13 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                         maskedEmail={pendingEmailData.maskedEmail}
                         onConfirm={handleEmailConfirm}
                         onCancel={handleEmailCancel}
+                    />
+                )}
+
+                {showTempPinModal && (
+                    <TempPinDisplayModal
+                        tempPin={displayTempPin}
+                        onClose={() => setShowTempPinModal(false)}
                     />
                 )}
             </>

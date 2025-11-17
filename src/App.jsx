@@ -15,6 +15,7 @@ import { exportData, importData } from './utils/dataManager';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import useAlarmManager from './hooks/useAlarmManager';
+import { getRandomStealthPhrase } from './utils/stealthPhrases';
 // 하위 컴포넌트들
 import Header from './components/Header.jsx';
 import StatsGrid from './components/StatsGrid.jsx';
@@ -1148,6 +1149,44 @@ function App() {
         handleExitSelectionMode();
     };
 
+    const handleToggleSelectedMemosStealth = () => {
+        if (selectedMemoIds.size === 0) return;
+
+        // 선택된 메모 객체들 가져오기
+        const selectedMemoObjects = memos.filter(memo => selectedMemoIds.has(memo.id));
+
+        // 선택된 메모 중 하나라도 스텔스가 아니면 모두 스텔스로, 모두 스텔스면 모두 해제
+        const allStealth = selectedMemoObjects.every(memo => memo.isStealth);
+        const newStealth = !allStealth;
+
+        // 메모 업데이트
+        setMemos(prevMemos =>
+            prevMemos.map(memo => {
+                if (selectedMemoIds.has(memo.id)) {
+                    if (newStealth) {
+                        // 스텔스 설정: 랜덤 더미 문구 할당
+                        return {
+                            ...memo,
+                            isStealth: true,
+                            stealthPhrase: getRandomStealthPhrase()
+                        };
+                    } else {
+                        // 스텔스 해제
+                        return {
+                            ...memo,
+                            isStealth: false,
+                            stealthPhrase: undefined
+                        };
+                    }
+                }
+                return memo;
+            })
+        );
+
+        showToast(`${selectedMemoIds.size}개의 메모가 ${newStealth ? '스텔스 설정' : '스텔스 해제'}되었습니다.`);
+        handleExitSelectionMode();
+    };
+
     const requestDeleteSelectedMemos = () => {
         if (selectedMemoIds.size === 0) return;
         const idsToDelete = Array.from(selectedMemoIds);
@@ -1974,6 +2013,7 @@ if (isLoading) {
                                 onToggleMemoSelection={handleToggleMemoSelection}
                                 onExitSelectionMode={handleExitSelectionMode}
                                 onToggleSelectedMemosImportance={handleToggleSelectedMemosImportance}
+                                onToggleSelectedMemosStealth={handleToggleSelectedMemosStealth}
                                 onRequestDeleteSelectedMemos={requestDeleteSelectedMemos}
                             />
                         }
