@@ -47,6 +47,9 @@ const SectionHeader = styled.div`
 `;
 
 const SelectionModeBar = styled.div`
+    position: sticky;
+    top: 0;
+    z-index: 100;
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     padding: 12px 24px;
     margin-bottom: 16px;
@@ -100,9 +103,14 @@ const SelectionButton = styled.button`
 `;
 
 const ActionButtonsBar = styled.div`
+    position: sticky;
+    top: 60px;
+    z-index: 99;
+    background: #1a1d24;
+    padding: 8px 0;
+    margin-bottom: 16px;
     display: flex;
     gap: 8px;
-    margin-bottom: 16px;
 `;
 
 const ActionButton = styled.button`
