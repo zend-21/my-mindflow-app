@@ -40,7 +40,6 @@ import FortuneFlow from './components/FortuneFlow.jsx';
 import ProfilePage from './components/ProfilePage.jsx';
 import Timer from './components/Timer.jsx';
 import MacroModal from './components/MacroModal.jsx';
-import MacroQuickAccess from './components/MacroQuickAccess.jsx';
 import { TrashProvider } from './contexts/TrashContext';
 import TrashPage from './components/TrashPage.jsx';
 import AppContent from './components/AppContent.jsx';
@@ -2192,8 +2191,6 @@ if (isLoading) {
             {isMacroModalOpen && (
                 <MacroModal onClose={() => setIsMacroModalOpen(false)} />
             )}
-            {/* 📝 매크로 빠른 접근 */}
-            <MacroQuickAccess />
             {/* ✨ 🔮 오늘의 운세 전체 플로우 컴포넌트 */}
             {isFortuneFlowOpen && (
                 <FortuneFlow
