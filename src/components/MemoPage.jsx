@@ -57,12 +57,23 @@ const SelectionModeBar = styled.div`
     z-index: 100;
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     padding: 12px 24px;
-    margin-bottom: 16px;
+    margin-bottom: 0;
     border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(240, 147, 251, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     display: flex;
     align-items: center;
     gap: 12px;
+
+    &::after {
+        content: '';
+        position: absolute;
+        bottom: -8px;
+        left: 0;
+        right: 0;
+        height: 8px;
+        background: linear-gradient(to bottom, rgba(26, 29, 36, 0.95), rgba(26, 29, 36, 0));
+        pointer-events: none;
+    }
 `;
 
 const SelectionInfo = styled.div`
@@ -112,10 +123,22 @@ const ActionButtonsBar = styled.div`
     top: 60px;
     z-index: 99;
     background: #1a1d24;
-    padding: 8px 0;
-    margin-bottom: 16px;
+    padding: 16px 0;
+    margin-bottom: 8px;
     display: flex;
     gap: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+
+    &::after {
+        content: '';
+        position: absolute;
+        bottom: -8px;
+        left: 0;
+        right: 0;
+        height: 8px;
+        background: linear-gradient(to bottom, rgba(26, 29, 36, 0.95), rgba(26, 29, 36, 0));
+        pointer-events: none;
+    }
 `;
 
 const ActionButton = styled.button`
