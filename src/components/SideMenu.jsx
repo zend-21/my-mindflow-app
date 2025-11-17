@@ -289,6 +289,7 @@ const SideMenu = ({
     onLogout,
     onLoginClick,
     onSync,
+    onOpenMacro,  // ⚙️ 매크로 기능 추가
     onOpenFortune,
     onOpenTimer,  // ⏱️ 타이머 기능 추가
     onOpenTrash  // 🗑️ 휴지통 기능 추가
@@ -398,6 +399,12 @@ const SideMenu = ({
                         <MenuItemsWrapper>
                             {/* 🔮 그룹 1: 기능 */}
                             <MenuGroup>
+                                <MenuItem onClick={() => {
+                                    onClose();
+                                    if (onOpenMacro) onOpenMacro();
+                                }}>
+                                    <span className="icon">⚙️</span> 매크로
+                                </MenuItem>
                                 <MenuItem onClick={() => {
                                     onClose();
                                     onOpenFortune();

@@ -39,6 +39,8 @@ import LoginModal from './components/LoginModal.jsx';
 import FortuneFlow from './components/FortuneFlow.jsx';
 import ProfilePage from './components/ProfilePage.jsx';
 import Timer from './components/Timer.jsx';
+import MacroModal from './components/MacroModal.jsx';
+import MacroQuickAccess from './components/MacroQuickAccess.jsx';
 import { TrashProvider } from './contexts/TrashContext';
 import TrashPage from './components/TrashPage.jsx';
 import AppContent from './components/AppContent.jsx';
@@ -345,6 +347,7 @@ function App() {
     
     const [activeTab, setActiveTab] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isMacroModalOpen, setIsMacroModalOpen] = useState(false);
     const [isFortuneFlowOpen, setIsFortuneFlowOpen] = useState(false);
     const [isTimerOpen, setIsTimerOpen] = useState(false);
     const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
@@ -960,7 +963,8 @@ function App() {
                 recentActivities,
                 widgets,
                 displayCount,
-                trashedItems: JSON.parse(localStorage.getItem('trashedItems_shared') || '[]')
+                trashedItems: JSON.parse(localStorage.getItem('trashedItems_shared') || '[]'),
+                macroTexts: JSON.parse(localStorage.getItem('macroTexts') || '[]')
             }
         };
 
@@ -1014,6 +1018,9 @@ function App() {
                     if (data.displayCount) setDisplayCount(data.displayCount);
                     if (data.trashedItems) {
                         localStorage.setItem('trashedItems_shared', JSON.stringify(data.trashedItems));
+                    }
+                    if (data.macroTexts) {
+                        localStorage.setItem('macroTexts', JSON.stringify(data.macroTexts));
                     }
                 } else if (Array.isArray(importedData)) {
                     // 구 형식 (메모만 있는 경우)
@@ -1500,6 +1507,7 @@ function App() {
                 displayCount,
                 widgets,
                 trashedItems: JSON.parse(localStorage.getItem('trashedItems_shared') || '[]'),
+                macroTexts: JSON.parse(localStorage.getItem('macroTexts') || '[]'),
                 userEmail: profile.email,
             };
 
@@ -1649,6 +1657,9 @@ function App() {
                 if (result.data.widgets) setWidgets(result.data.widgets);
                 if (result.data.trashedItems) {
                     localStorage.setItem('trashedItems_shared', JSON.stringify(result.data.trashedItems));
+                }
+                if (result.data.macroTexts) {
+                    localStorage.setItem('macroTexts', JSON.stringify(result.data.macroTexts));
                 }
 
                 addActivity('복원', 'Google Drive에서 복원 완료');
@@ -2038,6 +2049,10 @@ if (isLoading) {
                         displayCount={displayCount}
                         setDisplayCount={setDisplayCount}
                         showToast={showToast}
+                        onOpenMacro={() => {
+                            setIsMenuOpen(false);
+                            setIsMacroModalOpen(true);
+                        }}
                         onOpenFortune={handleOpenFortune}
                         onExport={handleDataExport}
                         onImport={handleDataImport}
@@ -2172,7 +2187,13 @@ if (isLoading) {
                 scheduleData={scheduleForAlarm}
                 onSave={handleSaveAlarm}
                 onClose={() => setIsAlarmModalOpen(false)}
-            /> 
+            />
+            {/* ⚙️ 매크로 모달 */}
+            {isMacroModalOpen && (
+                <MacroModal onClose={() => setIsMacroModalOpen(false)} />
+            )}
+            {/* 📝 매크로 빠른 접근 */}
+            <MacroQuickAccess />
             {/* ✨ 🔮 오늘의 운세 전체 플로우 컴포넌트 */}
             {isFortuneFlowOpen && (
                 <FortuneFlow
