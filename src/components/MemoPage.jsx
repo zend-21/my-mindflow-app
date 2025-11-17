@@ -35,6 +35,11 @@ const NewBadge = styled.span`
     font-weight: bold;
     padding: 4px 8px;
     border-radius: 12px;
+    display: flex;
+    align-items: center;
+    line-height: 1;
+    padding-top: 6px;
+    padding-bottom: 4px;
 `;
 const MemoContainer = styled.div`
     padding: 0px 0px;
@@ -926,7 +931,7 @@ const MemoPage = ({
                                     )}
                                     {memo.isStealth && (
                                         <StealthBadge>
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                 {/* 고스트 몸통 */}
                                                 <path d="M12 2C7.58 2 4 5.58 4 10V18C4 18.55 4.45 19 5 19C5.55 19 6 18.55 6 18V17C6 16.45 6.45 16 7 16C7.55 16 8 16.45 8 17V18.5C8 19.05 8.45 19.5 9 19.5C9.55 19.5 10 19.05 10 18.5V17C10 16.45 10.45 16 11 16C11.55 16 12 16.45 12 17V18.5C12 19.05 12.45 19.5 13 19.5C13.55 19.5 14 19.05 14 18.5V17C14 16.45 14.45 16 15 16C15.55 16 16 16.45 16 17V18.5C16 19.05 16.45 19.5 17 19.5C17.55 19.5 18 19.05 18 18.5V17C18 16.45 18.45 16 19 16C19.55 16 20 16.45 20 17V18C20 18.55 19.55 19 19 19C18.45 19 18 18.55 18 18V10C18 5.58 14.42 2 12 2Z"
                                                       fill="white"
