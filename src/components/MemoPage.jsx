@@ -538,7 +538,7 @@ const MemoList = styled.div`
             -webkit-box-orient: vertical;
             word-break: break-word;
             flex-grow: 0;
-            padding-top: 10px;
+            padding-top: 12px;
         }
         
          & ${DateText} {
