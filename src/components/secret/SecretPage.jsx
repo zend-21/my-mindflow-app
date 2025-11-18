@@ -1584,7 +1584,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '20px',
-                paddingTop: 'max(50px, env(safe-area-inset-top, 20px))' // Safe Area 대응
+                paddingTop: 'calc(20px + env(safe-area-inset-top, 0px) + 80px)' // 모바일 Safe Area 대응 (PC는 20px, 모바일은 safe-area + 80px)
             }}>
                 {/* 닫기 버튼 */}
                 <button
