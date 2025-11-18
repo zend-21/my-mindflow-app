@@ -1976,16 +1976,17 @@ if (isLoading) {
                         $showHeader={showHeader}
                         $isDragging={isDragging}
                         $isSecretTab={activeTab === 'secret'}
-                        // 터치 이벤트 (모바일)
-                        onTouchStart={handleTouchStart}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
-                        onTouchCancel={handleTouchCancel}
-                        // 마우스 이벤트 (PC)
-                        onMouseDown={handleMouseDown}
-                        onMouseMove={handleMouseMove}
-                        onMouseUp={handleMouseUp}
-                        onMouseLeave={handleMouseLeave}
+                        // 터치 이벤트 (모바일) - 시크릿 페이지에서는 완전히 비활성화
+                        {...(activeTab !== 'secret' && {
+                            onTouchStart: handleTouchStart,
+                            onTouchMove: handleTouchMove,
+                            onTouchEnd: handleTouchEnd,
+                            onTouchCancel: handleTouchCancel,
+                            onMouseDown: handleMouseDown,
+                            onMouseMove: handleMouseMove,
+                            onMouseUp: handleMouseUp,
+                            onMouseLeave: handleMouseLeave
+                        })}
                     >
                         {activeTab === 'home' && (
                             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
@@ -2044,6 +2045,7 @@ if (isLoading) {
                                 onClose={() => setActiveTab('home')}
                                 profile={profile}
                                 showToast={showToast}
+                                setShowHeader={setShowHeader}
                             />
                         )}
                         {activeTab === 'review' && <ReviewPage showToast={showToast} setShowHeader={setShowHeader} />}

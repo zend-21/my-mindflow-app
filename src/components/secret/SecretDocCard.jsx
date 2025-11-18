@@ -20,6 +20,7 @@ const Card = styled.div`
     transition: all 0.2s;
     position: relative;
     overflow: hidden;
+    touch-action: pan-y; /* 세로 스크롤 허용 */
 
     &::before {
         content: '';
@@ -379,10 +380,14 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
         // 시작 위치 저장
         startPosRef.current = {
             x: e.clientX,
-            y: e.clientY
+            y: e.clientY,
+            time: Date.now()
         };
 
         isLongPressRef.current = false;
+
+        // 타이머를 즉시 시작하지 않고 짧은 지연 후 시작
+        // 이렇게 하면 스와이프 시작 시 움직임을 먼저 감지할 수 있음
         longPressTimerRef.current = setTimeout(() => {
             isLongPressRef.current = true;
             if (onLongPress) {
@@ -392,11 +397,11 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
     };
 
     const handlePointerMove = (e) => {
-        // 움직임이 10px 이상이면 타이머 취소 (스크롤 등)
+        // 움직임이 5px 이상이면 즉시 타이머 취소 (스와이프 감지)
         const deltaX = Math.abs(e.clientX - startPosRef.current.x);
         const deltaY = Math.abs(e.clientY - startPosRef.current.y);
 
-        if (deltaX > 10 || deltaY > 10) {
+        if (deltaX > 5 || deltaY > 5) {
             clearTimeout(longPressTimerRef.current);
             isLongPressRef.current = false;
         }
@@ -447,10 +452,13 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
     return (
         <Card
             onClick={handleCardClick}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerCancel}
+            onTouchStart={handlePointerDown}
+            onTouchMove={handlePointerMove}
+            onTouchEnd={handlePointerUp}
+            onTouchCancel={handlePointerCancel}
+            onMouseDown={handlePointerDown}
+            onMouseMove={handlePointerMove}
+            onMouseUp={handlePointerUp}
             $isSelected={isSelected}
         >
             {selectionMode && (

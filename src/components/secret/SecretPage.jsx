@@ -558,7 +558,7 @@ const PlusIcon = styled.div`
     }
 `;
 
-const SecretPage = ({ onClose, profile, showToast }) => {
+const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
     const [isUnlocked, setIsUnlocked] = useState(false);
     const [currentPin, setCurrentPin] = useState('');
     const [docs, setDocs] = useState([]);
@@ -567,6 +567,8 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     const [selectedCategory, setSelectedCategory] = useState('all');
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [editingDoc, setEditingDoc] = useState(null);
+    const containerRef = useRef(null);
+    const lastScrollY = useRef(0);
     const [settings, setSettings] = useState(() => {
         // 강제로 pinLength를 6으로 설정
         const loadedSettings = getSettings();
@@ -906,6 +908,36 @@ const SecretPage = ({ onClose, profile, showToast }) => {
             showToast?.('문서를 불러올 수 없습니다.');
         }
     };
+
+    // 스크롤 기반 헤더 숨김/표시
+    useEffect(() => {
+        if (!isUnlocked) return; // PIN 입력 전에는 실행하지 않음
+
+        const scrollContainer = containerRef.current;
+        if (!scrollContainer) return;
+
+        const handleScroll = () => {
+            const currentScrollY = scrollContainer.scrollTop;
+
+            // 최상단(50px 이하)에 있으면 헤더 표시
+            if (currentScrollY <= 50) {
+                setShowHeader?.(true);
+            }
+            // 그 외의 경우 헤더 숨김
+            else {
+                setShowHeader?.(false);
+            }
+
+            lastScrollY.current = currentScrollY;
+        };
+
+        scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+
+        return () => {
+            scrollContainer.removeEventListener('scroll', handleScroll);
+            setShowHeader?.(true);
+        };
+    }, [isUnlocked, setShowHeader]);
 
     // 검색, 필터링 및 정렬
     useEffect(() => {
@@ -1538,35 +1570,79 @@ const SecretPage = ({ onClose, profile, showToast }) => {
     };
 
     if (!isUnlocked) {
-        return (
-            <>
-                <Container>
-                    <InnerContent>
-                        <PinInput
-                            pinLength={settings.pinLength}
-                            title={isSettingNewPin
-                                ? (isConfirmingPin ? '새 PIN 확인' : '새 PIN 설정')
-                                : (hasPinSet()
-                                    ? 'PIN 입력'
-                                    : (isConfirmingPin ? 'PIN 확인' : 'PIN 설정'))
-                            }
-                            subtitle={isSettingNewPin
-                                ? (isConfirmingPin
+        return createPortal(
+            <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.85)',
+                backdropFilter: 'blur(10px)',
+                zIndex: 20000,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px'
+            }}>
+                {/* 닫기 버튼 */}
+                <button
+                    onClick={onClose}
+                    style={{
+                        position: 'absolute',
+                        top: '20px',
+                        right: '20px',
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        color: '#ffffff',
+                        fontSize: '24px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s',
+                        zIndex: 20001
+                    }}
+                    onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)';
+                        e.currentTarget.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                >
+                    ×
+                </button>
+
+                <div style={{ width: '100%', maxWidth: '500px' }}>
+                    <PinInput
+                        pinLength={settings.pinLength}
+                        title={isSettingNewPin
+                            ? (isConfirmingPin ? '새 PIN 확인' : '새 PIN 설정')
+                            : (hasPinSet()
+                                ? 'PIN 입력'
+                                : (isConfirmingPin ? 'PIN 확인' : 'PIN 설정'))
+                        }
+                        subtitle={isSettingNewPin
+                            ? (isConfirmingPin
+                                ? '동일한 PIN을 한 번 더 입력해주세요'
+                                : '임시 PIN과 다른 새로운 PIN을 설정하세요')
+                            : (hasPinSet()
+                                ? '시크릿 페이지에 접근하려면 PIN을 입력하세요'
+                                : (isConfirmingPin
                                     ? '동일한 PIN을 한 번 더 입력해주세요'
-                                    : '임시 PIN과 다른 새로운 PIN을 설정하세요')
-                                : (hasPinSet()
-                                    ? '시크릿 페이지에 접근하려면 PIN을 입력하세요'
-                                    : (isConfirmingPin
-                                        ? '동일한 PIN을 한 번 더 입력해주세요'
-                                        : '시크릿 페이지를 보호할 PIN을 설정하세요'))
-                            }
-                            onSubmit={handlePinSubmit}
-                            onForgotPin={profile?.email && !isSettingNewPin ? handleForgotPin : null}
-                            onChangePin={hasPinSet() && !isSettingNewPin ? handleChangePinClick : null}
-                            isSettingNewPin={isSettingNewPin}
-                        />
-                    </InnerContent>
-                </Container>
+                                    : '시크릿 페이지를 보호할 PIN을 설정하세요'))
+                        }
+                        onSubmit={handlePinSubmit}
+                        onForgotPin={profile?.email && !isSettingNewPin ? handleForgotPin : null}
+                        onChangePin={hasPinSet() && !isSettingNewPin ? handleChangePinClick : null}
+                        isSettingNewPin={isSettingNewPin}
+                    />
+                </div>
 
                 {showPinChangeModal && (
                     <PinChangeModal
@@ -1592,13 +1668,14 @@ const SecretPage = ({ onClose, profile, showToast }) => {
                         onClose={() => setShowTempPinModal(false)}
                     />
                 )}
-            </>
+            </div>,
+            document.body
         );
     }
 
     return (
         <>
-        <Container>
+        <Container ref={containerRef}>
             <InnerContent>
             <SearchBar>
                 <SearchIcon>

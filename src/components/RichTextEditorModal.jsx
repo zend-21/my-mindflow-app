@@ -13,7 +13,6 @@ const RichTextEditorModal = ({ isOpen, onClose, content, onSave, showToast, rest
   const [linkText, setLinkText] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const textareaRef = useRef(null);
 
   useEffect(() => {
@@ -196,15 +195,9 @@ const RichTextEditorModal = ({ isOpen, onClose, content, onSave, showToast, rest
   // 저장 핸들러
   const handleSave = () => {
     if (hasChanges) {
-      setShowSaveConfirm(true);
+      onSave(editorContent);
+      onClose();
     }
-  };
-
-  // 저장 확인
-  const confirmSave = () => {
-    setShowSaveConfirm(false);
-    onSave(editorContent);
-    onClose();
   };
 
   // 취소 확인
@@ -418,29 +411,6 @@ const RichTextEditorModal = ({ isOpen, onClose, content, onSave, showToast, rest
                 <button
                   className="confirm-yes"
                   onClick={confirmCancel}
-                >
-                  예
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 저장 확인 모달 */}
-        {showSaveConfirm && (
-          <div className="confirm-overlay" onClick={() => setShowSaveConfirm(false)}>
-            <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
-              <p>변경된 내용대로 수정할까요?</p>
-              <div className="confirm-buttons">
-                <button
-                  className="confirm-no"
-                  onClick={() => setShowSaveConfirm(false)}
-                >
-                  아니오
-                </button>
-                <button
-                  className="confirm-yes"
-                  onClick={confirmSave}
                 >
                   예
                 </button>
