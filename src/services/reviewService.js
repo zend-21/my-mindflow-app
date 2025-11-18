@@ -331,6 +331,8 @@ export const getUserReviews = async (userId, options = {}) => {
       isPublic = null
     } = options;
 
+    console.log('🔍 getUserReviews 호출 - sortBy:', sortBy, 'sortOrder:', sortOrder);
+
     // 쿼리 구성
     let q = query(
       collection(db, REVIEWS_COLLECTION),
@@ -360,11 +362,13 @@ export const getUserReviews = async (userId, options = {}) => {
       });
     });
 
+    console.log('✅ getUserReviews 완료 - 리뷰 수:', reviews.length);
     return reviews;
   } catch (error) {
-    console.error('리뷰 목록 조회 실패:', error);
-    // 에러 발생 시 빈 배열 반환 (Firebase 미설정 등)
-    return [];
+    console.error('❌ 리뷰 목록 조회 실패:', error);
+    console.error('에러 상세:', error.message, error.code);
+    // 에러 발생 시에도 throw하여 상위에서 처리하도록 변경
+    throw error;
   }
 };
 
@@ -385,9 +389,11 @@ export const searchReviews = async (userId, searchQuery) => {
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
 
-      const foodMatch = review.foodItems.some(food =>
-        food.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      const foodMatch = review.foodItems.some(food => {
+        // 새 형식 { name, price } 또는 구 형식 string 모두 처리
+        const foodName = typeof food === 'string' ? food : food.name;
+        return foodName.toLowerCase().includes(searchQuery.toLowerCase());
+      });
 
       return nameMatch || foodMatch;
     });

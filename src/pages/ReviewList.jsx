@@ -29,9 +29,11 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
           .toLowerCase()
           .includes(searchQuery.toLowerCase());
 
-        const foodMatch = review.foodItems.some(food =>
-          food.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        const foodMatch = review.foodItems.some(food => {
+          // 새 형식 { name, price } 또는 구 형식 string 모두 처리
+          const foodName = typeof food === 'string' ? food : food.name;
+          return foodName.toLowerCase().includes(searchQuery.toLowerCase());
+        });
 
         const contentMatch = review.content
           .toLowerCase()
@@ -46,16 +48,22 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
 
   const loadReviews = async () => {
     try {
+      console.log('📥 리뷰 로딩 시작 - sortBy:', sortBy, 'sortOrder:', sortOrder);
       setLoading(true);
 
       const sortConfig = getSortConfig(sortBy, sortOrder);
+      console.log('⚙️ 정렬 설정:', sortConfig);
+
       const data = await getUserReviews(userId, sortConfig);
+      console.log('✅ 리뷰 로드 완료:', data.length, '개');
 
       setReviews(data);
       setFilteredReviews(data);
     } catch (error) {
-      console.error('리뷰 목록 로드 실패:', error);
-      showToast?.('리뷰 목록을 불러오는데 실패했습니다.');
+      console.error('❌ 리뷰 목록 로드 실패:', error);
+      console.error('에러 상세:', error.message);
+      showToast?.('리뷰 목록을 불러오는데 실패했습니다: ' + error.message);
+      // 에러 발생 시에도 기존 데이터 유지 (빈 배열로 초기화하지 않음)
     } finally {
       setLoading(false);
     }
@@ -76,15 +84,22 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
   };
 
   const handleSortChange = (newSortBy) => {
+    console.log('🔄 정렬 변경 요청:', newSortBy, '현재 sortBy:', sortBy, '현재 sortOrder:', sortOrder);
+
     if (sortBy === newSortBy) {
       // 같은 필드를 클릭하면 정렬 순서만 토글
-      setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
+      const newOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+      console.log('📊 같은 필드 클릭 - 순서 토글:', newOrder);
+      setSortOrder(newOrder);
     } else {
       // 다른 필드를 클릭하면 기본 정렬 순서로 설정
+      console.log('📊 다른 필드 클릭 - sortBy 변경:', newSortBy);
       setSortBy(newSortBy);
       if (newSortBy === REVIEW_SORT_OPTIONS.LATEST || newSortBy === REVIEW_SORT_OPTIONS.RATING_HIGH) {
+        console.log('📊 기본 정렬 순서: desc');
         setSortOrder('desc');
       } else {
+        console.log('📊 기본 정렬 순서: asc');
         setSortOrder('asc');
       }
     }
@@ -169,7 +184,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
   return (
     <div className="review-list-page">
       <header className="review-list-header">
-        <h1>내 리뷰</h1>
+        <h1>내 리뷰 ({reviews.length})</h1>
         <button
           className="write-button"
           onClick={onNavigateToWrite}
@@ -202,13 +217,13 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
             className={`sort-button ${sortBy === REVIEW_SORT_OPTIONS.LATEST ? 'active' : ''}`}
             onClick={() => handleSortChange(REVIEW_SORT_OPTIONS.LATEST)}
           >
-            최신순 {sortBy === REVIEW_SORT_OPTIONS.LATEST && (sortOrder === 'desc' ? '↓' : '↑')}
+            최신순 {sortBy === REVIEW_SORT_OPTIONS.LATEST ? (sortOrder === 'desc' ? '↓' : '↑') : ''}
           </button>
           <button
             className={`sort-button ${sortBy === REVIEW_SORT_OPTIONS.RATING_HIGH ? 'active' : ''}`}
             onClick={() => handleSortChange(REVIEW_SORT_OPTIONS.RATING_HIGH)}
           >
-            별점 {sortBy === REVIEW_SORT_OPTIONS.RATING_HIGH && (sortOrder === 'desc' ? '↓' : '↑')}
+            별점순 {sortBy === REVIEW_SORT_OPTIONS.RATING_HIGH ? (sortOrder === 'desc' ? '↓' : '↑') : ''}
           </button>
         </div>
       </div>
