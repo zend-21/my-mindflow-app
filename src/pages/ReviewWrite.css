@@ -263,6 +263,11 @@
   overflow-y: auto;
   overflow-wrap: break-word;
   word-break: break-word;
+  cursor: pointer;
+}
+
+.formatted-content-display-preview * {
+  pointer-events: none;
 }
 
 .formatted-content-display-preview strong {

@@ -236,10 +236,87 @@
   transition: all 0.2s;
 }
 
-.editor-save-button:hover {
+.editor-save-button:hover:not(.disabled) {
   background: #f5a3fc;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(240, 147, 251, 0.3);
+}
+
+.editor-save-button.disabled {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.3);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* 확인 모달 */
+.confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10001;
+}
+
+.confirm-modal {
+  background: rgba(31, 34, 41, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.confirm-modal p {
+  color: #f0f0f0;
+  font-size: 16px;
+  line-height: 1.6;
+  margin: 0 0 1.5rem 0;
+  text-align: center;
+}
+
+.confirm-buttons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.confirm-no,
+.confirm-yes {
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.confirm-no {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.confirm-no:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.confirm-yes {
+  background: #f093fb;
+  border: none;
+  color: white;
+}
+
+.confirm-yes:hover {
+  background: #f5a3fc;
+  transform: translateY(-1px);
 }
 
 /* 반응형 */

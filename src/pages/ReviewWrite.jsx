@@ -531,7 +531,7 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
                 />
               ) : (
                 <div className="empty-content-placeholder-preview">
-                  아직 작성된 내용이 없습니다.
+                  여기를 탭하여 작성하세요
                 </div>
               )}
               <button
@@ -544,7 +544,7 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
                   console.log('isEditorOpen을 true로 설정함');
                 }}
               >
-                ✏️ 편집
+                {isEditMode ? '✏️ 편집' : '✏️ 작성'}
               </button>
             </div>
           </div>

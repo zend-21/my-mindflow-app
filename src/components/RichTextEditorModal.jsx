@@ -12,11 +12,16 @@ const RichTextEditorModal = ({ isOpen, onClose, content, onSave, showToast, rest
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [linkText, setLinkText] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false);
   const textareaRef = useRef(null);
 
   useEffect(() => {
     setEditorContent(content || '');
   }, [content]);
+
+  // 내용이 변경되었는지 확인
+  const hasChanges = editorContent !== (content || '');
 
   // 텍스트 포맷팅 함수
   const applyFormat = (formatType) => {
@@ -179,9 +184,32 @@ const RichTextEditorModal = ({ isOpen, onClose, content, onSave, showToast, rest
     }, 0);
   };
 
+  // 취소 핸들러
+  const handleCancel = () => {
+    if (hasChanges) {
+      setShowCancelConfirm(true);
+    } else {
+      onClose();
+    }
+  };
+
   // 저장 핸들러
   const handleSave = () => {
+    if (hasChanges) {
+      setShowSaveConfirm(true);
+    }
+  };
+
+  // 저장 확인
+  const confirmSave = () => {
+    setShowSaveConfirm(false);
     onSave(editorContent);
+    onClose();
+  };
+
+  // 취소 확인
+  const confirmCancel = () => {
+    setShowCancelConfirm(false);
     onClose();
   };
 
@@ -192,11 +220,10 @@ const RichTextEditorModal = ({ isOpen, onClose, content, onSave, showToast, rest
   console.log('모달 표시 중');
 
   const modalContent = (
-    <div className="rich-text-editor-overlay" onClick={onClose}>
+    <div className="rich-text-editor-overlay" onClick={(e) => e.stopPropagation()}>
       <div className="rich-text-editor-modal" onClick={(e) => e.stopPropagation()}>
         <div className="editor-header">
           <h2>리뷰 내용 작성 ({restaurantName || '가게 선택 안함'})</h2>
-          <button className="close-button" onClick={onClose}>×</button>
         </div>
 
         <div className="editor-toolbar">
@@ -362,18 +389,65 @@ const RichTextEditorModal = ({ isOpen, onClose, content, onSave, showToast, rest
           <button
             type="button"
             className="editor-cancel-button"
-            onClick={onClose}
+            onClick={handleCancel}
           >
             취소
           </button>
           <button
             type="button"
-            className="editor-save-button"
+            className={`editor-save-button ${!hasChanges ? 'disabled' : ''}`}
             onClick={handleSave}
+            disabled={!hasChanges}
           >
-            저장
+            수정
           </button>
         </div>
+
+        {/* 취소 확인 모달 */}
+        {showCancelConfirm && (
+          <div className="confirm-overlay" onClick={() => setShowCancelConfirm(false)}>
+            <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+              <p>변경된 내용을 저장하지 않고 창을 닫을까요?</p>
+              <div className="confirm-buttons">
+                <button
+                  className="confirm-no"
+                  onClick={() => setShowCancelConfirm(false)}
+                >
+                  아니오
+                </button>
+                <button
+                  className="confirm-yes"
+                  onClick={confirmCancel}
+                >
+                  예
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 저장 확인 모달 */}
+        {showSaveConfirm && (
+          <div className="confirm-overlay" onClick={() => setShowSaveConfirm(false)}>
+            <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+              <p>변경된 내용대로 수정할까요?</p>
+              <div className="confirm-buttons">
+                <button
+                  className="confirm-no"
+                  onClick={() => setShowSaveConfirm(false)}
+                >
+                  아니오
+                </button>
+                <button
+                  className="confirm-yes"
+                  onClick={confirmSave}
+                >
+                  예
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
