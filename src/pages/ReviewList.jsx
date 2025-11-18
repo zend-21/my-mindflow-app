@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getUserReviews, searchReviews, deleteReview, toggleReviewPublic, checkCanMakePublic } from '../services/reviewService';
 import { REVIEW_SORT_OPTIONS } from '../types/review';
 import './ReviewList.css';
@@ -11,6 +11,10 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState(REVIEW_SORT_OPTIONS.LATEST);
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
+  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
+
+  const lastScrollY = useRef(0);
+  const scrollTimeout = useRef(null);
 
   // TODO: 실제 사용자 ID는 인증 시스템에서 가져와야 함
   const userId = 'temp_user_id';
@@ -46,6 +50,41 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
       setFilteredReviews(filtered);
     }
   }, [searchQuery, reviews]);
+
+  // 스크롤 기반 헤더 숨김/표시
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+
+      // 스크롤 위치가 100px 이상일 때만 헤더 숨김 동작
+      if (currentScrollY < 100) {
+        setIsHeaderHidden(false);
+        lastScrollY.current = currentScrollY;
+        return;
+      }
+
+      // 스크롤 방향 감지
+      if (currentScrollY > lastScrollY.current) {
+        // 아래로 스크롤 - 헤더 숨김
+        setIsHeaderHidden(true);
+      } else {
+        // 위로 스크롤 - 헤더 표시
+        setIsHeaderHidden(false);
+      }
+
+      lastScrollY.current = currentScrollY;
+    };
+
+    // 스크롤 이벤트 리스너 등록
+    window.addEventListener('scroll', handleScroll, { passive: true });
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (scrollTimeout.current) {
+        clearTimeout(scrollTimeout.current);
+      }
+    };
+  }, []);
 
   const loadReviews = async () => {
     try {
@@ -231,7 +270,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
 
   return (
     <div className="review-list-page">
-      <header className="review-list-header">
+      <header className={`review-list-header ${isHeaderHidden ? 'hidden' : ''}`}>
         <h1>내 리뷰 ({reviews.length})</h1>
         <button
           className="write-button"
