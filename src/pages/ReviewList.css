@@ -267,6 +267,42 @@
   white-space: nowrap;
 }
 
+/* 별점 표시 스타일 */
+.star-display {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.star-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+  -webkit-text-stroke: 0.5px rgba(0, 0, 0, 0.2);
+}
+
+.star-icon.filled {
+  color: #ffc107;
+}
+
+.star-icon.partial {
+  position: relative;
+  color: #ddd;
+}
+
+.star-icon.partial::before {
+  content: '★';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: #ffc107;
+  overflow: hidden;
+  width: var(--fill-percent, 50%);
+}
+
+.star-icon.empty {
+  color: #ddd;
+}
+
 .review-title {
   font-size: 1rem;
   font-weight: 600;

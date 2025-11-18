@@ -170,16 +170,46 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
   };
 
   const renderStars = (rating) => {
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 >= 0.5;
-    const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);
+    const wholeNumber = Math.floor(rating);
+    const decimalPart = rating - wholeNumber;
+    const decimalString = decimalPart.toFixed(2).substring(2);
 
     return (
-      <>
-        {'★'.repeat(fullStars)}
-        {hasHalfStar && '⯨'}
-        {'☆'.repeat(emptyStars)}
-      </>
+      <span className="star-display">
+        {[...Array(5)].map((_, index) => {
+          const starNumber = index + 1;
+
+          // 꽉 찬 별
+          if (starNumber <= wholeNumber) {
+            return (
+              <span key={index} className="star-icon filled">
+                ★
+              </span>
+            );
+          }
+
+          // 부분적으로 채워진 별
+          if (starNumber === wholeNumber + 1 && decimalPart > 0) {
+            const fillPercent = parseInt(decimalString);
+            return (
+              <span
+                key={index}
+                className="star-icon partial"
+                style={{ '--fill-percent': `${fillPercent}%` }}
+              >
+                ★
+              </span>
+            );
+          }
+
+          // 빈 별
+          return (
+            <span key={index} className="star-icon empty">
+              ★
+            </span>
+          );
+        })}
+      </span>
     );
   };
 
