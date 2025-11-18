@@ -6,7 +6,8 @@ import './ReviewList.css';
 const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
   const [reviews, setReviews] = useState([]);
   const [filteredReviews, setFilteredReviews] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true); // 첫 로딩
+  const [sortLoading, setSortLoading] = useState(false); // 정렬 로딩
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState(REVIEW_SORT_OPTIONS.LATEST);
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
@@ -49,7 +50,13 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
   const loadReviews = async () => {
     try {
       console.log('📥 리뷰 로딩 시작 - sortBy:', sortBy, 'sortOrder:', sortOrder);
-      setLoading(true);
+
+      // 첫 로딩인지 정렬 로딩인지 구분
+      if (initialLoading) {
+        setInitialLoading(true);
+      } else {
+        setSortLoading(true);
+      }
 
       const sortConfig = getSortConfig(sortBy, sortOrder);
       console.log('⚙️ 정렬 설정:', sortConfig);
@@ -65,7 +72,8 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
       showToast?.('리뷰 목록을 불러오는데 실패했습니다: ' + error.message);
       // 에러 발생 시에도 기존 데이터 유지 (빈 배열로 초기화하지 않음)
     } finally {
-      setLoading(false);
+      setInitialLoading(false);
+      setSortLoading(false);
     }
   };
 
@@ -213,7 +221,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
     );
   };
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="review-list-page">
         <div className="loading">로딩 중...</div>
@@ -270,7 +278,12 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
 
       {/* 리뷰 목록 */}
       <div className="review-list-content">
-        {filteredReviews.length === 0 ? (
+        {sortLoading ? (
+          <div className="sort-loading">
+            <div className="loading-spinner"></div>
+            <p>정렬 중...</p>
+          </div>
+        ) : filteredReviews.length === 0 ? (
           <div className="empty-state">
             <p>
               {searchQuery
