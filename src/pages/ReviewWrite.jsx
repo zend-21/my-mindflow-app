@@ -5,6 +5,7 @@ import { createReview, getReview, updateReview } from '../services/reviewService
 import { compressImage } from '../utils/storage';
 import RestaurantAutocomplete from '../components/RestaurantAutocomplete';
 import DetailedRatingInput from '../components/DetailedRatingInput';
+import RichTextEditorModal from '../components/RichTextEditorModal';
 import './ReviewWrite.css';
 
 const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
@@ -27,6 +28,7 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
   });
 
   const [loading, setLoading] = useState(false);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
 
   // 수정 모드: 기존 리뷰 데이터 로드
   useEffect(() => {
@@ -104,6 +106,68 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
       ...prev,
       [name]: value
     }));
+  };
+
+  // 리치 텍스트 에디터에서 내용 저장
+  const handleContentSave = (content) => {
+    setFormData(prev => ({
+      ...prev,
+      content: content
+    }));
+  };
+
+  // 마크다운 형식의 내용을 HTML로 렌더링 (간단한 구현)
+  const renderFormattedContent = (text) => {
+    if (!text) return '';
+
+    let formatted = text;
+
+    // 볼드 처리: **text**
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+    // 이탤릭 처리: *text*
+    formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+    // 정렬 처리
+    formatted = formatted.replace(/\[center\](.*?)\[\/center\]/g, '<div style="text-align: center;">$1</div>');
+    formatted = formatted.replace(/\[left\](.*?)\[\/left\]/g, '<div style="text-align: left;">$1</div>');
+    formatted = formatted.replace(/\[right\](.*?)\[\/right\]/g, '<div style="text-align: right;">$1</div>');
+
+    // 이미지 처리: ![alt](src)
+    formatted = formatted.replace(/!\[(.*?)\]\((.*?)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; border-radius: 8px; margin: 10px 0;" />');
+
+    // 비디오 처리: [video](url)
+    formatted = formatted.replace(/\[video\]\((.*?)\)/g, (match, url) => {
+      // YouTube URL 감지
+      const youtubeRegex = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/;
+      const youtubeMatch = url.match(youtubeRegex);
+
+      if (youtubeMatch) {
+        const videoId = youtubeMatch[1];
+        return `<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; margin: 10px 0;">
+          <iframe
+            style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 8px;"
+            src="https://www.youtube.com/embed/${videoId}"
+            frameborder="0"
+            allowfullscreen>
+          </iframe>
+        </div>`;
+      }
+
+      // 일반 비디오 URL
+      return `<video controls style="max-width: 100%; border-radius: 8px; margin: 10px 0;">
+        <source src="${url}" />
+        Your browser does not support the video tag.
+      </video>`;
+    });
+
+    // 링크 처리: [text](url)
+    formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: #f093fb; text-decoration: underline;">$1</a>');
+
+    // 줄바꿈 처리
+    formatted = formatted.replace(/\n/g, '<br />');
+
+    return formatted;
   };
 
   // 별점 변경 핸들러
@@ -224,7 +288,7 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
     // 1단계: 가게명 확인
     if (!formData.restaurantName.trim()) {
       showToast?.('가게명을 입력해주세요.');
-      
+
       // 가게명 입력 필드로 스크롤 (말풍선이 화면 상단에 보이도록)
       setTimeout(() => {
         const restaurantNameField = document.querySelector('#restaurantName');
@@ -243,10 +307,27 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
       return;
     }
 
-    // 2단계: 별점 확인
+    // 2단계: 리뷰 내용 확인
+    if (!formData.content.trim()) {
+      showToast?.('리뷰 내용을 입력해주세요.');
+
+      // 내용 섹션으로 스크롤
+      setTimeout(() => {
+        const contentSection = document.querySelector('.content-display-container');
+        if (contentSection) {
+          const formSection = contentSection.closest('.form-section');
+          if (formSection) {
+            formSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      }, 100);
+      return;
+    }
+
+    // 3단계: 별점 확인
     if (formData.rating === 0) {
       showToast?.('별점을 선택해주세요.');
-      
+
       // 별점 섹션으로 스크롤
       setTimeout(() => {
         const ratingSection = document.querySelector('.detailed-rating-input');
@@ -262,28 +343,6 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
             if (firstStarButton) {
               firstStarButton.focus();
             }
-          }, 300);
-        }
-      }, 100);
-      return;
-    }
-
-    // 3단계: 리뷰 내용 확인
-    if (!formData.content.trim()) {
-      showToast?.('리뷰 내용을 입력해주세요.');
-      
-      // 내용 입력 필드로 스크롤 (라벨이 보이도록)
-      setTimeout(() => {
-        const contentField = document.querySelector('#content');
-        if (contentField) {
-          // textarea의 라벨까지 포함하여 보이도록
-          const formGroup = contentField.closest('.form-group');
-          if (formGroup) {
-            formGroup.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-          // 포커스 지연
-          setTimeout(() => {
-            contentField.focus();
           }, 300);
         }
       }, 100);
@@ -362,6 +421,52 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
               placeholder="가게를 선택하면 자동 입력됩니다"
               style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', cursor: 'not-allowed' }}
             />
+          </div>
+        </section>
+
+        {/* 리뷰 내용 */}
+        <section className="form-section">
+          <h2>리뷰 내용</h2>
+
+          <div className="form-group">
+            <label htmlFor="title">제목</label>
+            <input
+              type="text"
+              id="title"
+              name="title"
+              value={formData.title}
+              onChange={handleChange}
+              placeholder="예: 양념치킨이 정말 맛있어요"
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="content">
+              내용 <span className="required">(필수)</span>
+            </label>
+            <div className="content-display-container">
+              {formData.content ? (
+                <div
+                  className="formatted-content-display-preview"
+                  dangerouslySetInnerHTML={{ __html: renderFormattedContent(formData.content) }}
+                />
+              ) : (
+                <div className="empty-content-placeholder-preview">
+                  아직 작성된 내용이 없습니다.
+                </div>
+              )}
+              <button
+                type="button"
+                className="open-editor-button"
+                onClick={() => {
+                  console.log('편집 버튼 클릭됨');
+                  setIsEditorOpen(true);
+                  console.log('isEditorOpen을 true로 설정함');
+                }}
+              >
+                ✏️ 편집
+              </button>
+            </div>
           </div>
         </section>
 
@@ -481,37 +586,6 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
           </div>
         </section>
 
-        {/* 리뷰 내용 */}
-        <section className="form-section">
-          <h2>리뷰 내용</h2>
-
-          <div className="form-group">
-            <label htmlFor="title">제목</label>
-            <input
-              type="text"
-              id="title"
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              placeholder="예: 양념치킨이 정말 맛있어요"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="content">
-              내용 <span className="required">(필수)</span>
-            </label>
-            <textarea
-              id="content"
-              name="content"
-              value={formData.content}
-              onChange={handleChange}
-              placeholder="솔직한 후기를 작성해주세요. 이 리뷰는 나만 볼 수 있습니다."
-              rows="6"
-            />
-          </div>
-        </section>
-
         {/* 사진 - 임시 비활성화 (Storage 미설정) */}
         {false && (
         <section className="form-section">
@@ -565,6 +639,15 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
           </button>
         </div>
       </form>
+
+      {/* 리치 텍스트 에디터 모달 */}
+      <RichTextEditorModal
+        isOpen={isEditorOpen}
+        onClose={() => setIsEditorOpen(false)}
+        content={formData.content}
+        onSave={handleContentSave}
+        showToast={showToast}
+      />
     </div>
   );
 };

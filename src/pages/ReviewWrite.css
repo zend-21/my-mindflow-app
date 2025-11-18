@@ -11,7 +11,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   z-index: 10000; /* 헤더와 푸터 위에 표시 */
-  isolation: isolate; /* 새로운 stacking context 생성 */
+  /* isolation: isolate; */ /* 모달 표시를 위해 주석 처리 */
 }
 
 .review-write-header {
@@ -64,9 +64,9 @@
 }
 
 .review-write-form {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 1rem;
+  padding: 1.5rem;
 }
 
 .form-section {
@@ -74,8 +74,8 @@
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border-radius: 16px;
-  padding: 1.5rem;
-  margin-bottom: 1rem;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -140,7 +140,94 @@
 
 .form-group textarea {
   resize: vertical;
-  min-height: 120px;
+  min-height: 300px;
+  line-height: 1.6;
+  font-size: 15px;
+}
+
+/* 내용 입력창 특별 스타일 */
+#content {
+  min-height: 350px;
+  padding: 16px 20px;
+  line-height: 1.8;
+  font-size: 15px;
+}
+
+/* 제목 입력창도 조금 더 크게 */
+#title {
+  font-size: 16px;
+  padding: 14px 18px;
+  font-weight: 500;
+}
+
+/* 내용 표시 컨테이너 */
+.content-display-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.formatted-content-display-preview {
+  min-height: 189px; /* 7줄 높이: 15px * 1.8 * 7 = 189px */
+  max-height: 189px;
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 15px;
+  line-height: 1.8;
+  overflow-y: auto;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.formatted-content-display-preview strong {
+  font-weight: 700;
+  color: #f0f0f0;
+}
+
+.formatted-content-display-preview em {
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.empty-content-placeholder-preview {
+  min-height: 189px; /* 7줄 높이 */
+  padding: 1.5rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 2px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.open-editor-button {
+  width: 100%;
+  padding: 14px 24px;
+  background: rgba(240, 147, 251, 0.15);
+  border: 1px solid rgba(240, 147, 251, 0.3);
+  border-radius: 12px;
+  color: #f093fb;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.open-editor-button:hover {
+  background: rgba(240, 147, 251, 0.25);
+  border-color: rgba(240, 147, 251, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(240, 147, 251, 0.2);
 }
 
 /* 별점 선택 */
@@ -429,11 +516,20 @@
 /* 반응형 */
 @media (max-width: 768px) {
   .review-write-form {
-    padding: 0.75rem;
+    padding: 1rem;
   }
 
   .form-section {
-    padding: 1rem;
+    padding: 1.5rem;
+  }
+
+  #content {
+    min-height: 280px;
+    font-size: 14px;
+  }
+
+  #title {
+    font-size: 15px;
   }
 
   .star-button {
