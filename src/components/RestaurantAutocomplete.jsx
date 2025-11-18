@@ -16,6 +16,7 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
   const [showResults, setShowResults] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [pendingLocationMode, setPendingLocationMode] = useState(null); // 주소 입력 대기 중인 모드
 
   // 위치 모드: 'current' (현재위치), 'address1', 'address2', 'address3' (저장주소 슬롯)
   const [locationMode, setLocationMode] = useState(() => {
@@ -230,23 +231,33 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
 
   // 위치 모드 변경 핸들러
   const handleLocationModeChange = async (mode) => {
+    console.log('🗺️ 위치 모드 변경:', mode);
+
     // 저장주소 슬롯이 비어있으면 주소 등록 모달 표시
     if (mode.startsWith('address')) {
       const slotIndex = parseInt(mode.replace('address', '')) - 1;
       if (!savedAddresses[slotIndex]) {
+        console.log('📍 주소가 비어있음 - 모달 표시');
+        setPendingLocationMode(mode); // 대기 중인 모드 저장
         setShowAddressModal(true);
-        setLocationMode(mode); // 모드는 미리 설정
-        localStorage.setItem(LOCATION_MODE_KEY, mode);
-        return;
+        return; // 모드는 아직 변경하지 않음
       }
     }
 
+    // 모드 변경 확정
     setLocationMode(mode);
     localStorage.setItem(LOCATION_MODE_KEY, mode);
+    console.log('🗺️ 위치 모드 확정:', mode);
 
     // 현재위치 모드로 변경 시 GPS 위치 가져오기
-    if (mode === 'current' && !currentLocation) {
-      await fetchCurrentLocation();
+    if (mode === 'current') {
+      if (!currentLocation) {
+        console.log('📍 현재 위치가 없음 - 위치 가져오기 시작');
+        await fetchCurrentLocation();
+      } else {
+        console.log('📍 현재 위치가 이미 있음:', currentLocation);
+        showToast?.('저장된 현재 위치를 사용합니다.');
+      }
     }
 
     // 모드 변경 후 검색어가 있으면 재검색
@@ -265,8 +276,9 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
       label: '', // 사용자가 설정할 수 있는 라벨 (예: 집, 회사 등)
     };
 
-    // 현재 선택된 슬롯에 저장
-    const slotIndex = parseInt(locationMode.replace('address', '')) - 1;
+    // 대기 중이던 모드의 슬롯에 저장
+    const targetMode = pendingLocationMode || locationMode;
+    const slotIndex = parseInt(targetMode.replace('address', '')) - 1;
     const newAddresses = [...savedAddresses];
     newAddresses[slotIndex] = locationData;
 
@@ -275,10 +287,25 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
     setShowAddressModal(false);
     showToast?.('주소가 저장되었습니다.');
 
+    // 주소 저장 후 해당 모드로 변경
+    if (pendingLocationMode) {
+      setLocationMode(pendingLocationMode);
+      localStorage.setItem(LOCATION_MODE_KEY, pendingLocationMode);
+      console.log('🗺️ 주소 저장 완료 - 모드 변경:', pendingLocationMode);
+      setPendingLocationMode(null);
+    }
+
     // 검색어가 있으면 재검색
     if (query.trim() !== '') {
       performSearch(query);
     }
+  };
+
+  // 주소 입력 취소
+  const handleAddressCancel = () => {
+    console.log('📍 주소 입력 취소');
+    setShowAddressModal(false);
+    setPendingLocationMode(null); // 대기 중이던 모드 취소
   };
 
   // 현재 GPS 위치 가져오기
@@ -304,9 +331,17 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
 
   // 가게 선택
   const handleSelect = (restaurant) => {
+    console.log('🏪 가게 선택:', restaurant.name);
     setQuery(restaurant.name);
     setShowResults(false);
     setResults([]);
+    setSelectedIndex(-1);
+
+    // input blur 처리하여 드롭다운 확실히 닫기
+    if (inputRef.current) {
+      inputRef.current.blur();
+    }
+
     onSelect(restaurant);
   };
 
@@ -471,7 +506,7 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
 
       {/* 주소 설정 모달 */}
       {showAddressModal && (
-        <div className="location-modal-overlay" onClick={() => setShowAddressModal(false)}>
+        <div className="location-modal-overlay" onClick={handleAddressCancel}>
           <div className="location-modal" onClick={(e) => e.stopPropagation()}>
             <h3>주소 등록</h3>
             <p>검색 기준으로 사용할 위치를 입력하세요.</p>
@@ -485,7 +520,7 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
             <div className="location-modal-actions">
               <button
                 className="modal-cancel-btn"
-                onClick={() => setShowAddressModal(false)}
+                onClick={handleAddressCancel}
               >
                 취소
               </button>
