@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getUserReviews, searchReviews, deleteReview } from '../services/reviewService';
+import { getUserReviews, searchReviews, deleteReview, toggleReviewPublic, checkCanMakePublic } from '../services/reviewService';
 import { REVIEW_SORT_OPTIONS } from '../types/review';
 import './ReviewList.css';
 
@@ -9,6 +9,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState(REVIEW_SORT_OPTIONS.LATEST);
+  const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
 
   // TODO: 실제 사용자 ID는 인증 시스템에서 가져와야 함
   const userId = 'temp_user_id';
@@ -16,7 +17,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
   // 리뷰 목록 로드
   useEffect(() => {
     loadReviews();
-  }, [sortBy]);
+  }, [sortBy, sortOrder]);
 
   // 검색 처리
   useEffect(() => {
@@ -47,7 +48,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
     try {
       setLoading(true);
 
-      const sortConfig = getSortConfig(sortBy);
+      const sortConfig = getSortConfig(sortBy, sortOrder);
       const data = await getUserReviews(userId, sortConfig);
 
       setReviews(data);
@@ -60,18 +61,32 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
     }
   };
 
-  const getSortConfig = (sortOption) => {
-    switch (sortOption) {
-      case REVIEW_SORT_OPTIONS.LATEST:
-        return { sortBy: 'createdAt', sortOrder: 'desc' };
-      case REVIEW_SORT_OPTIONS.OLDEST:
-        return { sortBy: 'createdAt', sortOrder: 'asc' };
-      case REVIEW_SORT_OPTIONS.RATING_HIGH:
-        return { sortBy: 'rating', sortOrder: 'desc' };
-      case REVIEW_SORT_OPTIONS.RATING_LOW:
-        return { sortBy: 'rating', sortOrder: 'asc' };
-      default:
-        return { sortBy: 'createdAt', sortOrder: 'desc' };
+  const getSortConfig = (sortOption, order) => {
+    const fieldMap = {
+      [REVIEW_SORT_OPTIONS.LATEST]: 'createdAt',
+      [REVIEW_SORT_OPTIONS.OLDEST]: 'createdAt',
+      [REVIEW_SORT_OPTIONS.RATING_HIGH]: 'rating',
+      [REVIEW_SORT_OPTIONS.RATING_LOW]: 'rating'
+    };
+
+    return {
+      sortBy: fieldMap[sortOption] || 'createdAt',
+      sortOrder: order
+    };
+  };
+
+  const handleSortChange = (newSortBy) => {
+    if (sortBy === newSortBy) {
+      // 같은 필드를 클릭하면 정렬 순서만 토글
+      setSortOrder(sortOrder === 'desc' ? 'asc' : 'desc');
+    } else {
+      // 다른 필드를 클릭하면 기본 정렬 순서로 설정
+      setSortBy(newSortBy);
+      if (newSortBy === REVIEW_SORT_OPTIONS.LATEST || newSortBy === REVIEW_SORT_OPTIONS.RATING_HIGH) {
+        setSortOrder('desc');
+      } else {
+        setSortOrder('asc');
+      }
     }
   };
 
@@ -90,12 +105,52 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
     }
   };
 
+  const handleTogglePublic = async (reviewId, currentIsPublic) => {
+    const newIsPublic = !currentIsPublic;
+
+    try {
+      await toggleReviewPublic(reviewId, userId, newIsPublic);
+      showToast?.(newIsPublic ? '리뷰가 공개되었습니다.' : '리뷰가 비공개로 전환되었습니다.');
+      loadReviews();
+    } catch (error) {
+      console.error('리뷰 공개 상태 변경 실패:', error);
+      showToast?.(error.message || '공개 상태 변경에 실패했습니다.');
+    }
+  };
+
   const formatDate = (date) => {
     if (!date) return '';
     return new Date(date).toLocaleDateString('ko-KR', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
+    });
+  };
+
+  const formatDateWithTime = (date) => {
+    if (!date) return '';
+    const d = new Date(date);
+    const dateStr = d.toLocaleDateString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    const timeStr = d.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    return `${dateStr} ${timeStr}`;
+  };
+
+  const formatDateTime = (date) => {
+    if (!date) return '';
+    return new Date(date).toLocaleString('ko-KR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
@@ -142,17 +197,19 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
           )}
         </div>
 
-        <div className="sort-box">
-          <label>정렬:</label>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
+        <div className="sort-buttons">
+          <button
+            className={`sort-button ${sortBy === REVIEW_SORT_OPTIONS.LATEST ? 'active' : ''}`}
+            onClick={() => handleSortChange(REVIEW_SORT_OPTIONS.LATEST)}
           >
-            <option value={REVIEW_SORT_OPTIONS.LATEST}>최신순</option>
-            <option value={REVIEW_SORT_OPTIONS.OLDEST}>오래된순</option>
-            <option value={REVIEW_SORT_OPTIONS.RATING_HIGH}>별점 높은순</option>
-            <option value={REVIEW_SORT_OPTIONS.RATING_LOW}>별점 낮은순</option>
-          </select>
+            최신순 {sortBy === REVIEW_SORT_OPTIONS.LATEST && (sortOrder === 'desc' ? '↓' : '↑')}
+          </button>
+          <button
+            className={`sort-button ${sortBy === REVIEW_SORT_OPTIONS.RATING_HIGH ? 'active' : ''}`}
+            onClick={() => handleSortChange(REVIEW_SORT_OPTIONS.RATING_HIGH)}
+          >
+            별점 {sortBy === REVIEW_SORT_OPTIONS.RATING_HIGH && (sortOrder === 'desc' ? '↓' : '↑')}
+          </button>
         </div>
       </div>
 
@@ -176,25 +233,32 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
           </div>
         ) : (
           <div className="review-grid">
-            {filteredReviews.map((review) => (
-              <div key={review.id} className="review-card">
-                {/* 사진 */}
-                {review.photos && review.photos.length > 0 && (
-                  <div className="review-photo">
-                    <img
-                      src={review.photos[0]}
-                      alt={review.restaurantName}
-                    />
-                    {review.photos.length > 1 && (
-                      <div className="photo-count">
-                        +{review.photos.length - 1}
-                      </div>
-                    )}
-                  </div>
-                )}
+            {filteredReviews.map((review) => {
+              const { canMakePublic, remainingDays } = checkCanMakePublic(review);
 
-                {/* 리뷰 내용 */}
-                <div className="review-body">
+              return (
+                <div key={review.id} className="review-card">
+                  {/* 사진 */}
+                  {review.photos && review.photos.length > 0 && (
+                    <div className="review-photo">
+                      <img
+                        src={review.photos[0]}
+                        alt={review.restaurantName}
+                      />
+                      {review.photos.length > 1 && (
+                        <div className="photo-count">
+                          +{review.photos.length - 1}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 리뷰 내용 - 클릭 가능 */}
+                  <div
+                    className="review-body"
+                    onClick={() => onNavigateToEdit(review.id)}
+                    style={{ cursor: 'pointer' }}
+                  >
                   <div className="review-header-card">
                     <h3 className="restaurant-name">
                       {review.restaurantName}
@@ -208,10 +272,8 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
                     <h4 className="review-title">{review.title}</h4>
                   )}
 
-                  <p className="review-content">
-                    {review.content.length > 100
-                      ? `${review.content.substring(0, 100)}...`
-                      : review.content}
+                  <p className="review-content review-content-preview">
+                    {review.content}
                   </p>
 
                   {review.foodItems && review.foodItems.length > 0 && (
@@ -244,28 +306,44 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
                     )}
                   </div>
 
-                  <div className="review-footer">
-                    <span className="created-date">
-                      {formatDate(review.createdAt)}
+                  {/* 작성일 및 상태 정보 */}
+                  <div className="review-info-row">
+                    <span className="created-date-with-time">
+                      {formatDateWithTime(review.createdAt)}
                     </span>
-                    <div className="review-actions">
-                      <button
-                        className="edit-button"
-                        onClick={() => onNavigateToEdit(review.id)}
-                      >
-                        수정
-                      </button>
-                      <button
-                        className="delete-button"
-                        onClick={() => handleDelete(review.id)}
-                      >
-                        삭제
-                      </button>
+                    <div className="status-badges">
+                      <span className={`public-status-badge ${review.isPublic ? 'public' : 'private'}`}>
+                        {review.isPublic ? '공개' : '비공개'}
+                      </span>
+                      {!review.isPublic && remainingDays > 0 && (
+                        <span className="remaining-days-badge">
+                          D-{remainingDays}
+                        </span>
+                      )}
+                      {review.editHistory && review.editHistory.length > 0 && (
+                        <span className="edit-count-badge">
+                          수정 {review.editHistory.length}회
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
+
+                {/* 삭제 버튼만 별도로 */}
+                <div className="review-actions-single">
+                  <button
+                    className="delete-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(review.id);
+                    }}
+                  >
+                    삭제
+                  </button>
+                </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
       </div>

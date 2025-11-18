@@ -32,6 +32,24 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
   useEffect(() => {
     if (isEditMode && reviewId) {
       loadReviewData();
+    } else {
+      // 생성 모드: 폼 초기화 (브라우저 자동완성 방지)
+      setFormData({
+        restaurantId: '',
+        restaurantName: '',
+        restaurantAddress: '',
+        restaurantPhone: '',
+        rating: 0,
+        tasteRating: 0,
+        priceRating: 0,
+        serviceRating: 0,
+        title: '',
+        content: '',
+        photos: [],
+        foodItems: [{ name: '', price: '' }],
+        totalPrice: '',
+        orderDate: new Date().toISOString().split('T')[0]
+      });
     }
   }, [reviewId, isEditMode]);
 
@@ -304,7 +322,7 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
         <h1>{isEditMode ? '리뷰 수정' : '리뷰 작성'}</h1>
       </header>
 
-      <form className="review-write-form" onSubmit={handleSubmit}>
+      <form className="review-write-form" onSubmit={handleSubmit} autoComplete="off">
         {/* 가게 정보 */}
         <section className="form-section">
           <h2>가게 정보</h2>
@@ -494,7 +512,8 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
           </div>
         </section>
 
-        {/* 사진 */}
+        {/* 사진 - 임시 비활성화 (Storage 미설정) */}
+        {false && (
         <section className="form-section">
           <h2>사진</h2>
 
@@ -525,6 +544,7 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
             )}
           </div>
         </section>
+        )}
 
         {/* 제출 버튼 */}
         <div className="form-actions">

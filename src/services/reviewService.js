@@ -53,7 +53,8 @@ export const createReview = async (reviewData, userId) => {
       orderDate: Timestamp.fromDate(new Date(reviewData.orderDate)),
       isPublic: false, // 오프라인 리뷰는 기본 비공개
       createdAt: Timestamp.fromDate(now),
-      updatedAt: Timestamp.fromDate(now)
+      updatedAt: Timestamp.fromDate(now),
+      editHistory: [] // 수정 이력 (빈 배열로 시작)
     };
 
     // Firestore에 리뷰 문서 생성
@@ -116,6 +117,85 @@ export const updateReview = async (reviewId, updateData, userId) => {
         }));
     }
 
+    // 수정 이력 추가
+    const now = new Date();
+
+    // 변경 사항 분석
+    const changes = {};
+
+    // 가게명 변경
+    if (updateData.restaurantName !== existingReview.restaurantName) {
+      changes.restaurantName = {
+        changed: true,
+        isMinor: false,
+        before: existingReview.restaurantName,
+        after: updateData.restaurantName
+      };
+    }
+
+    // 평점 변경
+    if (updateData.rating !== existingReview.rating) {
+      changes.rating = {
+        changed: true,
+        isMinor: false,
+        before: existingReview.rating,
+        after: updateData.rating
+      };
+    }
+
+    // 내용 변경 (오타 수정 vs 본질적 수정 구분)
+    if (updateData.content !== existingReview.content) {
+      const oldContent = existingReview.content || '';
+      const newContent = updateData.content || '';
+
+      // Levenshtein distance 계산 (편집 거리)
+      const editDistance = calculateEditDistance(oldContent, newContent);
+      const contentLength = Math.max(oldContent.length, newContent.length);
+      const changeRatio = editDistance / contentLength;
+
+      // 변경 비율이 10% 미만이고, 길이 차이가 5글자 이하면 오타 수정으로 간주
+      const isMinorEdit = changeRatio < 0.1 && Math.abs(oldContent.length - newContent.length) <= 5;
+
+      changes.content = {
+        changed: true,
+        isMinor: isMinorEdit,
+        editDistance: editDistance,
+        changeRatio: Math.round(changeRatio * 100),
+        before: oldContent,
+        after: newContent
+      };
+    }
+
+    // 주문 항목 변경
+    if (JSON.stringify(processedFoodItems) !== JSON.stringify(existingReview.foodItems)) {
+      changes.foodItems = {
+        changed: true,
+        isMinor: false,
+        before: existingReview.foodItems,
+        after: processedFoodItems
+      };
+    }
+
+    // 총액 변경
+    const newTotalPrice = updateData.totalPrice ? parseInt(updateData.totalPrice) : null;
+    if (newTotalPrice !== existingReview.totalPrice) {
+      changes.totalPrice = {
+        changed: true,
+        isMinor: false,
+        before: existingReview.totalPrice,
+        after: newTotalPrice
+      };
+    }
+
+    const editHistoryEntry = {
+      editedAt: Timestamp.fromDate(now),
+      changes: changes
+    };
+
+    // 기존 수정 이력 가져오기 (없으면 빈 배열)
+    const editHistory = existingReview.editHistory || [];
+    editHistory.push(editHistoryEntry);
+
     // 수정 데이터 준비
     const dataToUpdate = {
       restaurantId: updateData.restaurantId || '',
@@ -130,7 +210,8 @@ export const updateReview = async (reviewId, updateData, userId) => {
       content: updateData.content,
       foodItems: processedFoodItems,
       totalPrice: updateData.totalPrice ? parseInt(updateData.totalPrice) : null,
-      updatedAt: Timestamp.fromDate(new Date())
+      updatedAt: Timestamp.fromDate(now),
+      editHistory: editHistory
     };
 
     // 날짜 필드 변환
@@ -317,3 +398,122 @@ export const searchReviews = async (userId, searchQuery) => {
     throw error;
   }
 };
+
+/**
+ * 리뷰 공개 상태 토글
+ * @param {string} reviewId - 리뷰 ID
+ * @param {string} userId - 사용자 ID
+ * @param {boolean} isPublic - 공개 여부
+ * @returns {Promise<void>}
+ */
+export const toggleReviewPublic = async (reviewId, userId, isPublic) => {
+  try {
+    const reviewRef = doc(db, REVIEWS_COLLECTION, reviewId);
+
+    // 기존 리뷰 조회
+    const reviewSnap = await getDoc(reviewRef);
+
+    if (!reviewSnap.exists()) {
+      throw new Error('리뷰를 찾을 수 없습니다.');
+    }
+
+    const review = reviewSnap.data();
+
+    // 권한 확인
+    if (review.userId !== userId) {
+      throw new Error('권한이 없습니다.');
+    }
+
+    // 공개 대기 기간 확인 (7일)
+    const createdAt = review.createdAt.toDate();
+    const now = new Date();
+    const daysSinceCreation = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+    const WAITING_PERIOD_DAYS = 7;
+
+    // 비공개 → 공개로 전환하려는 경우에만 대기 기간 체크
+    if (!review.isPublic && isPublic) {
+      if (daysSinceCreation < WAITING_PERIOD_DAYS) {
+        const remainingDays = WAITING_PERIOD_DAYS - daysSinceCreation;
+        throw new Error(`리뷰 작성 후 ${WAITING_PERIOD_DAYS}일이 지나야 공개할 수 있습니다. (남은 기간: ${remainingDays}일)`);
+      }
+
+      // TODO: 신뢰도 점수 체크 (추후 구현)
+      // if (userTrustScore >= INSTANT_PUBLIC_THRESHOLD) {
+      //   // 즉시 공개 가능
+      // }
+    }
+
+    // 상태 업데이트
+    await updateDoc(reviewRef, {
+      isPublic,
+      updatedAt: Timestamp.fromDate(now)
+    });
+  } catch (error) {
+    console.error('리뷰 공개 상태 변경 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * 리뷰의 공개 가능 여부 확인
+ * @param {Object} review - 리뷰 객체
+ * @returns {Object} { canMakePublic: boolean, remainingDays: number }
+ */
+export const checkCanMakePublic = (review) => {
+  const createdAt = review.createdAt instanceof Date
+    ? review.createdAt
+    : review.createdAt?.toDate();
+
+  if (!createdAt) {
+    return { canMakePublic: false, remainingDays: 0 };
+  }
+
+  const now = new Date();
+  const daysSinceCreation = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
+  const WAITING_PERIOD_DAYS = 7;
+
+  const remainingDays = Math.max(0, WAITING_PERIOD_DAYS - daysSinceCreation);
+  const canMakePublic = daysSinceCreation >= WAITING_PERIOD_DAYS;
+
+  // TODO: 신뢰도 점수가 높으면 즉시 공개 가능
+  // if (userTrustScore >= INSTANT_PUBLIC_THRESHOLD) {
+  //   return { canMakePublic: true, remainingDays: 0 };
+  // }
+
+  return { canMakePublic, remainingDays };
+};
+
+/**
+ * Levenshtein distance 계산 (두 문자열 간의 편집 거리)
+ * @param {string} str1 - 첫 번째 문자열
+ * @param {string} str2 - 두 번째 문자열
+ * @returns {number} 편집 거리
+ */
+function calculateEditDistance(str1, str2) {
+  const len1 = str1.length;
+  const len2 = str2.length;
+
+  // DP 테이블 생성
+  const dp = Array(len1 + 1).fill(null).map(() => Array(len2 + 1).fill(0));
+
+  // 초기화
+  for (let i = 0; i <= len1; i++) dp[i][0] = i;
+  for (let j = 0; j <= len2; j++) dp[0][j] = j;
+
+  // DP 계산
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1];
+      } else {
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,      // 삭제
+          dp[i][j - 1] + 1,      // 삽입
+          dp[i - 1][j - 1] + 1   // 교체
+        );
+      }
+    }
+  }
+
+  return dp[len1][len2];
+}
