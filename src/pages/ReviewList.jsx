@@ -15,6 +15,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
   const lastScrollY = useRef(0);
   const scrollTimeout = useRef(null);
   const contentRef = useRef(null);
+  const scrollDirection = useRef(null); // 'up' | 'down' | null
 
   // TODO: 실제 사용자 ID는 인증 시스템에서 가져와야 함
   const userId = 'temp_user_id';
@@ -53,45 +54,33 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
 
   // 스크롤 기반 헤더 숨김/표시
   useEffect(() => {
-    const handleScroll = (e) => {
-      const target = e.target;
-      const currentScrollY = target.scrollTop;
+    if (initialLoading) return; // 로딩 중에는 실행하지 않음
 
-      // 스크롤 위치가 100px 이상일 때만 헤더 숨김 동작
-      if (currentScrollY < 100) {
+    const scrollContainer = contentRef.current;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      const currentScrollY = scrollContainer.scrollTop;
+
+      // 최상단(50px 이하)에 있으면 헤더 표시
+      if (currentScrollY <= 50) {
         setShowHeader?.(true);
-        lastScrollY.current = currentScrollY;
-        return;
       }
-
-      // 스크롤 방향 감지
-      if (currentScrollY > lastScrollY.current) {
-        // 아래로 스크롤 - 헤더 숨김
+      // 그 외의 경우 (스크롤이 조금이라도 내려가 있으면) 헤더 숨김
+      else {
         setShowHeader?.(false);
-      } else {
-        // 위로 스크롤 - 헤더 표시
-        setShowHeader?.(true);
       }
 
       lastScrollY.current = currentScrollY;
     };
 
-    const contentElement = contentRef.current;
-    if (contentElement) {
-      contentElement.addEventListener('scroll', handleScroll, { passive: true });
-    }
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
 
     return () => {
-      if (contentElement) {
-        contentElement.removeEventListener('scroll', handleScroll);
-      }
-      if (scrollTimeout.current) {
-        clearTimeout(scrollTimeout.current);
-      }
-      // 컴포넌트 언마운트 시 헤더 다시 표시
+      scrollContainer.removeEventListener('scroll', handleScroll);
       setShowHeader?.(true);
     };
-  }, [setShowHeader]);
+  }, [initialLoading, setShowHeader]);
 
   const loadReviews = async () => {
     try {
