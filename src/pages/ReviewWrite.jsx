@@ -762,7 +762,8 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
       {showChangeRestaurantConfirm && (
         <ConfirmModal
           title="가게명 변경"
-          message={`가게명을 다시 검색할까요?\n주소와 전화번호도 함께 변경됩니다.`}
+          message={`가게명을 다시 검색할까요?
+주소와 전화번호도 함께 변경됩니다.`}
           icon=""
           confirmText="예"
           cancelText="아니오"
@@ -775,10 +776,13 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
       {showCancelConfirm && (
         <ConfirmModal
           title="수정 취소"
-          message="수정된 내용이 있습니다.\n취소를 누르면 수정한 내용이 반영되지 않습니다.\n\n정말 취소하시겠습니까?"
+          message={`수정된 내용이 있습니다.
+취소를 누르면 수정한 내용이 반영되지 않습니다.
+
+정말 취소하시겠습니까?`}
           icon="⚠️"
-          confirmText="취소하기"
-          cancelText="계속 수정"
+          confirmText="예"
+          cancelText="아니오"
           onConfirm={confirmCancel}
           onCancel={() => setShowCancelConfirm(false)}
         />
