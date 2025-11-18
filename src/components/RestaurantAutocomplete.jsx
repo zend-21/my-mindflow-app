@@ -284,18 +284,21 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
   // 현재 GPS 위치 가져오기
   const fetchCurrentLocation = async () => {
     try {
+      console.log('📍 현재 위치 가져오기 시작...');
       setIsLoading(true);
       showToast?.('현재 위치를 가져오는 중...');
 
       const location = await getCurrentLocation();
       setCurrentLocation(location);
 
-      showToast?.('현재 위치를 가져왔습니다.');
+      console.log('📍 현재 위치 가져오기 성공:', location);
+      showToast?.(`현재 위치를 가져왔습니다. (${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)})`);
     } catch (error) {
-      console.error('위치 가져오기 실패:', error);
-      showToast?.('위치 정보를 가져올 수 없습니다. 위치 권한을 확인하세요.');
+      console.error('📍 위치 가져오기 실패:', error);
+      showToast?.(`위치 정보를 가져올 수 없습니다: ${error.message}`);
     } finally {
       setIsLoading(false);
+      console.log('📍 위치 가져오기 완료 (loading 해제)');
     }
   };
 
