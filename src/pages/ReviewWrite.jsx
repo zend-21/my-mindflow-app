@@ -526,6 +526,7 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
               {formData.content ? (
                 <div
                   className="formatted-content-display-preview"
+                  onClick={() => setIsEditorOpen(true)}
                   dangerouslySetInnerHTML={{ __html: renderFormattedContent(formData.content) }}
                 />
               ) : (

@@ -355,7 +355,6 @@ const RichTextEditorModal = ({ isOpen, onClose, content, onSave, showToast, rest
             value={editorContent}
             onChange={(e) => setEditorContent(e.target.value)}
             placeholder="솔직한 후기를 작성해주세요. 이 리뷰는 나만 볼 수 있습니다."
-            autoFocus
           />
         </div>
 
