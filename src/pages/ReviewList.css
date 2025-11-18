@@ -262,9 +262,18 @@
 }
 
 .rating {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
   color: #ffc107;
-  font-size: 1.1rem;
   white-space: nowrap;
+}
+
+.rating-number {
+  font-size: 0.75rem;
+  color: #ffc107;
+  font-weight: 500;
 }
 
 /* 별점 표시 스타일 */

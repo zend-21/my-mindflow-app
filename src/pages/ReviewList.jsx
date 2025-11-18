@@ -320,6 +320,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
                     </h3>
                     <div className="rating">
                       {renderStars(review.rating)}
+                      <div className="rating-number">({review.rating.toFixed(2)})</div>
                     </div>
                   </div>
 
