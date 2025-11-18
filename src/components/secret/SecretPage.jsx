@@ -1584,14 +1584,14 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 padding: '20px',
-                paddingTop: 'calc(20px + env(safe-area-inset-top, 0px) + 80px)' // 모바일 Safe Area 대응 (PC는 20px, 모바일은 safe-area + 80px)
+                paddingTop: window.innerWidth <= 768 ? '130px' : '20px' // 모바일만 130px 상단 여백
             }}>
                 {/* 닫기 버튼 */}
                 <button
                     onClick={onClose}
                     style={{
                         position: 'absolute',
-                        top: 'max(20px, calc(env(safe-area-inset-top, 0px) + 10px))', // Safe Area 대응
+                        top: window.innerWidth <= 768 ? '40px' : 'max(20px, calc(env(safe-area-inset-top, 0px) + 10px))', // 모바일은 40px, PC는 기존 방식
                         right: '20px',
                         width: '40px',
                         height: '40px',
