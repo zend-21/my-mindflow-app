@@ -61,9 +61,17 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  position: sticky;
-  top: 0;
+  position: fixed;
+  top: 70px; /* 앱 헤더 아래 */
+  left: 0;
+  right: 0;
   z-index: 50;
+  transition: top 0.3s ease;
+}
+
+/* 헤더가 숨겨졌을 때 */
+.review-list-header.header-hidden {
+  top: 0;
 }
 
 .review-list-header h1 {
@@ -102,6 +110,17 @@
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
+  position: fixed;
+  top: 130px; /* 헤더(70px) + 리뷰헤더(60px) */
+  left: 0;
+  right: 0;
+  z-index: 49;
+  transition: top 0.3s ease;
+}
+
+/* 헤더가 숨겨졌을 때 필터 섹션도 올라감 */
+.filter-section.header-hidden {
+  top: 60px; /* 리뷰헤더 높이만큼만 */
 }
 
 .search-box {
@@ -192,7 +211,13 @@
 /* 리뷰 목록 */
 .review-list-content {
   padding: 0.5rem 1rem 1rem 1rem;
-  margin-top: 0;
+  margin-top: 190px; /* 헤더(70px) + 리뷰헤더(60px) + 필터(60px) */
+  transition: margin-top 0.3s ease;
+}
+
+/* 헤더가 숨겨졌을 때 콘텐츠 위치 조정 */
+.review-list-content.header-hidden {
+  margin-top: 120px; /* 리뷰헤더(60px) + 필터(60px) */
 }
 
 .empty-state {

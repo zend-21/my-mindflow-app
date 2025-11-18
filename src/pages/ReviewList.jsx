@@ -16,6 +16,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
   const scrollTimeout = useRef(null);
   const contentRef = useRef(null);
   const scrollDirection = useRef(null); // 'up' | 'down' | null
+  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
 
   // TODO: 실제 사용자 ID는 인증 시스템에서 가져와야 함
   const userId = 'temp_user_id';
@@ -65,10 +66,12 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
       // 최상단(50px 이하)에 있으면 헤더 표시
       if (currentScrollY <= 50) {
         setShowHeader?.(true);
+        setIsHeaderHidden(false);
       }
       // 그 외의 경우 (스크롤이 조금이라도 내려가 있으면) 헤더 숨김
       else {
         setShowHeader?.(false);
+        setIsHeaderHidden(true);
       }
 
       lastScrollY.current = currentScrollY;
@@ -266,7 +269,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
 
   return (
     <div className="review-list-page" ref={contentRef}>
-      <header className="review-list-header">
+      <header className={`review-list-header ${isHeaderHidden ? 'header-hidden' : ''}`}>
         <h1>내 리뷰 ({reviews.length})</h1>
         <button
           className="write-button"
@@ -277,7 +280,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
       </header>
 
       {/* 검색 및 필터 */}
-      <div className="filter-section">
+      <div className={`filter-section ${isHeaderHidden ? 'header-hidden' : ''}`}>
         <div className="search-box">
           <input
             type="text"
@@ -312,7 +315,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
       </div>
 
       {/* 리뷰 목록 */}
-      <div className="review-list-content">
+      <div className={`review-list-content ${isHeaderHidden ? 'header-hidden' : ''}`}>
         {sortLoading ? (
           <div className="sort-loading">
             <div className="loading-spinner"></div>
