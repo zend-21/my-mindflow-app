@@ -377,17 +377,20 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
     const handlePointerDown = (e) => {
         if (selectionMode) return; // 다중 선택 모드에서는 길게 누르기 비활성화
 
+        // 터치와 마우스 이벤트 모두 지원
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
         // 시작 위치 저장
         startPosRef.current = {
-            x: e.clientX,
-            y: e.clientY,
+            x: clientX,
+            y: clientY,
             time: Date.now()
         };
 
         isLongPressRef.current = false;
 
-        // 타이머를 즉시 시작하지 않고 짧은 지연 후 시작
-        // 이렇게 하면 스와이프 시작 시 움직임을 먼저 감지할 수 있음
+        // 길게 누르기 타이머 시작
         longPressTimerRef.current = setTimeout(() => {
             isLongPressRef.current = true;
             if (onLongPress) {
@@ -397,9 +400,13 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
     };
 
     const handlePointerMove = (e) => {
+        // 터치와 마우스 이벤트 모두 지원
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
         // 움직임이 5px 이상이면 즉시 타이머 취소 (스와이프 감지)
-        const deltaX = Math.abs(e.clientX - startPosRef.current.x);
-        const deltaY = Math.abs(e.clientY - startPosRef.current.y);
+        const deltaX = Math.abs(clientX - startPosRef.current.x);
+        const deltaY = Math.abs(clientY - startPosRef.current.y);
 
         if (deltaX > 5 || deltaY > 5) {
             clearTimeout(longPressTimerRef.current);
@@ -410,9 +417,13 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
     const handlePointerUp = (e) => {
         clearTimeout(longPressTimerRef.current);
 
-        // 실제로 움직임이 있었는지 확인 (스크롤 방지)
-        const deltaX = Math.abs(e.clientX - startPosRef.current.x);
-        const deltaY = Math.abs(e.clientY - startPosRef.current.y);
+        // 터치와 마우스 이벤트 모두 지원 (터치는 changedTouches 사용)
+        const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
+        const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
+
+        // 실제로 움직임이 있었는지 확인 (스와이프 방지)
+        const deltaX = Math.abs(clientX - startPosRef.current.x);
+        const deltaY = Math.abs(clientY - startPosRef.current.y);
         const hasMoved = deltaX > 5 || deltaY > 5;
 
         // selectionMode가 아니고, 롱프레스가 아니며, 움직임이 없었을 때만 클릭으로 문서 열기

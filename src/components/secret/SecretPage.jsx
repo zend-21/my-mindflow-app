@@ -1583,14 +1583,15 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: '20px'
+                padding: '20px',
+                paddingTop: 'max(50px, env(safe-area-inset-top, 20px))' // Safe Area 대응
             }}>
                 {/* 닫기 버튼 */}
                 <button
                     onClick={onClose}
                     style={{
                         position: 'absolute',
-                        top: '20px',
+                        top: 'max(20px, calc(env(safe-area-inset-top, 0px) + 10px))', // Safe Area 대응
                         right: '20px',
                         width: '40px',
                         height: '40px',
