@@ -1,0 +1,203 @@
+/* src/components/DetailedRatingInput.css */
+
+.detailed-rating-input {
+  margin-bottom: 1rem;
+}
+
+.rating-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.95rem;
+}
+
+.required {
+  color: #ff6b6b;
+  margin-left: 0.25rem;
+  font-size: 0.85em;
+}
+
+.rating-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  min-height: 2.3rem;
+}
+
+.star-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.star-button {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s;
+  color: #ddd;
+  line-height: 1;
+  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.2);
+}
+
+.star-button:hover {
+  transform: scale(1.15);
+}
+
+.star-button.filled {
+  color: #ffc107;
+}
+
+.star-button.partial {
+  position: relative;
+  color: #ddd;
+}
+
+.star-button.partial::before {
+  content: '★';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: #ffc107;
+  overflow: hidden;
+  width: var(--fill-percent, 50%);
+}
+
+.star-button.empty {
+  color: #ddd;
+}
+
+.score-display {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #f0f0f0;
+}
+
+.score-number {
+  min-width: 1.5rem;
+  text-align: right;
+}
+
+.decimal-dot {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.decimal-input {
+  width: 3.5rem;
+  padding: 0.5rem 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #f0f0f0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.decimal-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.decimal-input:focus {
+  outline: none;
+  border-color: rgba(240, 147, 251, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
+}
+
+.score-suffix {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1rem;
+}
+
+.rating-reset-button {
+  background: rgba(245, 87, 108, 0.2);
+  border: 1px solid rgba(245, 87, 108, 0.3);
+  border-radius: 6px;
+  color: #f5576c;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.4rem 0.7rem;
+  transition: all 0.2s;
+  line-height: 1;
+  margin-left: auto;
+}
+
+.rating-reset-button:hover {
+  background: rgba(245, 87, 108, 0.3);
+  border-color: rgba(245, 87, 108, 0.5);
+  transform: scale(1.05);
+}
+
+.rating-reset-button:active {
+  background: rgba(245, 87, 108, 0.4);
+  transform: scale(0.98);
+}
+
+.rating-detail {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* 하위 별점 (맛, 가격, 친절) - 작게 표시 */
+.detailed-rating-input.sub-rating .star-button {
+  font-size: 1.5rem;
+}
+
+.detailed-rating-input.sub-rating .score-display {
+  font-size: 1rem;
+}
+
+.detailed-rating-input.sub-rating .decimal-input {
+  width: 3.5rem !important;
+  font-size: 0.95rem;
+  padding: 0.5rem 0.5rem !important;
+}
+
+.detailed-rating-input.sub-rating .rating-label {
+  font-size: 0.85rem;
+}
+
+.detailed-rating-input.sub-rating .rating-reset-button {
+  font-size: 0.9rem;
+  padding: 0.35rem 0.6rem;
+}
+
+.detailed-rating-input.sub-rating .rating-controls {
+  min-height: 2.2rem;
+}
+
+/* 반응형 */
+@media (max-width: 480px) {
+  .star-button {
+    font-size: 1.75rem;
+  }
+
+  .score-display {
+    font-size: 1.1rem;
+  }
+
+  .decimal-input {
+    width: 3rem;
+    font-size: 1rem;
+    padding: 0.4rem 0.4rem;
+  }
+
+  .detailed-rating-input.sub-rating .star-button {
+    font-size: 1.4rem;
+  }
+
+  .detailed-rating-input.sub-rating .score-display {
+    font-size: 0.9rem;
+  }
+}

@@ -1,0 +1,450 @@
+.review-list-page {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
+  padding-bottom: 80px; /* 푸터 공간 확보 */
+  padding-top: 70px; /* 헤더 높이만큼 패딩 */
+  margin-top: 0;
+  overflow-y: auto;
+  z-index: 10;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-size: 1.1rem;
+  color: #aaa;
+}
+
+.review-list-header {
+  background: rgba(31, 34, 41, 0.95);
+  backdrop-filter: blur(10px);
+  padding: 1.5rem;
+  box-shadow: none;
+  border-bottom: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.review-list-header h1 {
+  font-size: 1.5rem;
+  margin: 0;
+  font-weight: 700;
+  color: #f0f0f0;
+}
+
+.write-button {
+  background: #f093fb;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.write-button:hover {
+  background: #f5a3fc;
+  transform: translateY(-1px);
+}
+
+/* 필터 섹션 */
+.filter-section {
+  background: rgba(31, 34, 41, 0.8);
+  backdrop-filter: blur(10px);
+  padding: 1rem 1.5rem;
+  margin: 0;
+  border-radius: 0;
+  box-shadow: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.search-box {
+  flex: 1;
+  min-width: 200px;
+  position: relative;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 12px 16px;
+  padding-right: 2.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffffff;
+  transition: all 0.2s;
+}
+
+.search-box input::placeholder {
+  color: #808080;
+}
+
+.search-box input:focus {
+  outline: none;
+  border-color: rgba(240, 147, 251, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
+}
+
+.clear-search {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clear-search:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.sort-box {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sort-box label {
+  font-size: 0.95rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+.sort-box select {
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  color: #b0b0b0;
+  transition: all 0.2s;
+}
+
+.sort-box select:focus {
+  outline: none;
+  border-color: rgba(240, 147, 251, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+  color: #f093fb;
+}
+
+/* 리뷰 목록 */
+.review-list-content {
+  padding: 0.5rem 1rem 1rem 1rem;
+  margin-top: 0;
+}
+
+.empty-state {
+  background: rgba(31, 34, 41, 0.6);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  margin-top: 0;
+}
+
+.empty-state p {
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 1.5rem;
+}
+
+.empty-write-button {
+  background: #f093fb;
+  color: white;
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.empty-write-button:hover {
+  background: #f5a3fc;
+  transform: translateY(-1px);
+}
+
+.review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 1rem;
+}
+
+.review-card {
+  background: rgba(31, 34, 41, 0.6);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+.review-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(240, 147, 251, 0.15);
+  border-color: rgba(240, 147, 251, 0.3);
+}
+
+.review-photo {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.review-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-count {
+  position: absolute;
+  bottom: 0.5rem;
+  right: 0.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+}
+
+.review-body {
+  padding: 1.25rem;
+}
+
+.review-header-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+  gap: 1rem;
+}
+
+.restaurant-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: #f0f0f0;
+  flex: 1;
+}
+
+.rating {
+  color: #ffc107;
+  font-size: 1.1rem;
+  white-space: nowrap;
+}
+
+.review-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.review-content {
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.6;
+  margin: 0 0 1rem 0;
+  font-size: 0.95rem;
+}
+
+.food-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.food-tag {
+  background: rgba(240, 147, 251, 0.15);
+  color: #f093fb;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid rgba(240, 147, 251, 0.25);
+}
+
+.food-tag .food-price {
+  color: rgba(240, 147, 251, 0.8);
+  font-weight: 400;
+}
+
+.review-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.order-date {
+}
+
+.price {
+  font-weight: 600;
+  color: #4a90e2;
+}
+
+.review-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.created-date {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.review-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.edit-button,
+.delete-button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.edit-button {
+  background: rgba(240, 147, 251, 0.15);
+  color: #f093fb;
+  border: 1px solid rgba(240, 147, 251, 0.3);
+}
+
+.edit-button:hover {
+  background: rgba(240, 147, 251, 0.25);
+  color: #f5a3fc;
+  border-color: rgba(240, 147, 251, 0.5);
+}
+
+.delete-button {
+  background: rgba(245, 87, 108, 0.15);
+  color: #f5576c;
+  border: 1px solid rgba(245, 87, 108, 0.3);
+}
+
+.delete-button:hover {
+  background: rgba(245, 87, 108, 0.25);
+  color: #f7778c;
+  border-color: rgba(245, 87, 108, 0.5);
+}
+
+/* 통계 */
+.review-stats {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  margin: 1rem;
+  background: rgba(31, 34, 41, 0.8);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.stat-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #f093fb;
+}
+
+/* 반응형 */
+@media (max-width: 768px) {
+  .review-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-section {
+    flex-direction: column;
+  }
+
+  .search-box {
+    min-width: 100%;
+  }
+
+  .sort-box {
+    width: 100%;
+  }
+
+  .sort-box select {
+    flex: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .review-list-header {
+    padding: 1rem;
+  }
+
+  .review-list-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .write-button {
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  .review-body {
+    padding: 1rem;
+  }
+}

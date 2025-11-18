@@ -44,6 +44,7 @@ import { TrashProvider } from './contexts/TrashContext';
 import TrashPage from './components/TrashPage.jsx';
 import AppContent from './components/AppContent.jsx';
 import SecretPage from './components/secret/SecretPage.jsx';
+import ReviewPage from './pages/ReviewPage.jsx';
 
 // ★★★ 토스트 메시지 스타일 ★★★
 const fadeIn = keyframes`
@@ -2027,7 +2028,6 @@ if (isLoading) {
                                 onRequestDeleteSelectedMemos={requestDeleteSelectedMemos}
                             />
                         }
-                        {activeTab === 'review' && <div>리뷰 페이지</div>}
                         {activeTab === 'todo' && <div>할 일 페이지</div>}
                         {activeTab === 'recent-detail' && <div>최근 활동 상세 페이지</div>}
                         {activeTab === 'trash' && <TrashPage showToast={showToast} />}
@@ -2038,6 +2038,7 @@ if (isLoading) {
                                 showToast={showToast}
                             />
                         )}
+                        {activeTab === 'review' && <ReviewPage showToast={showToast} />}
                     </ContentArea>
 
                     <FloatingButton onClick={handleOpenNewMemoFromFAB} activeTab={activeTab} />

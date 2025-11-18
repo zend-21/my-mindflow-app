@@ -15,7 +15,8 @@
       "Bash(cat:*)",
       "Bash(findstr:*)",
       "Bash(git checkout:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(npx cap init:*)"
     ],
     "deny": [],
     "ask": []

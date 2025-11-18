@@ -259,8 +259,8 @@ const FloatingButton = ({ activeTab, onClick }) => {
         };
     }, []);
 
-    // secret 탭에서는 FloatingButton 숨김
-    if (activeTab === 'secret') {
+    // secret 탭과 review 탭에서는 FloatingButton 숨김
+    if (activeTab === 'secret' || activeTab === 'review') {
         return null;
     }
 
