@@ -596,9 +596,11 @@
 }
 
 .cancel-button:disabled,
-.submit-button:disabled {
-  opacity: 0.6;
+.submit-button:disabled,
+.submit-button.disabled {
+  opacity: 0.5;
   cursor: not-allowed;
+  background: rgba(240, 147, 251, 0.3);
 }
 
 /* 반응형 */

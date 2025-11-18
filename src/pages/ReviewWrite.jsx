@@ -28,10 +28,12 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
     orderDate: new Date().toISOString().split('T')[0]
   });
 
+  const [originalData, setOriginalData] = useState(null); // 수정 모드: 원본 데이터
   const [loading, setLoading] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [isEditingRestaurant, setIsEditingRestaurant] = useState(false);
   const [showChangeRestaurantConfirm, setShowChangeRestaurantConfirm] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   // 수정 모드: 기존 리뷰 데이터 로드
   useEffect(() => {
@@ -75,7 +77,7 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
         });
       }
 
-      setFormData({
+      const loadedData = {
         restaurantId: review.restaurantId || '',
         restaurantName: review.restaurantName,
         restaurantAddress: review.restaurantAddress || '',
@@ -92,7 +94,10 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
         orderDate: review.orderDate
           ? new Date(review.orderDate).toISOString().split('T')[0]
           : new Date().toISOString().split('T')[0]
-      });
+      };
+
+      setFormData(loadedData);
+      setOriginalData(JSON.parse(JSON.stringify(loadedData))); // 깊은 복사
     } catch (error) {
       console.error('리뷰 로드 실패:', error);
       showToast?.('리뷰를 불러오는데 실패했습니다.');
@@ -240,6 +245,14 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
   // 자동 계산된 총액 (표시용)
   const autoCalculatedTotal = calculateTotalPrice(formData.foodItems);
 
+  // 변경사항 확인 (수정 모드에서만)
+  const hasChanges = () => {
+    if (!isEditMode || !originalData) return false;
+
+    // JSON 문자열로 비교 (공백 포함)
+    return JSON.stringify(formData) !== JSON.stringify(originalData);
+  };
+
   // 가게 선택 핸들러 (자동완성에서 선택 시)
   const handleRestaurantSelect = (restaurant) => {
     setFormData(prev => ({
@@ -298,6 +311,21 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
       ...prev,
       photos: prev.photos.filter((_, i) => i !== index)
     }));
+  };
+
+  // 취소 버튼 핸들러
+  const handleCancel = () => {
+    if (isEditMode && hasChanges()) {
+      setShowCancelConfirm(true);
+    } else {
+      onBack();
+    }
+  };
+
+  // 취소 확인
+  const confirmCancel = () => {
+    setShowCancelConfirm(false);
+    onBack();
   };
 
   // 폼 제출
@@ -705,15 +733,15 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
           <button
             type="button"
             className="cancel-button"
-            onClick={onBack}
+            onClick={handleCancel}
             disabled={loading}
           >
             취소
           </button>
           <button
             type="submit"
-            className="submit-button"
-            disabled={loading}
+            className={`submit-button ${isEditMode && !hasChanges() ? 'disabled' : ''}`}
+            disabled={loading || (isEditMode && !hasChanges())}
           >
             {loading ? '저장 중...' : isEditMode ? '수정하기' : '저장하기'}
           </button>
@@ -740,6 +768,19 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
           cancelText="아니오"
           onConfirm={handleConfirmChangeRestaurant}
           onCancel={() => setShowChangeRestaurantConfirm(false)}
+        />
+      )}
+
+      {/* 취소 확인 모달 */}
+      {showCancelConfirm && (
+        <ConfirmModal
+          title="수정 취소"
+          message="수정된 내용이 있습니다.\n취소를 누르면 수정한 내용이 반영되지 않습니다.\n\n정말 취소하시겠습니까?"
+          icon="⚠️"
+          confirmText="취소하기"
+          cancelText="계속 수정"
+          onConfirm={confirmCancel}
+          onCancel={() => setShowCancelConfirm(false)}
         />
       )}
     </div>
