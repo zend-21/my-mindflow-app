@@ -3,11 +3,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { searchRestaurants, getCurrentLocation, searchNearbyRestaurants } from '../services/kakaoMapService';
 import AddressInput from './AddressInput';
+import AddressManageModal from './AddressManageModal';
 import './RestaurantAutocomplete.css';
 
 // 로컬 스토리지 키
 const SAVED_ADDRESSES_KEY = 'mindflow_saved_addresses'; // 최대 3개 저장
 const LOCATION_MODE_KEY = 'mindflow_location_mode';
+
+// 아이콘 SVG 맵핑
+const ICON_SVGS = {
+  home: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+  briefcase: 'M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16M2 7h20v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7z',
+  users: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
+  heart: 'M20.8 4.6a5.5 5.5 0 0 0-7.7 0l-1.1 1-1.1-1a5.5 5.5 0 0 0-7.7 7.8l1 1 7.8 7.8 7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z',
+  map: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z',
+};
 
 const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
   const [query, setQuery] = useState(initialValue);
@@ -17,6 +27,8 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [pendingLocationMode, setPendingLocationMode] = useState(null); // 주소 입력 대기 중인 모드
+  const [showManageModal, setShowManageModal] = useState(false);
+  const [manageSlotIndex, setManageSlotIndex] = useState(null);
 
   // 위치 모드: 'current' (현재위치), 'address1', 'address2', 'address3' (저장주소 슬롯)
   const [locationMode, setLocationMode] = useState(() => {
@@ -29,6 +41,8 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
   const inputRef = useRef(null);
   const resultsRef = useRef(null);
   const searchTimeoutRef = useRef(null);
+  const longPressTimerRef = useRef(null);
+  const longPressStartRef = useRef(null);
 
   // 저장된 주소들 불러오기 (최대 3개)
   useEffect(() => {
@@ -396,6 +410,28 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
   const getAddressLabel = (slotIndex) => {
     const address = savedAddresses[slotIndex];
     if (!address) return `주소${slotIndex + 1}`;
+
+    // 아이콘 SVG 표시
+    if (address.icon && ICON_SVGS[address.icon]) {
+      return (
+        <>
+          <svg
+            className="address-icon-svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d={ICON_SVGS[address.icon]} />
+          </svg>
+          {address.label || ''}
+        </>
+      );
+    }
+
+    // 커스텀 라벨만 표시
     if (address.label) return address.label;
 
     // 주소에서 동/구 이름 추출 (예: "서울 강남구" -> "강남")
@@ -405,6 +441,75 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
       return district.replace('구', '').replace('동', ''); // "강남"
     }
     return `주소${slotIndex + 1}`;
+  };
+
+  // 길게 누르기 시작
+  const handleLongPressStart = (slotIndex) => {
+    longPressStartRef.current = {
+      time: Date.now(),
+      slotIndex,
+      isLongPress: false
+    };
+
+    longPressTimerRef.current = setTimeout(() => {
+      // 500ms 이상 누르면 관리 모달 열기
+      longPressStartRef.current.isLongPress = true;
+      setManageSlotIndex(slotIndex);
+      setShowManageModal(true);
+    }, 500);
+  };
+
+  // 길게 누르기 취소
+  const handleLongPressEnd = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  };
+
+  // 주소 버튼 클릭 (길게 누르기가 아닐 때만)
+  const handleAddressButtonClick = (mode) => {
+    // 길게 눌렀으면 일반 클릭 무시
+    if (longPressStartRef.current?.isLongPress) {
+      longPressStartRef.current = null;
+      return;
+    }
+
+    handleLocationModeChange(mode);
+  };
+
+  // 주소 저장
+  const handleAddressSave = (slotIndex, addressData) => {
+    const newAddresses = [...savedAddresses];
+    newAddresses[slotIndex] = addressData;
+
+    localStorage.setItem(SAVED_ADDRESSES_KEY, JSON.stringify(newAddresses));
+    setSavedAddresses(newAddresses);
+
+    // 저장 후 해당 모드로 자동 전환
+    const mode = `address${slotIndex + 1}`;
+    setLocationMode(mode);
+    localStorage.setItem(LOCATION_MODE_KEY, mode);
+
+    if (query.trim() !== '') {
+      performSearch(query);
+    }
+  };
+
+  // 주소 삭제
+  const handleAddressDelete = (slotIndex) => {
+    const newAddresses = [...savedAddresses];
+    newAddresses[slotIndex] = null;
+
+    localStorage.setItem(SAVED_ADDRESSES_KEY, JSON.stringify(newAddresses));
+    setSavedAddresses(newAddresses);
+
+    // 삭제한 주소가 현재 선택된 모드면 address1로 변경
+    const mode = `address${slotIndex + 1}`;
+    if (locationMode === mode) {
+      setLocationMode('address1');
+      localStorage.setItem(LOCATION_MODE_KEY, 'address1');
+    }
   };
 
   return (
@@ -422,7 +527,13 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
         <button
           type="button"
           className={`mode-tab ${locationMode === 'address1' ? 'active' : ''}`}
-          onClick={() => handleLocationModeChange('address1')}
+          onClick={() => handleAddressButtonClick('address1')}
+          onMouseDown={() => handleLongPressStart(0)}
+          onMouseUp={handleLongPressEnd}
+          onMouseLeave={handleLongPressEnd}
+          onTouchStart={() => handleLongPressStart(0)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
           disabled={isLoading}
         >
           {getAddressLabel(0)}
@@ -431,7 +542,13 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
         <button
           type="button"
           className={`mode-tab ${locationMode === 'address2' ? 'active' : ''}`}
-          onClick={() => handleLocationModeChange('address2')}
+          onClick={() => handleAddressButtonClick('address2')}
+          onMouseDown={() => handleLongPressStart(1)}
+          onMouseUp={handleLongPressEnd}
+          onMouseLeave={handleLongPressEnd}
+          onTouchStart={() => handleLongPressStart(1)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
           disabled={isLoading}
         >
           {getAddressLabel(1)}
@@ -440,7 +557,13 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
         <button
           type="button"
           className={`mode-tab ${locationMode === 'address3' ? 'active' : ''}`}
-          onClick={() => handleLocationModeChange('address3')}
+          onClick={() => handleAddressButtonClick('address3')}
+          onMouseDown={() => handleLongPressStart(2)}
+          onMouseUp={handleLongPressEnd}
+          onMouseLeave={handleLongPressEnd}
+          onTouchStart={() => handleLongPressStart(2)}
+          onTouchEnd={handleLongPressEnd}
+          onTouchCancel={handleLongPressEnd}
           disabled={isLoading}
         >
           {getAddressLabel(2)}
@@ -527,6 +650,22 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 주소 관리 모달 */}
+      {showManageModal && manageSlotIndex !== null && (
+        <AddressManageModal
+          isOpen={showManageModal}
+          onClose={() => {
+            setShowManageModal(false);
+            setManageSlotIndex(null);
+          }}
+          slotIndex={manageSlotIndex}
+          currentAddress={savedAddresses[manageSlotIndex]}
+          onSave={handleAddressSave}
+          onDelete={handleAddressDelete}
+          showToast={showToast}
+        />
       )}
     </div>
   );

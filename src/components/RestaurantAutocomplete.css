@@ -36,9 +36,9 @@
 }
 
 .mode-tab.active {
-  background: rgba(240, 147, 251, 0.15);
-  border-color: rgba(240, 147, 251, 0.5);
-  color: #f093fb;
+  background: rgba(240, 147, 251, 0.15) !important;
+  border-color: rgba(240, 147, 251, 0.5) !important;
+  color: #f093fb !important;
 }
 
 .mode-tab:disabled {
@@ -54,6 +54,15 @@
   border-radius: 4px;
   font-size: 10px;
   color: #ffa500;
+}
+
+.address-icon-svg {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+  vertical-align: middle;
+  margin-top: -2px;
 }
 
 .autocomplete-input-wrapper {

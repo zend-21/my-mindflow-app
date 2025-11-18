@@ -1,0 +1,374 @@
+.address-manage-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.address-manage-modal {
+  background: linear-gradient(135deg, rgba(31, 34, 41, 0.98) 0%, rgba(41, 44, 51, 0.98) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  width: 85vw;
+  max-width: 500px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  touch-action: auto;
+}
+
+.address-manage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.address-manage-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.address-manage-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.8rem;
+  cursor: pointer;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  border-radius: 6px;
+}
+
+.address-manage-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.address-manage-content {
+  padding: 20px;
+}
+
+.address-manage-section {
+  margin-bottom: 18px;
+}
+
+.address-manage-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 10px;
+}
+
+/* 아이콘 옵션 - 컴팩트 */
+.icon-options-compact {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.icon-option-compact {
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+}
+
+.icon-option-compact svg {
+  width: 24px;
+  height: 24px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.icon-option-compact:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(240, 147, 251, 0.3);
+  transform: translateY(-2px);
+}
+
+.icon-option-compact.selected {
+  background: rgba(240, 147, 251, 0.15);
+  border-color: rgba(240, 147, 251, 0.6);
+}
+
+.icon-option-compact.selected svg {
+  color: #f093fb;
+}
+
+/* 커스텀 라벨 입력 */
+.custom-label-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.custom-label-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(240, 147, 251, 0.5);
+}
+
+.custom-label-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* 주소 표시 - 컴팩트 */
+.selected-address-compact {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.address-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.address-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.road-address {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.change-address-btn-compact {
+  padding: 6px 12px;
+  background: rgba(240, 147, 251, 0.1);
+  border: 1px solid rgba(240, 147, 251, 0.3);
+  border-radius: 6px;
+  color: #f093fb;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.change-address-btn-compact:hover {
+  background: rgba(240, 147, 251, 0.2);
+  border-color: rgba(240, 147, 251, 0.5);
+}
+
+.select-address-btn {
+  width: 100%;
+  padding: 10px;
+  background: rgba(240, 147, 251, 0.1);
+  border: 1px solid rgba(240, 147, 251, 0.3);
+  border-radius: 10px;
+  color: #f093fb;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.select-address-btn:hover {
+  background: rgba(240, 147, 251, 0.2);
+  border-color: rgba(240, 147, 251, 0.5);
+}
+
+/* 상세주소 입력 */
+.detail-address-input {
+  width: 100%;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+  transition: all 0.2s;
+}
+
+.detail-address-input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(240, 147, 251, 0.5);
+}
+
+.detail-address-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* 액션 버튼들 - 컴팩트 */
+.address-manage-actions {
+  padding: 16px 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  gap: 10px;
+}
+
+.delete-btn-compact {
+  flex: 1;
+  padding: 10px;
+  background: rgba(255, 59, 48, 0.1);
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  border-radius: 10px;
+  color: #ff3b30;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.delete-btn-compact:hover {
+  background: rgba(255, 59, 48, 0.2);
+  border-color: rgba(255, 59, 48, 0.5);
+}
+
+.save-btn-compact {
+  flex: 1;
+  padding: 10px;
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-btn-compact:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(240, 147, 251, 0.3);
+}
+
+/* 주소 입력 오버레이 */
+.address-input-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 9999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+
+.address-input-container {
+  background: linear-gradient(135deg, rgba(31, 34, 41, 0.98) 0%, rgba(41, 44, 51, 0.98) 100%);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  width: 85vw;
+  max-width: 600px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  touch-action: auto;
+}
+
+.address-input-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.address-input-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.address-input-close {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 1.8rem;
+  cursor: pointer;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  border-radius: 6px;
+}
+
+.address-input-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.address-input-content {
+  padding: 20px;
+}
+
+/* 모바일 대응 */
+@media (max-width: 768px) {
+  .address-manage-modal {
+    width: 90vw;
+  }
+
+  .address-input-container {
+    width: 90vw;
+  }
+
+  .icon-options-compact {
+    justify-content: space-between;
+  }
+
+  .icon-option-compact {
+    width: 44px;
+    height: 44px;
+  }
+
+  .icon-option-compact svg {
+    width: 22px;
+    height: 22px;
+  }
+}
