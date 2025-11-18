@@ -166,8 +166,11 @@
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
-  min-width: 85px;
+  width: 95px;
   text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sort-button:hover {
@@ -630,7 +633,7 @@
   .sort-button {
     padding: 0.4rem 0.75rem;
     font-size: 0.85rem;
-    min-width: 75px;
+    width: 85px;
   }
 
   .status-badges {

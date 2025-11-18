@@ -399,7 +399,7 @@ const RichTextEditorModal = ({ isOpen, onClose, content, onSave, showToast, rest
             onClick={handleSave}
             disabled={!hasChanges}
           >
-            수정
+            저장
           </button>
         </div>
 
