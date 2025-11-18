@@ -145,6 +145,89 @@
   font-size: 15px;
 }
 
+/* 가게 정보 표시 (수정 모드) */
+.restaurant-display-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.restaurant-name-display {
+  flex: 1;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.change-restaurant-button {
+  padding: 10px 20px;
+  background: rgba(240, 147, 251, 0.15);
+  border: 1px solid rgba(240, 147, 251, 0.3);
+  border-radius: 8px;
+  color: #f093fb;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.change-restaurant-button:hover {
+  background: rgba(240, 147, 251, 0.25);
+  border-color: rgba(240, 147, 251, 0.5);
+  transform: translateY(-1px);
+}
+
+.restaurant-info-compact {
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.restaurant-info-compact label {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 0;
+  min-width: 60px;
+  flex-shrink: 0;
+}
+
+.info-text {
+  flex: 1;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.cancel-change-button {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-change-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #fff;
+}
+
 /* 내용 입력창 특별 스타일 */
 #content {
   min-height: 350px;
@@ -560,5 +643,30 @@
     flex: 0 0 36px;
     width: 36px;
     height: 36px;
+  }
+
+  /* 가게 정보 표시 반응형 */
+  .restaurant-display-row {
+    gap: 0.5rem;
+  }
+
+  .restaurant-name-display {
+    font-size: 13px;
+    padding: 10px 14px;
+  }
+
+  .change-restaurant-button {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+
+  .info-text {
+    font-size: 12px;
+    padding: 8px 14px;
+  }
+
+  .cancel-change-button {
+    padding: 8px 16px;
+    font-size: 13px;
   }
 }

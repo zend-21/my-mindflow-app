@@ -5,7 +5,7 @@ import { CameraResultType, CameraSource } from '@capacitor/camera';
 import { compressImage } from '../utils/storage';
 import './RichTextEditorModal.css';
 
-const RichTextEditorModal = ({ isOpen, onClose, content, onSave, showToast }) => {
+const RichTextEditorModal = ({ isOpen, onClose, content, onSave, showToast, restaurantName }) => {
   const [editorContent, setEditorContent] = useState(content || '');
   const [videoUrl, setVideoUrl] = useState('');
   const [showVideoInput, setShowVideoInput] = useState(false);
@@ -195,7 +195,7 @@ const RichTextEditorModal = ({ isOpen, onClose, content, onSave, showToast }) =>
     <div className="rich-text-editor-overlay" onClick={onClose}>
       <div className="rich-text-editor-modal" onClick={(e) => e.stopPropagation()}>
         <div className="editor-header">
-          <h2>리뷰 내용 작성</h2>
+          <h2>리뷰 내용 작성 ({restaurantName || '가게 선택 안함'})</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
 

@@ -369,6 +369,14 @@ function App() {
             return;
         }
 
+        // 모달이 열려있으면 pull-to-refresh 비활성화
+        const hasModalOpen = document.querySelector('.rich-text-editor-overlay') ||
+                            document.querySelector('.search-modal-overlay') ||
+                            document.querySelector('.modal-overlay');
+        if (hasModalOpen) {
+            return;
+        }
+
         pullStartY.current = clientY;
         pullStartTime.current = Date.now();
         setIsDragging(true);

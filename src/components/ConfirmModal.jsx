@@ -154,34 +154,52 @@ const ConfirmButton = styled(Button)`
     }
 `;
 
-const ConfirmModal = ({ type = 'phone', onConfirm, onCancel }) => {
+const ConfirmModal = ({
+    type = 'phone',
+    title,
+    message,
+    icon = '⚠️',
+    confirmText = '예',
+    cancelText = '아니오',
+    onConfirm,
+    onCancel,
+    showWarning = false,
+    warningText = ''
+}) => {
+    // 기존 type 기반 로직 (하위 호환성 유지)
     const isGoogleRestore = type === 'google';
+    const defaultTitle = isGoogleRestore ? '동기화 확인 (구글→폰)' : '휴대폰 복원 확인';
+    const defaultMessage = `${isGoogleRestore ? '구글 드라이브의 데이터가 휴대폰 데이터를 덮어씁니다.' : '현재 휴대폰 데이터를 덮어씁니다.'}\n${isGoogleRestore ? '동기화를' : '복원을'} 진행하시겠습니까?`;
+    const defaultConfirmText = isGoogleRestore ? '동기화' : '복원하기';
 
     return (
         <Overlay onClick={onCancel}>
             <ModalContainer onClick={(e) => e.stopPropagation()}>
-                <Icon>⚠️</Icon>
-                <Title>{isGoogleRestore ? '동기화 확인 (구글→폰)' : '휴대폰 복원 확인'}</Title>
+                <Icon>{icon}</Icon>
+                <Title>{title || defaultTitle}</Title>
                 <Message>
-                    <Highlight>현재 휴대폰 데이터를 덮어씁니다.</Highlight>{'\n'}
-                    {isGoogleRestore ? '동기화를' : '복원을'} 진행하시겠습니까?
+                    {message || defaultMessage}
                 </Message>
 
-                {isGoogleRestore && (
+                {(showWarning || isGoogleRestore) && (
                     <Warning>
-                        💡 <strong>동기화 주의사항 (구글→폰)</strong><br />
-                        구글 드라이브의 데이터가 휴대폰 데이터를 덮어씁니다.
-                        중요한 데이터가 있다면 <strong>동기화 전에 휴대폰 백업</strong>을 먼저 진행하세요.
-                        (과거 데이터가 최신 데이터를 덮어쓸 경우 휴대폰 복원으로 데이터를 되돌릴 수 있습니다)
+                        {warningText || (
+                            <>
+                                💡 <strong>동기화 주의사항 (구글→폰)</strong><br />
+                                구글 드라이브의 데이터가 휴대폰 데이터를 덮어씁니다.
+                                중요한 데이터가 있다면 <strong>동기화 전에 휴대폰 백업</strong>을 먼저 진행하세요.
+                                (과거 데이터가 최신 데이터를 덮어쓸 경우 휴대폰 복원으로 데이터를 되돌릴 수 있습니다)
+                            </>
+                        )}
                     </Warning>
                 )}
 
                 <ButtonGroup>
                     <CancelButton onClick={onCancel}>
-                        취소
+                        {cancelText}
                     </CancelButton>
                     <ConfirmButton onClick={onConfirm}>
-                        {isGoogleRestore ? '동기화' : '복원하기'}
+                        {confirmText || defaultConfirmText}
                     </ConfirmButton>
                 </ButtonGroup>
             </ModalContainer>

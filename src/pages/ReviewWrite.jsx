@@ -6,6 +6,7 @@ import { compressImage } from '../utils/storage';
 import RestaurantAutocomplete from '../components/RestaurantAutocomplete';
 import DetailedRatingInput from '../components/DetailedRatingInput';
 import RichTextEditorModal from '../components/RichTextEditorModal';
+import ConfirmModal from '../components/ConfirmModal';
 import './ReviewWrite.css';
 
 const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
@@ -29,6 +30,8 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
 
   const [loading, setLoading] = useState(false);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isEditingRestaurant, setIsEditingRestaurant] = useState(false);
+  const [showChangeRestaurantConfirm, setShowChangeRestaurantConfirm] = useState(false);
 
   // 수정 모드: 기존 리뷰 데이터 로드
   useEffect(() => {
@@ -246,6 +249,22 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
       restaurantAddress: restaurant.address || restaurant.roadAddress || '',
       restaurantPhone: restaurant.phone || ''
     }));
+
+    // 수정 모드에서 가게 변경 시 편집 모드 종료
+    if (isEditMode) {
+      setIsEditingRestaurant(false);
+    }
+  };
+
+  // 가게명 변경 버튼 클릭
+  const handleChangeRestaurant = () => {
+    setShowChangeRestaurantConfirm(true);
+  };
+
+  // 가게명 변경 확인
+  const handleConfirmChangeRestaurant = () => {
+    setIsEditingRestaurant(true);
+    setShowChangeRestaurantConfirm(false);
   };
 
   // 사진 촬영/선택
@@ -386,42 +405,109 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
         <section className="form-section">
           <h2>가게 정보</h2>
 
-          <div className="form-group">
-            <label htmlFor="restaurantName">
-              가게명 <span className="required">(필수)</span>
-            </label>
-            <RestaurantAutocomplete
-              onSelect={handleRestaurantSelect}
-              initialValue={formData.restaurantName}
-              showToast={showToast}
-            />
-          </div>
+          {isEditMode && !isEditingRestaurant ? (
+            // 수정 모드: 읽기 전용 표시
+            <>
+              <div className="form-group">
+                <label htmlFor="restaurantName">
+                  가게명 <span className="required">(필수)</span>
+                </label>
+                <div className="restaurant-display-row">
+                  <div className="restaurant-name-display">
+                    {formData.restaurantName}
+                  </div>
+                  <button
+                    type="button"
+                    className="change-restaurant-button"
+                    onClick={handleChangeRestaurant}
+                  >
+                    변경
+                  </button>
+                </div>
+              </div>
 
-          <div className="form-group">
-            <label htmlFor="restaurantAddress">주소</label>
-            <input
-              type="text"
-              id="restaurantAddress"
-              name="restaurantAddress"
-              value={formData.restaurantAddress}
-              readOnly
-              placeholder="가게를 선택하면 자동 입력됩니다"
-              style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', cursor: 'not-allowed' }}
-            />
-          </div>
+              <div className="form-group restaurant-info-compact">
+                <label>주소</label>
+                <div className="info-text">
+                  {formData.restaurantAddress || '주소 정보 없음'}
+                </div>
+              </div>
 
-          <div className="form-group">
-            <label htmlFor="restaurantPhone">전화번호</label>
-            <input
-              type="tel"
-              id="restaurantPhone"
-              name="restaurantPhone"
-              value={formData.restaurantPhone}
-              readOnly
-              placeholder="가게를 선택하면 자동 입력됩니다"
-              style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', cursor: 'not-allowed' }}
-            />
-          </div>
+              <div className="form-group restaurant-info-compact">
+                <label>전화번호</label>
+                <div className="info-text">
+                  {formData.restaurantPhone || '전화번호 정보 없음'}
+                </div>
+              </div>
+            </>
+          ) : (
+            // 생성 모드 또는 가게 변경 모드: 검색 가능
+            <>
+              <div className="form-group">
+                <label htmlFor="restaurantName">
+                  가게명 <span className="required">(필수)</span>
+                </label>
+                <RestaurantAutocomplete
+                  onSelect={handleRestaurantSelect}
+                  initialValue={formData.restaurantName}
+                  showToast={showToast}
+                />
+                {isEditMode && isEditingRestaurant && (
+                  <button
+                    type="button"
+                    className="cancel-change-button"
+                    onClick={() => setIsEditingRestaurant(false)}
+                  >
+                    취소
+                  </button>
+                )}
+              </div>
+
+              <div className="form-group restaurant-info-compact">
+                <label htmlFor="restaurantAddress">주소</label>
+                <input
+                  type="text"
+                  id="restaurantAddress"
+                  name="restaurantAddress"
+                  value={formData.restaurantAddress}
+                  readOnly
+                  placeholder="가게를 선택하면 자동 입력됩니다"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                    cursor: 'not-allowed',
+                    flex: 1,
+                    padding: '10px 16px',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '8px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '13px'
+                  }}
+                />
+              </div>
+
+              <div className="form-group restaurant-info-compact">
+                <label htmlFor="restaurantPhone">전화번호</label>
+                <input
+                  type="tel"
+                  id="restaurantPhone"
+                  name="restaurantPhone"
+                  value={formData.restaurantPhone}
+                  readOnly
+                  placeholder="가게를 선택하면 자동 입력됩니다"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                    cursor: 'not-allowed',
+                    flex: 1,
+                    padding: '10px 16px',
+                    border: '1px solid rgba(255, 255, 255, 0.05)',
+                    borderRadius: '8px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    fontSize: '13px'
+                  }}
+                />
+              </div>
+            </>
+          )}
         </section>
 
         {/* 리뷰 내용 */}
@@ -429,22 +515,14 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
           <h2>리뷰 내용</h2>
 
           <div className="form-group">
-            <label htmlFor="title">제목</label>
-            <input
-              type="text"
-              id="title"
-              name="title"
-              value={formData.title}
-              onChange={handleChange}
-              placeholder="예: 양념치킨이 정말 맛있어요"
-            />
-          </div>
-
-          <div className="form-group">
             <label htmlFor="content">
               내용 <span className="required">(필수)</span>
             </label>
-            <div className="content-display-container">
+            <div
+              className="content-display-container"
+              onClick={() => setIsEditorOpen(true)}
+              style={{ cursor: 'pointer' }}
+            >
               {formData.content ? (
                 <div
                   className="formatted-content-display-preview"
@@ -458,7 +536,8 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
               <button
                 type="button"
                 className="open-editor-button"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   console.log('편집 버튼 클릭됨');
                   setIsEditorOpen(true);
                   console.log('isEditorOpen을 true로 설정함');
@@ -647,7 +726,21 @@ const ReviewWrite = ({ reviewId, onBack, onSaved, showToast }) => {
         content={formData.content}
         onSave={handleContentSave}
         showToast={showToast}
+        restaurantName={formData.restaurantName}
       />
+
+      {/* 가게명 변경 확인 모달 */}
+      {showChangeRestaurantConfirm && (
+        <ConfirmModal
+          title="가게명 변경"
+          message={`가게명을 다시 검색할까요?\n주소와 전화번호도 함께 변경됩니다.`}
+          icon=""
+          confirmText="예"
+          cancelText="아니오"
+          onConfirm={handleConfirmChangeRestaurant}
+          onCancel={() => setShowChangeRestaurantConfirm(false)}
+        />
+      )}
     </div>
   );
 };
