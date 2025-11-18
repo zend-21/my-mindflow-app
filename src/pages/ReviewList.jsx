@@ -3,7 +3,7 @@ import { getUserReviews, searchReviews, deleteReview, toggleReviewPublic, checkC
 import { REVIEW_SORT_OPTIONS } from '../types/review';
 import './ReviewList.css';
 
-const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
+const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHeader }) => {
   const [reviews, setReviews] = useState([]);
   const [filteredReviews, setFilteredReviews] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true); // 첫 로딩
@@ -11,10 +11,10 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState(REVIEW_SORT_OPTIONS.LATEST);
   const [sortOrder, setSortOrder] = useState('desc'); // 'asc' or 'desc'
-  const [isHeaderHidden, setIsHeaderHidden] = useState(false);
 
   const lastScrollY = useRef(0);
   const scrollTimeout = useRef(null);
+  const contentRef = useRef(null);
 
   // TODO: 실제 사용자 ID는 인증 시스템에서 가져와야 함
   const userId = 'temp_user_id';
@@ -53,12 +53,13 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
 
   // 스크롤 기반 헤더 숨김/표시
   useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
+    const handleScroll = (e) => {
+      const target = e.target;
+      const currentScrollY = target.scrollTop;
 
       // 스크롤 위치가 100px 이상일 때만 헤더 숨김 동작
       if (currentScrollY < 100) {
-        setIsHeaderHidden(false);
+        setShowHeader?.(true);
         lastScrollY.current = currentScrollY;
         return;
       }
@@ -66,25 +67,31 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
       // 스크롤 방향 감지
       if (currentScrollY > lastScrollY.current) {
         // 아래로 스크롤 - 헤더 숨김
-        setIsHeaderHidden(true);
+        setShowHeader?.(false);
       } else {
         // 위로 스크롤 - 헤더 표시
-        setIsHeaderHidden(false);
+        setShowHeader?.(true);
       }
 
       lastScrollY.current = currentScrollY;
     };
 
-    // 스크롤 이벤트 리스너 등록
-    window.addEventListener('scroll', handleScroll, { passive: true });
+    const contentElement = contentRef.current;
+    if (contentElement) {
+      contentElement.addEventListener('scroll', handleScroll, { passive: true });
+    }
 
     return () => {
-      window.removeEventListener('scroll', handleScroll);
+      if (contentElement) {
+        contentElement.removeEventListener('scroll', handleScroll);
+      }
       if (scrollTimeout.current) {
         clearTimeout(scrollTimeout.current);
       }
+      // 컴포넌트 언마운트 시 헤더 다시 표시
+      setShowHeader?.(true);
     };
-  }, []);
+  }, [setShowHeader]);
 
   const loadReviews = async () => {
     try {
@@ -269,8 +276,8 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast }) => {
   }
 
   return (
-    <div className="review-list-page">
-      <header className={`review-list-header ${isHeaderHidden ? 'hidden' : ''}`}>
+    <div className="review-list-page" ref={contentRef}>
+      <header className="review-list-header">
         <h1>내 리뷰 ({reviews.length})</h1>
         <button
           className="write-button"

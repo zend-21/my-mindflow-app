@@ -2046,7 +2046,7 @@ if (isLoading) {
                                 showToast={showToast}
                             />
                         )}
-                        {activeTab === 'review' && <ReviewPage showToast={showToast} />}
+                        {activeTab === 'review' && <ReviewPage showToast={showToast} setShowHeader={setShowHeader} />}
                     </ContentArea>
 
                     <FloatingButton onClick={handleOpenNewMemoFromFAB} activeTab={activeTab} />

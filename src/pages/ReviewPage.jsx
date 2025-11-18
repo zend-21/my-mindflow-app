@@ -7,7 +7,7 @@ import ReviewWrite from './ReviewWrite';
  * 리뷰 페이지 메인 컨테이너
  * ReviewList와 ReviewWrite를 관리
  */
-const ReviewPage = ({ showToast }) => {
+const ReviewPage = ({ showToast, setShowHeader }) => {
   const [currentView, setCurrentView] = useState('list'); // 'list' | 'write' | 'edit'
   const [editReviewId, setEditReviewId] = useState(null);
 
@@ -39,6 +39,7 @@ const ReviewPage = ({ showToast }) => {
           onNavigateToWrite={handleNavigateToWrite}
           onNavigateToEdit={handleNavigateToEdit}
           showToast={showToast}
+          setShowHeader={setShowHeader}
         />
       )}
 
