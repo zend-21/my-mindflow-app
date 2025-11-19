@@ -478,15 +478,35 @@ export const checkCanMakePublic = (review) => {
   const daysSinceCreation = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
   const WAITING_PERIOD_DAYS = 7;
 
-  const remainingDays = Math.max(0, WAITING_PERIOD_DAYS - daysSinceCreation);
   const canMakePublic = daysSinceCreation >= WAITING_PERIOD_DAYS;
+
+  let daysInfo;
+  if (daysSinceCreation < WAITING_PERIOD_DAYS) {
+    // D-7 ~ D-1 (공개 불가)
+    daysInfo = {
+      type: 'minus',
+      value: WAITING_PERIOD_DAYS - daysSinceCreation
+    };
+  } else if (daysSinceCreation === WAITING_PERIOD_DAYS) {
+    // D-0 (오늘이 공개 가능일)
+    daysInfo = {
+      type: 'zero',
+      value: 0
+    };
+  } else {
+    // D+1, D+2, D+3... (공개 가능일 경과)
+    daysInfo = {
+      type: 'plus',
+      value: daysSinceCreation - WAITING_PERIOD_DAYS
+    };
+  }
 
   // TODO: 신뢰도 점수가 높으면 즉시 공개 가능
   // if (userTrustScore >= INSTANT_PUBLIC_THRESHOLD) {
-  //   return { canMakePublic: true, remainingDays: 0 };
+  //   return { canMakePublic: true, daysInfo: { type: 'zero', value: 0 } };
   // }
 
-  return { canMakePublic, remainingDays };
+  return { canMakePublic, daysInfo };
 };
 
 /**

@@ -26,6 +26,15 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
   const touchCurrentY = useRef(0);
   const isPullRefreshActive = useRef(false);
 
+  // 🧪 테스트 모드: D-day 강제 조작
+  const [testMode, setTestMode] = useState(false);
+
+  // 공개 보류 상태 관리
+  const [pendingReviews, setPendingReviews] = useState(new Set());
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [selectedReviewId, setSelectedReviewId] = useState(null);
+  const [fakeDaysOffset, setFakeDaysOffset] = useState(0); // 음수면 과거로, 양수면 미래로
+
   // TODO: 실제 사용자 ID는 인증 시스템에서 가져와야 함
   const userId = 'temp_user_id';
 
@@ -257,11 +266,52 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
     try {
       await toggleReviewPublic(reviewId, userId, newIsPublic);
       showToast?.(newIsPublic ? '리뷰가 공개되었습니다.' : '리뷰가 비공개로 전환되었습니다.');
+
+      // 공개 시 보류 목록에서 제거
+      if (newIsPublic) {
+        setPendingReviews(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(reviewId);
+          return newSet;
+        });
+      }
+
       loadReviews();
     } catch (error) {
       console.error('리뷰 공개 상태 변경 실패:', error);
       showToast?.(error.message || '공개 상태 변경에 실패했습니다.');
     }
+  };
+
+  // 공개하기 버튼 클릭 시 모달 표시
+  const handlePublishClick = (reviewId) => {
+    setSelectedReviewId(reviewId);
+    setShowPublishModal(true);
+  };
+
+  // 공개 확정
+  const handleConfirmPublish = async () => {
+    if (selectedReviewId) {
+      await handleTogglePublic(selectedReviewId, false);
+      setShowPublishModal(false);
+      setSelectedReviewId(null);
+    }
+  };
+
+  // 보류
+  const handlePendPublish = () => {
+    if (selectedReviewId) {
+      setPendingReviews(prev => new Set([...prev, selectedReviewId]));
+      setShowPublishModal(false);
+      setSelectedReviewId(null);
+      showToast?.('공개를 보류했습니다.');
+    }
+  };
+
+  // 모달 닫기
+  const handleCloseModal = () => {
+    setShowPublishModal(false);
+    setSelectedReviewId(null);
   };
 
   const formatDate = (date) => {
@@ -379,12 +429,14 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
 
       <header className={`review-list-header ${isHeaderHidden ? 'header-hidden' : ''}`}>
         <h1>내 리뷰 ({reviews.length})</h1>
-        <button
-          className="write-button"
-          onClick={onNavigateToWrite}
-        >
-          + 리뷰 작성
-        </button>
+        <div className="header-actions">
+          <button
+            className="write-button"
+            onClick={onNavigateToWrite}
+          >
+            + 리뷰 작성
+          </button>
+        </div>
       </header>
 
       {/* 검색 및 필터 */}
@@ -447,8 +499,13 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
           </div>
         ) : (
           <div className="review-grid">
-            {filteredReviews.map((review) => {
-              const { canMakePublic, remainingDays } = checkCanMakePublic(review);
+            {filteredReviews.map((review, index) => {
+              // 첫 번째 리뷰는 임시로 공개 가능한 상태로 가정 (D-0)
+              const isFirstReview = index === 0;
+              const publicInfo = isFirstReview
+                ? { canMakePublic: true, daysInfo: { type: 'zero', value: 0 } }
+                : checkCanMakePublic(review);
+              const { canMakePublic, daysInfo } = publicInfo;
 
               return (
                 <div key={review.id} className="review-card">
@@ -527,12 +584,21 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
                       {formatDateWithTime(review.createdAt)}
                     </span>
                     <div className="status-badges">
-                      <span className={`public-status-badge ${review.isPublic ? 'public' : 'private'}`}>
-                        {review.isPublic ? '공개' : '비공개'}
-                      </span>
-                      {!review.isPublic && remainingDays > 0 && (
+                      {/* 보류 상태 */}
+                      {pendingReviews.has(review.id) ? (
+                        <span className="public-status-badge pending">
+                          보류
+                        </span>
+                      ) : (
+                        <span className={`public-status-badge ${review.isPublic ? 'public' : 'private'}`}>
+                          {review.isPublic ? '공개' : '비공개'}
+                        </span>
+                      )}
+                      {!review.isPublic && !pendingReviews.has(review.id) && daysInfo && (
                         <span className="remaining-days-badge">
-                          D-{remainingDays}
+                          {daysInfo.type === 'minus' && `D-${daysInfo.value}`}
+                          {daysInfo.type === 'zero' && 'D-0'}
+                          {daysInfo.type === 'plus' && `D+${daysInfo.value}`}
                         </span>
                       )}
                       {review.editHistory && review.editHistory.length > 0 && (
@@ -544,17 +610,127 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
                   </div>
                 </div>
 
-                {/* 삭제 버튼만 별도로 */}
-                <div className="review-actions-single">
-                  <button
-                    className="delete-button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(review.id);
-                    }}
-                  >
-                    삭제
-                  </button>
+                {/* 액션 버튼들 */}
+                <div className="review-actions">
+                  {/* 첫 번째 리뷰 - 공개 전 & 보류 상태 아닐 때 */}
+                  {isFirstReview && !review.isPublic && !pendingReviews.has(review.id) && (
+                    <button
+                      className="toggle-public-button can-publish first-review-publish"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePublishClick(review.id);
+                      }}
+                      title="공개하기"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                      </svg>
+                      공개하기
+                    </button>
+                  )}
+
+                  {/* 첫 번째 리뷰 - 보류 상태 */}
+                  {isFirstReview && !review.isPublic && pendingReviews.has(review.id) && (
+                    <button
+                      className="toggle-public-button pending-status first-review-publish"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePublishClick(review.id);
+                      }}
+                      title="공개 보류 중 (클릭하여 다시 선택)"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                      </svg>
+                      공개하기
+                    </button>
+                  )}
+
+                  {/* 첫 번째 리뷰 - 공개 완료 */}
+                  {isFirstReview && review.isPublic && (
+                    <button
+                      className="toggle-public-button published-status first-review-publish"
+                      disabled
+                      title="공개됨"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 9.9-1"></path>
+                      </svg>
+                      (공개함)
+                    </button>
+                  )}
+
+                  {/* 나머지 리뷰 - 공개된 경우 비공개 버튼 */}
+                  {!isFirstReview && review.isPublic && (
+                    <button
+                      className="toggle-public-button public-active"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (window.confirm('리뷰를 비공개로 전환하시겠습니까?\n커뮤니티에서 더 이상 보이지 않습니다.')) {
+                          handleTogglePublic(review.id, review.isPublic);
+                        }
+                      }}
+                      title="비공개로 전환"
+                    >
+                      <svg
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                      </svg>
+                      비공개로
+                    </button>
+                  )}
+
+                  {/* 우측 정렬: 삭제 버튼 */}
+                  <div className="actions-right">
+                    <button
+                      className="delete-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(review.id);
+                      }}
+                    >
+                      삭제
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -578,6 +754,27 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
                 filteredReviews.length
               ).toFixed(1)}점
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* 공개/보류 선택 모달 */}
+      {showPublishModal && (
+        <div className="publish-modal-overlay" onClick={handleCloseModal}>
+          <div className="publish-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close-button" onClick={handleCloseModal}>
+              ✕
+            </button>
+            <h3>리뷰 공개</h3>
+            <p>리뷰를 커뮤니티에 공개하시겠습니까?</p>
+            <div className="modal-buttons">
+              <button className="modal-button publish" onClick={handleConfirmPublish}>
+                공개
+              </button>
+              <button className="modal-button pend" onClick={handlePendPublish}>
+                보류
+              </button>
+            </div>
           </div>
         </div>
       )}

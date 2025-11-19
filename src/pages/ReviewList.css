@@ -147,7 +147,7 @@
 }
 
 .write-button {
-  background: #f093fb;
+  background: linear-gradient(135deg, #f093fb, #c770e0);
   color: white;
   border: none;
   padding: 10px 20px;
@@ -156,11 +156,13 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(240, 147, 251, 0.3);
 }
 
 .write-button:hover {
-  background: #f5a3fc;
+  background: linear-gradient(135deg, #f5a3fc, #d085e8);
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(240, 147, 251, 0.4);
 }
 
 /* 필터 섹션 */
@@ -511,15 +513,21 @@
 }
 
 .public-status-badge.public {
-  background: rgba(46, 213, 115, 0.2);
-  color: #2ed573;
-  border: 1px solid rgba(46, 213, 115, 0.3);
+  background: linear-gradient(135deg, rgba(46, 213, 115, 0.25), rgba(0, 200, 83, 0.25));
+  color: #00ff88;
+  border: 1px solid rgba(46, 213, 115, 0.4);
 }
 
 .public-status-badge.private {
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.public-status-badge.pending {
+  background: linear-gradient(135deg, rgba(255, 152, 0, 0.25), rgba(255, 193, 7, 0.25));
+  color: #ffb340;
+  border: 1px solid rgba(255, 152, 0, 0.4);
 }
 
 .remaining-days-badge {
@@ -527,9 +535,9 @@
   border-radius: 4px;
   font-size: 0.7rem;
   font-weight: 600;
-  background: rgba(255, 193, 7, 0.2);
-  color: rgba(255, 193, 7, 0.9);
-  border: 1px solid rgba(255, 193, 7, 0.3);
+  background: linear-gradient(135deg, rgba(255, 193, 7, 0.25), rgba(255, 152, 0, 0.25));
+  color: #ffc107;
+  border: 1px solid rgba(255, 193, 7, 0.4);
 }
 
 .edit-count-badge {
@@ -542,13 +550,25 @@
   border: 1px solid rgba(100, 181, 246, 0.3);
 }
 
-/* 삭제 버튼만 있는 액션 영역 */
-.review-actions-single {
+/* 액션 영역 (공개 버튼 + 삭제 버튼) */
+.review-actions {
   display: flex;
-  justify-content: flex-end;
+  gap: 0.5rem;
   padding: 0.75rem 1rem;
   background: rgba(0, 0, 0, 0.2);
   border-top: 1px solid rgba(255, 255, 255, 0.05);
+  justify-content: space-between;
+  align-items: center;
+}
+
+.actions-right {
+  display: flex;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.first-review-publish {
+  margin-right: auto;
 }
 
 .review-meta {
@@ -581,51 +601,98 @@
   color: rgba(255, 255, 255, 0.4);
 }
 
-.review-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.public-toggle-button {
-  padding: 0.5rem 0.75rem;
+/* 공개/비공개 토글 버튼 */
+.toggle-public-button {
+  padding: 0.5rem 0.85rem;
   border: none;
-  border-radius: 6px;
-  font-size: 0.9rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  background: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  white-space: nowrap;
 }
 
-.public-toggle-button:hover:not(.disabled) {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(255, 255, 255, 0.3);
+/* 공개 가능 상태 (초록색) */
+.toggle-public-button.can-publish {
+  background: linear-gradient(135deg, rgba(46, 213, 115, 0.2), rgba(0, 200, 83, 0.2));
+  color: #00ff88;
+  border: 1px solid rgba(46, 213, 115, 0.4);
+  animation: pulse-green 2s infinite;
 }
 
-.public-toggle-button.active {
-  background: rgba(46, 213, 115, 0.2);
-  color: #2ed573;
-  border: 1px solid rgba(46, 213, 115, 0.3);
+.toggle-public-button.can-publish:hover {
+  background: linear-gradient(135deg, rgba(46, 213, 115, 0.3), rgba(0, 200, 83, 0.3));
+  border-color: rgba(46, 213, 115, 0.6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(46, 213, 115, 0.4);
 }
 
-.public-toggle-button.active:hover {
-  background: rgba(46, 213, 115, 0.25);
-  border-color: rgba(46, 213, 115, 0.4);
+@keyframes pulse-green {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(46, 213, 115, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(46, 213, 115, 0);
+  }
 }
 
-.public-toggle-button.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+/* 현재 공개 중 (파란색) */
+.toggle-public-button.public-active {
+  background: rgba(100, 181, 246, 0.15);
+  color: #64b5f6;
+  border: 1px solid rgba(100, 181, 246, 0.3);
+}
+
+.toggle-public-button.public-active:hover {
+  background: rgba(100, 181, 246, 0.25);
+  border-color: rgba(100, 181, 246, 0.5);
+  transform: translateY(-1px);
+}
+
+/* 공개 완료 상태 (초록색 톤, disabled) */
+.toggle-public-button.published-status {
+  background: rgba(46, 213, 115, 0.1);
+  color: rgba(46, 213, 115, 0.7);
+  border: 1px solid rgba(46, 213, 115, 0.2);
+  cursor: default;
+  opacity: 0.8;
+}
+
+.toggle-public-button.published-status:hover {
+  transform: none;
+  background: rgba(46, 213, 115, 0.1);
+}
+
+/* 공개 보류 상태 (주황색 톤, 클릭 가능하지만 비활성화처럼 보임) */
+.toggle-public-button.pending-status {
+  background: rgba(255, 152, 0, 0.1);
+  color: rgba(255, 152, 0, 0.7);
+  border: 1px solid rgba(255, 152, 0, 0.2);
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.toggle-public-button.pending-status:hover {
+  background: rgba(255, 152, 0, 0.15);
+  border-color: rgba(255, 152, 0, 0.3);
+  opacity: 0.85;
+}
+
+/* 공개 불가 상태 (회색, disabled) */
+.toggle-public-button.disabled {
   background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
-.public-toggle-button .remaining-days {
-  font-size: 10px;
-  font-weight: 600;
+.toggle-public-button.disabled:hover {
+  transform: none;
 }
 
 .delete-button {
@@ -635,15 +702,15 @@
   font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s;
-  background: rgba(245, 87, 108, 0.15);
-  color: #f5576c;
-  border: 1px solid rgba(245, 87, 108, 0.3);
+  background: linear-gradient(135deg, rgba(245, 87, 108, 0.2), rgba(220, 60, 90, 0.2));
+  color: #ff6b88;
+  border: 1px solid rgba(245, 87, 108, 0.4);
 }
 
 .delete-button:hover {
-  background: rgba(245, 87, 108, 0.25);
-  color: #f7778c;
-  border-color: rgba(245, 87, 108, 0.5);
+  background: linear-gradient(135deg, rgba(245, 87, 108, 0.3), rgba(220, 60, 90, 0.3));
+  color: #ff8aa0;
+  border-color: rgba(245, 87, 108, 0.6);
 }
 
 /* 통계 */
@@ -744,4 +811,231 @@
     padding: 0.4rem 0.75rem;
     font-size: 0.8rem;
   }
+}
+
+/* 🧪 테스트 모드 */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.test-mode-button {
+  padding: 0.5rem 0.75rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s;
+}
+
+.test-mode-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+}
+
+.test-mode-button.active {
+  background: rgba(240, 147, 251, 0.2);
+  border-color: rgba(240, 147, 251, 0.4);
+  animation: pulse-test 2s infinite;
+}
+
+@keyframes pulse-test {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(240, 147, 251, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(240, 147, 251, 0);
+  }
+}
+
+.test-mode-panel {
+  background: rgba(240, 147, 251, 0.1);
+  border: 2px solid rgba(240, 147, 251, 0.3);
+  border-radius: 12px;
+  padding: 1rem;
+  margin: 0 1rem 1rem;
+  box-shadow: 0 4px 12px rgba(240, 147, 251, 0.2);
+}
+
+.test-mode-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f093fb;
+  margin-bottom: 0.75rem;
+  text-align: center;
+}
+
+.test-mode-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+}
+
+.test-mode-controls button {
+  padding: 0.4rem 0.75rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.2s;
+}
+
+.test-mode-controls button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+.test-mode-controls button.reset {
+  background: rgba(245, 87, 108, 0.2);
+  color: #f5576c;
+  border-color: rgba(245, 87, 108, 0.3);
+}
+
+.test-mode-info {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+}
+
+/* 공개/보류 선택 모달 */
+.publish-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.publish-modal-content {
+  position: relative;
+  background: rgba(31, 34, 41, 0.98);
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 400px;
+  width: 90%;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-close-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+}
+
+.modal-close-button:hover {
+  background: rgba(245, 87, 108, 0.3);
+  border-color: rgba(245, 87, 108, 0.5);
+  color: #f5576c;
+  transform: scale(1.1);
+}
+
+.publish-modal-content h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1.5rem;
+  color: #f0f0f0;
+  text-align: center;
+}
+
+.publish-modal-content p {
+  margin: 0 0 2rem 0;
+  color: rgba(255, 255, 255, 0.7);
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 1rem;
+}
+
+.modal-button {
+  flex: 1;
+  padding: 0.875rem 1.5rem;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-button.publish {
+  background: rgba(46, 213, 115, 0.2);
+  color: #2ed573;
+  border: 1px solid rgba(46, 213, 115, 0.4);
+}
+
+.modal-button.publish:hover {
+  background: rgba(46, 213, 115, 0.3);
+  border-color: rgba(46, 213, 115, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(46, 213, 115, 0.3);
+}
+
+.modal-button.pend {
+  background: rgba(255, 152, 0, 0.2);
+  color: #ff9800;
+  border: 1px solid rgba(255, 152, 0, 0.4);
+}
+
+.modal-button.pend:hover {
+  background: rgba(255, 152, 0, 0.3);
+  border-color: rgba(255, 152, 0, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
 }

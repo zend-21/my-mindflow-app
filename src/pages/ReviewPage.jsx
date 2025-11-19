@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import ReviewList from './ReviewList';
 import ReviewWrite from './ReviewWrite';
+// import CommunityList from './CommunityList'; // 나중에 사용
 
 /**
  * 리뷰 페이지 메인 컨테이너

@@ -35,9 +35,9 @@ const ZODIAC_SIGNS = [
 // 타로 카드 데이터 로드 (156개: 78장 × 정/역방향)
 let TAROT_DATA = null;
 
-const loadTarotData = () => {
+const loadTarotData = async () => {
     if (!TAROT_DATA) {
-        TAROT_DATA = getTarotData();
+        TAROT_DATA = await getTarotData();
     }
     return TAROT_DATA;
 };
@@ -45,9 +45,9 @@ const loadTarotData = () => {
 // 별자리 운세 데이터 로드 (2400개: 12별자리 × 200개)
 let HOROSCOPE_DATA = null;
 
-const loadHoroscopeData = () => {
+const loadHoroscopeData = async () => {
     if (!HOROSCOPE_DATA) {
-        HOROSCOPE_DATA = getHoroscopeData();
+        HOROSCOPE_DATA = await getHoroscopeData();
     }
     return HOROSCOPE_DATA;
 };
@@ -397,11 +397,11 @@ const selectRandomContentByKeyword = (keyword, categoryData) => {
  * 타로 카드 선택 (개선된 로직: 우주 에너지 + 운명 + 시간)
  * @param {Object} userData - 사용자 정보
  * @param {Date} currentTime - 현재 시각
- * @returns {Object} { card: string, isReversed: boolean, message: string, content: string, id: string }
+ * @returns {Promise<Object>} { card: string, isReversed: boolean, message: string, content: string, id: string }
  */
-const selectTarotCard = (userData, currentTime) => {
+const selectTarotCard = async (userData, currentTime) => {
     // 타로 데이터 로드 (156개: 78장 × 정/역방향)
-    const tarotData = loadTarotData();
+    const tarotData = await loadTarotData();
 
     // 정방향 카드만 추출 (78장)
     const uprightCards = tarotData.filter(card => !card.Keyword.includes('역방향'));
@@ -467,11 +467,11 @@ const selectLuckyElement = (userData, luckyData) => {
  * 별자리 운세 선택 (신문 스타일: 날짜 기반)
  * @param {string} zodiacSign - 별자리 이름
  * @param {Date} date - 날짜
- * @returns {Object} { keyword: string, content: string }
+ * @returns {Promise<Object>} { keyword: string, content: string }
  */
-const selectHoroscopeFortune = (zodiacSign, date) => {
+const selectHoroscopeFortune = async (zodiacSign, date) => {
     // 별자리 운세 데이터 로드
-    const horoscopeData = loadHoroscopeData();
+    const horoscopeData = await loadHoroscopeData();
 
     // 별자리 이름을 영문 약어로 매핑
     const zodiacMap = {
@@ -747,10 +747,10 @@ export const calculateFortune = async (userData, fortuneData) => {
     const luckyElements = await selectLuckyElements(userDayStem, today, todayPillar, userData);
 
     // 7. 타로 카드 선택 (개선된 로직)
-    const tarot = selectTarotCard(userData, today);
+    const tarot = await selectTarotCard(userData, today);
 
     // 8. 별자리 운세 선택 (신문 스타일: 날짜 기반)
-    const horoscopeFortune = selectHoroscopeFortune(zodiacSign, today);
+    const horoscopeFortune = await selectHoroscopeFortune(zodiacSign, today);
 
     // 날짜를 YYYY-MM-DD 형식으로 저장 (자정 기준 정확한 비교)
     const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;

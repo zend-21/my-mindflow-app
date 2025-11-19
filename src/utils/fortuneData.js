@@ -1,11 +1,7 @@
 // src/utils/fortuneData.js
 
 // fortune.csv 파일을 raw string으로 import (Vite의 ?raw 쿼리 사용)
-import rawCsvData from './fortune.csv?raw';
-// Tarot.csv 파일을 raw string으로 import
-import rawTarotData from '../fortune_data/Tarot.csv?raw';
-// Horoscope.csv 파일을 raw string으로 import
-import rawHoroscopeData from '../fortune_data/horoscope.csv?raw'; 
+import rawCsvData from './fortune.csv?raw'; 
 
 // CSV 파일을 파싱하는 간단한 유틸리티 함수 (실제 라이브러리 대체 가능)
 const parseCsv = (csvString) => {
@@ -71,20 +67,34 @@ export const getFortuneData = () => {
 
 /**
  * 타로 카드 데이터를 파싱하여 반환
- * @returns {Array} 156개의 타로 카드 데이터 (78장 × 정/역방향)
+ * @returns {Promise<Array>} 156개의 타로 카드 데이터 (78장 × 정/역방향)
  */
-export const getTarotData = () => {
-    const tarotData = parseCsv(rawTarotData);
-    return tarotData;
+export const getTarotData = async () => {
+    try {
+        const response = await fetch('/fortune_data/Tarot.csv');
+        const rawTarotData = await response.text();
+        const tarotData = parseCsv(rawTarotData);
+        return tarotData;
+    } catch (error) {
+        console.error('Failed to load tarot data:', error);
+        return [];
+    }
 };
 
 /**
  * 별자리 운세 데이터를 파싱하여 반환
- * @returns {Array} 240개의 별자리 운세 데이터 (12별자리 × 20개)
+ * @returns {Promise<Array>} 240개의 별자리 운세 데이터 (12별자리 × 20개)
  */
-export const getHoroscopeData = () => {
-    const horoscopeData = parseCsv(rawHoroscopeData);
-    return horoscopeData;
+export const getHoroscopeData = async () => {
+    try {
+        const response = await fetch('/fortune_data/horoscope.csv');
+        const rawHoroscopeData = await response.text();
+        const horoscopeData = parseCsv(rawHoroscopeData);
+        return horoscopeData;
+    } catch (error) {
+        console.error('Failed to load horoscope data:', error);
+        return [];
+    }
 };
 
 /**

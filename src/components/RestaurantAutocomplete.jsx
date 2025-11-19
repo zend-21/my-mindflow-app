@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { searchMultipleCategories, getCurrentLocation, searchNearbyMultipleCategories } from '../services/kakaoMapService';
+import { enrichPlacesWithReviews } from '../services/publicReviewService';
 import AddressInput from './AddressInput';
 import AddressManageModal from './AddressManageModal';
 import CategorySettingsModal from './CategorySettingsModal';
@@ -290,7 +291,10 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
         return 0;
       });
 
-      setResults(searchResults);
+      // 🌟 검색 결과에 우리 앱 리뷰 정보 병합
+      const enrichedResults = await enrichPlacesWithReviews(searchResults);
+
+      setResults(enrichedResults);
       setShowResults(true);
       setSelectedIndex(-1);
     } catch (error) {
@@ -673,7 +677,17 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
               onClick={() => handleSelect(restaurant)}
               onMouseEnter={() => setSelectedIndex(index)}
             >
-              <div className="result-name">{restaurant.name}</div>
+              <div className="result-header">
+                <div className="result-name">{restaurant.name}</div>
+                {/* 🌟 우리 앱 리뷰 정보 표시 */}
+                {restaurant.hasAppReviews && (
+                  <div className="app-review-badge">
+                    <span className="review-star">⭐</span>
+                    <span className="review-rating">{restaurant.appAverageRating.toFixed(1)}</span>
+                    <span className="review-count">({restaurant.appReviewCount})</span>
+                  </div>
+                )}
+              </div>
               <div className="result-address">{restaurant.address}</div>
               <div className="result-info">
                 <span className="result-category">{restaurant.category}</span>

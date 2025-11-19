@@ -310,3 +310,45 @@
   background: rgba(240, 147, 251, 0.3);
   border-color: rgba(240, 147, 251, 0.5);
 }
+
+/* 🌟 우리 앱 리뷰 표시 */
+.result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 4px;
+}
+
+.app-review-badge {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  background: rgba(255, 193, 7, 0.15);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.review-star {
+  font-size: 0.85rem;
+}
+
+.review-rating {
+  color: #ffc107;
+  font-weight: 700;
+}
+
+.review-count {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.7rem;
+}
+
+.autocomplete-result-item:hover .app-review-badge {
+  background: rgba(255, 193, 7, 0.25);
+  border-color: rgba(255, 193, 7, 0.5);
+}
