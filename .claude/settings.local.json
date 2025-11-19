@@ -16,7 +16,9 @@
       "Bash(findstr:*)",
       "Bash(git checkout:*)",
       "Bash(npm install:*)",
-      "Bash(npx cap init:*)"
+      "Bash(npx cap init:*)",
+      "Bash(npm run fix-restaurants:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

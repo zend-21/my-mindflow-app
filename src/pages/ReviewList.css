@@ -146,6 +146,28 @@
   transform: translateY(-1px);
 }
 
+.community-button {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.community-button:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(240, 147, 251, 0.4);
+  color: #f093fb;
+  transform: translateY(-1px);
+}
+
 .write-button {
   background: linear-gradient(135deg, #f093fb, #c770e0);
   color: white;
@@ -525,9 +547,9 @@
 }
 
 .public-status-badge.pending {
-  background: linear-gradient(135deg, rgba(100, 181, 246, 0.25), rgba(66, 165, 245, 0.25));
-  color: #64b5f6;
-  border: 1px solid rgba(100, 181, 246, 0.4);
+  background: linear-gradient(135deg, rgba(76, 209, 55, 0.25), rgba(46, 213, 115, 0.25));
+  color: #4cd137;
+  border: 1px solid rgba(76, 209, 55, 0.4);
 }
 
 .remaining-days-badge {
@@ -667,18 +689,18 @@
   background: rgba(46, 213, 115, 0.1);
 }
 
-/* 공개 보류 상태 (파란색 톤, 클릭 가능하지만 비활성화처럼 보임) */
+/* 공개 보류 상태 (그린색 톤, 클릭 가능하지만 비활성화처럼 보임) */
 .toggle-public-button.pending-status {
-  background: linear-gradient(135deg, rgba(100, 181, 246, 0.15), rgba(66, 165, 245, 0.15));
-  color: #64b5f6;
-  border: 1px solid rgba(100, 181, 246, 0.3);
+  background: linear-gradient(135deg, rgba(76, 209, 55, 0.15), rgba(46, 213, 115, 0.15));
+  color: #4cd137;
+  border: 1px solid rgba(76, 209, 55, 0.3);
   cursor: pointer;
   opacity: 0.8;
 }
 
 .toggle-public-button.pending-status:hover {
-  background: linear-gradient(135deg, rgba(100, 181, 246, 0.2), rgba(66, 165, 245, 0.2));
-  border-color: rgba(100, 181, 246, 0.4);
+  background: linear-gradient(135deg, rgba(76, 209, 55, 0.2), rgba(46, 213, 115, 0.2));
+  border-color: rgba(76, 209, 55, 0.4);
   opacity: 0.9;
 }
 
@@ -741,6 +763,40 @@
   font-size: 0.9rem;
   color: rgba(255, 255, 255, 0.6);
   margin-bottom: 0.5rem;
+}
+
+/* 사용자 계급 섹션 */
+.user-rank-section {
+  padding: 1rem;
+  margin: 0 1rem 1rem 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+.user-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  border: 1px solid;
+  font-size: 1rem;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s;
+}
+
+.user-rank-badge:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.rank-icon {
+  font-size: 1.5rem;
+}
+
+.rank-label {
+  font-size: 1rem;
 }
 
 .stat-value {

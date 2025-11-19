@@ -14,6 +14,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { uploadMultipleImages, deleteMultipleImages } from '../utils/storage';
+import { saveRestaurant, updateRestaurantStats } from './restaurantService';
 
 const REVIEWS_COLLECTION = 'reviews';
 
@@ -27,6 +28,17 @@ export const createReview = async (reviewData, userId) => {
   try {
     const now = new Date();
 
+    // 🆕 업체 정보가 있으면 restaurants 컬렉션에 저장
+    let restaurantId = '';
+    if (reviewData.selectedRestaurant) {
+      try {
+        restaurantId = await saveRestaurant(reviewData.selectedRestaurant);
+        console.log('✅ 업체 정보 저장 완료:', restaurantId);
+      } catch (error) {
+        console.error('⚠️ 업체 정보 저장 실패 (리뷰는 계속 진행):', error);
+      }
+    }
+
     // 음식 항목 처리 (새 형식 { name, price })
     const processedFoodItems = reviewData.foodItems
       .filter(item => item.name && item.name.trim() !== '')
@@ -38,7 +50,7 @@ export const createReview = async (reviewData, userId) => {
     // Firestore에 저장할 데이터 준비
     const reviewToSave = {
       userId,
-      restaurantId: reviewData.restaurantId || '',
+      restaurantId: restaurantId || reviewData.restaurantId || '', // 🆕 저장된 restaurantId 사용
       restaurantName: reviewData.restaurantName,
       restaurantAddress: reviewData.restaurantAddress || '',
       restaurantPhone: reviewData.restaurantPhone || '',
@@ -53,6 +65,13 @@ export const createReview = async (reviewData, userId) => {
       totalPrice: reviewData.totalPrice ? parseInt(reviewData.totalPrice) : null,
       orderDate: Timestamp.fromDate(new Date(reviewData.orderDate)),
       isPublic: false, // 오프라인 리뷰는 기본 비공개
+
+      // 🆕 좋아요 시스템 초기화
+      likes: 0,
+      dislikes: 0,
+      likedBy: [],
+      dislikedBy: [],
+
       createdAt: Timestamp.fromDate(now),
       updatedAt: Timestamp.fromDate(now),
       editHistory: [] // 수정 이력 (빈 배열로 시작)
@@ -60,6 +79,13 @@ export const createReview = async (reviewData, userId) => {
 
     // Firestore에 리뷰 문서 생성
     const docRef = await addDoc(collection(db, REVIEWS_COLLECTION), reviewToSave);
+
+    // 🆕 업체 통계 업데이트 (비동기, 실패해도 리뷰 작성은 성공)
+    if (restaurantId) {
+      updateRestaurantStats(restaurantId).catch(err =>
+        console.error('업체 통계 업데이트 실패:', err)
+      );
+    }
 
     // 사진이 있으면 업로드
     if (reviewData.photos && reviewData.photos.length > 0) {
@@ -278,6 +304,13 @@ export const deleteReview = async (reviewId, userId) => {
 
     // Firestore에서 삭제
     await deleteDoc(reviewRef);
+
+    // 🆕 업체 통계 업데이트 (리뷰 삭제 시)
+    if (review.restaurantId) {
+      updateRestaurantStats(review.restaurantId).catch(err =>
+        console.error('업체 통계 업데이트 실패:', err)
+      );
+    }
   } catch (error) {
     console.error('리뷰 삭제 실패:', error);
     throw error;
@@ -431,23 +464,34 @@ export const toggleReviewPublic = async (reviewId, userId, isPublic) => {
       throw new Error('권한이 없습니다.');
     }
 
+    // 🆕 관리자 권한 체크 (관리자는 D-7 제한 없이 즉시 공개 가능)
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    const userRank = userDoc.exists() ? userDoc.data().rank : 'newbie';
+    const isAdmin = userRank === 'admin';
+
     // 공개 대기 기간 확인 (7일)
     const createdAt = review.createdAt.toDate();
     const now = new Date();
     const daysSinceCreation = Math.floor((now - createdAt) / (1000 * 60 * 60 * 24));
     const WAITING_PERIOD_DAYS = 7;
 
+    // 디버깅: 날짜 정보 로그
+    console.log('📅 공개 가능 체크:', {
+      createdAt: createdAt.toISOString(),
+      now: now.toISOString(),
+      daysSinceCreation,
+      WAITING_PERIOD_DAYS,
+      isAdmin,
+      canPublish: isAdmin || daysSinceCreation >= WAITING_PERIOD_DAYS
+    });
+
     // 비공개 → 공개로 전환하려는 경우에만 대기 기간 체크
     if (!review.isPublic && isPublic) {
-      if (daysSinceCreation < WAITING_PERIOD_DAYS) {
+      // 관리자는 즉시 공개 가능
+      if (!isAdmin && daysSinceCreation < WAITING_PERIOD_DAYS) {
         const remainingDays = WAITING_PERIOD_DAYS - daysSinceCreation;
-        throw new Error(`리뷰 작성 후 ${WAITING_PERIOD_DAYS}일이 지나야 공개할 수 있습니다. (남은 기간: ${remainingDays}일)`);
+        throw new Error(`리뷰 작성 후 ${WAITING_PERIOD_DAYS}일이 지나야 공개할 수 있습니다. (남은 기간: ${remainingDays}일, 경과: ${daysSinceCreation}일)`);
       }
-
-      // TODO: 신뢰도 점수 체크 (추후 구현)
-      // if (userTrustScore >= INSTANT_PUBLIC_THRESHOLD) {
-      //   // 즉시 공개 가능
-      // }
     }
 
     // 상태 업데이트
@@ -457,6 +501,13 @@ export const toggleReviewPublic = async (reviewId, userId, isPublic) => {
       // 공개 시 보류 상태 해제
       ...(isPublic && { isPending: false, pendingAt: null })
     });
+
+    // 🆕 업체 통계 업데이트 (공개 상태 변경 시)
+    if (review.restaurantId) {
+      updateRestaurantStats(review.restaurantId).catch(err =>
+        console.error('업체 통계 업데이트 실패:', err)
+      );
+    }
   } catch (error) {
     console.error('리뷰 공개 상태 변경 실패:', error);
     throw error;
@@ -504,13 +555,22 @@ export const setPendingStatus = async (reviewId, userId, isPending) => {
  * @param {Object} review - 리뷰 객체
  * @returns {Object} { canMakePublic: boolean, remainingDays: number }
  */
-export const checkCanMakePublic = (review) => {
+export const checkCanMakePublic = (review, userRank = 'newbie') => {
   const createdAt = review.createdAt instanceof Date
     ? review.createdAt
     : review.createdAt?.toDate();
 
   if (!createdAt) {
     return { canMakePublic: false, remainingDays: 0 };
+  }
+
+  // 관리자는 즉시 공개 가능
+  const isAdmin = userRank === 'admin';
+  if (isAdmin) {
+    return {
+      canMakePublic: true,
+      daysInfo: { type: 'admin', value: 0 }
+    };
   }
 
   const now = new Date();

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getUserReviews, searchReviews, deleteReview, toggleReviewPublic, checkCanMakePublic, setPendingStatus } from '../services/reviewService';
+import { getUserInfo, RANK_INFO } from '../services/userService';
 import { REVIEW_SORT_OPTIONS } from '../types/review';
 import './ReviewList.css';
 
-const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHeader }) => {
+const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, onNavigateToCommunity, showToast, setShowHeader }) => {
   const [reviews, setReviews] = useState([]);
   const [filteredReviews, setFilteredReviews] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true); // 첫 로딩
@@ -34,8 +35,16 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
   const [selectedReviewId, setSelectedReviewId] = useState(null);
   const [fakeDaysOffset, setFakeDaysOffset] = useState(0); // 음수면 과거로, 양수면 미래로
 
+  // 사용자 정보
+  const [userInfo, setUserInfo] = useState(null);
+
   // TODO: 실제 사용자 ID는 인증 시스템에서 가져와야 함
   const userId = 'temp_user_id';
+
+  // 사용자 정보 로드
+  useEffect(() => {
+    loadUserInfo();
+  }, []);
 
   // 리뷰 목록 로드
   useEffect(() => {
@@ -177,6 +186,15 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
       scrollContainer.removeEventListener('touchend', handleTouchEnd);
     };
   }, [initialLoading, pullDistance, isRefreshing, showToast]);
+
+  const loadUserInfo = async () => {
+    try {
+      const info = await getUserInfo(userId);
+      setUserInfo(info);
+    } catch (error) {
+      console.error('사용자 정보 로드 실패:', error);
+    }
+  };
 
   const loadReviews = async () => {
     try {
@@ -431,6 +449,14 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
       <header className={`review-list-header ${isHeaderHidden ? 'header-hidden' : ''}`}>
         <h1>내 리뷰 ({reviews.length})</h1>
         <div className="header-actions">
+          {onNavigateToCommunity && (
+            <button
+              className="community-button"
+              onClick={onNavigateToCommunity}
+            >
+              🌍 커뮤니티
+            </button>
+          )}
           <button
             className="write-button"
             onClick={onNavigateToWrite}
@@ -501,11 +527,8 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
         ) : (
           <div className="review-grid">
             {filteredReviews.map((review, index) => {
-              // 첫 번째 리뷰는 임시로 공개 가능한 상태로 가정 (D-0)
-              const isFirstReview = index === 0;
-              const publicInfo = isFirstReview
-                ? { canMakePublic: true, daysInfo: { type: 'zero', value: 0 } }
-                : checkCanMakePublic(review);
+              // 관리자는 즉시 공개 가능
+              const publicInfo = checkCanMakePublic(review, userInfo?.rank);
               const { canMakePublic, daysInfo } = publicInfo;
 
               return (
@@ -597,6 +620,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
                       )}
                       {!review.isPublic && !review.isPending && daysInfo && (
                         <span className="remaining-days-badge">
+                          {daysInfo.type === 'admin' && '👑 관리자'}
                           {daysInfo.type === 'minus' && `D-${daysInfo.value}`}
                           {daysInfo.type === 'zero' && 'D-0'}
                           {daysInfo.type === 'plus' && `D+${daysInfo.value}`}
@@ -613,8 +637,8 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
 
                 {/* 액션 버튼들 */}
                 <div className="review-actions">
-                  {/* 첫 번째 리뷰 - 공개 전 & 보류 상태 아닐 때 */}
-                  {isFirstReview && !review.isPublic && !review.isPending && (
+                  {/* 관리자는 즉시 공개 가능 - 공개 전 & 보류 상태 아닐 때 */}
+                  {daysInfo?.type === 'admin' && !review.isPublic && !review.isPending && (
                     <button
                       className="toggle-public-button can-publish first-review-publish"
                       onClick={(e) => {
@@ -640,8 +664,8 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
                     </button>
                   )}
 
-                  {/* 첫 번째 리뷰 - 보류 상태 */}
-                  {isFirstReview && !review.isPublic && review.isPending && (
+                  {/* 관리자 - 보류 상태 */}
+                  {daysInfo?.type === 'admin' && !review.isPublic && review.isPending && (
                     <button
                       className="toggle-public-button pending-status first-review-publish"
                       onClick={(e) => {
@@ -667,8 +691,8 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
                     </button>
                   )}
 
-                  {/* 첫 번째 리뷰 - 공개 완료 */}
-                  {isFirstReview && review.isPublic && (
+                  {/* 관리자 - 공개 완료 */}
+                  {daysInfo?.type === 'admin' && review.isPublic && (
                     <button
                       className="toggle-public-button published-status first-review-publish"
                       disabled
@@ -691,8 +715,8 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
                     </button>
                   )}
 
-                  {/* 나머지 리뷰 - 공개된 경우 비공개 버튼 */}
-                  {!isFirstReview && review.isPublic && (
+                  {/* 일반 사용자 - 공개된 경우 비공개 버튼 */}
+                  {daysInfo?.type !== 'admin' && review.isPublic && (
                     <button
                       className="toggle-public-button public-active"
                       onClick={(e) => {
@@ -755,6 +779,23 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
                 filteredReviews.length
               ).toFixed(1)}점
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* 사용자 계급 표시 */}
+      {userInfo && RANK_INFO[userInfo.rank] && (
+        <div className="user-rank-section">
+          <div
+            className="user-rank-badge"
+            style={{
+              color: RANK_INFO[userInfo.rank].color,
+              background: RANK_INFO[userInfo.rank].bgColor,
+              borderColor: RANK_INFO[userInfo.rank].borderColor
+            }}
+          >
+            <span className="rank-icon">{RANK_INFO[userInfo.rank].icon}</span>
+            <span className="rank-label">{RANK_INFO[userInfo.rank].label}</span>
           </div>
         </div>
       )}

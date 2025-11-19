@@ -2,58 +2,80 @@
 import React, { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { getPopularRestaurants } from '../services/restaurantService';
 import './CommunityList.css';
 
 /**
- * 커뮤니티 리뷰 목록 (공개 리뷰만 표시)
- * 인스타그램 스타일의 카드형 레이아웃
+ * 커뮤니티 업체 목록 (업체 중심)
+ * - 공개 리뷰가 있는 업체만 표시
+ * - 업체별로 그룹화
  */
-const CommunityList = ({ showToast }) => {
-  const [reviews, setReviews] = useState([]);
+const CommunityList = ({ showToast, onBack, onNavigateToRestaurant }) => {
+  const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState('latest'); // 'latest' | 'rating' | 'popular'
-  const [selectedReview, setSelectedReview] = useState(null); // 상세보기
+  const [sortBy, setSortBy] = useState('reviewCount'); // 'reviewCount' | 'avgRating' | 'totalLikes'
 
   useEffect(() => {
-    loadCommunityReviews();
+    loadRestaurants();
   }, [sortBy]);
 
-  const loadCommunityReviews = async () => {
+  const loadRestaurants = async () => {
     try {
       setLoading(true);
 
-      // 공개 리뷰만 조회
-      let q = query(
-        collection(db, 'reviews'),
-        where('isPublic', '==', true),
-        limit(50)
+      // 인기 업체 조회 (reviewCount, avgRating, totalLikes 기준)
+      const restaurantList = await getPopularRestaurants(sortBy, 50);
+
+      // reviewCount > 0인 업체만 필터링 (공개 리뷰가 있는 업체만)
+      const filteredRestaurants = restaurantList.filter(r => r.reviewCount > 0);
+
+      // 각 업체의 대표 사진 가져오기 (첫 번째 공개 리뷰의 첫 사진)
+      const restaurantsWithPhotos = await Promise.all(
+        filteredRestaurants.map(async (restaurant) => {
+          try {
+            // orderBy 제거 (인덱스 불필요)
+            const reviewsQuery = query(
+              collection(db, 'reviews'),
+              where('restaurantId', '==', restaurant.id),
+              where('isPublic', '==', true)
+            );
+            const snapshot = await getDocs(reviewsQuery);
+
+            let thumbnailPhoto = null;
+            if (!snapshot.empty) {
+              // 클라이언트에서 최신 리뷰 찾기
+              const reviews = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+              }));
+
+              reviews.sort((a, b) => {
+                const aTime = a.createdAt?.toMillis() || 0;
+                const bTime = b.createdAt?.toMillis() || 0;
+                return bTime - aTime;
+              });
+
+              const firstReview = reviews[0];
+              if (firstReview.photos && firstReview.photos.length > 0) {
+                thumbnailPhoto = firstReview.photos[0];
+              }
+            }
+
+            return {
+              ...restaurant,
+              thumbnailPhoto
+            };
+          } catch (error) {
+            console.error('대표 사진 조회 실패:', error);
+            return restaurant;
+          }
+        })
       );
 
-      // 정렬 조건 추가
-      if (sortBy === 'latest') {
-        q = query(q, orderBy('createdAt', 'desc'));
-      } else if (sortBy === 'rating') {
-        q = query(q, orderBy('rating', 'desc'), orderBy('createdAt', 'desc'));
-      }
-
-      const snapshot = await getDocs(q);
-      const reviewList = [];
-
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        reviewList.push({
-          id: doc.id,
-          ...data,
-          orderDate: data.orderDate?.toDate(),
-          createdAt: data.createdAt?.toDate(),
-          updatedAt: data.updatedAt?.toDate(),
-        });
-      });
-
-      setReviews(reviewList);
+      setRestaurants(restaurantsWithPhotos);
     } catch (error) {
-      console.error('커뮤니티 리뷰 로딩 실패:', error);
-      showToast?.('리뷰를 불러올 수 없습니다.');
+      console.error('업체 목록 로딩 실패:', error);
+      showToast?.('업체 목록을 불러올 수 없습니다.');
     } finally {
       setLoading(false);
     }
@@ -77,22 +99,12 @@ const CommunityList = ({ showToast }) => {
     return stars;
   };
 
-  // 익명화된 작성자 표시
-  const getAnonymousName = (userId, createdAt) => {
-    // userId와 날짜를 조합하여 고유한 익명 ID 생성
-    const hash = (userId + createdAt?.getTime()).split('').reduce((acc, char) => {
-      return ((acc << 5) - acc) + char.charCodeAt(0);
-    }, 0);
-    const index = Math.abs(hash) % 100;
-    return `맛잘알${index.toString().padStart(2, '0')}`;
-  };
-
   if (loading) {
     return (
       <div className="community-list-page">
         <div className="loading-spinner">
           <div className="spinner"></div>
-          <p>커뮤니티 리뷰 불러오는 중...</p>
+          <p>인기 업체 불러오는 중...</p>
         </div>
       </div>
     );
@@ -102,47 +114,56 @@ const CommunityList = ({ showToast }) => {
     <div className="community-list-page">
       {/* 정렬 필터 */}
       <div className="community-header">
+        {onBack && (
+          <button className="back-button" onClick={onBack}>
+            ← 뒤로
+          </button>
+        )}
         <div className="sort-tabs">
           <button
-            className={`sort-tab ${sortBy === 'latest' ? 'active' : ''}`}
-            onClick={() => setSortBy('latest')}
+            className={`sort-tab ${sortBy === 'reviewCount' ? 'active' : ''}`}
+            onClick={() => setSortBy('reviewCount')}
           >
-            최신순
+            리뷰 많은 순
           </button>
           <button
-            className={`sort-tab ${sortBy === 'rating' ? 'active' : ''}`}
-            onClick={() => setSortBy('rating')}
+            className={`sort-tab ${sortBy === 'avgRating' ? 'active' : ''}`}
+            onClick={() => setSortBy('avgRating')}
           >
-            평점순
+            평점 높은 순
+          </button>
+          <button
+            className={`sort-tab ${sortBy === 'totalLikes' ? 'active' : ''}`}
+            onClick={() => setSortBy('totalLikes')}
+          >
+            좋아요 많은 순
           </button>
         </div>
         <div className="review-count">
-          🌍 공개 리뷰 {reviews.length}개
+          🍽️ 인기 업체 {restaurants.length}개
         </div>
       </div>
 
-      {/* 리뷰 그리드 (인스타그램 스타일) */}
-      {reviews.length === 0 ? (
+      {/* 업체 그리드 */}
+      {restaurants.length === 0 ? (
         <div className="empty-community">
           <div className="empty-icon">🌟</div>
-          <p>아직 공개된 리뷰가 없습니다.</p>
-          <p className="empty-hint">리뷰를 공개하면 다른 사용자들과 공유할 수 있어요!</p>
+          <p>아직 공개된 리뷰가 있는 업체가 없습니다.</p>
+          <p className="empty-hint">리뷰를 공개하면 커뮤니티에 업체가 추가됩니다!</p>
         </div>
       ) : (
         <div className="community-grid">
-          {reviews.map((review) => (
+          {restaurants.map((restaurant) => (
             <div
-              key={review.id}
+              key={restaurant.id}
               className="community-card"
-              onClick={() => setSelectedReview(review)}
+              onClick={() => onNavigateToRestaurant?.(restaurant.id)}
             >
-              {/* 사진 (필수 아님) */}
-              {review.photos && review.photos.length > 0 ? (
+              {/* 업체 대표 사진 */}
+              {restaurant.thumbnailPhoto ? (
                 <div className="card-image">
-                  <img src={review.photos[0]} alt={review.restaurantName} />
-                  {review.photos.length > 1 && (
-                    <div className="photo-count">📷 {review.photos.length}</div>
-                  )}
+                  <img src={restaurant.thumbnailPhoto} alt={restaurant.name} />
+                  <div className="photo-count">📷 {restaurant.reviewCount}</div>
                 </div>
               ) : (
                 <div className="card-image-placeholder">
@@ -152,39 +173,32 @@ const CommunityList = ({ showToast }) => {
 
               {/* 카드 내용 */}
               <div className="card-content">
-                {/* 가게명 & 별점 */}
+                {/* 업체명 & 별점 */}
                 <div className="card-header">
-                  <h3 className="restaurant-name">{review.restaurantName}</h3>
+                  <h3 className="restaurant-name">{restaurant.name}</h3>
                   <div className="rating-display">
-                    {renderStars(review.rating)}
-                    <span className="rating-number">{review.rating.toFixed(1)}</span>
+                    {renderStars(restaurant.avgRating || 0)}
+                    <span className="rating-number">
+                      {restaurant.avgRating ? restaurant.avgRating.toFixed(1) : '0.0'}
+                    </span>
                   </div>
                 </div>
 
-                {/* 리뷰 내용 미리보기 */}
+                {/* 업체 정보 미리보기 */}
                 <p className="review-preview">
-                  {review.content.length > 80
-                    ? `${review.content.substring(0, 80)}...`
-                    : review.content}
+                  {restaurant.category || '음식점'}
                 </p>
 
                 {/* 메타 정보 */}
                 <div className="card-meta">
-                  <span className="author">
-                    {getAnonymousName(review.userId, review.createdAt)}
-                  </span>
+                  <span className="stat">리뷰 {restaurant.reviewCount}개</span>
                   <span className="separator">·</span>
-                  <span className="date">
-                    {review.createdAt?.toLocaleDateString('ko-KR', {
-                      month: 'short',
-                      day: 'numeric'
-                    })}
-                  </span>
-                  {review.restaurantAddress && (
+                  <span className="stat">좋아요 {restaurant.totalLikes || 0}개</span>
+                  {restaurant.address && (
                     <>
                       <span className="separator">·</span>
                       <span className="location">
-                        {review.restaurantAddress.split(' ')[1] || '위치'}
+                        {restaurant.address.split(' ')[1] || '위치'}
                       </span>
                     </>
                   )}
@@ -192,69 +206,6 @@ const CommunityList = ({ showToast }) => {
               </div>
             </div>
           ))}
-        </div>
-      )}
-
-      {/* 리뷰 상세보기 모달 */}
-      {selectedReview && (
-        <div className="review-detail-modal" onClick={() => setSelectedReview(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <button className="modal-close" onClick={() => setSelectedReview(null)}>
-              ✕
-            </button>
-
-            {/* 사진 슬라이드 */}
-            {selectedReview.photos && selectedReview.photos.length > 0 && (
-              <div className="modal-photos">
-                {selectedReview.photos.map((photo, idx) => (
-                  <img key={idx} src={photo} alt={`${selectedReview.restaurantName} ${idx + 1}`} />
-                ))}
-              </div>
-            )}
-
-            {/* 상세 정보 */}
-            <div className="modal-details">
-              <h2 className="modal-restaurant-name">{selectedReview.restaurantName}</h2>
-              <div className="modal-rating">
-                {renderStars(selectedReview.rating)}
-                <span className="modal-rating-number">{selectedReview.rating.toFixed(1)}</span>
-              </div>
-
-              {selectedReview.restaurantAddress && (
-                <p className="modal-address">📍 {selectedReview.restaurantAddress}</p>
-              )}
-
-              <div className="modal-content-text">{selectedReview.content}</div>
-
-              {selectedReview.foodItems && selectedReview.foodItems.length > 0 && (
-                <div className="modal-food-items">
-                  <strong>주문 메뉴:</strong>
-                  <div className="food-tags">
-                    {selectedReview.foodItems.map((item, idx) => (
-                      <span key={idx} className="food-tag">{item}</span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {selectedReview.price && (
-                <p className="modal-price">💰 {selectedReview.price.toLocaleString()}원</p>
-              )}
-
-              <div className="modal-footer">
-                <span className="modal-author">
-                  {getAnonymousName(selectedReview.userId, selectedReview.createdAt)}
-                </span>
-                <span className="modal-date">
-                  {selectedReview.createdAt?.toLocaleDateString('ko-KR', {
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric'
-                  })}
-                </span>
-              </div>
-            </div>
-          </div>
         </div>
       )}
     </div>

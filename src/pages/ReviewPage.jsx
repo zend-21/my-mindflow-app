@@ -2,15 +2,17 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import ReviewList from './ReviewList';
 import ReviewWrite from './ReviewWrite';
-// import CommunityList from './CommunityList'; // 나중에 사용
+import CommunityList from './CommunityList';
+import RestaurantDetail from './RestaurantDetail';
 
 /**
  * 리뷰 페이지 메인 컨테이너
- * ReviewList와 ReviewWrite를 관리
+ * ReviewList, ReviewWrite, CommunityList, RestaurantDetail를 관리
  */
 const ReviewPage = ({ showToast, setShowHeader }) => {
-  const [currentView, setCurrentView] = useState('list'); // 'list' | 'write' | 'edit'
+  const [currentView, setCurrentView] = useState('list'); // 'list' | 'write' | 'edit' | 'community' | 'restaurantDetail'
   const [editReviewId, setEditReviewId] = useState(null);
+  const [selectedRestaurantId, setSelectedRestaurantId] = useState(null);
 
   const handleNavigateToWrite = () => {
     setCurrentView('write');
@@ -27,6 +29,15 @@ const ReviewPage = ({ showToast, setShowHeader }) => {
     setEditReviewId(null);
   };
 
+  const handleNavigateToCommunity = () => {
+    setCurrentView('community');
+  };
+
+  const handleNavigateToRestaurant = (restaurantId) => {
+    setSelectedRestaurantId(restaurantId);
+    setCurrentView('restaurantDetail');
+  };
+
   // 리뷰 작성/수정 완료 후 목록으로 돌아가기
   const handleReviewSaved = (message) => {
     showToast?.(message || '리뷰가 저장되었습니다!');
@@ -35,12 +46,32 @@ const ReviewPage = ({ showToast, setShowHeader }) => {
 
   return (
     <>
+      {/* 내 리뷰 목록 */}
       {currentView === 'list' && (
         <ReviewList
           onNavigateToWrite={handleNavigateToWrite}
           onNavigateToEdit={handleNavigateToEdit}
+          onNavigateToCommunity={handleNavigateToCommunity}
           showToast={showToast}
           setShowHeader={setShowHeader}
+        />
+      )}
+
+      {/* 커뮤니티 */}
+      {currentView === 'community' && (
+        <CommunityList
+          showToast={showToast}
+          onBack={handleNavigateToList}
+          onNavigateToRestaurant={handleNavigateToRestaurant}
+        />
+      )}
+
+      {/* 업체 상세 */}
+      {currentView === 'restaurantDetail' && selectedRestaurantId && (
+        <RestaurantDetail
+          restaurantId={selectedRestaurantId}
+          showToast={showToast}
+          onBack={handleNavigateToCommunity}
         />
       )}
 
