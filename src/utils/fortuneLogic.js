@@ -576,12 +576,21 @@ const mapScoreToKeyword = (score, category) => {
  */
 const calculateCategoryScore = (userDayStem, todayPillar, categoryIndex) => {
     const userStemIndex = HEAVENLY_STEMS.indexOf(userDayStem);
+    const today = new Date();
 
-    // 천간 인덱스 + 지지 인덱스 + 카테고리별 가중치
-    const baseScore = (userStemIndex + todayPillar.index + categoryIndex * 7) % 100;
+    // 날짜를 시드로 사용하여 매일 다른 점수
+    const dateSeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
 
-    // 0~100 범위로 정규화
-    return baseScore;
+    // 여러 요소를 조합하여 더 다양한 점수 생성
+    const factor1 = (userStemIndex * 13 + todayPillar.index * 17) % 101;
+    const factor2 = (dateSeed * 7 + categoryIndex * 23) % 101;
+    const factor3 = (userStemIndex + todayPillar.index + categoryIndex) % 101;
+
+    // 세 가지 요소를 가중평균 (더 넓은 분포)
+    const baseScore = Math.floor((factor1 * 0.4 + factor2 * 0.35 + factor3 * 0.25));
+
+    // 0~100 범위 보장
+    return Math.max(0, Math.min(100, baseScore));
 };
 
 /**
