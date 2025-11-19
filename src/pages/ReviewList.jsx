@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getUserReviews, searchReviews, deleteReview, toggleReviewPublic, checkCanMakePublic } from '../services/reviewService';
+import { getUserReviews, searchReviews, deleteReview, toggleReviewPublic, checkCanMakePublic, setPendingStatus } from '../services/reviewService';
 import { REVIEW_SORT_OPTIONS } from '../types/review';
 import './ReviewList.css';
 
@@ -29,8 +29,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
   // 🧪 테스트 모드: D-day 강제 조작
   const [testMode, setTestMode] = useState(false);
 
-  // 공개 보류 상태 관리
-  const [pendingReviews, setPendingReviews] = useState(new Set());
+  // 공개 보류 모달 관리
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [selectedReviewId, setSelectedReviewId] = useState(null);
   const [fakeDaysOffset, setFakeDaysOffset] = useState(0); // 음수면 과거로, 양수면 미래로
@@ -267,15 +266,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
       await toggleReviewPublic(reviewId, userId, newIsPublic);
       showToast?.(newIsPublic ? '리뷰가 공개되었습니다.' : '리뷰가 비공개로 전환되었습니다.');
 
-      // 공개 시 보류 목록에서 제거
-      if (newIsPublic) {
-        setPendingReviews(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(reviewId);
-          return newSet;
-        });
-      }
-
+      // 리뷰 목록 새로고침 (보류 상태는 toggleReviewPublic에서 자동으로 해제됨)
       loadReviews();
     } catch (error) {
       console.error('리뷰 공개 상태 변경 실패:', error);
@@ -299,12 +290,22 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
   };
 
   // 보류
-  const handlePendPublish = () => {
+  const handlePendPublish = async () => {
     if (selectedReviewId) {
-      setPendingReviews(prev => new Set([...prev, selectedReviewId]));
-      setShowPublishModal(false);
-      setSelectedReviewId(null);
-      showToast?.('공개를 보류했습니다.');
+      try {
+        // Firebase에 보류 상태 저장
+        await setPendingStatus(selectedReviewId, userId, true);
+
+        setShowPublishModal(false);
+        setSelectedReviewId(null);
+        showToast?.('공개를 보류했습니다.');
+
+        // 리뷰 목록 새로고침
+        loadReviews();
+      } catch (error) {
+        console.error('보류 처리 실패:', error);
+        showToast?.('보류 처리에 실패했습니다.');
+      }
     }
   };
 
@@ -585,7 +586,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
                     </span>
                     <div className="status-badges">
                       {/* 보류 상태 */}
-                      {pendingReviews.has(review.id) ? (
+                      {review.isPending ? (
                         <span className="public-status-badge pending">
                           보류
                         </span>
@@ -594,7 +595,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
                           {review.isPublic ? '공개' : '비공개'}
                         </span>
                       )}
-                      {!review.isPublic && !pendingReviews.has(review.id) && daysInfo && (
+                      {!review.isPublic && !review.isPending && daysInfo && (
                         <span className="remaining-days-badge">
                           {daysInfo.type === 'minus' && `D-${daysInfo.value}`}
                           {daysInfo.type === 'zero' && 'D-0'}
@@ -613,7 +614,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
                 {/* 액션 버튼들 */}
                 <div className="review-actions">
                   {/* 첫 번째 리뷰 - 공개 전 & 보류 상태 아닐 때 */}
-                  {isFirstReview && !review.isPublic && !pendingReviews.has(review.id) && (
+                  {isFirstReview && !review.isPublic && !review.isPending && (
                     <button
                       className="toggle-public-button can-publish first-review-publish"
                       onClick={(e) => {
@@ -640,7 +641,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
                   )}
 
                   {/* 첫 번째 리뷰 - 보류 상태 */}
-                  {isFirstReview && !review.isPublic && pendingReviews.has(review.id) && (
+                  {isFirstReview && !review.isPublic && review.isPending && (
                     <button
                       className="toggle-public-button pending-status first-review-publish"
                       onClick={(e) => {

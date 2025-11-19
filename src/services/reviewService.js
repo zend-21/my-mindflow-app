@@ -10,7 +10,8 @@ import {
   query,
   where,
   orderBy,
-  Timestamp
+  Timestamp,
+  serverTimestamp
 } from 'firebase/firestore';
 import { uploadMultipleImages, deleteMultipleImages } from '../utils/storage';
 
@@ -452,10 +453,48 @@ export const toggleReviewPublic = async (reviewId, userId, isPublic) => {
     // 상태 업데이트
     await updateDoc(reviewRef, {
       isPublic,
-      updatedAt: Timestamp.fromDate(now)
+      updatedAt: Timestamp.fromDate(now),
+      // 공개 시 보류 상태 해제
+      ...(isPublic && { isPending: false, pendingAt: null })
     });
   } catch (error) {
     console.error('리뷰 공개 상태 변경 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * 리뷰 보류 상태 설정
+ * @param {string} reviewId - 리뷰 ID
+ * @param {string} userId - 사용자 ID
+ * @param {boolean} isPending - 보류 상태
+ */
+export const setPendingStatus = async (reviewId, userId, isPending) => {
+  try {
+    const reviewRef = doc(db, REVIEWS_COLLECTION, reviewId);
+
+    // 기존 리뷰 조회
+    const reviewSnap = await getDoc(reviewRef);
+
+    if (!reviewSnap.exists()) {
+      throw new Error('리뷰를 찾을 수 없습니다.');
+    }
+
+    const review = reviewSnap.data();
+
+    // 권한 확인
+    if (review.userId !== userId) {
+      throw new Error('권한이 없습니다.');
+    }
+
+    // 보류 상태 업데이트
+    await updateDoc(reviewRef, {
+      isPending: isPending,
+      pendingAt: isPending ? serverTimestamp() : null,
+      updatedAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('보류 상태 설정 실패:', error);
     throw error;
   }
 };
