@@ -1,9 +1,11 @@
 // src/components/RestaurantAutocomplete.jsx
 
 import React, { useState, useEffect, useRef } from 'react';
-import { searchRestaurants, getCurrentLocation, searchNearbyRestaurants } from '../services/kakaoMapService';
+import { searchMultipleCategories, getCurrentLocation, searchNearbyMultipleCategories } from '../services/kakaoMapService';
 import AddressInput from './AddressInput';
 import AddressManageModal from './AddressManageModal';
+import CategorySettingsModal from './CategorySettingsModal';
+import { CATEGORY_SETTINGS_KEY, DEFAULT_CATEGORY, KAKAO_CATEGORIES } from '../config/categoryConfig';
 import './RestaurantAutocomplete.css';
 
 // 로컬 스토리지 키
@@ -12,11 +14,11 @@ const LOCATION_MODE_KEY = 'mindflow_location_mode';
 
 // 아이콘 SVG 맵핑
 const ICON_SVGS = {
-  home: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
-  briefcase: 'M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16M2 7h20v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7z',
+  home: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 22V12h6v10',
+  building: 'M3 21h18M6 18V9M10 18V9M14 18V9M18 18V9M12 2l9 4v2H3V6l9-4z',
   users: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75',
   heart: 'M20.8 4.6a5.5 5.5 0 0 0-7.7 0l-1.1 1-1.1-1a5.5 5.5 0 0 0-7.7 7.8l1 1 7.8 7.8 7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z',
-  map: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z',
+  flag: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7',
 };
 
 const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
@@ -29,6 +31,7 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
   const [pendingLocationMode, setPendingLocationMode] = useState(null); // 주소 입력 대기 중인 모드
   const [showManageModal, setShowManageModal] = useState(false);
   const [manageSlotIndex, setManageSlotIndex] = useState(null);
+  const [showCategorySettings, setShowCategorySettings] = useState(false);
 
   // 위치 모드: 'current' (현재위치), 'address1', 'address2', 'address3' (저장주소 슬롯)
   const [locationMode, setLocationMode] = useState(() => {
@@ -37,12 +40,32 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
 
   const [savedAddresses, setSavedAddresses] = useState([]); // 최대 3개 저장 가능
   const [currentLocation, setCurrentLocation] = useState(null); // 현재 GPS 위치
+  const [categoryRefresh, setCategoryRefresh] = useState(0); // 카테고리 변경 감지용
 
   const inputRef = useRef(null);
   const resultsRef = useRef(null);
   const searchTimeoutRef = useRef(null);
   const longPressTimerRef = useRef(null);
   const longPressStartRef = useRef(null);
+
+  // 선택된 카테고리 코드 가져오기
+  const getSelectedCategoryCodes = () => {
+    const saved = localStorage.getItem(CATEGORY_SETTINGS_KEY);
+    if (saved) {
+      try {
+        const categoryIds = JSON.parse(saved);
+        // categoryId를 Kakao API 코드로 변환
+        return categoryIds.map(id => {
+          const category = Object.values(KAKAO_CATEGORIES).find(cat => cat.id === id);
+          return category ? category.code : null;
+        }).filter(code => code !== null);
+      } catch (error) {
+        console.error('카테고리 설정 로드 실패:', error);
+        return [DEFAULT_CATEGORY.code];
+      }
+    }
+    return [DEFAULT_CATEGORY.code]; // 기본값: 음식점
+  };
 
   // 저장된 주소들 불러오기 (최대 3개)
   useEffect(() => {
@@ -62,6 +85,31 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
     };
 
     loadSavedAddresses();
+  }, []);
+
+  // 카테고리 설정 변경 감지
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === CATEGORY_SETTINGS_KEY) {
+        console.log('🔄 카테고리 설정 변경 감지');
+        setCategoryRefresh(prev => prev + 1);
+      }
+    };
+
+    // storage 이벤트는 다른 탭/창에서의 변경만 감지하므로
+    // 같은 페이지 내 변경을 위한 커스텀 이벤트도 추가
+    const handleCategoryChange = () => {
+      console.log('🔄 카테고리 변경 이벤트 수신');
+      setCategoryRefresh(prev => prev + 1);
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('categorySettingsChanged', handleCategoryChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('categorySettingsChanged', handleCategoryChange);
+    };
   }, []);
 
   // 검색 디바운스 (300ms 대기)
@@ -85,7 +133,7 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [query, locationMode]); // locationMode 변경 시에도 재검색
+  }, [query, locationMode, categoryRefresh]); // locationMode, 카테고리 변경 시에도 재검색
 
   const performSearch = async (searchQuery) => {
     if (!searchQuery || searchQuery.trim() === '') {
@@ -94,6 +142,10 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
 
     try {
       setIsLoading(true);
+
+      // 선택된 카테고리 코드 가져오기
+      const categoryCodes = getSelectedCategoryCodes();
+      console.log('🔍 검색 카테고리:', categoryCodes);
 
       // 현재 선택된 위치 모드에 따라 기준 위치 결정
       let baseLocation = null;
@@ -120,7 +172,7 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
       for (let page = 1; page <= maxPages; page++) {
         let pageResults;
         if (baseLocation) {
-          pageResults = await searchRestaurants(searchQuery, {
+          pageResults = await searchMultipleCategories(searchQuery, categoryCodes, {
             x: baseLocation.longitude,
             y: baseLocation.latitude,
             radius: 5000, // 5km 반경
@@ -128,7 +180,7 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
             page: page
           });
         } else {
-          pageResults = await searchRestaurants(searchQuery, {
+          pageResults = await searchMultipleCategories(searchQuery, categoryCodes, {
             size: 15,
             page: page
           });
@@ -168,7 +220,7 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
             let partialResults = [];
             // 부분 검색은 1페이지만
             if (baseLocation) {
-              partialResults = await searchRestaurants(partialQuery, {
+              partialResults = await searchMultipleCategories(partialQuery, categoryCodes, {
                 x: baseLocation.longitude,
                 y: baseLocation.latitude,
                 radius: 5000,
@@ -176,7 +228,7 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
                 page: 1
               });
             } else {
-              partialResults = await searchRestaurants(partialQuery, {
+              partialResults = await searchMultipleCategories(partialQuery, categoryCodes, {
                 size: 15,
                 page: 1
               });
@@ -421,7 +473,7 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
           >
             <path d={ICON_SVGS[address.icon]} />
           </svg>
-          {address.label || ''}
+          {address.label && address.label}
         </>
       );
     }
@@ -582,6 +634,17 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
           placeholder="가게 이름을 입력하세요 (예: 피자헛 강남)"
           className="autocomplete-input"
         />
+        <button
+          type="button"
+          className="category-settings-btn"
+          onClick={() => setShowCategorySettings(true)}
+          title="검색 카테고리 설정"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
       </div>
 
       {isLoading && (
@@ -592,7 +655,7 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
         <div ref={resultsRef} className="autocomplete-results">
           {results.map((restaurant, index) => (
             <div
-              key={restaurant.id}
+              key={`${restaurant.id}-${index}`}
               className={`autocomplete-result-item ${
                 index === selectedIndex ? 'selected' : ''
               }`}
@@ -662,6 +725,16 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
           showToast={showToast}
         />
       )}
+
+      {/* 카테고리 설정 모달 */}
+      <CategorySettingsModal
+        isOpen={showCategorySettings}
+        onClose={() => setShowCategorySettings(false)}
+        onSave={(selectedCategories) => {
+          console.log('선택된 카테고리:', selectedCategories);
+        }}
+        showToast={showToast}
+      />
     </div>
   );
 };

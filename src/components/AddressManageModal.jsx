@@ -5,11 +5,11 @@ import AddressInput from './AddressInput';
 
 // 아이콘 옵션 (시크릿 페이지에서 사용하는 아이콘 재사용)
 const ICON_OPTIONS = [
-  { id: 'home', name: '집', svg: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' },
-  { id: 'briefcase', name: '회사', svg: 'M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16M2 7h20v14a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7z' },
+  { id: 'home', name: '집', svg: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 22V12h6v10' },
+  { id: 'building', name: '회사', svg: 'M3 21h18M6 18V9M10 18V9M14 18V9M18 18V9M12 2l9 4v2H3V6l9-4z' },
   { id: 'users', name: '가족', svg: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75' },
   { id: 'heart', name: '즐겨찾기', svg: 'M20.8 4.6a5.5 5.5 0 0 0-7.7 0l-1.1 1-1.1-1a5.5 5.5 0 0 0-7.7 7.8l1 1 7.8 7.8 7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.8z' },
-  { id: 'map', name: '위치', svg: 'M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z' },
+  { id: 'flag', name: '목적지', svg: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1zM4 22v-7' },
 ];
 
 const AddressManageModal = ({

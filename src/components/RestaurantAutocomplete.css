@@ -68,6 +68,7 @@
 .autocomplete-input-wrapper {
   position: relative;
   display: flex;
+  align-items: center;
   gap: 0.5rem;
 }
 
@@ -92,6 +93,32 @@
   border-color: rgba(240, 147, 251, 0.5);
   background: rgba(255, 255, 255, 0.08);
   box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
+}
+
+.category-settings-btn {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.category-settings-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.category-settings-btn:hover {
+  background: rgba(240, 147, 251, 0.15);
+  border-color: rgba(240, 147, 251, 0.4);
+  color: #f093fb;
+  transform: translateY(-1px);
 }
 
 .nearby-button {
