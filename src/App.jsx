@@ -483,7 +483,7 @@ function App() {
                 clearTimeout(idleTimerRef.current);
             }
         };
-    }, []);  
+    }, []);
 
     // 🔄 일반 데이터는 로그인/게스트 공통 저장 (동일한 localStorage 키 사용)
     // ✅ 휴대폰 환경: 로그인 상태를 인지 못한 채 메모 작성 시 데이터 유실 방지
@@ -1600,6 +1600,24 @@ function App() {
         
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [profile, accessToken, isGapiReady, memos, calendarSchedules, recentActivities, displayCount, widgets]);
+
+    // Pull-to-refresh에서 Google Drive 동기화 트리거
+    useEffect(() => {
+        const handleTriggerSync = async () => {
+            console.log('🔄 Pull-to-refresh에서 동기화 트리거됨');
+            if (profile && accessToken && isGapiReady) {
+                await performSync(true); // 수동 동기화로 처리 (토스트 메시지 표시)
+            } else {
+                console.log('❌ 동기화 조건 미충족 - profile:', !!profile, 'accessToken:', !!accessToken, 'isGapiReady:', isGapiReady);
+            }
+        };
+
+        window.addEventListener('triggerGoogleDriveSync', handleTriggerSync);
+
+        return () => {
+            window.removeEventListener('triggerGoogleDriveSync', handleTriggerSync);
         };
     }, [profile, accessToken, isGapiReady, memos, calendarSchedules, recentActivities, displayCount, widgets]);
 

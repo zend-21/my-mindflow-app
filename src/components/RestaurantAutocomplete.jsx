@@ -51,19 +51,30 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
   // 선택된 카테고리 코드 가져오기
   const getSelectedCategoryCodes = () => {
     const saved = localStorage.getItem(CATEGORY_SETTINGS_KEY);
+    console.log('📋 저장된 카테고리 설정:', saved);
+
     if (saved) {
       try {
         const categoryIds = JSON.parse(saved);
+        console.log('📋 파싱된 카테고리 IDs:', categoryIds);
+
         // categoryId를 Kakao API 코드로 변환
-        return categoryIds.map(id => {
+        const codes = categoryIds.map(id => {
           const category = Object.values(KAKAO_CATEGORIES).find(cat => cat.id === id);
-          return category ? category.code : null;
-        }).filter(code => code !== null);
+          const code = category ? category.code : null;
+          console.log(`  - ${id} → ${code} (${category?.name || 'unknown'})`);
+          return code;
+        });
+
+        console.log('🔍 최종 카테고리 코드 배열:', codes);
+        return codes;
       } catch (error) {
-        console.error('카테고리 설정 로드 실패:', error);
+        console.error('❌ 카테고리 설정 로드 실패:', error);
         return [DEFAULT_CATEGORY.code];
       }
     }
+
+    console.log('🔍 기본 카테고리 사용:', DEFAULT_CATEGORY.code);
     return [DEFAULT_CATEGORY.code]; // 기본값: 음식점
   };
 

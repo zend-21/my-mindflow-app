@@ -47,15 +47,30 @@ const CategorySettingsModal = ({ isOpen, onClose, onSave, showToast }) => {
 
   const handleToggleCategory = (categoryId) => {
     setSelectedCategories(prev => {
+      // '전체' 카테고리를 선택한 경우
+      if (categoryId === 'all') {
+        if (prev.includes('all')) {
+          // '전체'를 해제하려고 하면 기본값(음식점)으로 변경
+          showToast?.('최소 1개의 카테고리를 선택해야 합니다.');
+          return [DEFAULT_CATEGORY.id];
+        } else {
+          // '전체'를 선택하면 다른 모든 카테고리 해제
+          return ['all'];
+        }
+      }
+
+      // 다른 카테고리를 선택한 경우
       if (prev.includes(categoryId)) {
-        // 최소 1개는 선택되어야 함
+        // 해제하려는 경우
         if (prev.length === 1) {
           showToast?.('최소 1개의 카테고리를 선택해야 합니다.');
           return prev;
         }
         return prev.filter(id => id !== categoryId);
       } else {
-        return [...prev, categoryId];
+        // 추가하려는 경우 - '전체'가 선택되어 있으면 '전체'를 해제
+        const newSelection = prev.filter(id => id !== 'all');
+        return [...newSelection, categoryId];
       }
     });
   };

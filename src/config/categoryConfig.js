@@ -5,6 +5,12 @@
  * https://developers.kakao.com/docs/latest/ko/local/dev-guide#search-by-category
  */
 export const KAKAO_CATEGORIES = {
+  ALL: {
+    id: 'all',
+    code: null, // null이면 카테고리 필터 없이 전체 검색
+    name: '전체',
+    icon: 'store',
+  },
   RESTAURANT: {
     id: 'restaurant',
     code: 'FD6', // 음식점
@@ -101,6 +107,7 @@ export const KAKAO_CATEGORIES = {
  * 리뷰 가능한 카테고리 목록 (UI에 표시될 순서대로)
  */
 export const REVIEWABLE_CATEGORIES = [
+  KAKAO_CATEGORIES.ALL, // 전체 카테고리 (맨 앞)
   KAKAO_CATEGORIES.RESTAURANT,
   KAKAO_CATEGORIES.CAFE,
   KAKAO_CATEGORIES.CONVENIENCE_STORE,

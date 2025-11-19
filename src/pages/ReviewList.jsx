@@ -18,6 +18,14 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
   const scrollDirection = useRef(null); // 'up' | 'down' | null
   const [isHeaderHidden, setIsHeaderHidden] = useState(false);
 
+  // Pull-to-refresh 상태
+  const [isPulling, setIsPulling] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const touchStartY = useRef(0);
+  const touchCurrentY = useRef(0);
+  const isPullRefreshActive = useRef(false);
+
   // TODO: 실제 사용자 ID는 인증 시스템에서 가져와야 함
   const userId = 'temp_user_id';
 
@@ -84,6 +92,83 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
       setShowHeader?.(true);
     };
   }, [initialLoading, setShowHeader]);
+
+  // Pull-to-refresh 핸들러
+  useEffect(() => {
+    if (initialLoading) return;
+
+    const scrollContainer = contentRef.current;
+    if (!scrollContainer) return;
+
+    const PULL_THRESHOLD = 80; // 동기화 트리거 거리 (픽셀)
+
+    const handleTouchStart = (e) => {
+      // 스크롤이 최상단일 때만 pull-to-refresh 활성화
+      if (scrollContainer.scrollTop === 0) {
+        touchStartY.current = e.touches[0].clientY;
+        isPullRefreshActive.current = true;
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (!isPullRefreshActive.current || isRefreshing) return;
+
+      touchCurrentY.current = e.touches[0].clientY;
+      const pullDist = touchCurrentY.current - touchStartY.current;
+
+      // 아래로 당기는 경우에만 (위로 스크롤 방지)
+      if (pullDist > 0 && scrollContainer.scrollTop === 0) {
+        setIsPulling(true);
+        // 최대 120px까지만 당기기 허용
+        setPullDistance(Math.min(pullDist, 120));
+
+        // 기본 스크롤 동작 방지
+        if (pullDist > 10) {
+          e.preventDefault();
+        }
+      }
+    };
+
+    const handleTouchEnd = async () => {
+      if (!isPullRefreshActive.current) return;
+
+      isPullRefreshActive.current = false;
+
+      // 임계값을 넘었으면 새로고침 트리거
+      if (pullDistance >= PULL_THRESHOLD && !isRefreshing) {
+        setIsRefreshing(true);
+
+        try {
+          // Google Drive 동기화 이벤트 발생
+          window.dispatchEvent(new CustomEvent('triggerGoogleDriveSync'));
+
+          // 리뷰 목록도 다시 로드
+          await loadReviews();
+
+          showToast?.('✅ 동기화 완료');
+        } catch (error) {
+          console.error('동기화 실패:', error);
+          showToast?.('❌ 동기화 실패');
+        } finally {
+          setIsRefreshing(false);
+        }
+      }
+
+      // 상태 초기화
+      setIsPulling(false);
+      setPullDistance(0);
+    };
+
+    scrollContainer.addEventListener('touchstart', handleTouchStart, { passive: true });
+    scrollContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+    scrollContainer.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      scrollContainer.removeEventListener('touchstart', handleTouchStart);
+      scrollContainer.removeEventListener('touchmove', handleTouchMove);
+      scrollContainer.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [initialLoading, pullDistance, isRefreshing, showToast]);
 
   const loadReviews = async () => {
     try {
@@ -269,6 +354,29 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, showToast, setShowHea
 
   return (
     <div className="review-list-page" ref={contentRef}>
+      {/* Pull-to-refresh 인디케이터 */}
+      {(isPulling || isRefreshing) && (
+        <div
+          className="pull-to-refresh-indicator"
+          style={{
+            transform: `translateY(${isPulling ? pullDistance - 60 : 0}px)`,
+            opacity: isPulling ? Math.min(pullDistance / 80, 1) : 1,
+          }}
+        >
+          {isRefreshing ? (
+            <>
+              <div className="refresh-spinner"></div>
+              <span>동기화 중...</span>
+            </>
+          ) : (
+            <>
+              <div className="refresh-icon" style={{ transform: `rotate(${pullDistance * 3}deg)` }}>↻</div>
+              <span>{pullDistance >= 80 ? '놓아서 동기화' : '아래로 당겨서 동기화'}</span>
+            </>
+          )}
+        </div>
+      )}
+
       <header className={`review-list-header ${isHeaderHidden ? 'header-hidden' : ''}`}>
         <h1>내 리뷰 ({reviews.length})</h1>
         <button

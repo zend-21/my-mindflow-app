@@ -141,7 +141,7 @@ export const searchNearbyRestaurants = async (latitude, longitude, radius = 500,
 /**
  * 여러 카테고리로 검색 (병합)
  * @param {string} query - 검색어
- * @param {Array<string>} categoryCodes - 카테고리 코드 배열 (예: ['FD6', 'CE7'])
+ * @param {Array<string>} categoryCodes - 카테고리 코드 배열 (예: ['FD6', 'CE7'], null 포함 시 전체 검색)
  * @param {Object} options - 검색 옵션
  * @returns {Promise<Array>} 중복 제거된 통합 검색 결과
  */
@@ -151,8 +151,19 @@ export const searchMultipleCategories = async (query, categoryCodes = ['FD6'], o
   }
 
   try {
+    // null이 포함되어 있으면 (전체 검색) 카테고리 필터 없이 검색
+    if (categoryCodes.includes(null) || categoryCodes.length === 0) {
+      console.log('🌐 전체 카테고리 검색 (필터 없음)');
+      return await searchRestaurants(query, { ...options, categoryCode: undefined });
+    }
+
+    // null이 아닌 카테고리 코드만 필터링
+    const validCategoryCodes = categoryCodes.filter(code => code !== null);
+
+    console.log('🔍 선택된 카테고리로 검색:', validCategoryCodes);
+
     // 각 카테고리별로 병렬 검색
-    const searchPromises = categoryCodes.map(categoryCode =>
+    const searchPromises = validCategoryCodes.map(categoryCode =>
       searchRestaurants(query, { ...options, categoryCode })
     );
 
@@ -184,14 +195,25 @@ export const searchMultipleCategories = async (query, categoryCodes = ['FD6'], o
  * GPS 위치 기반 여러 카테고리 주변 검색
  * @param {number} latitude - 위도
  * @param {number} longitude - 경도
- * @param {Array<string>} categoryCodes - 카테고리 코드 배열
+ * @param {Array<string>} categoryCodes - 카테고리 코드 배열 (null 포함 시 전체 검색)
  * @param {number} radius - 반경(m)
  * @returns {Promise<Array>} 통합 검색 결과
  */
 export const searchNearbyMultipleCategories = async (latitude, longitude, categoryCodes = ['FD6'], radius = 500) => {
   try {
+    // null이 포함되어 있으면 (전체 검색) 카테고리 필터 없이 검색
+    if (categoryCodes.includes(null) || categoryCodes.length === 0) {
+      console.log('🌐 주변 전체 카테고리 검색 (필터 없음)');
+      return await searchNearbyRestaurants(latitude, longitude, radius, undefined);
+    }
+
+    // null이 아닌 카테고리 코드만 필터링
+    const validCategoryCodes = categoryCodes.filter(code => code !== null);
+
+    console.log('🔍 선택된 카테고리로 주변 검색:', validCategoryCodes);
+
     // 각 카테고리별로 병렬 검색
-    const searchPromises = categoryCodes.map(categoryCode =>
+    const searchPromises = validCategoryCodes.map(categoryCode =>
       searchNearbyRestaurants(latitude, longitude, radius, categoryCode)
     );
 
