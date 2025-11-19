@@ -263,15 +263,10 @@ const RestaurantAutocomplete = ({ onSelect, initialValue = '', showToast }) => {
     localStorage.setItem(LOCATION_MODE_KEY, mode);
     console.log('🗺️ 위치 모드 확정:', mode);
 
-    // 현재위치 모드로 변경 시 GPS 위치 가져오기
+    // 현재위치 모드로 변경 시 항상 GPS 위치 새로 가져오기
     if (mode === 'current') {
-      if (!currentLocation) {
-        console.log('📍 현재 위치가 없음 - 위치 가져오기 시작');
-        await fetchCurrentLocation();
-      } else {
-        console.log('📍 현재 위치가 이미 있음:', currentLocation);
-        showToast?.('저장된 현재 위치를 사용합니다.');
-      }
+      console.log('📍 현재 위치 가져오기 시작');
+      await fetchCurrentLocation();
     }
 
     // 모드 변경 후 검색어가 있으면 재검색
