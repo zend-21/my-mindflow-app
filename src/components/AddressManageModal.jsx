@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import './AddressManageModal.css';
 import AddressInput from './AddressInput';
 
@@ -124,7 +125,7 @@ const AddressManageModal = ({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <>
       <div className="address-manage-overlay">
         <div className="address-manage-modal">
@@ -250,7 +251,8 @@ const AddressManageModal = ({
           </div>
         </div>
       )}
-    </>
+    </>,
+    document.body
   );
 };
 
