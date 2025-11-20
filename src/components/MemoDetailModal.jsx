@@ -446,11 +446,16 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
     const handleContentChange = (e) => {
         const newContent = e.target.value;
         setEditedContent(newContent);
-        
+
+        // 히스토리 중간에서 수정한 경우, 이후 히스토리 삭제
         const newHistory = history.slice(0, historyIndex + 1);
-        newHistory.push(newContent);
-        setHistory(newHistory);
-        setHistoryIndex(newHistory.length - 1);
+
+        // 마지막 항목과 동일하지 않을 때만 추가
+        if (newHistory[newHistory.length - 1] !== newContent) {
+            newHistory.push(newContent);
+            setHistory(newHistory);
+            setHistoryIndex(newHistory.length - 1);
+        }
     };
 
     const handleDoubleClick = () => {
