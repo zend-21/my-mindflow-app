@@ -170,14 +170,16 @@ const ButtonContainer = styled.div`
 `;
 
 const ModalButton = styled.button`
-    padding: 8px 12px;      /* 가로 패딩 축소 */
+    padding: 8px 10px;      /* 가로 패딩 더 축소 */
     border: none;
-    border-radius: 8px;
-    font-size: 14px;        /* 글씨 크기 축소 */
+    border-radius: 6px;     /* 둥근 모서리 약간 축소 */
+    font-size: 13px;        /* 글씨 크기 더 축소 */
     cursor: pointer;
     transition: background-color 0.2s ease;
     white-space: nowrap;    /* 줄바꿈 방지 */
     min-width: fit-content; /* 내용에 맞게 크기 조정 */
+    flex: 1;                /* 동일한 너비로 분배 */
+    max-width: 50%;         /* 각 버튼 최대 50% */
 `;
 
 const SaveButton = styled(ModalButton)`
@@ -249,10 +251,10 @@ const RightButtonWrapper = styled.div`
 // 1. 상단 30-40-30 그리드 컨테이너
 const TopGridContainer = styled.div`
     display: grid;
-    /* 좌측 25%, 중앙 40%, 우측 35% 비율 */
-    grid-template-columns: 1.25fr 2fr 1.75fr;
+    /* 좌측 20%, 중앙 50%, 우측 30% 비율 - 중앙 영역 확대 */
+    grid-template-columns: 1fr 2.5fr 1.5fr;
     align-items: center;
-    gap: 6px;
+    gap: 4px;  /* 간격 더 축소 */
     width: 100%;
     margin-bottom: 15px; /* 아래 줄과의 간격 */
 `;
@@ -275,7 +277,8 @@ const GridAreaLeft = styled(GridArea)`
 const GridAreaCenter = styled(GridArea)`
     display: flex;
     justify-content: center;
-    gap: 10px;
+    gap: 4px;  /* 버튼 간격 축소 */
+    width: 100%; /* 전체 너비 사용 */
 `;
 
 const GridAreaRight = styled(GridArea)`
