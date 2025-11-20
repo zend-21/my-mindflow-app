@@ -229,9 +229,11 @@ const InfoText = styled.p`
 `;
 
 const RoomSettingsModal = ({ isOpen, onClose, onConfirm, defaultTitle = '' }) => {
-  const [roomTitle, setRoomTitle] = useState(defaultTitle);
+  const [roomTitle, setRoomTitle] = useState(''); // 빈 문자열로 시작
   const [isPublic, setIsPublic] = useState(false);
-  const [allowEdit, setAllowEdit] = useState(false);
+
+  // 메모 첫 줄 추출 (placeholder용)
+  const firstLine = defaultTitle.split('\n')[0].trim().substring(0, 50);
 
   if (!isOpen) return null;
 
@@ -244,7 +246,7 @@ const RoomSettingsModal = ({ isOpen, onClose, onConfirm, defaultTitle = '' }) =>
     onConfirm({
       title: roomTitle.trim(),
       isPublic,
-      allowEdit
+      allowEdit: false // 기본값: 방장만 편집 가능
     });
   };
 
@@ -266,15 +268,15 @@ const RoomSettingsModal = ({ isOpen, onClose, onConfirm, defaultTitle = '' }) =>
           <InfoBox>
             <InfoText>
               협업방을 만들고 친구들과 메모를 함께 작업할 수 있습니다.
-              방 생성 후 언제든지 친구를 초대할 수 있습니다.
+              편집 권한은 방 생성 후 협업방 내에서 설정할 수 있습니다.
             </InfoText>
           </InfoBox>
 
           <Section>
-            <Label>방 제목</Label>
+            <Label>방 제목 (메모 첫 줄이 자동으로 제안됩니다)</Label>
             <Input
               type="text"
-              placeholder="예: 프로젝트 기획 회의"
+              placeholder={firstLine || "예: 프로젝트 기획 회의"}
               value={roomTitle}
               onChange={(e) => setRoomTitle(e.target.value)}
               maxLength={100}
@@ -283,7 +285,7 @@ const RoomSettingsModal = ({ isOpen, onClose, onConfirm, defaultTitle = '' }) =>
           </Section>
 
           <Section>
-            <Label>방 설정</Label>
+            <Label>공개 설정</Label>
 
             <ToggleOption>
               <ToggleLabel>
@@ -297,23 +299,6 @@ const RoomSettingsModal = ({ isOpen, onClose, onConfirm, defaultTitle = '' }) =>
                   type="checkbox"
                   checked={isPublic}
                   onChange={(e) => setIsPublic(e.target.checked)}
-                />
-                <ToggleSlider />
-              </ToggleSwitch>
-            </ToggleOption>
-
-            <ToggleOption>
-              <ToggleLabel>
-                <ToggleTitle>모두 편집 가능</ToggleTitle>
-                <ToggleDescription>
-                  {allowEdit ? '모든 참여자가 메모를 수정할 수 있습니다' : '방장만 편집 권한을 부여할 수 있습니다'}
-                </ToggleDescription>
-              </ToggleLabel>
-              <ToggleSwitch>
-                <ToggleInput
-                  type="checkbox"
-                  checked={allowEdit}
-                  onChange={(e) => setAllowEdit(e.target.checked)}
                 />
                 <ToggleSlider />
               </ToggleSwitch>
