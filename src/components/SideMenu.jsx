@@ -76,6 +76,26 @@ const MenuItemsWrapper = styled.div`
     flex: 1;
     display: flex;
     flex-direction: column;
+    overflow-y: auto; /* 스크롤 가능하도록 설정 */
+    overflow-x: hidden; /* 가로 스크롤 방지 */
+
+    /* 스크롤바 스타일링 (웹킷 브라우저) */
+    &::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.2);
+        border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
 `;
 
 const MenuHeader = styled.div`

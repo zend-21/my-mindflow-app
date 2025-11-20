@@ -28,6 +28,11 @@ export const createReview = async (reviewData, userId) => {
   try {
     const now = new Date();
 
+    // 사용자 프로필 정보 가져오기
+    const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
+    const userName = userProfile.name || '익명';
+    const userEmail = userProfile.email || '';
+
     // 🆕 업체 정보가 있으면 restaurants 컬렉션에 저장
     let restaurantId = '';
     if (reviewData.selectedRestaurant) {
@@ -49,7 +54,9 @@ export const createReview = async (reviewData, userId) => {
 
     // Firestore에 저장할 데이터 준비
     const reviewToSave = {
-      userId,
+      userId, // Firebase UID (화면에 노출 안 됨)
+      userName, // 닉네임 (화면에 표시됨)
+      userEmail, // 이메일 (내부 저장용, 화면에 노출 안 됨)
       restaurantId: restaurantId || reviewData.restaurantId || '', // 🆕 저장된 restaurantId 사용
       restaurantName: reviewData.restaurantName,
       restaurantAddress: reviewData.restaurantAddress || '',
