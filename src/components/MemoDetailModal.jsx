@@ -95,6 +95,7 @@ const HistoryButton = styled.button`
   font-size: 22px;
   cursor: pointer;
   padding: 4px 6px;
+  color: #e0e0e0; /* 흰색으로 변경하여 잘 보이도록 */
 
   &:disabled {
     opacity: 0.3;
@@ -116,9 +117,19 @@ const HideKeyboardButton = styled.button`
   color: #e0e0e0;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  padding: 8px 13px;      /* 🔼 버튼 크기 키움 */
-  font-size: 13px;        /* 🔼 글씨 크게 */
+  padding: 6px 10px;      /* 패딩 축소 */
+  font-size: 12px;        /* 글씨 크기 축소 */
   cursor: pointer;
+  white-space: nowrap;    /* 텍스트 줄바꿈 방지 */
+  min-width: fit-content; /* 내용에 맞게 크기 조정 */
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  /* Material Icons 아이콘 크기 조정 */
+  .material-icons {
+    font-size: 16px;
+  }
 
   /* ▼▼▼ 추가된 포커스 스타일 ▼▼▼ */
   &:focus {
@@ -188,12 +199,13 @@ const CancelButton = styled(ModalButton)`
     }
 `;
 
-const DateText = styled.span`
-    font-size: 12px;
+const DateText = styled.div`
+    font-size: 10px;        /* 글씨 크기 더 축소 */
     color: #b0b0b0;
-    margin-top: 10px;
-    text-align: right;
-    flex-shrink: 0;
+    width: 100%;
+    text-align: left;       /* 좌측 정렬 */
+    line-height: 1.4;
+    margin-bottom: 12px;    /* 텍스트 입력창과의 간격 */
 `;
 
 const ImportantCheckWrapper = styled.div`
@@ -201,9 +213,10 @@ const ImportantCheckWrapper = styled.div`
     align-items: center;
     cursor: pointer;
     user-select: none;
-    font-size: 16px;
+    font-size: 14px;        /* 글씨 크기 축소 */
     color: #e0e0e0;
     flex-shrink: 0;
+    white-space: nowrap;    /* 줄바꿈 방지 */
 `;
 
 const ImportantRadioButton = styled.div`
@@ -234,10 +247,10 @@ const RightButtonWrapper = styled.div`
 // 1. 상단 30-40-30 그리드 컨테이너
 const TopGridContainer = styled.div`
     display: grid;
-    /* 좌측 30%, 중앙 40%, 우측 30% 비율 */
-    grid-template-columns: 2.5fr 5fr 2.5fr;
+    /* 좌측 25%, 중앙 40%, 우측 35% 비율 */
+    grid-template-columns: 1.25fr 2fr 1.75fr;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     width: 100%;
     margin-bottom: 15px; /* 아래 줄과의 간격 */
 `;
@@ -270,13 +283,13 @@ const GridAreaRight = styled(GridArea)`
     overflow: hidden;   /* 셀 영역을 벗어나지 않도록 */
 `;
 
-// 3. '중요'와 '저장 기록'을 담는 두 번째 줄 컨테이너
+// 3. '중요'와 '공유'를 담는 두 번째 줄 컨테이너
 const SecondRowContainer = styled.div`
     display: flex;
-    justify-content: space-between; /* 양쪽 끝으로 정렬 */
     align-items: center;
+    justify-content: space-between; /* 양쪽 끝 정렬 */
     width: 100%;
-    margin-bottom: 20px; /* 텍스트 입력창과의 간격 */
+    margin-bottom: 12px; /* 간격 축소 */
 `;
 
 // 공유 버튼 스타일
@@ -284,16 +297,21 @@ const ShareButton = styled.button`
     background: rgba(94, 190, 38, 0.2);
     border: 1px solid rgba(94, 190, 38, 0.5);
     border-radius: 8px;
-    padding: 6px 12px;
+    padding: 8px 14px;      /* 패딩 증가 */
     color: #5ebe26;
-    font-size: 13px;
+    font-size: 14px;        /* 글씨 크기 증가 */
     font-weight: 600;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 6px;              /* 간격 증가 */
     transition: all 0.2s;
-    margin-left: 12px;
+    white-space: nowrap;   /* 줄바꿈 방지 */
+    flex-shrink: 0;        /* 축소 방지 */
+
+    .material-icons {
+        font-size: 16px;   /* 아이콘 크기 증가 */
+    }
 
     &:hover {
         background: rgba(94, 190, 38, 0.3);
@@ -596,61 +614,60 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
                         <GridAreaRight>
                             {isKeyboardActive && (
                                 <HideKeyboardButton onClick={handleHideKeyboardClick}>
-                                    자판 숨김
+                                    <span className="material-icons">keyboard_hide</span>
+                                    숨김
                                 </HideKeyboardButton>
                             )}
                         </GridAreaRight>
                     </TopGridContainer>
 
-                    {/* 2. 새로운 두 번째 줄 */}
+                    {/* 2. 새로운 두 번째 줄 - 중요와 공유 */}
                     <SecondRowContainer>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            {/* 좌측: 중요 체크박스 */}
-                            <ImportantCheckWrapper onClick={handleImportantToggle}>
-                                <ImportantRadioButton $isImportant={isImportant}>
-                                    <RadioInnerCircle $isImportant={isImportant} />
-                                </ImportantRadioButton>
-                                중요
-                            </ImportantCheckWrapper>
+                        {/* 중요 체크박스 */}
+                        <ImportantCheckWrapper onClick={handleImportantToggle}>
+                            <ImportantRadioButton $isImportant={isImportant}>
+                                <RadioInnerCircle $isImportant={isImportant} />
+                            </ImportantRadioButton>
+                            중요
+                        </ImportantCheckWrapper>
 
-                            {/* 공유 버튼 */}
-                            <ShareButton onClick={handleShareClick}>
-                                <span className="material-icons" style={{ fontSize: '16px' }}>share</span>
-                                공유
-                            </ShareButton>
-                        </div>
-
-                        {/* 우측: 저장 기록 */}
-                        <DateText>
-                            {memo.createdAt && (
-                                <>
-                                    최초 등록일: {new Date(memo.createdAt).toLocaleString('ko-KR', {
-                                        year: 'numeric',
-                                        month: '2-digit',
-                                        day: '2-digit',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        second: '2-digit',
-                                        hour12: false
-                                    }).replace(/\. /g, '. ').replace(/\.$/, '')}
-                                    <br />
-                                </>
-                            )}
-                            {memo.updatedAt && memo.createdAt && memo.updatedAt !== memo.createdAt && (
-                                <>
-                                    최종 수정일: {new Date(memo.updatedAt).toLocaleString('ko-KR', {
-                                        year: 'numeric',
-                                        month: '2-digit',
-                                        day: '2-digit',
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        second: '2-digit',
-                                        hour12: false
-                                    }).replace(/\. /g, '. ').replace(/\.$/, '')}
-                                </>
-                            )}
-                        </DateText>
+                        {/* 공유 버튼 */}
+                        <ShareButton onClick={handleShareClick}>
+                            <span className="material-icons">share</span>
+                            공유
+                        </ShareButton>
                     </SecondRowContainer>
+
+                    {/* 3. 날짜 정보 - 별도 줄 */}
+                    <DateText>
+                        {memo.createdAt && (
+                            <>
+                                최초 등록일: {new Date(memo.createdAt).toLocaleString('ko-KR', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                    hour12: false
+                                }).replace(/\. /g, '. ').replace(/\.$/, '')}
+                                {memo.updatedAt && memo.updatedAt !== memo.createdAt && ' / '}
+                            </>
+                        )}
+                        {memo.updatedAt && memo.createdAt && memo.updatedAt !== memo.createdAt && (
+                            <>
+                                최종 수정일: {new Date(memo.updatedAt).toLocaleString('ko-KR', {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                    hour12: false
+                                }).replace(/\. /g, '. ').replace(/\.$/, '')}
+                            </>
+                        )}
+                    </DateText>
 
                     <ModalTextarea
                         ref={textareaRef}
