@@ -170,12 +170,14 @@ const ButtonContainer = styled.div`
 `;
 
 const ModalButton = styled.button`
-    padding: 8px 15px;
+    padding: 8px 12px;      /* 가로 패딩 축소 */
     border: none;
     border-radius: 8px;
-    font-size: 16px;
+    font-size: 14px;        /* 글씨 크기 축소 */
     cursor: pointer;
     transition: background-color 0.2s ease;
+    white-space: nowrap;    /* 줄바꿈 방지 */
+    min-width: fit-content; /* 내용에 맞게 크기 조정 */
 `;
 
 const SaveButton = styled(ModalButton)`
@@ -259,6 +261,7 @@ const TopGridContainer = styled.div`
 const GridArea = styled.div`
     display: flex;
     align-items: center;
+    gap: 6px;  /* 버튼 사이 간격 */
 `;
 
 const GridAreaLeft = styled(GridArea)`

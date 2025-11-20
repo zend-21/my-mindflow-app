@@ -78,8 +78,9 @@ const MenuItemsWrapper = styled.div`
     flex-direction: column;
     overflow-y: auto; /* 스크롤 가능하도록 설정 */
     overflow-x: hidden; /* 가로 스크롤 방지 */
+    -webkit-overflow-scrolling: touch; /* iOS 부드러운 스크롤 */
 
-    /* 스크롤바 스타일링 (웹킷 브라우저) */
+    /* 스크롤바 스타일링 (웹킷 브라우저 - PC용) */
     &::-webkit-scrollbar {
         width: 6px;
     }
@@ -96,6 +97,9 @@ const MenuItemsWrapper = styled.div`
     &::-webkit-scrollbar-thumb:hover {
         background: rgba(255, 255, 255, 0.3);
     }
+
+    /* 모바일에서도 스크롤 가능하도록 명시적 설정 */
+    overscroll-behavior: contain;
 `;
 
 const MenuHeader = styled.div`
