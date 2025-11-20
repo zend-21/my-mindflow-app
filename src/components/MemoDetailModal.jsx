@@ -3,6 +3,9 @@
 import React, { useState, useEffect, Fragment, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
 import Portal from './Portal';
+import RoomSettingsModal from './collaboration/RoomSettingsModal';
+import CollaborationRoom from './collaboration/CollaborationRoom';
+import { createCollaborationRoom } from '../services/collaborationRoomService';
 
 /* --- (1) 기존 스타일 및 애니메이션 (모두 동일) --- */
 const fadeIn = keyframes`
@@ -276,6 +279,34 @@ const SecondRowContainer = styled.div`
     margin-bottom: 20px; /* 텍스트 입력창과의 간격 */
 `;
 
+// 공유 버튼 스타일
+const ShareButton = styled.button`
+    background: rgba(94, 190, 38, 0.2);
+    border: 1px solid rgba(94, 190, 38, 0.5);
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: #5ebe26;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    margin-left: 12px;
+
+    &:hover {
+        background: rgba(94, 190, 38, 0.3);
+    }
+
+    &:focus {
+        outline: none;
+    }
+    &:focus-visible {
+        box-shadow: 0 0 0 2px rgba(94, 190, 38, 0.5);
+    }
+`;
+
 /* --- (2) 커스텀 확인 모달 스타일 (기존과 동일) --- */
 const ConfirmOverlay = styled.div`
     position: fixed;
@@ -356,6 +387,9 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
     const [isImportant, setIsImportant] = useState(false);
     const [history, setHistory] = useState([]);
     const [historyIndex, setHistoryIndex] = useState(0);
+    const [isRoomSettingsOpen, setIsRoomSettingsOpen] = useState(false);
+    const [isCollaborationRoomOpen, setIsCollaborationRoomOpen] = useState(false);
+    const [currentRoomId, setCurrentRoomId] = useState(null);
     // ★★★ 추가: 키보드 활성화 상태를 관리하는 state ★★★
     const [isKeyboardActive, setIsKeyboardActive] = useState(false);
 
@@ -491,6 +525,45 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
         }
     };
 
+    // 공유 버튼 클릭: 방 설정 모달 열기
+    const handleShareClick = () => {
+        // 메모 첫 50자를 기본 제목으로 제안
+        setIsRoomSettingsOpen(true);
+    };
+
+    // 방 설정 완료 후 방 생성 및 협업방 열기
+    const handleRoomSettingsConfirm = async (settings) => {
+        try {
+            // 협업방 생성
+            const roomId = await createCollaborationRoom(
+                memo.id,
+                settings.title, // 사용자가 입력한 제목
+                editedContent, // 현재 편집 중인 내용
+                settings.isPublic, // 공개 여부
+                settings.allowEdit // 모두 편집 가능 여부
+            );
+
+            setCurrentRoomId(roomId);
+            setIsRoomSettingsOpen(false);
+
+            // 방 생성 완료 후 협업방 화면으로 이동
+            setIsCollaborationRoomOpen(true);
+
+            setToastMessage('협업방이 생성되었습니다!');
+            setTimeout(() => setToastMessage(null), 2000);
+        } catch (error) {
+            console.error('협업방 생성 실패:', error);
+            setToastMessage(error.message || '협업방 생성에 실패했습니다.');
+            setTimeout(() => setToastMessage(null), 2000);
+        }
+    };
+
+    // 협업방 닫기
+    const handleCloseCollaborationRoom = () => {
+        setIsCollaborationRoomOpen(false);
+        setCurrentRoomId(null);
+    };
+
     return (
       <Portal>
         <Fragment>
@@ -531,13 +604,21 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
 
                     {/* 2. 새로운 두 번째 줄 */}
                     <SecondRowContainer>
-                        {/* 좌측: 중요 체크박스 */}
-                        <ImportantCheckWrapper onClick={handleImportantToggle}>
-                            <ImportantRadioButton $isImportant={isImportant}>
-                                <RadioInnerCircle $isImportant={isImportant} />
-                            </ImportantRadioButton>
-                            중요
-                        </ImportantCheckWrapper>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            {/* 좌측: 중요 체크박스 */}
+                            <ImportantCheckWrapper onClick={handleImportantToggle}>
+                                <ImportantRadioButton $isImportant={isImportant}>
+                                    <RadioInnerCircle $isImportant={isImportant} />
+                                </ImportantRadioButton>
+                                중요
+                            </ImportantCheckWrapper>
+
+                            {/* 공유 버튼 */}
+                            <ShareButton onClick={handleShareClick}>
+                                <span className="material-icons" style={{ fontSize: '16px' }}>share</span>
+                                공유
+                            </ShareButton>
+                        </div>
 
                         {/* 우측: 저장 기록 */}
                         <DateText>
@@ -602,6 +683,26 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
                         {toastMessage}
                     </ToastBox>
                 </ToastOverlay>
+            )}
+
+            {/* 방 설정 모달 */}
+            <RoomSettingsModal
+                isOpen={isRoomSettingsOpen}
+                onClose={() => setIsRoomSettingsOpen(false)}
+                onConfirm={handleRoomSettingsConfirm}
+                defaultTitle={memo?.content?.substring(0, 50) || '제목 없음'}
+            />
+
+            {/* 협업방 */}
+            {isCollaborationRoomOpen && currentRoomId && (
+                <CollaborationRoom
+                    roomId={currentRoomId}
+                    onClose={handleCloseCollaborationRoom}
+                    showToast={(message) => {
+                        setToastMessage(message);
+                        setTimeout(() => setToastMessage(null), 2000);
+                    }}
+                />
             )}
         </Fragment>
       </Portal>

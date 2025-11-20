@@ -45,6 +45,9 @@ private/
 # 업로드 방지
 테스트.jsx
 
+# 메신저 기능
+readme.txt
+
 .vercel
 
 # Python

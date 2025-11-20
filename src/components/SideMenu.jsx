@@ -3,6 +3,8 @@
 import React, { useState, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { avatarList } from './avatars/AvatarIcons';
+import FriendsModal from './collaboration/FriendsModal';
+import SharedNotesPage from './collaboration/SharedNotesPage';
 
 // 문제를 단순화하기 위해, 일단 Roulette 컴포넌트는 잠시 제외했습니다.
 // 이 코드로 오류가 사라진다면, 문제는 Roulette.jsx 파일에 있을 수 있습니다.
@@ -299,6 +301,9 @@ const SideMenu = ({
     const [profileImageType, setProfileImageType] = useState('avatar');
     const [selectedAvatarId, setSelectedAvatarId] = useState(null);
     const [avatarBgColor, setAvatarBgColor] = useState('none');
+    // 협업 관련 상태
+    const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
+    const [isSharedNotesPageOpen, setIsSharedNotesPageOpen] = useState(false);
 
     const handleError = () => { // 에러 발생 시 상태 변경
         setImageError(true);
@@ -419,6 +424,24 @@ const SideMenu = ({
                                 </MenuItem>
                             </MenuGroup>
 
+                            {/* 👥 그룹 2: 협업 (로그인 사용자 전용) */}
+                            {profile && (
+                                <MenuGroup>
+                                    <MenuItem onClick={() => {
+                                        onClose();
+                                        setIsFriendsModalOpen(true);
+                                    }}>
+                                        <span className="icon">👥</span> 친구 관리
+                                    </MenuItem>
+                                    <MenuItem onClick={() => {
+                                        onClose();
+                                        setIsSharedNotesPageOpen(true);
+                                    }}>
+                                        <span className="icon">📝</span> 공유된 메모
+                                    </MenuItem>
+                                </MenuGroup>
+                            )}
+
                             {/* 📱 그룹 2: 백업/복원 */}
                             <MenuGroup>
                                 <MenuItem onClick={onExport}>
@@ -468,6 +491,18 @@ const SideMenu = ({
                         </MenuItemsWrapper>
                     </MenuContainer>
                 </>
+            )}
+
+            {/* 협업 관련 모달 및 페이지 */}
+            <FriendsModal
+                isOpen={isFriendsModalOpen}
+                onClose={() => setIsFriendsModalOpen(false)}
+            />
+
+            {isSharedNotesPageOpen && (
+                <SharedNotesPage
+                    onBack={() => setIsSharedNotesPageOpen(false)}
+                />
             )}
         </>
     );

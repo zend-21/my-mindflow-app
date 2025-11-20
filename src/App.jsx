@@ -1,7 +1,7 @@
 // src/App.jsx
 
 import React, { useState, useEffect, useRef } from 'react';
-import styled, { keyframes, css } from 'styled-components'; 
+import styled, { keyframes, css } from 'styled-components';
 import { GlobalStyle } from './styles.js';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
@@ -45,6 +45,7 @@ import TrashPage from './components/TrashPage.jsx';
 import AppContent from './components/AppContent.jsx';
 import SecretPage from './components/secret/SecretPage.jsx';
 import ReviewPage from './pages/ReviewPage.jsx';
+import AppRouter from './components/AppRouter.jsx';
 
 // ★★★ 토스트 메시지 스타일 ★★★
 const fadeIn = keyframes`
@@ -335,7 +336,7 @@ const DraggableWidget = ({ id, onSwitchTab, addActivity, recentActivities, displ
 function App() {
     // ✅ 기존 상태들은 그대로 유지
     const [isLoading, setIsLoading] = useState(true);
-    const [profile, setProfile] = useState(null); 
+    const [profile, setProfile] = useState(null);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
     
     // ✅ 새로 추가되는 상태들
@@ -1945,7 +1946,7 @@ function App() {
         return () => window.removeEventListener('restoreToApp', handleRestore);
     }, []);
 
-if (isLoading) {
+    if (isLoading) {
         return (
             <Screen>
                 <LoadingScreen>
@@ -1956,10 +1957,11 @@ if (isLoading) {
     }
 
     return (
-        <TrashProvider autoDeleteDays={30}>
-            <AppContent>
-                <GlobalStyle />
-            <Screen>
+        <AppRouter>
+            <TrashProvider autoDeleteDays={30}>
+                <AppContent>
+                    <GlobalStyle />
+                <Screen>
                 {/* ★★★ 더 이상 로그인 여부로 화면을 막지 않고, 항상 메인 앱을 보여줍니다. ★★★ */}
                 <>
                     <Header
@@ -2259,6 +2261,7 @@ if (isLoading) {
 
             </AppContent>
         </TrashProvider>
+        </AppRouter>
     );
 }
 

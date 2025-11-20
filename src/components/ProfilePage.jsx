@@ -9,6 +9,12 @@ import FortuneFlow from './FortuneFlow';
 import { syncProfilePictureToGoogleDrive, loadProfilePictureFromGoogleDrive } from '../utils/googleDriveSync';
 import AvatarSelector from './AvatarSelector';
 import { avatarList } from './avatars/AvatarIcons';
+import ChangeUniqueIdModal from './collaboration/ChangeUniqueIdModal';
+import QRScanner from './collaboration/QRScanner';
+import { auth, db } from '../firebase/config';
+import { doc, getDoc } from 'firebase/firestore';
+import QRCode from 'qrcode';
+import { Copy, QrCode, Share2, Scan } from 'lucide-react';
 
 // 🎨 Styled Components
 
@@ -381,6 +387,32 @@ const FortuneContent = styled.div`
     transition: max-height 0.3s ease;
 `;
 
+// 협업 ID 전용 컨텐츠 (스크롤 가능)
+const CollabContent = styled.div`
+    max-height: ${props => props.$isExpanded ? '600px' : '0'};
+    overflow: ${props => props.$isExpanded ? 'auto' : 'hidden'};
+    transition: max-height 0.3s ease;
+
+    /* 커스텀 스크롤바 */
+    &::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(94, 190, 38, 0.3);
+        border-radius: 3px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+        background: rgba(94, 190, 38, 0.5);
+    }
+`;
+
 const FortuneInfo = styled.div`
     padding: 16px;
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
@@ -643,6 +675,116 @@ const NicknameInput = styled.input`
     }
 `;
 
+// 협업 ID 스타일
+const IdDisplayBox = styled.div`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background: rgba(94, 190, 38, 0.1);
+    border: 1px solid rgba(94, 190, 38, 0.3);
+    border-radius: 12px;
+    margin-bottom: 12px;
+`;
+
+const IdText = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #5ebe26;
+    font-size: 16px;
+    font-weight: 600;
+`;
+
+const IdPrefix = styled.span`
+    color: rgba(94, 190, 38, 0.7);
+    font-size: 18px;
+    font-weight: 700;
+`;
+
+const IconButton = styled.button`
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+`;
+
+const QRCodeContainer = styled.div`
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    padding: 20px;
+    background: white;
+    border-radius: 12px;
+    margin-bottom: 12px;
+`;
+
+const QRCodeImage = styled.img`
+    width: 200px;
+    height: 200px;
+    border-radius: 8px;
+`;
+
+const QRActions = styled.div`
+    display: flex;
+    gap: 8px;
+    width: 100%;
+`;
+
+const QRButton = styled.button`
+    flex: 1;
+    padding: 12px;
+    background: rgba(94, 190, 38, 0.1);
+    border: 1px solid rgba(94, 190, 38, 0.3);
+    border-radius: 10px;
+    color: #5ebe26;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+
+    &:hover {
+        background: rgba(94, 190, 38, 0.2);
+        border-color: rgba(94, 190, 38, 0.5);
+    }
+`;
+
+const ChangeIdButton = styled.button`
+    width: 100%;
+    padding: 14px;
+    background: rgba(240, 147, 251, 0.1);
+    border: 1px solid rgba(240, 147, 251, 0.3);
+    border-radius: 12px;
+    color: #f093fb;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        background: rgba(240, 147, 251, 0.2);
+        border-color: rgba(240, 147, 251, 0.5);
+        box-shadow: 0 2px 8px rgba(240, 147, 251, 0.2);
+    }
+`;
+
 // 🎯 Main Component
 
 const BACKGROUND_COLORS = {
@@ -681,6 +823,13 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     // 생년월일 마스킹 관련 상태
     const [isBirthDateRevealed, setIsBirthDateRevealed] = useState(false);
     const birthDateTimerRef = useRef(null);
+
+    // 협업 ID 관련 상태
+    const [uniqueId, setUniqueId] = useState(null);
+    const [qrCodeUrl, setQrCodeUrl] = useState(null);
+    const [isChangeIdModalOpen, setIsChangeIdModalOpen] = useState(false);
+    const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+    const [isCollabExpanded, setIsCollabExpanded] = useState(false);
 
     // 운세 프로필 정보
     const fortuneProfile = getUserProfile();
@@ -784,6 +933,43 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
         window.addEventListener('avatarBgColorChanged', handleBgColorChange);
         return () => window.removeEventListener('avatarBgColorChanged', handleBgColorChange);
     }, []);
+
+    // 고유 ID 로드
+    useEffect(() => {
+        const loadUniqueId = async () => {
+            // localStorage에서 userId 가져오기
+            const userId = localStorage.getItem('firebaseUserId');
+            if (!userId || !profile) return;
+
+            try {
+                const userRef = doc(db, 'users', userId);
+                const userDoc = await getDoc(userRef);
+                if (userDoc.exists()) {
+                    const id = userDoc.data().uniqueId;
+                    setUniqueId(id);
+
+                    // QR 코드 생성
+                    if (id) {
+                        const qrUrl = await QRCode.toDataURL(id, {
+                            width: 200,
+                            margin: 2,
+                            color: {
+                                dark: '#000000',
+                                light: '#FFFFFF'
+                            }
+                        });
+                        setQrCodeUrl(qrUrl);
+                    }
+                }
+            } catch (err) {
+                console.error('고유 ID 로드 오류:', err);
+            }
+        };
+
+        if (profile) {
+            loadUniqueId();
+        }
+    }, [profile]);
 
     // 생년월일 마스킹 함수
     const maskBirthDate = (year, month, day) => {
@@ -1029,6 +1215,44 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
         }
     };
 
+    // 고유 ID 복사
+    const handleCopyId = () => {
+        if (uniqueId) {
+            navigator.clipboard.writeText(uniqueId);
+            showToast?.('ID가 클립보드에 복사되었습니다');
+        }
+    };
+
+    // 초대 링크 복사
+    const handleCopyInviteLink = () => {
+        if (!uniqueId) return;
+
+        // 환경 변수에서 앱 URL 가져오기 (없으면 현재 origin 사용)
+        const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+        const inviteLink = `${appUrl}/add/${uniqueId}`;
+
+        navigator.clipboard.writeText(inviteLink);
+        showToast?.('초대 링크가 복사되었습니다! 카톡에 붙여넣기 하세요');
+    };
+
+    // ID 변경 성공 핸들러
+    const handleIdChangeSuccess = async (newId) => {
+        setUniqueId(newId);
+
+        // QR 코드 재생성
+        const qrUrl = await QRCode.toDataURL(newId, {
+            width: 200,
+            margin: 2,
+            color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+            }
+        });
+        setQrCodeUrl(qrUrl);
+
+        showToast?.('고유 ID가 변경되었습니다!');
+    };
+
     return (
         <>
             <Overlay>
@@ -1157,6 +1381,64 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                         </StatItem>
                     </StatsGrid>
                 </Section>
+
+                {/* 협업 ID 관리 (로그인 시에만 표시) */}
+                {profile && (
+                    <Section>
+                        <FortuneSection onClick={() => setIsCollabExpanded(!isCollabExpanded)}>
+                            <FortuneSectionHeader>
+                                <SectionTitle style={{ margin: 0 }}>👥 협업 고유 ID</SectionTitle>
+                                <CollapseIcon $isExpanded={isCollabExpanded}>▼</CollapseIcon>
+                            </FortuneSectionHeader>
+                        </FortuneSection>
+
+                        <CollabContent $isExpanded={isCollabExpanded}>
+                            <FortuneInfo>
+                                <InfoRow>
+                                    <InfoLabel>내 고유 ID</InfoLabel>
+                                </InfoRow>
+                                <IdDisplayBox>
+                                    <IdText>
+                                        <IdPrefix>@</IdPrefix>
+                                        {uniqueId || '설정되지 않음'}
+                                    </IdText>
+                                    {uniqueId && (
+                                        <IconButton onClick={handleCopyId} title="ID 복사">
+                                            <Copy size={18} />
+                                        </IconButton>
+                                    )}
+                                </IdDisplayBox>
+                            </FortuneInfo>
+
+                            {uniqueId && qrCodeUrl && (
+                                <QRCodeContainer>
+                                    <QRCodeImage src={qrCodeUrl} alt="QR Code" />
+                                    <QRActions>
+                                        <QRButton onClick={handleCopyInviteLink}>
+                                            <Copy size={16} />
+                                            초대 링크 복사
+                                        </QRButton>
+                                    </QRActions>
+                                </QRCodeContainer>
+                            )}
+
+                            <ChangeIdButton
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsChangeIdModalOpen(true);
+                                }}
+                            >
+                                고유 ID 변경하기
+                            </ChangeIdButton>
+
+                            <FortuneInfo style={{ marginTop: '12px' }}>
+                                <InfoLabel style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                                    💬 초대 링크를 카톡으로 보내거나, 대면 시 QR 코드를 상대방이 스캔하면 바로 친구 추가할 수 있습니다.
+                                </InfoLabel>
+                            </FortuneInfo>
+                        </CollabContent>
+                    </Section>
+                )}
 
                 {/* 운세 정보 관리 */}
                 <Section>
@@ -1305,6 +1587,28 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                     birthYear={fortuneProfile?.birthYear}
                     birthMonth={fortuneProfile?.birthMonth}
                     birthDay={fortuneProfile?.birthDay}
+                />
+            )}
+
+            {/* 고유 ID 변경 모달 */}
+            {isChangeIdModalOpen && (
+                <ChangeUniqueIdModal
+                    isOpen={isChangeIdModalOpen}
+                    onClose={() => setIsChangeIdModalOpen(false)}
+                    currentId={uniqueId}
+                    onSuccess={handleIdChangeSuccess}
+                />
+            )}
+
+            {/* QR 스캐너 */}
+            {isQRScannerOpen && (
+                <QRScanner
+                    isOpen={isQRScannerOpen}
+                    onClose={() => setIsQRScannerOpen(false)}
+                    onSuccess={() => {
+                        showToast?.('친구 요청을 보냈습니다!');
+                        setIsQRScannerOpen(false);
+                    }}
                 />
             )}
         </>

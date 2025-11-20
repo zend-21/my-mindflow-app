@@ -1,0 +1,205 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ========================================
+    // 헬퍼 함수들
+    // ========================================
+
+    // 사용자 인증 확인
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // 사용자 ID 소유권 확인
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // 협업방 참여자 확인 (헬퍼 함수)
+    function isParticipant(roomData) {
+      return request.auth.uid in roomData.participants.map('userId', p, p.userId);
+    }
+
+    // 편집 권한 확인 (헬퍼 함수)
+    function hasEditPermission(roomData) {
+      return roomData.permissions.allCanEdit == true ||
+             request.auth.uid in roomData.permissions.editableUsers;
+    }
+
+    // ========================================
+    // 기존 레스토랑/리뷰 - 공개 읽기
+    // ========================================
+    match /restaurants/{restaurantId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /userProfiles/{userId} {
+      allow read: if true;
+      allow write: if isOwner(userId);
+    }
+
+    // ========================================
+    // 사용자 (Users) 컬렉션
+    // ========================================
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isOwner(userId);
+      allow update, delete: if isOwner(userId);
+    }
+
+    // ========================================
+    // 협업방 (Collaboration Rooms)
+    // ========================================
+    match /collaborationRooms/{roomId} {
+      // 생성: 로그인 + 소유자 확인
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerId == request.auth.uid;
+
+      // 읽기: 참여자만 (클라이언트에서 배열 검증)
+      allow read: if isSignedIn();
+
+      // 수정: 방장 또는 편집 권한이 있는 사용자
+      allow update: if isSignedIn() && (
+        request.auth.uid == resource.data.ownerId ||
+        resource.data.permissions.allCanEdit == true ||
+        request.auth.uid in resource.data.permissions.editableUsers
+      );
+
+      // 삭제: 방장만
+      allow delete: if isSignedIn() &&
+        request.auth.uid == resource.data.ownerId;
+    }
+
+    // ========================================
+    // 채팅 메시지 (Chat Messages)
+    // ========================================
+    match /chatMessages/{messageId} {
+      // 생성: 로그인 + 본인 확인
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.type in ['text', 'system', 'edit'];
+
+      // 읽기: 로그인한 사용자
+      allow read: if isSignedIn();
+
+      // 수정: 로그인한 사용자 (읽음 처리용)
+      allow update: if isSignedIn();
+
+      // 삭제: 작성자만
+      allow delete: if isSignedIn() &&
+        request.auth.uid == resource.data.userId;
+    }
+
+    // ========================================
+    // 방 초대 (Room Invitations)
+    // ========================================
+    match /roomInvitations/{invitationId} {
+      // 생성: 초대하는 사람만
+      allow create: if isSignedIn() &&
+        request.resource.data.inviterId == request.auth.uid;
+
+      // 읽기: 초대한 사람 또는 초대받은 사람
+      allow read: if isSignedIn() && (
+        request.auth.uid == resource.data.inviterId ||
+        request.auth.uid == resource.data.inviteeId
+      );
+
+      // 수정: 초대받은 사람만 (수락/거절)
+      allow update: if isSignedIn() &&
+        request.auth.uid == resource.data.inviteeId &&
+        request.resource.data.status in ['accepted', 'rejected'];
+
+      // 삭제: 초대한 사람만
+      allow delete: if isSignedIn() &&
+        request.auth.uid == resource.data.inviterId;
+    }
+
+    // ========================================
+    // 메모 공유 (Shared Memos)
+    // ========================================
+    match /sharedMemos/{memoId} {
+      // 생성: 로그인한 사용자
+      allow create: if isSignedIn();
+
+      // 읽기: 소유자 또는 공유받은 사람 (클라이언트 검증)
+      allow read: if isSignedIn();
+
+      // 수정/삭제: 소유자만
+      allow update, delete: if isSignedIn() &&
+        request.auth.uid == resource.data.ownerId;
+    }
+
+    // ========================================
+    // 친구 관계 (Friendships)
+    // ========================================
+    match /friendships/{friendshipId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // ========================================
+    // 친구 요청 (Friend Requests)
+    // ========================================
+    match /friendRequests/{requestId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // ========================================
+    // 공유 노트 (Shared Notes)
+    // ========================================
+    match /sharedNotes/{noteId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerId == request.auth.uid;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() &&
+        resource.data.ownerId == request.auth.uid;
+    }
+
+    // ========================================
+    // 수정 제안 (Edit Suggestions)
+    // ========================================
+    match /editSuggestions/{suggestionId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
+    }
+
+    // ========================================
+    // 알림 (Notifications)
+    // ========================================
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() &&
+        resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() &&
+        resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() &&
+        resource.data.userId == request.auth.uid;
+    }
+
+    // ========================================
+    // 타이핑 상태 (Typing Status)
+    // ========================================
+    match /typingStatus/{statusId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid;
+    }
+  }
+}
