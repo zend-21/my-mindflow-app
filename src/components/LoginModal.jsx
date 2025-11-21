@@ -53,7 +53,7 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
     const googleLogin = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
             console.log('🔑 Access Token 받음:', tokenResponse);
-            
+
             // Access Token으로 사용자 정보 가져오기
             try {
                 const userInfoResponse = await fetch(
@@ -64,10 +64,10 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
                         },
                     }
                 );
-                
+
                 const userInfo = await userInfoResponse.json();
                 console.log('👤 사용자 정보:', userInfo);
-                
+
                 // onSuccess 콜백에 Access Token과 사용자 정보 전달
                 onSuccess({
                     accessToken: tokenResponse.access_token,

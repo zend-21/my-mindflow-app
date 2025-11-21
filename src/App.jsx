@@ -1413,29 +1413,36 @@ function App() {
     const handleLoginSuccess = async (response) => {
         try {
             const { accessToken, userInfo } = response;
-            
+
             // ★★★ 수정: 강력한 URL HTTPS 강제 변환 로직 ★★★
             let pictureUrl = userInfo.picture;
             if (pictureUrl) {
                 // http:// 또는 https:// 부분을 제거하고 무조건 https://를 붙입니다.
-                const strippedUrl = pictureUrl.replace(/^https?:\/\//, ''); 
+                const strippedUrl = pictureUrl.replace(/^https?:\/\//, '');
                 pictureUrl = `https://${strippedUrl}`;
             }
             // ★★★
-            
+
+            // 🔥 Firebase 사용자 ID 생성 (이메일 기반 해시)
+            // Google sub ID 또는 이메일을 기반으로 고유 ID 생성
+            const firebaseUserId = userInfo.sub || userInfo.id || btoa(userInfo.email).replace(/[^a-zA-Z0-9]/g, '').substring(0, 28);
+
             // 사용자 프로필 설정
             const profileData = {
                 email: userInfo.email,
                 name: userInfo.name,
                 picture: pictureUrl, // 수정된 pictureUrl 사용
             };
-            
+
             setProfile(profileData);
             setAccessTokenState(accessToken);
-            
+
             localStorage.setItem('userProfile', JSON.stringify(profileData));
             localStorage.setItem('accessToken', accessToken);
-            
+            localStorage.setItem('firebaseUserId', firebaseUserId); // 🔥 협업 기능용 사용자 ID 저장
+
+            console.log('✅ 로그인 완료 - firebaseUserId:', firebaseUserId);
+
             // GAPI에 토큰 설정
             if (isGapiReady) {
                 setAccessToken(accessToken);
@@ -1718,6 +1725,7 @@ function App() {
         localStorage.removeItem('userProfile');
         localStorage.removeItem('accessToken');
         localStorage.removeItem('lastSyncTime');
+        localStorage.removeItem('firebaseUserId'); // 🔥 협업 기능용 사용자 ID 제거
 
         showToast("✓ 로그아웃되었습니다");
         setIsMenuOpen(false);
