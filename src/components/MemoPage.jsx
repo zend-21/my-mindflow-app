@@ -1,11 +1,13 @@
 // src/components/MemoPage.jsx
 
-import React, { useRef } from 'react';
-import styled, { keyframes, css } from 'styled-components'; 
+import React, { useRef, useState, useEffect } from 'react';
+import styled, { keyframes, css } from 'styled-components';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useMemoFolders } from '../hooks/useMemoFolders';
 import { exportData, importData } from '../utils/dataManager';
 import Header from './Header';
 import { BsCheckCircleFill, BsCircle } from 'react-icons/bs';
+import { checkMemoSharedStatus } from '../services/collaborationRoomService';
 
 // 애니메이션 keyframes
 const fadeIn = keyframes`
@@ -633,7 +635,199 @@ const CheckboxContainer = styled.div`
 const StyledCheckIcon = styled(BsCheckCircleFill)`
     transform: translateY(0px);
 `;
+
+// 폴더 탭 스타일
+const FolderTabContainer = styled.div`
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+
+    &::-webkit-scrollbar {
+        height: 4px;
+    }
+    &::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 2px;
+    }
+    &::-webkit-scrollbar-thumb {
+        background: rgba(74, 144, 226, 0.3);
+        border-radius: 2px;
+    }
+`;
+
+const FolderTab = styled.button`
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 20px;
+    border: 1px solid ${props => props.$active ? 'rgba(74, 144, 226, 0.5)' : 'rgba(255, 255, 255, 0.1)'};
+    background: ${props => props.$active ? 'rgba(74, 144, 226, 0.15)' : 'rgba(255, 255, 255, 0.03)'};
+    color: ${props => props.$active ? '#4a90e2' : '#888'};
+    font-size: 13px;
+    font-weight: ${props => props.$active ? '600' : '500'};
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+
+    &:hover {
+        background: rgba(74, 144, 226, 0.1);
+        border-color: rgba(74, 144, 226, 0.3);
+        color: #4a90e2;
+    }
+
+    span.count {
+        background: ${props => props.$active ? 'rgba(74, 144, 226, 0.3)' : 'rgba(255, 255, 255, 0.1)'};
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 11px;
+        min-width: 18px;
+        text-align: center;
+    }
+`;
+
+const AddFolderTab = styled(FolderTab)`
+    border-style: dashed;
+    color: #666;
+
+    &:hover {
+        color: #4a90e2;
+        border-color: rgba(74, 144, 226, 0.5);
+    }
+`;
+
+// 폴더 모달 스타일
+const FolderModalOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    animation: ${fadeIn} 0.2s ease-out;
+`;
+
+const FolderModalBox = styled.div`
+    background: linear-gradient(135deg, #2a2d35, #333842);
+    border-radius: 16px;
+    padding: 24px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
+`;
+
+const FolderModalTitle = styled.h3`
+    color: #e0e0e0;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+`;
+
+const FolderInput = styled.input`
+    width: 100%;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    background: #1a1d24;
+    color: #e0e0e0;
+    font-size: 15px;
+    outline: none;
+    margin-bottom: 16px;
+
+    &:focus {
+        border-color: #4a90e2;
+    }
+
+    &::placeholder {
+        color: #666;
+    }
+`;
+
+const IconPickerContainer = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 20px;
+`;
+
+const IconOption = styled.button`
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 2px solid ${props => props.$selected ? '#4a90e2' : 'rgba(255, 255, 255, 0.1)'};
+    background: ${props => props.$selected ? 'rgba(74, 144, 226, 0.2)' : 'rgba(255, 255, 255, 0.05)'};
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        border-color: rgba(74, 144, 226, 0.5);
+        background: rgba(74, 144, 226, 0.1);
+    }
+`;
+
+const FolderModalButtons = styled.div`
+    display: flex;
+    gap: 12px;
+`;
+
+const FolderModalButton = styled.button`
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    ${props => props.$variant === 'cancel' && `
+        background: rgba(255, 255, 255, 0.1);
+        color: #b0b0b0;
+        &:hover { background: rgba(255, 255, 255, 0.15); }
+    `}
+
+    ${props => props.$variant === 'confirm' && `
+        background: #4a90e2;
+        color: white;
+        &:hover { background: #3b78c4; }
+    `}
+
+    ${props => props.$variant === 'delete' && `
+        background: #e74c3c;
+        color: white;
+        &:hover { background: #c0392b; }
+    `}
+`;
+
+const FolderEditButton = styled.button`
+    background: transparent;
+    border: none;
+    color: #666;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 2px 6px;
+    margin-left: 4px;
+    border-radius: 4px;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #4a90e2;
+    }
+`;
+
 // --- (모든 스타일 끝) ---
+
+// 아이콘 선택 옵션
+const FOLDER_ICONS = ['📁', '📂', '🗂️', '📋', '📝', '💼', '🎯', '⭐', '💡', '🔖', '📌', '🏷️', '🔒', '🔓', '💎', '🎨'];
 
 const MemoPage = ({
     memos,
@@ -647,7 +841,8 @@ const MemoPage = ({
     onExitSelectionMode,
     onToggleSelectedMemosImportance,
     onToggleSelectedMemosStealth,
-    onRequestDeleteSelectedMemos
+    onRequestDeleteSelectedMemos,
+    onUpdateMemoFolder
 }) => {
     const [layoutView, setLayoutView] = useLocalStorage('memoLayoutView', 'list');
     const [searchQuery, setSearchQuery] = React.useState('');
@@ -655,6 +850,87 @@ const MemoPage = ({
     const [sortDirection, setSortDirection] = React.useState('desc'); // 'asc' 또는 'desc'
     const longPressTimer = useRef(null);
     const PRESS_DURATION = 500;
+
+    // 폴더 관련 상태
+    const {
+        folders,
+        activeFolder,
+        setActiveFolder,
+        addFolder,
+        updateFolder,
+        deleteFolder
+    } = useMemoFolders();
+
+    // 공유된 메모 ID 목록
+    const [sharedMemoIds, setSharedMemoIds] = useState(new Set());
+
+    // 폴더 모달 상태
+    const [folderModal, setFolderModal] = useState(null); // null | { mode: 'add' | 'edit', folder?: object }
+    const [folderName, setFolderName] = useState('');
+    const [folderIcon, setFolderIcon] = useState('📁');
+
+    // 공유 상태 확인 (메모 목록이 변경될 때)
+    useEffect(() => {
+        const checkSharedMemos = async () => {
+            if (!memos || memos.length === 0) return;
+
+            const sharedIds = new Set();
+            for (const memo of memos) {
+                try {
+                    const result = await checkMemoSharedStatus(memo.id);
+                    if (result.isShared) {
+                        sharedIds.add(memo.id);
+                    }
+                } catch (e) {
+                    // 에러 무시
+                }
+            }
+            setSharedMemoIds(sharedIds);
+        };
+
+        checkSharedMemos();
+    }, [memos]);
+
+    // 폴더 모달 열기
+    const openAddFolderModal = () => {
+        setFolderModal({ mode: 'add' });
+        setFolderName('');
+        setFolderIcon('📁');
+    };
+
+    const openEditFolderModal = (folder) => {
+        setFolderModal({ mode: 'edit', folder });
+        setFolderName(folder.name);
+        setFolderIcon(folder.icon);
+    };
+
+    // 폴더 저장
+    const handleSaveFolder = () => {
+        if (!folderName.trim()) return;
+
+        if (folderModal.mode === 'add') {
+            addFolder(folderName, folderIcon);
+        } else if (folderModal.mode === 'edit') {
+            updateFolder(folderModal.folder.id, { name: folderName, icon: folderIcon });
+        }
+        setFolderModal(null);
+    };
+
+    // 폴더 삭제
+    const handleDeleteFolder = () => {
+        if (folderModal?.folder) {
+            deleteFolder(folderModal.folder.id);
+            setFolderModal(null);
+        }
+    };
+
+    // 폴더별 메모 수 계산
+    const getFolderMemoCount = (folderId) => {
+        if (!memos) return 0;
+        if (folderId === 'all') return memos.length;
+        if (folderId === 'shared') return sharedMemoIds.size;
+        return memos.filter(memo => memo.folderId === folderId).length;
+    };
 
     const handleAddMemoClick = () => {
         onOpenNewMemo();
@@ -713,14 +989,21 @@ const MemoPage = ({
     // 검색 및 정렬 로직
     let filteredAndSortedMemos = [];
     if (memos && Array.isArray(memos)) {
-        // 1. 검색 필터링
+        // 1. 폴더 필터링
         filteredAndSortedMemos = memos.filter(memo => {
+            if (activeFolder === 'all') return true;
+            if (activeFolder === 'shared') return sharedMemoIds.has(memo.id);
+            return memo.folderId === activeFolder;
+        });
+
+        // 2. 검색 필터링
+        filteredAndSortedMemos = filteredAndSortedMemos.filter(memo => {
             if (!searchQuery.trim()) return true;
             const query = searchQuery.toLowerCase();
             return memo.content?.toLowerCase().includes(query);
         });
 
-        // 2. 정렬
+        // 3. 정렬
         filteredAndSortedMemos = [...filteredAndSortedMemos].sort((a, b) => {
             if (sortOrder === 'importance') {
                 // 중요도순 정렬
@@ -850,6 +1133,35 @@ const MemoPage = ({
                             </LayoutButtonSet>
                         </HeaderButtonWrapper>
                     </SectionHeader>
+
+                    {/* 폴더 탭 */}
+                    <FolderTabContainer>
+                        {folders.map(folder => (
+                            <FolderTab
+                                key={folder.id}
+                                $active={activeFolder === folder.id}
+                                onClick={() => setActiveFolder(folder.id)}
+                            >
+                                <span>{folder.icon}</span>
+                                <span>{folder.name}</span>
+                                <span className="count">{getFolderMemoCount(folder.id)}</span>
+                                {!folder.isDefault && activeFolder === folder.id && (
+                                    <FolderEditButton
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            openEditFolderModal(folder);
+                                        }}
+                                    >
+                                        ✏️
+                                    </FolderEditButton>
+                                )}
+                            </FolderTab>
+                        ))}
+                        <AddFolderTab onClick={openAddFolderModal}>
+                            <span>+</span>
+                            <span>새 폴더</span>
+                        </AddFolderTab>
+                    </FolderTabContainer>
 
                     <SearchBar>
                         <SearchInput
@@ -1006,6 +1318,56 @@ const MemoPage = ({
                     </EmptyMessage>
                 )}
             </MemoList>
+
+            {/* 폴더 추가/수정 모달 */}
+            {folderModal && (
+                <FolderModalOverlay onClick={() => setFolderModal(null)}>
+                    <FolderModalBox onClick={(e) => e.stopPropagation()}>
+                        <FolderModalTitle>
+                            {folderModal.mode === 'add' ? '새 폴더 만들기' : '폴더 수정'}
+                        </FolderModalTitle>
+
+                        <FolderInput
+                            type="text"
+                            placeholder="폴더 이름을 입력하세요"
+                            value={folderName}
+                            onChange={(e) => setFolderName(e.target.value)}
+                            autoFocus
+                            maxLength={20}
+                        />
+
+                        <IconPickerContainer>
+                            {FOLDER_ICONS.map(icon => (
+                                <IconOption
+                                    key={icon}
+                                    $selected={folderIcon === icon}
+                                    onClick={() => setFolderIcon(icon)}
+                                >
+                                    {icon}
+                                </IconOption>
+                            ))}
+                        </IconPickerContainer>
+
+                        <FolderModalButtons>
+                            <FolderModalButton $variant="cancel" onClick={() => setFolderModal(null)}>
+                                취소
+                            </FolderModalButton>
+                            {folderModal.mode === 'edit' && (
+                                <FolderModalButton $variant="delete" onClick={handleDeleteFolder}>
+                                    삭제
+                                </FolderModalButton>
+                            )}
+                            <FolderModalButton
+                                $variant="confirm"
+                                onClick={handleSaveFolder}
+                                disabled={!folderName.trim()}
+                            >
+                                {folderModal.mode === 'add' ? '생성' : '저장'}
+                            </FolderModalButton>
+                        </FolderModalButtons>
+                    </FolderModalBox>
+                </FolderModalOverlay>
+            )}
         </MemoContainer>
     );
 };

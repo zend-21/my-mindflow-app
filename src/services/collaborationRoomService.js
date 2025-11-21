@@ -908,3 +908,35 @@ export const regenerateAllRoomCodesInWorkspace = async (workspaceId) => {
     throw error;
   }
 };
+
+/**
+ * 메모 ID로 활성 협업방이 있는지 확인
+ * @param {string} memoId - 메모 ID
+ * @returns {Promise<{isShared: boolean, room: Object|null}>}
+ */
+export const checkMemoSharedStatus = async (memoId) => {
+  try {
+    if (!memoId) return { isShared: false, room: null };
+
+    const q = query(
+      collection(db, 'collaborationRooms'),
+      where('memoId', '==', memoId),
+      where('status', '==', 'active')
+    );
+
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      return { isShared: false, room: null };
+    }
+
+    const roomDoc = snapshot.docs[0];
+    return {
+      isShared: true,
+      room: { id: roomDoc.id, ...roomDoc.data() }
+    };
+  } catch (error) {
+    console.error('메모 공유 상태 확인 오류:', error);
+    return { isShared: false, room: null };
+  }
+};

@@ -285,15 +285,16 @@ const RoomSettingsModal = ({ isOpen, onClose, onConfirm, defaultTitle = '' }) =>
     });
   };
 
-  const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
+  // 영역 밖 클릭해도 닫히지 않음 (실수 방지)
+  // const handleOverlayClick = (e) => {
+  //   if (e.target === e.currentTarget) {
+  //     onClose();
+  //   }
+  // };
 
   return (
     <Portal>
-      <Overlay onClick={handleOverlayClick}>
+      <Overlay>
         <ModalBox onClick={(e) => e.stopPropagation()}>
           <Header>
             <Title>협업방 설정</Title>
@@ -335,9 +336,11 @@ const RoomSettingsModal = ({ isOpen, onClose, onConfirm, defaultTitle = '' }) =>
 
             <ToggleOption>
               <ToggleLabel>
-                <ToggleTitle>공개 방</ToggleTitle>
+                <ToggleTitle>{isPublic ? '공개' : '비공개'}</ToggleTitle>
                 <ToggleDescription>
-                  {isPublic ? '친구 목록에 이 방이 표시됩니다' : '초대받은 사람만 입장할 수 있습니다'}
+                  {isPublic
+                    ? '내 WS 코드를 아는 사용자에게 표시됩니다'
+                    : '초대 코드를 가진 사람만 입장할 수 있습니다'}
                 </ToggleDescription>
               </ToggleLabel>
               <ToggleSwitch>

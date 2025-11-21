@@ -49,6 +49,7 @@ import SecretPage from './components/secret/SecretPage.jsx';
 import ReviewPage from './pages/ReviewPage.jsx';
 import AppRouter from './components/AppRouter.jsx';
 import './utils/createWorkspaceManually'; // 워크스페이스 수동 생성 유틸리티
+import { createWorkspace, checkWorkspaceExists } from './services/workspaceService'; // 자동 워크스페이스 생성
 
 // ★★★ 토스트 메시지 스타일 ★★★
 const fadeIn = keyframes`
@@ -1075,7 +1076,7 @@ function App() {
             quietSync(); // ✅ 추가
         };
 
-    const handleEditMemo = (id, newContent, isImportant) => {
+    const handleEditMemo = (id, newContent, isImportant, folderId) => {
             const now = Date.now();
             setMemos(prevMemos =>
                 prevMemos.map(memo => {
@@ -1087,7 +1088,8 @@ function App() {
                             createdAt: memo.createdAt || now, // 기존 createdAt 유지, 없으면 현재 시간
                             updatedAt: now,
                             displayDate: new Date(now).toLocaleString(),
-                            isImportant: isImportant
+                            isImportant: isImportant,
+                            folderId: folderId !== undefined ? folderId : memo.folderId // 폴더 ID 저장
                         };
                     }
                     return memo;
@@ -1453,6 +1455,21 @@ function App() {
             localStorage.setItem('firebaseUserId', firebaseUserId); // 🔥 협업 기능용 사용자 ID 저장
 
             console.log('✅ 로그인 완료 - firebaseUserId:', firebaseUserId);
+
+            // 🏠 워크스페이스 자동 생성 (없으면 생성)
+            try {
+                const workspaceExists = await checkWorkspaceExists(firebaseUserId);
+                if (!workspaceExists) {
+                    console.log('🏗️ 워크스페이스가 없습니다. 자동 생성 중...');
+                    await createWorkspace(firebaseUserId, userInfo.name, userInfo.email);
+                    console.log('✅ 워크스페이스 자동 생성 완료');
+                } else {
+                    console.log('✅ 기존 워크스페이스 존재');
+                }
+            } catch (workspaceError) {
+                console.error('⚠️ 워크스페이스 생성 오류 (로그인은 계속):', workspaceError);
+                // 워크스페이스 생성 실패해도 로그인은 계속 진행
+            }
 
             // GAPI에 토큰 설정
             if (isGapiReady) {

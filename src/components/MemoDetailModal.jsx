@@ -5,7 +5,8 @@ import styled, { keyframes } from 'styled-components';
 import Portal from './Portal';
 import RoomSettingsModal from './collaboration/RoomSettingsModal';
 import CollaborationRoom from './collaboration/CollaborationRoom';
-import { createCollaborationRoom } from '../services/collaborationRoomService';
+import { createCollaborationRoom, checkMemoSharedStatus } from '../services/collaborationRoomService';
+import { useMemoFolders } from '../hooks/useMemoFolders';
 
 /* --- (1) 기존 스타일 및 애니메이션 (모두 동일) --- */
 const fadeIn = keyframes`
@@ -328,6 +329,32 @@ const ShareButton = styled.button`
     }
 `;
 
+// 공유됨 뱃지 스타일
+const SharedBadge = styled.div`
+    background: rgba(74, 144, 226, 0.2);
+    border: 1px solid rgba(74, 144, 226, 0.5);
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: #4a90e2;
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    .material-icons {
+        font-size: 16px;
+    }
+
+    &:hover {
+        background: rgba(74, 144, 226, 0.3);
+    }
+`;
+
 /* --- (2) 커스텀 확인 모달 스타일 (기존과 동일) --- */
 const ConfirmOverlay = styled.div`
     position: fixed;
@@ -400,6 +427,41 @@ const ToastBox = styled.div`
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
 `;
+
+/* --- 폴더 선택 스타일 --- */
+const FolderSelectContainer = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+`;
+
+const FolderLabel = styled.span`
+  color: #888;
+  font-size: 13px;
+  white-space: nowrap;
+`;
+
+const FolderSelect = styled.select`
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e0e0e0;
+  font-size: 14px;
+  cursor: pointer;
+  outline: none;
+
+  &:focus {
+    border-color: #4a90e2;
+  }
+
+  option {
+    background: #2a2d35;
+    color: #e0e0e0;
+  }
+`;
 /* --- 스타일 추가 완료 --- */
 
 
@@ -408,9 +470,15 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
     const [isImportant, setIsImportant] = useState(false);
     const [history, setHistory] = useState([]);
     const [historyIndex, setHistoryIndex] = useState(0);
+    const [selectedFolderId, setSelectedFolderId] = useState(null); // 폴더 선택
+
+    // 폴더 목록 가져오기
+    const { folders } = useMemoFolders();
     const [isRoomSettingsOpen, setIsRoomSettingsOpen] = useState(false);
     const [isCollaborationRoomOpen, setIsCollaborationRoomOpen] = useState(false);
     const [currentRoomId, setCurrentRoomId] = useState(null);
+    const [isShared, setIsShared] = useState(false); // 공유 상태
+    const [sharedRoom, setSharedRoom] = useState(null); // 공유된 방 정보
     // ★★★ 추가: 키보드 활성화 상태를 관리하는 state ★★★
     const [isKeyboardActive, setIsKeyboardActive] = useState(false);
 
@@ -427,18 +495,33 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
         if (isOpen && memo) {
             setEditedContent(memo.content);
             setIsImportant(memo.isImportant);
+            setSelectedFolderId(memo.folderId || null); // 폴더 ID 초기화
             const initialHistory = [memo.content];
             setHistory(initialHistory);
             setHistoryIndex(0);
-            
+
             closeConfirmModal();
             setToastMessage(null);
-            
+
             if (textareaRef.current) {
                 textareaRef.current.blur();
             }
             // ★★★ 추가: 모달이 닫힐 때 키보드 상태를 초기화 ★★★
             setIsKeyboardActive(false);
+
+            // 공유 상태 확인
+            const checkSharedStatus = async () => {
+                try {
+                    const result = await checkMemoSharedStatus(memo.id);
+                    setIsShared(result.isShared);
+                    setSharedRoom(result.room);
+                } catch (error) {
+                    console.error('공유 상태 확인 오류:', error);
+                    setIsShared(false);
+                    setSharedRoom(null);
+                }
+            };
+            checkSharedStatus();
         }
     }, [isOpen, memo]);
     
@@ -470,7 +553,7 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
     };   
 
     const executeSaveAndShowToast = () => {
-        onSave(memo.id, editedContent, isImportant);
+        onSave(memo.id, editedContent, isImportant, selectedFolderId);
         setToastMessage("메모를 수정했습니다.");
         setTimeout(() => {
             setToastMessage(null);
@@ -639,12 +722,40 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
                             중요
                         </ImportantCheckWrapper>
 
-                        {/* 공유 버튼 */}
-                        <ShareButton onClick={handleShareClick}>
-                            <span className="material-icons">share</span>
-                            공유
-                        </ShareButton>
+                        {/* 공유 버튼 또는 공유됨 뱃지 */}
+                        {isShared ? (
+                            <SharedBadge onClick={() => {
+                                if (sharedRoom) {
+                                    setCurrentRoomId(sharedRoom.id);
+                                    setIsCollaborationRoomOpen(true);
+                                }
+                            }}>
+                                <span className="material-icons">groups</span>
+                                공유됨
+                            </SharedBadge>
+                        ) : (
+                            <ShareButton onClick={handleShareClick}>
+                                <span className="material-icons">share</span>
+                                공유
+                            </ShareButton>
+                        )}
                     </SecondRowContainer>
+
+                    {/* 폴더 선택 */}
+                    <FolderSelectContainer>
+                        <FolderLabel>📁 폴더:</FolderLabel>
+                        <FolderSelect
+                            value={selectedFolderId || ''}
+                            onChange={(e) => setSelectedFolderId(e.target.value || null)}
+                        >
+                            <option value="">없음</option>
+                            {folders.filter(f => f.id !== 'all' && f.id !== 'shared').map(folder => (
+                                <option key={folder.id} value={folder.id}>
+                                    {folder.icon} {folder.name}
+                                </option>
+                            ))}
+                        </FolderSelect>
+                    </FolderSelectContainer>
 
                     {/* 3. 날짜 정보 - 별도 줄 */}
                     <DateText>

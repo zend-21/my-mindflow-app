@@ -141,8 +141,19 @@ const WorkspaceInfo = styled.div`
 
 const WorkspaceCodeSection = styled.div`
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+const CodeRow = styled.div`
+  display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+`;
+
+const ButtonRow = styled.div`
+  display: flex;
+  gap: 8px;
 `;
 
 const CodeLabel = styled.span`
@@ -790,10 +801,14 @@ const MyWorkspace = ({ onRoomSelect, onClose }) => {
                 {workspace && (
                   <WorkspaceInfo>
                     <WorkspaceCodeSection>
-                      <CodeLabel>WS 코드:</CodeLabel>
-                      <CodeValue>{workspace.workspaceCode}</CodeValue>
-                      <CodeButton onClick={handleCopyCode}>복사</CodeButton>
-                      <ChangeCodeButton onClick={handleChangeCode}>변경</ChangeCodeButton>
+                      <CodeRow>
+                        <CodeLabel>WS 코드:</CodeLabel>
+                        <CodeValue>{workspace.workspaceCode}</CodeValue>
+                      </CodeRow>
+                      <ButtonRow>
+                        <CodeButton onClick={handleCopyCode}>복사</CodeButton>
+                        <ChangeCodeButton onClick={handleChangeCode}>변경</ChangeCodeButton>
+                      </ButtonRow>
                     </WorkspaceCodeSection>
                   </WorkspaceInfo>
                 )}

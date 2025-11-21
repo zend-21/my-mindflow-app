@@ -15,12 +15,12 @@ import {
 import { sanitizeInput } from '../utils/securityUtils';
 
 /**
- * 고유한 워크스페이스 코드 생성 (형식: WORK-XXXXXX)
+ * 고유한 워크스페이스 코드 생성 (형식: WS-XXXXXX)
  * 6자리 = 36^6 = 21억 개 가능
  */
 const generateWorkspaceCode = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = 'WORK-';
+  let code = 'WS-';
   for (let i = 0; i < 6; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
