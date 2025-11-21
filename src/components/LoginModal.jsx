@@ -3,6 +3,8 @@ import styled from 'styled-components';
 import { GoogleLogin, useGoogleLogin } from '@react-oauth/google';
 import Portal from './Portal'; // ★ 1. Portal 컴포넌트를 import 합니다.
 import { jwtDecode } from "jwt-decode";
+import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { auth } from '../firebase/config';
 
 const ModalOverlay = styled.div`
     position: fixed; /* ★ 2. Portal과 함께 사용하기 위해 position을 fixed로 변경합니다. */
@@ -49,41 +51,52 @@ const CloseButton = styled.button`
 `;
 
 function LoginModal({ onSuccess, onError, onClose, setProfile }) {
-    // ✅ useGoogleLogin 훅 사용 (Access Token 받기)
-    const googleLogin = useGoogleLogin({
-        onSuccess: async (tokenResponse) => {
-            console.log('🔑 Access Token 받음:', tokenResponse);
+    // ✅ Firebase Auth + Google Drive 스코프를 함께 사용하는 로그인
+    const handleGoogleLogin = async () => {
+        try {
+            // Google Auth Provider 설정
+            const provider = new GoogleAuthProvider();
 
-            // Access Token으로 사용자 정보 가져오기
-            try {
-                const userInfoResponse = await fetch(
-                    'https://www.googleapis.com/oauth2/v3/userinfo',
-                    {
-                        headers: {
-                            Authorization: `Bearer ${tokenResponse.access_token}`,
-                        },
-                    }
-                );
+            // Google Drive 스코프 추가 (기존 기능 유지)
+            provider.addScope('https://www.googleapis.com/auth/drive.file');
+            provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+            provider.addScope('https://www.googleapis.com/auth/userinfo.email');
 
-                const userInfo = await userInfoResponse.json();
-                console.log('👤 사용자 정보:', userInfo);
+            // Firebase Auth로 Google 로그인
+            const result = await signInWithPopup(auth, provider);
 
-                // onSuccess 콜백에 Access Token과 사용자 정보 전달
-                onSuccess({
-                    accessToken: tokenResponse.access_token,
-                    userInfo: userInfo,
-                });
-            } catch (error) {
-                console.error('사용자 정보 가져오기 실패:', error);
-                onError();
-            }
-        },
-        onError: () => {
-            console.log('Login Failed');
+            // Google Access Token 얻기 (Google Drive용)
+            const credential = GoogleAuthProvider.credentialFromResult(result);
+            const accessToken = credential.accessToken;
+
+            // Firebase User 정보
+            const user = result.user;
+
+            console.log('🔥 Firebase 로그인 성공:', user.uid);
+            console.log('🔑 Access Token:', accessToken);
+
+            // 사용자 정보 구성
+            const userInfo = {
+                sub: user.uid, // Firebase UID 사용 (Firestore 규칙과 일치)
+                email: user.email,
+                name: user.displayName,
+                picture: user.photoURL,
+            };
+
+            console.log('👤 사용자 정보:', userInfo);
+
+            // onSuccess 콜백에 Access Token과 사용자 정보 전달
+            onSuccess({
+                accessToken: accessToken,
+                userInfo: userInfo,
+                firebaseUser: user, // Firebase User 객체도 전달
+            });
+
+        } catch (error) {
+            console.error('Google 로그인 실패:', error);
             onError();
-        },
-        scope: 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-    });
+        }
+    };
 
     return (
         <ModalOverlay>
@@ -96,8 +109,8 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
                 </ModalDescription>
                 
                 <GoogleButtonWrapper>
-                    {/* ✅ 버튼 클릭 시 googleLogin 실행 */}
-                    <GoogleButton onClick={() => googleLogin()}>
+                    {/* ✅ 버튼 클릭 시 Firebase Google 로그인 실행 */}
+                    <GoogleButton onClick={handleGoogleLogin}>
                         <GoogleIcon>G</GoogleIcon>
                         Google로 로그인
                     </GoogleButton>

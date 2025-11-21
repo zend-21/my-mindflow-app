@@ -5,6 +5,8 @@ import styled, { keyframes, css } from 'styled-components';
 import { GlobalStyle } from './styles.js';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
+import { GoogleAuthProvider, signInWithCredential, signOut } from 'firebase/auth';
+import { auth } from './firebase/config';
 import { initializeGapiClient, setAccessToken, syncToGoogleDrive, loadFromGoogleDrive, loadProfilePictureFromGoogleDrive, syncProfilePictureToGoogleDrive } from './utils/googleDriveSync';
 import { backupToGoogleDrive } from './utils/googleDriveBackup';
 import { DndContext, closestCenter, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
@@ -1719,7 +1721,17 @@ function App() {
     };
 
     // ✅ 로그아웃 (확장됨)
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        // 🔥 Firebase Auth 로그아웃
+        try {
+            if (auth) {
+                await signOut(auth);
+                console.log('🔥 Firebase 로그아웃 완료');
+            }
+        } catch (error) {
+            console.error('Firebase 로그아웃 오류:', error);
+        }
+
         setProfile(null);
         setAccessTokenState(null);
         localStorage.removeItem('userProfile');
@@ -1729,7 +1741,7 @@ function App() {
 
         showToast("✓ 로그아웃되었습니다");
         setIsMenuOpen(false);
-        
+
         // 자동 동기화 중지
         if (syncIntervalRef.current) {
             clearInterval(syncIntervalRef.current);
