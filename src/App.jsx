@@ -5,7 +5,7 @@ import styled, { keyframes, css } from 'styled-components';
 import { GlobalStyle } from './styles.js';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
-import { GoogleAuthProvider, signInWithCredential, signOut, getRedirectResult } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithCredential, signOut, getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase/config';
 import { initializeGapiClient, setAccessToken, syncToGoogleDrive, loadFromGoogleDrive, loadProfilePictureFromGoogleDrive, syncProfilePictureToGoogleDrive } from './utils/googleDriveSync';
 import { backupToGoogleDrive } from './utils/googleDriveBackup';
@@ -1463,62 +1463,77 @@ function App() {
         setIsLoginModalOpen(false);
     };
 
-    // 🔥 모바일 redirect 로그인 결과 처리
+    // 🔥 Firebase Auth 상태 변화 감지 (모바일 redirect 로그인 포함)
     useEffect(() => {
-        const checkRedirectResult = async () => {
-            try {
-                if (!auth) {
-                    console.log('🔥 Firebase auth 객체 없음');
+        if (!auth) {
+            console.log('🔥 Firebase auth 객체 없음');
+            return;
+        }
+
+        console.log('🔍 Firebase Auth 상태 감지 시작...');
+
+        // 이미 localStorage에 저장된 프로필이 있으면 스킵
+        const existingProfile = localStorage.getItem('userProfile');
+        const existingFirebaseUserId = localStorage.getItem('firebaseUserId');
+
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            console.log('🔔 Auth 상태 변경:', user ? user.email : 'null');
+
+            if (user) {
+                // 이미 로그인 처리가 완료된 경우 스킵
+                if (existingProfile && existingFirebaseUserId) {
+                    console.log('✅ 이미 로그인 상태 (localStorage 확인)');
                     return;
                 }
 
-                console.log('🔍 Redirect 결과 확인 중...');
-                const result = await getRedirectResult(auth);
+                console.log('📱 Firebase 사용자 감지! 로그인 처리 시작...');
 
-                if (result) {
-                    console.log('📱 Redirect 로그인 결과 감지!', result.user?.email);
-                    const credential = GoogleAuthProvider.credentialFromResult(result);
-                    const accessToken = credential?.accessToken;
-                    const user = result.user;
-
-                    // 직접 로그인 처리 (handleLoginSuccess 대신)
-                    let pictureUrl = user.photoURL;
-                    if (pictureUrl) {
-                        const strippedUrl = pictureUrl.replace(/^https?:\/\//, '');
-                        pictureUrl = `https://${strippedUrl}`;
-                    }
-
-                    const firebaseUserId = user.uid;
-                    const profileData = {
-                        email: user.email,
-                        name: user.displayName,
-                        picture: pictureUrl,
-                    };
-
-                    // State 업데이트
-                    setProfile(profileData);
-                    setAccessTokenState(accessToken);
-
-                    // localStorage 저장
-                    localStorage.setItem('userProfile', JSON.stringify(profileData));
-                    localStorage.setItem('accessToken', accessToken);
-                    localStorage.setItem('firebaseUserId', firebaseUserId);
-
-                    console.log('✅ 모바일 로그인 완료 - firebaseUserId:', firebaseUserId);
-
-                    // 로그인 모달 닫기 및 토스트
-                    setIsLoginModalOpen(false);
-                    showToast('✓ 로그인되었습니다');
-                } else {
-                    console.log('🔍 Redirect 결과 없음 (정상 - 첫 로드)');
+                // 직접 로그인 처리
+                let pictureUrl = user.photoURL;
+                if (pictureUrl) {
+                    const strippedUrl = pictureUrl.replace(/^https?:\/\//, '');
+                    pictureUrl = `https://${strippedUrl}`;
                 }
-            } catch (error) {
-                console.error('❌ Redirect 결과 처리 오류:', error);
-                showToast('⚠ 로그인에 실패했습니다');
-            }
-        };
 
-        checkRedirectResult();
+                const firebaseUserId = user.uid;
+                const profileData = {
+                    email: user.email,
+                    name: user.displayName,
+                    picture: pictureUrl,
+                };
+
+                // State 업데이트
+                setProfile(profileData);
+
+                // localStorage 저장
+                localStorage.setItem('userProfile', JSON.stringify(profileData));
+                localStorage.setItem('firebaseUserId', firebaseUserId);
+
+                console.log('✅ 모바일 로그인 완료 - firebaseUserId:', firebaseUserId);
+
+                // 로그인 모달 닫기 및 토스트
+                setIsLoginModalOpen(false);
+                showToast('✓ 로그인되었습니다');
+
+                // Access Token 가져오기 (getRedirectResult에서)
+                try {
+                    const result = await getRedirectResult(auth);
+                    if (result) {
+                        const credential = GoogleAuthProvider.credentialFromResult(result);
+                        const accessToken = credential?.accessToken;
+                        if (accessToken) {
+                            setAccessTokenState(accessToken);
+                            localStorage.setItem('accessToken', accessToken);
+                            console.log('🔑 Access Token 저장 완료');
+                        }
+                    }
+                } catch (tokenError) {
+                    console.log('Access Token 가져오기 실패 (무시):', tokenError.message);
+                }
+            }
+        });
+
+        return () => unsubscribe();
     }, []);
 
     // ✅ handleSync 함수 (performSync(true) 호출 확인)
