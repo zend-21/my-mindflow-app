@@ -1,14 +1,10 @@
 import React from 'react';
 import styled from 'styled-components';
-import { GoogleLogin, useGoogleLogin } from '@react-oauth/google';
-import Portal from './Portal'; // ★ 1. Portal 컴포넌트를 import 합니다.
-import { jwtDecode } from "jwt-decode";
-import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
-import { auth } from '../firebase/config';
-import { useEffect } from 'react';
+import { useGoogleLogin } from '@react-oauth/google';
+import Portal from './Portal';
 
 const ModalOverlay = styled.div`
-    position: fixed; /* ★ 2. Portal과 함께 사용하기 위해 position을 fixed로 변경합니다. */
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;
@@ -51,97 +47,6 @@ const CloseButton = styled.button`
     color: #b0b0b0;
 `;
 
-function LoginModal({ onSuccess, onError, onClose, setProfile }) {
-    // 모바일 감지
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-
-    // ✅ Firebase Auth + Google Drive 스코프를 함께 사용하는 로그인
-    const handleGoogleLogin = async () => {
-        try {
-            // Google Auth Provider 설정
-            const provider = new GoogleAuthProvider();
-
-            // Google Drive 스코프 추가 (기존 기능 유지)
-            provider.addScope('https://www.googleapis.com/auth/drive.file');
-            provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
-            provider.addScope('https://www.googleapis.com/auth/userinfo.email');
-
-            // 모바일에서는 redirect 사용 (COOP 문제 회피)
-            if (isMobile) {
-                console.log('📱 모바일 감지 - Redirect 방식 사용');
-                await signInWithRedirect(auth, provider);
-                return; // redirect 후 페이지가 새로고침됨
-            }
-
-            // PC에서는 popup 사용
-            console.log('💻 PC 감지 - Popup 방식 사용');
-            const result = await signInWithPopup(auth, provider);
-            handleLoginResult(result);
-
-        } catch (error) {
-            console.error('Google 로그인 실패:', error);
-            // popup-closed-by-user는 사용자가 닫은 것이므로 무시
-            if (error.code !== 'auth/popup-closed-by-user') {
-                onError();
-            }
-        }
-    };
-
-    // 로그인 결과 처리 (공통)
-    const handleLoginResult = (result) => {
-        // Google Access Token 얻기 (Google Drive용)
-        const credential = GoogleAuthProvider.credentialFromResult(result);
-        const accessToken = credential?.accessToken;
-
-        // Firebase User 정보
-        const user = result.user;
-
-        console.log('🔥 Firebase 로그인 성공:', user.uid);
-        console.log('🔑 Access Token:', accessToken);
-
-        // 사용자 정보 구성
-        const userInfo = {
-            sub: user.uid, // Firebase UID 사용 (Firestore 규칙과 일치)
-            email: user.email,
-            name: user.displayName,
-            picture: user.photoURL,
-        };
-
-        console.log('👤 사용자 정보:', userInfo);
-
-        // onSuccess 콜백에 Access Token과 사용자 정보 전달
-        onSuccess({
-            accessToken: accessToken,
-            userInfo: userInfo,
-            firebaseUser: user, // Firebase User 객체도 전달
-        });
-    };
-
-    return (
-        <ModalOverlay>
-            <ModalContent>
-                <CloseButton onClick={onClose}>×</CloseButton>
-                <ModalTitle>로그인</ModalTitle>
-                <ModalDescription>
-                    Google 계정으로 로그인하고<br />
-                    데이터를 안전하게 동기화하세요
-                </ModalDescription>
-                
-                <GoogleButtonWrapper>
-                    {/* ✅ 버튼 클릭 시 Firebase Google 로그인 실행 */}
-                    <GoogleButton onClick={handleGoogleLogin}>
-                        <GoogleIcon>G</GoogleIcon>
-                        Google로 로그인
-                    </GoogleButton>
-                </GoogleButtonWrapper>
-            </ModalContent>
-        </ModalOverlay>
-    );
-}
-
-export default LoginModal;
-
-// 스타일 컴포넌트 추가
 const GoogleButton = styled.button`
     display: flex;
     align-items: center;
@@ -198,3 +103,61 @@ const ModalDescription = styled.p`
     color: #b0b0b0;
     line-height: 1.5;
 `;
+
+function LoginModal({ onSuccess, onError, onClose, setProfile }) {
+    // 원래 방식: @react-oauth/google의 useGoogleLogin 사용
+    const login = useGoogleLogin({
+        onSuccess: async (tokenResponse) => {
+            console.log('Google OAuth 성공:', tokenResponse);
+
+            try {
+                // Access Token으로 사용자 정보 가져오기
+                const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                    headers: {
+                        Authorization: `Bearer ${tokenResponse.access_token}`,
+                    },
+                });
+
+                const userInfo = await userInfoResponse.json();
+                console.log('사용자 정보:', userInfo);
+
+                // onSuccess 콜백 호출
+                onSuccess({
+                    accessToken: tokenResponse.access_token,
+                    userInfo: userInfo,
+                });
+            } catch (error) {
+                console.error('사용자 정보 가져오기 실패:', error);
+                onError();
+            }
+        },
+        onError: (error) => {
+            console.error('Google OAuth 실패:', error);
+            onError();
+        },
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        flow: 'implicit',
+    });
+
+    return (
+        <ModalOverlay>
+            <ModalContent>
+                <CloseButton onClick={onClose}>×</CloseButton>
+                <ModalTitle>로그인</ModalTitle>
+                <ModalDescription>
+                    Google 계정으로 로그인하고<br />
+                    데이터를 안전하게 동기화하세요
+                </ModalDescription>
+
+                <GoogleButtonWrapper>
+                    <GoogleButton onClick={() => login()}>
+                        <GoogleIcon>G</GoogleIcon>
+                        Google로 로그인
+                    </GoogleButton>
+                </GoogleButtonWrapper>
+            </ModalContent>
+        </ModalOverlay>
+    );
+}
+
+export default LoginModal;

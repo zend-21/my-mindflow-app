@@ -5,7 +5,7 @@ import styled, { keyframes, css } from 'styled-components';
 import { GlobalStyle } from './styles.js';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
-import { GoogleAuthProvider, signInWithCredential, signOut, getRedirectResult, onAuthStateChanged } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithCredential, signOut } from 'firebase/auth';
 import { auth } from './firebase/config';
 import { initializeGapiClient, setAccessToken, syncToGoogleDrive, loadFromGoogleDrive, loadProfilePictureFromGoogleDrive, syncProfilePictureToGoogleDrive } from './utils/googleDriveSync';
 import { backupToGoogleDrive } from './utils/googleDriveBackup';
@@ -1463,97 +1463,6 @@ function App() {
         setIsLoginModalOpen(false);
     };
 
-    // 🔥 Firebase Auth 상태 변화 감지 (모바일 redirect 로그인 포함)
-    useEffect(() => {
-        if (!auth) {
-            console.log('🔥 Firebase auth 객체 없음');
-            return;
-        }
-
-        console.log('🔍 Firebase Auth 상태 감지 시작...');
-
-        // 이미 localStorage에 저장된 프로필이 있으면 스킵
-        const existingProfile = localStorage.getItem('userProfile');
-        const existingFirebaseUserId = localStorage.getItem('firebaseUserId');
-
-        // 로그인 처리 함수
-        const processLogin = (user, accessToken = null) => {
-            console.log('📱 Firebase 사용자 감지! 로그인 처리 시작...', user.email);
-
-            let pictureUrl = user.photoURL;
-            if (pictureUrl) {
-                const strippedUrl = pictureUrl.replace(/^https?:\/\//, '');
-                pictureUrl = `https://${strippedUrl}`;
-            }
-
-            const firebaseUserId = user.uid;
-            const profileData = {
-                email: user.email,
-                name: user.displayName,
-                picture: pictureUrl,
-            };
-
-            // State 업데이트
-            setProfile(profileData);
-            if (accessToken) {
-                setAccessTokenState(accessToken);
-                localStorage.setItem('accessToken', accessToken);
-            }
-
-            // localStorage 저장
-            localStorage.setItem('userProfile', JSON.stringify(profileData));
-            localStorage.setItem('firebaseUserId', firebaseUserId);
-
-            console.log('✅ 모바일 로그인 완료 - firebaseUserId:', firebaseUserId);
-
-            // 로그인 모달 닫기 및 토스트
-            setIsLoginModalOpen(false);
-            showToast('✓ 로그인되었습니다');
-        };
-
-        // 1. 먼저 getRedirectResult 확인 (redirect 후 처리)
-        const checkRedirect = async () => {
-            try {
-                console.log('🔄 getRedirectResult 확인 중...');
-                const result = await getRedirectResult(auth);
-
-                if (result && result.user) {
-                    console.log('📱 Redirect 결과 발견!', result.user.email);
-                    const credential = GoogleAuthProvider.credentialFromResult(result);
-                    const accessToken = credential?.accessToken;
-                    processLogin(result.user, accessToken);
-                    return true; // 처리됨
-                } else {
-                    console.log('🔄 Redirect 결과 없음');
-                }
-            } catch (error) {
-                console.error('❌ getRedirectResult 오류:', error);
-            }
-            return false;
-        };
-
-        // 2. Auth 상태 변화 구독
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            console.log('🔔 Auth 상태 변경:', user ? user.email : 'null');
-
-            if (user) {
-                // 이미 로그인 처리가 완료된 경우 스킵
-                if (existingProfile && existingFirebaseUserId) {
-                    console.log('✅ 이미 로그인 상태 (localStorage 확인)');
-                    return;
-                }
-
-                processLogin(user);
-            }
-        });
-
-        // redirect 결과 확인 실행
-        if (!existingProfile || !existingFirebaseUserId) {
-            checkRedirect();
-        }
-
-        return () => unsubscribe();
-    }, []);
 
     // ✅ handleSync 함수 (performSync(true) 호출 확인)
     const handleSync = async () => {
