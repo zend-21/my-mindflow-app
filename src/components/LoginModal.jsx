@@ -3,8 +3,9 @@ import styled from 'styled-components';
 import { GoogleLogin, useGoogleLogin } from '@react-oauth/google';
 import Portal from './Portal'; // ★ 1. Portal 컴포넌트를 import 합니다.
 import { jwtDecode } from "jwt-decode";
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { auth } from '../firebase/config';
+import { useEffect } from 'react';
 
 const ModalOverlay = styled.div`
     position: fixed; /* ★ 2. Portal과 함께 사용하기 위해 position을 fixed로 변경합니다. */
@@ -51,6 +52,9 @@ const CloseButton = styled.button`
 `;
 
 function LoginModal({ onSuccess, onError, onClose, setProfile }) {
+    // 모바일 감지
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
     // ✅ Firebase Auth + Google Drive 스코프를 함께 사용하는 로그인
     const handleGoogleLogin = async () => {
         try {
@@ -62,40 +66,55 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
             provider.addScope('https://www.googleapis.com/auth/userinfo.profile');
             provider.addScope('https://www.googleapis.com/auth/userinfo.email');
 
-            // Firebase Auth로 Google 로그인
+            // 모바일에서는 redirect 사용 (COOP 문제 회피)
+            if (isMobile) {
+                console.log('📱 모바일 감지 - Redirect 방식 사용');
+                await signInWithRedirect(auth, provider);
+                return; // redirect 후 페이지가 새로고침됨
+            }
+
+            // PC에서는 popup 사용
+            console.log('💻 PC 감지 - Popup 방식 사용');
             const result = await signInWithPopup(auth, provider);
-
-            // Google Access Token 얻기 (Google Drive용)
-            const credential = GoogleAuthProvider.credentialFromResult(result);
-            const accessToken = credential.accessToken;
-
-            // Firebase User 정보
-            const user = result.user;
-
-            console.log('🔥 Firebase 로그인 성공:', user.uid);
-            console.log('🔑 Access Token:', accessToken);
-
-            // 사용자 정보 구성
-            const userInfo = {
-                sub: user.uid, // Firebase UID 사용 (Firestore 규칙과 일치)
-                email: user.email,
-                name: user.displayName,
-                picture: user.photoURL,
-            };
-
-            console.log('👤 사용자 정보:', userInfo);
-
-            // onSuccess 콜백에 Access Token과 사용자 정보 전달
-            onSuccess({
-                accessToken: accessToken,
-                userInfo: userInfo,
-                firebaseUser: user, // Firebase User 객체도 전달
-            });
+            handleLoginResult(result);
 
         } catch (error) {
             console.error('Google 로그인 실패:', error);
-            onError();
+            // popup-closed-by-user는 사용자가 닫은 것이므로 무시
+            if (error.code !== 'auth/popup-closed-by-user') {
+                onError();
+            }
         }
+    };
+
+    // 로그인 결과 처리 (공통)
+    const handleLoginResult = (result) => {
+        // Google Access Token 얻기 (Google Drive용)
+        const credential = GoogleAuthProvider.credentialFromResult(result);
+        const accessToken = credential?.accessToken;
+
+        // Firebase User 정보
+        const user = result.user;
+
+        console.log('🔥 Firebase 로그인 성공:', user.uid);
+        console.log('🔑 Access Token:', accessToken);
+
+        // 사용자 정보 구성
+        const userInfo = {
+            sub: user.uid, // Firebase UID 사용 (Firestore 규칙과 일치)
+            email: user.email,
+            name: user.displayName,
+            picture: user.photoURL,
+        };
+
+        console.log('👤 사용자 정보:', userInfo);
+
+        // onSuccess 콜백에 Access Token과 사용자 정보 전달
+        onSuccess({
+            accessToken: accessToken,
+            userInfo: userInfo,
+            firebaseUser: user, // Firebase User 객체도 전달
+        });
     };
 
     return (

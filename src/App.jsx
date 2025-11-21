@@ -5,7 +5,7 @@ import styled, { keyframes, css } from 'styled-components';
 import { GlobalStyle } from './styles.js';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
-import { GoogleAuthProvider, signInWithCredential, signOut } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithCredential, signOut, getRedirectResult } from 'firebase/auth';
 import { auth } from './firebase/config';
 import { initializeGapiClient, setAccessToken, syncToGoogleDrive, loadFromGoogleDrive, loadProfilePictureFromGoogleDrive, syncProfilePictureToGoogleDrive } from './utils/googleDriveSync';
 import { backupToGoogleDrive } from './utils/googleDriveBackup';
@@ -1462,6 +1462,38 @@ function App() {
         console.log('Login Failed');
         setIsLoginModalOpen(false);
     };
+
+    // 🔥 모바일 redirect 로그인 결과 처리
+    useEffect(() => {
+        const checkRedirectResult = async () => {
+            try {
+                if (!auth) return;
+
+                const result = await getRedirectResult(auth);
+                if (result) {
+                    console.log('📱 Redirect 로그인 결과 감지');
+                    const credential = GoogleAuthProvider.credentialFromResult(result);
+                    const accessToken = credential?.accessToken;
+                    const user = result.user;
+
+                    handleLoginSuccess({
+                        accessToken: accessToken,
+                        userInfo: {
+                            sub: user.uid,
+                            email: user.email,
+                            name: user.displayName,
+                            picture: user.photoURL,
+                        },
+                        firebaseUser: user,
+                    });
+                }
+            } catch (error) {
+                console.error('Redirect 결과 처리 오류:', error);
+            }
+        };
+
+        checkRedirectResult();
+    }, []);
 
     // ✅ handleSync 함수 (performSync(true) 호출 확인)
     const handleSync = async () => {
