@@ -5,6 +5,8 @@ import styled, { keyframes } from 'styled-components';
 import { avatarList } from './avatars/AvatarIcons';
 import FriendsModal from './collaboration/FriendsModal';
 import SharedNotesPage from './collaboration/SharedNotesPage';
+import MyWorkspace from './collaboration/MyWorkspace';
+import WorkspaceBrowser from './collaboration/WorkspaceBrowser';
 
 // 문제를 단순화하기 위해, 일단 Roulette 컴포넌트는 잠시 제외했습니다.
 // 이 코드로 오류가 사라진다면, 문제는 Roulette.jsx 파일에 있을 수 있습니다.
@@ -328,6 +330,8 @@ const SideMenu = ({
     // 협업 관련 상태
     const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
     const [isSharedNotesPageOpen, setIsSharedNotesPageOpen] = useState(false);
+    const [isMyWorkspaceOpen, setIsMyWorkspaceOpen] = useState(false);
+    const [isWorkspaceBrowserOpen, setIsWorkspaceBrowserOpen] = useState(false);
 
     const handleError = () => { // 에러 발생 시 상태 변경
         setImageError(true);
@@ -453,6 +457,18 @@ const SideMenu = ({
                                 <MenuGroup>
                                     <MenuItem onClick={() => {
                                         onClose();
+                                        setIsMyWorkspaceOpen(true);
+                                    }}>
+                                        <span className="icon">🏠</span> 내 워크스페이스
+                                    </MenuItem>
+                                    <MenuItem onClick={() => {
+                                        onClose();
+                                        setIsWorkspaceBrowserOpen(true);
+                                    }}>
+                                        <span className="icon">🔍</span> 워크스페이스 탐색
+                                    </MenuItem>
+                                    <MenuItem onClick={() => {
+                                        onClose();
                                         setIsFriendsModalOpen(true);
                                     }}>
                                         <span className="icon">👥</span> 친구 관리
@@ -528,6 +544,27 @@ const SideMenu = ({
                     onBack={() => setIsSharedNotesPageOpen(false)}
                 />
             )}
+
+            {isMyWorkspaceOpen && (
+                <MyWorkspace
+                    onRoomSelect={(room) => {
+                        // TODO: 방 입장 로직 연결
+                        console.log('선택된 방:', room);
+                        setIsMyWorkspaceOpen(false);
+                    }}
+                    onClose={() => setIsMyWorkspaceOpen(false)}
+                />
+            )}
+
+            <WorkspaceBrowser
+                isOpen={isWorkspaceBrowserOpen}
+                onClose={() => setIsWorkspaceBrowserOpen(false)}
+                onRoomSelect={(room) => {
+                    // TODO: 방 입장 로직 연결
+                    console.log('선택된 방:', room);
+                    setIsWorkspaceBrowserOpen(false);
+                }}
+            />
         </>
     );
 };

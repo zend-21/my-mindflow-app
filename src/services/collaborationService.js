@@ -18,6 +18,7 @@ import {
   increment
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
+import { createWorkspace, checkWorkspaceExists } from './workspaceService';
 
 // ========================================
 // 1. 사용자 프로필 관리
@@ -42,6 +43,24 @@ export const createOrUpdateUserProfile = async (userData) => {
   };
 
   await setDoc(userRef, profileData, { merge: true });
+
+  // 워크스페이스가 없으면 생성
+  try {
+    const workspaceExists = await checkWorkspaceExists(auth.currentUser.uid);
+    if (!workspaceExists) {
+      console.log('워크스페이스가 없습니다. 생성합니다...');
+      await createWorkspace(
+        auth.currentUser.uid,
+        profileData.displayName,
+        profileData.email
+      );
+      console.log('워크스페이스 생성 완료');
+    }
+  } catch (error) {
+    console.error('워크스페이스 생성 오류:', error);
+    // 워크스페이스 생성 실패해도 사용자 프로필은 유지
+  }
+
   return profileData;
 };
 

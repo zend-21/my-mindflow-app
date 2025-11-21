@@ -55,12 +55,33 @@ service cloud.firestore {
     }
 
     // ========================================
-    // 협업방 (Collaboration Rooms)
+    // 워크스페이스 (Workspaces)
     // ========================================
-    match /collaborationRooms/{roomId} {
+    match /workspaces/{workspaceId} {
       // 생성: 로그인 + 소유자 확인
       allow create: if isSignedIn() &&
         request.resource.data.ownerId == request.auth.uid;
+
+      // 읽기: 로그인한 모든 사용자 (워크스페이스 코드로 접근)
+      allow read: if isSignedIn();
+
+      // 수정: 워크스페이스 소유자만
+      allow update: if isSignedIn() &&
+        request.auth.uid == resource.data.ownerId;
+
+      // 삭제: 워크스페이스 소유자만
+      allow delete: if isSignedIn() &&
+        request.auth.uid == resource.data.ownerId;
+    }
+
+    // ========================================
+    // 협업방 (Collaboration Rooms)
+    // ========================================
+    match /collaborationRooms/{roomId} {
+      // 생성: 로그인 + 소유자 확인 + 워크스페이스 ID 필수
+      allow create: if isSignedIn() &&
+        request.resource.data.ownerId == request.auth.uid &&
+        request.resource.data.workspaceId != null;
 
       // 읽기: 참여자만 (클라이언트에서 배열 검증)
       allow read: if isSignedIn();

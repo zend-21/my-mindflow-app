@@ -18,7 +18,11 @@
       "Bash(npm install:*)",
       "Bash(npx cap init:*)",
       "Bash(npm run fix-restaurants:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(firebase deploy:*)",
+      "Bash(npx firebase deploy --only firestore:rules)",
+      "Bash(firestore.indexes.json)",
+      "Bash(firebase firestore:indexes:*)"
     ],
     "deny": [],
     "ask": []

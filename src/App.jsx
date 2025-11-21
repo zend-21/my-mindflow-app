@@ -46,6 +46,7 @@ import AppContent from './components/AppContent.jsx';
 import SecretPage from './components/secret/SecretPage.jsx';
 import ReviewPage from './pages/ReviewPage.jsx';
 import AppRouter from './components/AppRouter.jsx';
+import './utils/createWorkspaceManually'; // 워크스페이스 수동 생성 유틸리티
 
 // ★★★ 토스트 메시지 스타일 ★★★
 const fadeIn = keyframes`

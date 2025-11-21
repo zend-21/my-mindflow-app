@@ -83,9 +83,14 @@ const Label = styled.label`
   font-weight: 500;
 `;
 
+const InputWrapper = styled.div`
+  position: relative;
+  width: 100%;
+`;
+
 const Input = styled.input`
   width: 100%;
-  padding: 12px;
+  padding: 12px 40px 12px 12px; /* 우측 패딩 추가 (X 버튼 공간) */
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   background: #1a1d24;
@@ -99,6 +104,29 @@ const Input = styled.input`
 
   &::placeholder {
     color: #666;
+  }
+`;
+
+const ClearButton = styled.button`
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #999;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+
+  &:hover {
+    color: #e0e0e0;
+    background: rgba(255, 255, 255, 0.1);
   }
 `;
 
@@ -229,11 +257,18 @@ const InfoText = styled.p`
 `;
 
 const RoomSettingsModal = ({ isOpen, onClose, onConfirm, defaultTitle = '' }) => {
-  const [roomTitle, setRoomTitle] = useState(''); // 빈 문자열로 시작
+  // 메모 첫 줄 추출 (최대 20자)
+  const firstLine = defaultTitle.split('\n')[0].trim().substring(0, 20);
+
+  const [roomTitle, setRoomTitle] = useState(firstLine); // 첫 줄로 자동 입력
   const [isPublic, setIsPublic] = useState(false);
 
-  // 메모 첫 줄 추출 (placeholder용)
-  const firstLine = defaultTitle.split('\n')[0].trim().substring(0, 50);
+  // 모달 열릴 때마다 첫 줄로 초기화
+  React.useEffect(() => {
+    if (isOpen) {
+      setRoomTitle(firstLine);
+    }
+  }, [isOpen, firstLine]);
 
   if (!isOpen) return null;
 
@@ -273,15 +308,26 @@ const RoomSettingsModal = ({ isOpen, onClose, onConfirm, defaultTitle = '' }) =>
           </InfoBox>
 
           <Section>
-            <Label>방 제목 (메모 첫 줄이 자동으로 제안됩니다)</Label>
-            <Input
-              type="text"
-              placeholder={firstLine || "예: 프로젝트 기획 회의"}
-              value={roomTitle}
-              onChange={(e) => setRoomTitle(e.target.value)}
-              maxLength={100}
-              autoFocus
-            />
+            <Label>방 제목 (메모 첫 줄이 자동으로 입력됩니다)</Label>
+            <InputWrapper>
+              <Input
+                type="text"
+                placeholder="예: 프로젝트 기획 회의"
+                value={roomTitle}
+                onChange={(e) => setRoomTitle(e.target.value)}
+                maxLength={100}
+                autoFocus
+              />
+              {roomTitle && (
+                <ClearButton
+                  type="button"
+                  onClick={() => setRoomTitle('')}
+                  title="제목 지우기"
+                >
+                  ×
+                </ClearButton>
+              )}
+            </InputWrapper>
           </Section>
 
           <Section>

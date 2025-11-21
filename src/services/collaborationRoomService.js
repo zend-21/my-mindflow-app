@@ -11,6 +11,69 @@ import {
   invitationLimiter,
   validateContentSize
 } from '../utils/securityUtils';
+import { getWorkspaceByUserId, updateWorkspaceStats } from './workspaceService';
+
+/**
+ * 독립적인 방 초대 코드 생성 (워크스페이스 코드와 분리)
+ * - 공개방: OR-XXXXXX (Open Room)
+ * - 비공개방: SR-XXXXXX (Secret Room)
+ * - 6자리 = 36^6 = 21억 개 가능
+ * - 워크스페이스 코드 노출 없음 (보안)
+ * @param {boolean} isPublic - 공개방 여부
+ * @returns {string} 초대 코드
+ */
+const generateRoomInviteCode = (isPublic) => {
+  const roomType = isPublic ? 'OR' : 'SR'; // Open Room / Secret Room
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let code = roomType + '-';
+
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+
+  return code; // 예: OR-A3B7X9, SR-K2M8P1
+};
+
+/**
+ * 방 초대 코드 중복 확인
+ */
+const isRoomInviteCodeUnique = async (code) => {
+  try {
+    const q = query(
+      collection(db, 'collaborationRooms'),
+      where('inviteCode', '==', code)
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.empty;
+  } catch (error) {
+    console.error('방 초대 코드 중복 확인 오류:', error);
+    return false;
+  }
+};
+
+/**
+ * 고유한 방 초대 코드 생성 (중복 체크 포함)
+ * @param {boolean} isPublic - 공개방 여부
+ * @returns {Promise<string>} 고유한 초대 코드
+ */
+const generateUniqueRoomInviteCode = async (isPublic) => {
+  let code;
+  let isUnique = false;
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (!isUnique && attempts < maxAttempts) {
+    code = generateRoomInviteCode(isPublic); // 독립적인 코드 생성
+    isUnique = await isRoomInviteCodeUnique(code);
+    attempts++;
+  }
+
+  if (!isUnique) {
+    throw new Error('고유한 방 초대 코드 생성 실패');
+  }
+
+  return code;
+};
 
 /**
  * 협업방 생성
@@ -55,12 +118,28 @@ export const createCollaborationRoom = async (memoId, memoTitle, memoContent, is
     throw new Error('유효하지 않은 사용자 이름입니다.');
   }
 
+  // 워크스페이스 ID 가져오기
+  let workspaceId = `workspace_${userId}`;
+  try {
+    const workspaceResult = await getWorkspaceByUserId(userId);
+    if (workspaceResult.success) {
+      workspaceId = workspaceResult.data.workspaceId;
+    }
+  } catch (error) {
+    console.warn('워크스페이스 조회 실패, 기본값 사용:', error);
+    // 기본 워크스페이스 ID 사용
+  }
+
+  // 모든 방에 초대 코드 생성 (공개방: OR-XXXXXX, 비공개방: SR-XXXXXX)
+  const inviteCode = await generateUniqueRoomInviteCode(isPublic);
+
   const roomData = {
     // 방 기본 정보
     memoId,
     memoTitle: titleValidation.sanitized || '제목 없음',
     ownerId: userId,
     ownerName: nameValidation.sanitized,
+    workspaceId, // 워크스페이스 ID 추가
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
 
@@ -87,12 +166,26 @@ export const createCollaborationRoom = async (memoId, memoTitle, memoContent, is
     isLocked: false,
     isPublic: isPublic, // 공개 방 여부 (설정값 반영)
 
+    // 초대 코드 (모든 방)
+    inviteCode: inviteCode, // 'OR-XXXXXX' (공개방) 또는 'SR-XXXXXX' (비공개방)
+
+    // 차단된 사용자 목록
+    blockedUsers: [], // 방 접근이 차단된 사용자 ID 배열
+
     // 통계
     messageCount: 0,
     lastMessageAt: null,
   };
 
   const roomRef = await addDoc(collection(db, 'collaborationRooms'), roomData);
+
+  // 워크스페이스 통계 업데이트
+  try {
+    await updateWorkspaceStats(workspaceId);
+  } catch (error) {
+    console.warn('워크스페이스 통계 업데이트 실패:', error);
+  }
+
   return roomRef.id;
 };
 
@@ -223,12 +316,22 @@ export const leaveRoom = async (roomId) => {
   if (!roomDoc.exists()) throw new Error('방을 찾을 수 없습니다');
 
   const room = roomDoc.data();
+  const workspaceId = room.workspaceId;
   const participants = room.participants.filter(p => p.userId !== userId);
 
   // 참여자가 없으면 방 폭파 또는 아카이브
   if (participants.length === 0) {
     // 옵션 1: 방 삭제
     await deleteDoc(roomRef);
+
+    // 워크스페이스 통계 업데이트
+    if (workspaceId) {
+      try {
+        await updateWorkspaceStats(workspaceId);
+      } catch (error) {
+        console.warn('워크스페이스 통계 업데이트 실패:', error);
+      }
+    }
 
     // 옵션 2: 아카이브 (주석 해제 시 사용)
     // await updateDoc(roomRef, {
@@ -251,6 +354,123 @@ export const leaveRoom = async (roomId) => {
         participants,
         updatedAt: new Date().toISOString()
       });
+    }
+  }
+
+  return true;
+};
+
+/**
+ * 방 삭제 (방장만 가능)
+ * @param {string} roomId - 방 ID
+ */
+export const deleteRoom = async (roomId) => {
+  const userId = localStorage.getItem('firebaseUserId');
+  if (!userId) throw new Error('로그인이 필요합니다');
+
+  const roomRef = doc(db, 'collaborationRooms', roomId);
+  const roomDoc = await getDoc(roomRef);
+
+  if (!roomDoc.exists()) throw new Error('방을 찾을 수 없습니다');
+
+  const room = roomDoc.data();
+
+  // 방장만 삭제 가능
+  if (room.ownerId !== userId) {
+    throw new Error('방장만 방을 삭제할 수 있습니다');
+  }
+
+  const workspaceId = room.workspaceId;
+
+  // 방 삭제
+  await deleteDoc(roomRef);
+
+  // 워크스페이스 통계 업데이트
+  if (workspaceId) {
+    try {
+      await updateWorkspaceStats(workspaceId);
+    } catch (error) {
+      console.warn('워크스페이스 통계 업데이트 실패:', error);
+    }
+  }
+
+  return true;
+};
+
+/**
+ * 방 폐쇄 (아카이브)
+ * @param {string} roomId - 방 ID
+ */
+export const closeRoom = async (roomId) => {
+  const userId = localStorage.getItem('firebaseUserId');
+  if (!userId) throw new Error('로그인이 필요합니다');
+
+  const roomRef = doc(db, 'collaborationRooms', roomId);
+  const roomDoc = await getDoc(roomRef);
+
+  if (!roomDoc.exists()) throw new Error('방을 찾을 수 없습니다');
+
+  const room = roomDoc.data();
+
+  // 방장만 폐쇄 가능
+  if (room.ownerId !== userId) {
+    throw new Error('방장만 방을 폐쇄할 수 있습니다');
+  }
+
+  const workspaceId = room.workspaceId;
+
+  // 방 상태를 archived로 변경
+  await updateDoc(roomRef, {
+    status: 'archived',
+    updatedAt: new Date().toISOString()
+  });
+
+  // 워크스페이스 통계 업데이트
+  if (workspaceId) {
+    try {
+      await updateWorkspaceStats(workspaceId);
+    } catch (error) {
+      console.warn('워크스페이스 통계 업데이트 실패:', error);
+    }
+  }
+
+  return true;
+};
+
+/**
+ * 방 재개방 (archived -> active)
+ * @param {string} roomId - 방 ID
+ */
+export const reopenRoom = async (roomId) => {
+  const userId = localStorage.getItem('firebaseUserId');
+  if (!userId) throw new Error('로그인이 필요합니다');
+
+  const roomRef = doc(db, 'collaborationRooms', roomId);
+  const roomDoc = await getDoc(roomRef);
+
+  if (!roomDoc.exists()) throw new Error('방을 찾을 수 없습니다');
+
+  const room = roomDoc.data();
+
+  // 방장만 재개방 가능
+  if (room.ownerId !== userId) {
+    throw new Error('방장만 방을 재개방할 수 있습니다');
+  }
+
+  const workspaceId = room.workspaceId;
+
+  // 방 상태를 active로 변경
+  await updateDoc(roomRef, {
+    status: 'active',
+    updatedAt: new Date().toISOString()
+  });
+
+  // 워크스페이스 통계 업데이트
+  if (workspaceId) {
+    try {
+      await updateWorkspaceStats(workspaceId);
+    } catch (error) {
+      console.warn('워크스페이스 통계 업데이트 실패:', error);
     }
   }
 
@@ -423,4 +643,268 @@ export const subscribeToRoom = (roomId, callback) => {
       callback({ id: doc.id, ...doc.data() });
     }
   });
+};
+
+/**
+ * 방 초대 코드 재생성 (방장만 가능)
+ * @param {string} roomId - 방 ID
+ * @returns {string} 새로운 초대 코드
+ */
+export const regenerateRoomInviteCode = async (roomId) => {
+  const userId = localStorage.getItem('firebaseUserId');
+  if (!userId) throw new Error('로그인이 필요합니다');
+
+  const roomRef = doc(db, 'collaborationRooms', roomId);
+  const roomDoc = await getDoc(roomRef);
+
+  if (!roomDoc.exists()) throw new Error('방을 찾을 수 없습니다');
+
+  const room = roomDoc.data();
+
+  // 방장만 초대 코드 재생성 가능
+  if (room.ownerId !== userId) {
+    throw new Error('방장만 초대 코드를 재생성할 수 있습니다');
+  }
+
+  // 새로운 초대 코드 생성 (공개방: OR-XXXXXX, 비공개방: SR-XXXXXX)
+  const newInviteCode = await generateUniqueRoomInviteCode(room.isPublic);
+
+  // 초대 코드 업데이트
+  await updateDoc(roomRef, {
+    inviteCode: newInviteCode,
+    updatedAt: new Date().toISOString()
+  });
+
+  console.log('방 초대 코드 재생성 완료:', newInviteCode);
+  return newInviteCode;
+};
+
+/**
+ * 사용자를 방에서 차단
+ * @param {string} roomId - 방 ID
+ * @param {string} targetUserId - 차단할 사용자 ID
+ */
+export const blockUserFromRoom = async (roomId, targetUserId) => {
+  const userId = localStorage.getItem('firebaseUserId');
+  if (!userId) throw new Error('로그인이 필요합니다');
+
+  // 🛡️ 보안: 사용자 ID 검증
+  if (!isValidUserId(targetUserId)) {
+    throw new Error('유효하지 않은 사용자 ID입니다.');
+  }
+
+  const roomRef = doc(db, 'collaborationRooms', roomId);
+  const roomDoc = await getDoc(roomRef);
+
+  if (!roomDoc.exists()) throw new Error('방을 찾을 수 없습니다');
+
+  const room = roomDoc.data();
+
+  // 방장만 차단 가능
+  if (room.ownerId !== userId) {
+    throw new Error('방장만 사용자를 차단할 수 있습니다');
+  }
+
+  // 자기 자신은 차단 불가
+  if (targetUserId === userId) {
+    throw new Error('자기 자신은 차단할 수 없습니다');
+  }
+
+  const blockedUsers = room.blockedUsers || [];
+
+  // 이미 차단된 사용자인지 확인
+  if (blockedUsers.includes(targetUserId)) {
+    throw new Error('이미 차단된 사용자입니다');
+  }
+
+  // 차단 목록에 추가
+  blockedUsers.push(targetUserId);
+
+  // 참여자 목록에서 제거
+  const participants = room.participants.filter(p => p.userId !== targetUserId);
+
+  // 업데이트
+  await updateDoc(roomRef, {
+    blockedUsers,
+    participants,
+    updatedAt: new Date().toISOString()
+  });
+
+  console.log('사용자 차단 완료:', targetUserId);
+  return true;
+};
+
+/**
+ * 사용자 차단 해제
+ * @param {string} roomId - 방 ID
+ * @param {string} targetUserId - 차단 해제할 사용자 ID
+ */
+export const unblockUserFromRoom = async (roomId, targetUserId) => {
+  const userId = localStorage.getItem('firebaseUserId');
+  if (!userId) throw new Error('로그인이 필요합니다');
+
+  // 🛡️ 보안: 사용자 ID 검증
+  if (!isValidUserId(targetUserId)) {
+    throw new Error('유효하지 않은 사용자 ID입니다.');
+  }
+
+  const roomRef = doc(db, 'collaborationRooms', roomId);
+  const roomDoc = await getDoc(roomRef);
+
+  if (!roomDoc.exists()) throw new Error('방을 찾을 수 없습니다');
+
+  const room = roomDoc.data();
+
+  // 방장만 차단 해제 가능
+  if (room.ownerId !== userId) {
+    throw new Error('방장만 차단을 해제할 수 있습니다');
+  }
+
+  const blockedUsers = room.blockedUsers || [];
+
+  // 차단된 사용자가 아닌 경우
+  if (!blockedUsers.includes(targetUserId)) {
+    throw new Error('차단되지 않은 사용자입니다');
+  }
+
+  // 차단 목록에서 제거
+  const updatedBlockedUsers = blockedUsers.filter(id => id !== targetUserId);
+
+  // 업데이트
+  await updateDoc(roomRef, {
+    blockedUsers: updatedBlockedUsers,
+    updatedAt: new Date().toISOString()
+  });
+
+  console.log('사용자 차단 해제 완료:', targetUserId);
+  return true;
+};
+
+/**
+ * 방 초대 코드로 방 찾기
+ * @param {string} inviteCode - 초대 코드
+ * @returns {Object} 방 정보
+ */
+export const getRoomByInviteCode = async (inviteCode) => {
+  try {
+    const q = query(
+      collection(db, 'collaborationRooms'),
+      where('inviteCode', '==', inviteCode.toUpperCase())
+    );
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      throw new Error('유효하지 않은 초대 코드입니다');
+    }
+
+    const roomDoc = snapshot.docs[0];
+    const room = roomDoc.data();
+
+    // 방이 활성 상태인지 확인
+    if (room.status !== 'active') {
+      throw new Error('폐쇄된 방입니다');
+    }
+
+    return { success: true, roomId: roomDoc.id, data: room };
+  } catch (error) {
+    console.error('초대 코드로 방 찾기 오류:', error);
+    throw error;
+  }
+};
+
+/**
+ * 초대 코드로 방 참여 (차단 확인 포함)
+ * @param {string} inviteCode - 초대 코드
+ */
+export const joinRoomByInviteCode = async (inviteCode) => {
+  const userId = localStorage.getItem('firebaseUserId');
+  const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
+
+  if (!userId) throw new Error('로그인이 필요합니다');
+
+  // 초대 코드로 방 찾기
+  const result = await getRoomByInviteCode(inviteCode);
+  const roomId = result.roomId;
+  const room = result.data;
+
+  // 차단된 사용자인지 확인
+  const blockedUsers = room.blockedUsers || [];
+  if (blockedUsers.includes(userId)) {
+    throw new Error('이 방에 접근할 수 없습니다');
+  }
+
+  // 이미 참여 중인지 확인
+  const isAlreadyParticipant = room.participants.some(p => p.userId === userId);
+  if (isAlreadyParticipant) {
+    return { success: true, roomId, message: '이미 참여 중인 방입니다' };
+  }
+
+  // 참여자 추가
+  const participants = room.participants || [];
+  participants.push({
+    userId,
+    displayName: userProfile.name || '알 수 없음',
+    photoURL: userProfile.picture || null,
+    role: 'participant',
+    joinedAt: new Date().toISOString()
+  });
+
+  const roomRef = doc(db, 'collaborationRooms', roomId);
+  await updateDoc(roomRef, {
+    participants,
+    updatedAt: new Date().toISOString()
+  });
+
+  return { success: true, roomId };
+};
+
+/**
+ * 워크스페이스의 모든 방 초대 코드 재생성 (이사 효과)
+ * - 워크스페이스 코드 변경 시 호출
+ * - 모든 방의 초대 코드를 새로 생성하여 기존 코드 무효화
+ * - 공개방, 비공개방 모두 재생성
+ * @param {string} workspaceId - 워크스페이스 ID
+ * @returns {Promise<{success: boolean, regeneratedCount: number}>}
+ */
+export const regenerateAllRoomCodesInWorkspace = async (workspaceId) => {
+  try {
+    console.log('워크스페이스의 모든 방 코드 재생성 시작:', workspaceId);
+
+    // 워크스페이스의 모든 활성 방 조회
+    const q = query(
+      collection(db, 'collaborationRooms'),
+      where('workspaceId', '==', workspaceId),
+      where('status', '==', 'active')
+    );
+
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      console.log('재생성할 방이 없습니다.');
+      return { success: true, regeneratedCount: 0 };
+    }
+
+    let regeneratedCount = 0;
+
+    // 각 방의 초대 코드 재생성
+    for (const roomDoc of snapshot.docs) {
+      const room = roomDoc.data();
+      const newInviteCode = await generateUniqueRoomInviteCode(room.isPublic);
+
+      await updateDoc(doc(db, 'collaborationRooms', roomDoc.id), {
+        inviteCode: newInviteCode,
+        updatedAt: new Date().toISOString()
+      });
+
+      regeneratedCount++;
+      console.log(`방 ${roomDoc.id} 코드 재생성: ${room.inviteCode} → ${newInviteCode}`);
+    }
+
+    console.log(`총 ${regeneratedCount}개 방의 초대 코드 재생성 완료`);
+    return { success: true, regeneratedCount };
+
+  } catch (error) {
+    console.error('방 코드 재생성 오류:', error);
+    throw error;
+  }
 };
