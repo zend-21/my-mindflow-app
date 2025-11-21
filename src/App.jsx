@@ -1425,9 +1425,18 @@ function App() {
             }
             // ★★★
 
-            // 🔥 Firebase 사용자 ID 생성 (이메일 기반 해시)
-            // Google sub ID 또는 이메일을 기반으로 고유 ID 생성
-            const firebaseUserId = userInfo.sub || userInfo.id || btoa(userInfo.email).replace(/[^a-zA-Z0-9]/g, '').substring(0, 28);
+            // 🔥 Firebase Auth에 Google credential로 로그인 (Firestore 권한용)
+            let firebaseUserId;
+            try {
+                const credential = GoogleAuthProvider.credential(null, accessToken);
+                const userCredential = await signInWithCredential(auth, credential);
+                firebaseUserId = userCredential.user.uid;
+                console.log('✅ Firebase Auth 로그인 성공 - uid:', firebaseUserId);
+            } catch (firebaseError) {
+                console.warn('⚠️ Firebase Auth 로그인 실패, 대체 ID 사용:', firebaseError);
+                // Firebase Auth 실패 시 대체 ID 사용
+                firebaseUserId = userInfo.sub || userInfo.id || btoa(userInfo.email).replace(/[^a-zA-Z0-9]/g, '').substring(0, 28);
+            }
 
             // 사용자 프로필 설정
             const profileData = {
