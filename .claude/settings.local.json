@@ -22,7 +22,8 @@
       "Bash(firebase deploy:*)",
       "Bash(npx firebase deploy --only firestore:rules)",
       "Bash(firestore.indexes.json)",
-      "Bash(firebase firestore:indexes:*)"
+      "Bash(firebase firestore:indexes:*)",
+      "Bash(npx vercel --prod)"
     ],
     "deny": [],
     "ask": []

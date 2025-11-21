@@ -1467,28 +1467,54 @@ function App() {
     useEffect(() => {
         const checkRedirectResult = async () => {
             try {
-                if (!auth) return;
+                if (!auth) {
+                    console.log('🔥 Firebase auth 객체 없음');
+                    return;
+                }
 
+                console.log('🔍 Redirect 결과 확인 중...');
                 const result = await getRedirectResult(auth);
+
                 if (result) {
-                    console.log('📱 Redirect 로그인 결과 감지');
+                    console.log('📱 Redirect 로그인 결과 감지!', result.user?.email);
                     const credential = GoogleAuthProvider.credentialFromResult(result);
                     const accessToken = credential?.accessToken;
                     const user = result.user;
 
-                    handleLoginSuccess({
-                        accessToken: accessToken,
-                        userInfo: {
-                            sub: user.uid,
-                            email: user.email,
-                            name: user.displayName,
-                            picture: user.photoURL,
-                        },
-                        firebaseUser: user,
-                    });
+                    // 직접 로그인 처리 (handleLoginSuccess 대신)
+                    let pictureUrl = user.photoURL;
+                    if (pictureUrl) {
+                        const strippedUrl = pictureUrl.replace(/^https?:\/\//, '');
+                        pictureUrl = `https://${strippedUrl}`;
+                    }
+
+                    const firebaseUserId = user.uid;
+                    const profileData = {
+                        email: user.email,
+                        name: user.displayName,
+                        picture: pictureUrl,
+                    };
+
+                    // State 업데이트
+                    setProfile(profileData);
+                    setAccessTokenState(accessToken);
+
+                    // localStorage 저장
+                    localStorage.setItem('userProfile', JSON.stringify(profileData));
+                    localStorage.setItem('accessToken', accessToken);
+                    localStorage.setItem('firebaseUserId', firebaseUserId);
+
+                    console.log('✅ 모바일 로그인 완료 - firebaseUserId:', firebaseUserId);
+
+                    // 로그인 모달 닫기 및 토스트
+                    setIsLoginModalOpen(false);
+                    showToast('✓ 로그인되었습니다');
+                } else {
+                    console.log('🔍 Redirect 결과 없음 (정상 - 첫 로드)');
                 }
             } catch (error) {
-                console.error('Redirect 결과 처리 오류:', error);
+                console.error('❌ Redirect 결과 처리 오류:', error);
+                showToast('⚠ 로그인에 실패했습니다');
             }
         };
 
