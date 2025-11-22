@@ -347,11 +347,15 @@ const FolderBadge = styled.div`
 
 // 공유됨 뱃지 스타일
 const SharedBadge = styled.div`
-    background: rgba(74, 144, 226, 0.2);
-    border: 1px solid rgba(74, 144, 226, 0.5);
+    background: ${props => props.$isPublic
+        ? 'rgba(74, 144, 226, 0.2)'  // 공개방: 파란색
+        : 'rgba(239, 83, 80, 0.2)'}; // 비공개방: 붉은색
+    border: 1px solid ${props => props.$isPublic
+        ? 'rgba(74, 144, 226, 0.5)'
+        : 'rgba(239, 83, 80, 0.5)'};
     border-radius: 8px;
     padding: 8px 14px;
-    color: #4a90e2;
+    color: ${props => props.$isPublic ? '#4a90e2' : '#ef5350'};
     font-size: 14px;
     font-weight: 600;
     display: flex;
@@ -367,7 +371,9 @@ const SharedBadge = styled.div`
     }
 
     &:hover {
-        background: rgba(74, 144, 226, 0.3);
+        background: ${props => props.$isPublic
+            ? 'rgba(74, 144, 226, 0.3)'
+            : 'rgba(239, 83, 80, 0.3)'};
     }
 `;
 
@@ -758,12 +764,15 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
 
                         {/* 공유 버튼 또는 공유됨 뱃지 */}
                         {isShared ? (
-                            <SharedBadge onClick={() => {
-                                if (sharedRoom) {
-                                    setCurrentRoomId(sharedRoom.id);
-                                    setIsCollaborationRoomOpen(true);
-                                }
-                            }}>
+                            <SharedBadge
+                                $isPublic={sharedRoom?.isPublic ?? false}
+                                onClick={() => {
+                                    if (sharedRoom) {
+                                        setCurrentRoomId(sharedRoom.id);
+                                        setIsCollaborationRoomOpen(true);
+                                    }
+                                }}
+                            >
                                 <span className="material-icons">groups</span>
                                 공유됨
                             </SharedBadge>

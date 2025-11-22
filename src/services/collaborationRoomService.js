@@ -916,7 +916,7 @@ export const regenerateAllRoomCodesInWorkspace = async (workspaceId) => {
  */
 export const checkMemoSharedStatus = async (memoId) => {
   try {
-    if (!memoId) return { isShared: false, room: null };
+    if (!memoId || !db) return { isShared: false, room: null };
 
     const q = query(
       collection(db, 'collaborationRooms'),
@@ -950,6 +950,10 @@ export const getRoomByMemoId = async (memoId) => {
   try {
     if (!memoId) {
       throw new Error('메모 ID가 필요합니다');
+    }
+
+    if (!db) {
+      return { success: false, room: null };
     }
 
     const q = query(

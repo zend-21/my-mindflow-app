@@ -1532,6 +1532,19 @@ function App() {
 
             console.log('✅ 로그인 완료 - firebaseUserId:', firebaseUserId);
 
+            // 📊 Analytics 사용자 ID 및 속성 설정
+            try {
+                const { setAnalyticsUserId, setAnalyticsUserProperties, logLoginEvent } = await import('./utils/analyticsUtils.js');
+                setAnalyticsUserId(firebaseUserId);
+                setAnalyticsUserProperties({
+                    user_name: userInfo.name,
+                    user_email: userInfo.email,
+                });
+                logLoginEvent('google');
+            } catch (analyticsError) {
+                console.warn('⚠️ Analytics 설정 오류:', analyticsError);
+            }
+
             // 🏠 워크스페이스 자동 생성 (없으면 생성)
             try {
                 const workspaceExists = await checkWorkspaceExists(firebaseUserId);
