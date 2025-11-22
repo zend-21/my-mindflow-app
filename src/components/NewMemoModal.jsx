@@ -108,11 +108,19 @@ const HideKeyboardButton = styled.button`
     color: #e0e0e0;
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    padding: 10px 12px;
-    font-size: 14px;
+    padding: 6px 10px;
+    font-size: 12px;
     cursor: pointer;
     transition: background-color 0.2s ease;
     white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    .material-icons {
+        font-size: 16px;
+    }
+
     &:hover {
         background-color: #3d424d;
     }
@@ -433,7 +441,8 @@ const NewMemoModal = ({ isOpen, onSave, onCancel, openSource }) => {
                             </ImportantCheckWrapper>
                             {isKeyboardActive && (
                                 <HideKeyboardButton onClick={handleHideKeyboardClick}>
-                                    자판 숨김
+                                    <span className="material-icons">keyboard_hide</span>
+                                    숨김
                                 </HideKeyboardButton>
                             )}
                         </LeftButtonWrapper>

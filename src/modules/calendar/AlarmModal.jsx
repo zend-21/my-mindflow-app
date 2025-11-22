@@ -155,11 +155,11 @@ const Input = styled.input`
 `;
 
 const TimeInput = styled.input`
-  width: 60px;
-  padding: 14px 10px;
+  width: 50px;
+  padding: 10px 8px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 16px;
+  font-size: 15px;
   text-align: center;
   background: #333842;
   color: #e0e0e0;
@@ -194,7 +194,7 @@ const Select = styled.select`
 `;
 
 const SetCurrentTimeButton = styled.button`
-  padding: 10px 16px;
+  padding: 8px 7px;
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: #333842;
@@ -222,7 +222,7 @@ const AddButton = styled.button`
   background: ${ALARM_COLORS.primary};
   color: white;
   border: none;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: background-color 0.2s;

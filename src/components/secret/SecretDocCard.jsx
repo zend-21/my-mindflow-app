@@ -377,6 +377,11 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
     const handlePointerDown = (e) => {
         if (selectionMode) return; // 다중 선택 모드에서는 길게 누르기 비활성화
 
+        // 카테고리 뱃지를 클릭한 경우 카드의 long press 타이머를 시작하지 않음
+        const target = e.target;
+        const isBadgeClick = target.closest('button[data-category-badge]');
+        if (isBadgeClick) return;
+
         // 터치와 마우스 이벤트 모두 지원
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
@@ -496,6 +501,7 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
                 {doc.category && (
                     <CategoryBadge
                         $category={doc.category}
+                        data-category-badge="true"
                         onClick={handleBadgeClick}
                         onPointerDown={(e) => {
                             e.stopPropagation();

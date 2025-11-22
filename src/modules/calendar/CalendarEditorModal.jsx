@@ -215,6 +215,7 @@ const HistoryButton = styled.button`
   font-size: 22px;    /* 크기 유지하되 */
   cursor: pointer;
   padding: 4px 6px;   /* 내부 여백 최소화 */
+  color: #e0e0e0;     /* 밝은 색상으로 변경 */
 
   &:disabled {
     opacity: 0.3;
@@ -232,21 +233,25 @@ const HistoryButton = styled.button`
 
 /* 자판 숨김 버튼 */
 const HideKeyboardButton = styled.button`
-  right: 0;
   background: #333842;
   color: #e0e0e0;
-  border: 0.5px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  padding: 8px 14px;      /* 🔼 버튼 크기 키움 */
-  font-size: 15px;        /* 🔼 글씨 크게 */
+  padding: 6px 10px;
+  font-size: 12px;
   cursor: pointer;
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 
-  /* ▼▼▼ 추가된 포커스 스타일 ▼▼▼ */
-  &:focus {
-    outline: none;
+  .material-icons {
+    font-size: 16px;
   }
-  &:focus-visible {
-    box-shadow: 0 0 0 3px rgba(150, 160, 170, 0.6);
+
+  &:hover {
+    background-color: #3d424d;
   }
 `;
 
@@ -503,7 +508,8 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
               <RightWrapper>
                 {isKeyboardActive && (
                   <HideKeyboardButton onClick={handleHideKeyboard}>
-                    자판 숨김
+                    <span className="material-icons">keyboard_hide</span>
+                    숨김
                   </HideKeyboardButton>
                 )}
               </RightWrapper>

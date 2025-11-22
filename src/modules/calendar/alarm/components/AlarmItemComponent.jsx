@@ -326,12 +326,6 @@ const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, onEdit, i
           {/* 타이틀 */}
           <TitleText $isAnniversary={alarm.isAnniversary}>
             {alarm.title || '제목 없음'}
-            {/* 일반 알람이 토글 OFF && 경과 전일 때만 "일시중지" 표시 */}
-            {!alarm.isAnniversary && alarm.enabled === false && !isExpired && (
-              <PausedLabel>
-                (일시중지)
-              </PausedLabel>
-            )}
           </TitleText>
         </TitleContainer>
 
