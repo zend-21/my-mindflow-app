@@ -690,7 +690,7 @@ const StyledCheckIcon = styled(BsCheckCircleFill)`
 const FolderCard = styled.div`
     background: linear-gradient(135deg, #2a2d35, #333842);
     border-radius: 12px;
-    padding: 16px;
+    padding: 12px;
     cursor: pointer;
     transition: all 0.2s;
     border: 2px solid ${props => props.$isShared
@@ -700,8 +700,6 @@ const FolderCard = styled.div`
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    min-height: 100px;
-    justify-content: center;
     ${props => props.$isShared && `
         box-shadow: 0 0 15px rgba(0, 255, 136, 0.15);
     `}
@@ -722,9 +720,11 @@ const FolderCard = styled.div`
 `;
 
 const FolderIconWrapper = styled.div`
-    font-size: 40px;
-    line-height: 1;
+    font-size: 32px;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+    display: flex;
+    align-items: center;
+    justify-content: center;
 `;
 
 // 공유 폴더 아이콘 (형광 그린)
@@ -743,28 +743,21 @@ const SharedFolderIcon = styled.div`
 
 const FolderName = styled.span`
     color: #e0e0e0;
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 500;
     text-align: center;
     word-break: break-word;
-    max-width: 100%;
 `;
 
 const FolderMemoCount = styled.span`
-    background: rgba(74, 144, 226, 0.2);
-    border: 1px solid rgba(74, 144, 226, 0.3);
-    color: #4a90e2;
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 10px;
+    color: #999;
+    font-size: 12px;
 `;
 
 const FolderEmptyBadge = styled.span`
-    background: rgba(255, 255, 255, 0.1);
     color: #666;
     font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 10px;
+    font-style: italic;
 `;
 
 const AddFolderCard = styled(FolderCard)`
@@ -1724,17 +1717,12 @@ const MemoPage = ({
                                     <CurrentFolderIcon>{currentFolder.icon}</CurrentFolderIcon>
                                     <CurrentFolderName>{currentFolder.name} ({folderMemoCount})</CurrentFolderName>
                                 </CurrentFolderInfo>
-                                <div style={{ display: 'flex', gap: '8px' }}>
-                                    <FolderEditButton onClick={() => openMoveMemosModal(currentFolder)}>
-                                        📋 메모 이동
-                                    </FolderEditButton>
-                                    <FolderExitButton onClick={() => setActiveFolder('all')}>
-                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M13 17L14.4 15.6 L11.8 13H22V11H11.8L14.4 8.4L13 7L8 12L13 17ZM4 5H13V3H4C2.9 3 2 3.9 2 5V19C2 20.1 2.9 21 4 21H13V19H4V5Z" fill="currentColor"/>
-                                        </svg>
-                                        폴더 나가기
-                                    </FolderExitButton>
-                                </div>
+                                <FolderExitButton onClick={() => setActiveFolder('all')}>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M13 17L14.4 15.6 L11.8 13H22V11H11.8L14.4 8.4L13 7L8 12L13 17ZM4 5H13V3H4C2.9 3 2 3.9 2 5V19C2 20.1 2.9 21 4 21H13V19H4V5Z" fill="currentColor"/>
+                                    </svg>
+                                    폴더 나가기
+                                </FolderExitButton>
                             </CurrentFolderHeader>
                         );
                     })()}
@@ -1778,9 +1766,30 @@ const MemoPage = ({
                         </SortButton>
                     </SortBar>
 
-                    <GuidanceMessage>
-                        하단의 목록창을 길게 누르면 다중 선택 모드가 활성화 됩니다.
-                    </GuidanceMessage>
+                    {/* 사용자 정의 폴더 내부일 때는 '문서 이동' 버튼, 그 외에는 안내 메시지 */}
+                    {activeFolder !== 'all' && activeFolder !== 'shared' ? (
+                        (() => {
+                            const currentFolder = customFolders.find(f => f.id === activeFolder);
+                            if (!currentFolder) return null;
+                            return (
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '4px', marginBottom: '-10px' }}>
+                                    <FolderEditButton onClick={() => openMoveMemosModal(currentFolder)}>
+                                        📋 문서 이동
+                                    </FolderEditButton>
+                                    <div style={{
+                                        width: '100%',
+                                        height: '1px',
+                                        background: 'rgba(255, 255, 255, 0.1)',
+                                        marginTop: '15px'
+                                    }} />
+                                </div>
+                            );
+                        })()
+                    ) : (
+                        <GuidanceMessage>
+                            하단의 목록창을 길게 누르면 다중 선택 모드가 활성화 됩니다.
+                        </GuidanceMessage>
+                    )}
                 </>
             )}
 
@@ -1829,7 +1838,7 @@ const MemoPage = ({
                                         }}
                                         onMouseUp={() => clearTimeout(folderLongPressTimer.current)}
                                         onMouseLeave={() => clearTimeout(folderLongPressTimer.current)}
-                                        title="길게 눌러서 삭제"
+                                        title="길게 눌러서 이름 변경"
                                     >
                                         <FolderIconWrapper>{folder.icon}</FolderIconWrapper>
                                         <FolderName>{folder.name}</FolderName>
