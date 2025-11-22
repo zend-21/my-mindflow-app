@@ -31,6 +31,25 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
     return () => unsubscribe();
   }, [roomId]);
 
+  // 방 입장 시 참가 이력에 자동 추가
+  useEffect(() => {
+    if (!roomId || !currentUserId || !room) return;
+
+    // 내가 만든 방은 제외 (운영중인 방에 이미 표시됨)
+    if (room.ownerId === currentUserId) return;
+
+    try {
+      const joinedRoomIds = JSON.parse(localStorage.getItem(`joinedRooms_${currentUserId}`) || '[]');
+      if (!joinedRoomIds.includes(roomId)) {
+        joinedRoomIds.push(roomId);
+        localStorage.setItem(`joinedRooms_${currentUserId}`, JSON.stringify(joinedRoomIds));
+        console.log('✅ 참가 이력에 추가:', roomId);
+      }
+    } catch (error) {
+      console.error('참가 이력 저장 실패:', error);
+    }
+  }, [roomId, currentUserId, room]);
+
   // 메시지 실시간 구독
   useEffect(() => {
     if (!roomId) return;

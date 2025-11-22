@@ -2,9 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { getWorkspaceByUserId, changeWorkspaceCode } from '../../services/workspaceService';
-import { collection, query, where, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import { deleteRoom, closeRoom, reopenRoom, regenerateRoomInviteCode } from '../../services/collaborationRoomService';
+import { deleteRoom, closeRoom, reopenRoom, regenerateRoomInviteCode, getRoomByInviteCode } from '../../services/collaborationRoomService';
+import RoomBrowser from './RoomBrowser';
 
 const fadeIn = keyframes`
   from { opacity: 0; }
@@ -549,14 +550,19 @@ const LoadingState = styled.div`
 
 const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) => {
   const [workspace, setWorkspace] = useState(null);
-  const [rooms, setRooms] = useState([]);
+  const [rooms, setRooms] = useState([]); // 내가 운영중인 방
+  const [joinedRooms, setJoinedRooms] = useState([]); // 참가 이력 방
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('all'); // all, open, restricted, archived
+  const [mainTab, setMainTab] = useState('owned'); // owned, joined, browse
+
+  // 내가 운영중인 방 - 서브탭
+  const [ownedRoomTab, setOwnedRoomTab] = useState('all'); // all, open, restricted, archived
 
   // 모달 상태
   const [confirmModal, setConfirmModal] = useState(null); // { title, message, onConfirm, variant }
   const [alertModal, setAlertModal] = useState(null); // { title, message, variant }
   const [unshareModal, setUnshareModal] = useState(null); // { roomId, roomTitle }
+  const [isRoomBrowserOpen, setIsRoomBrowserOpen] = useState(false);
 
   // 길게 누르기 상태
   const [longPressTimer, setLongPressTimer] = useState(null);
@@ -632,10 +638,60 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
       console.log('방 상세:', roomsList.map(r => ({ id: r.id, memoId: r.memoId, title: r.memoTitle, status: r.status })));
 
       setRooms(roomsList);
+
+      // 참가 이력 방 가져오기
+      await loadJoinedRooms(userId);
     } catch (error) {
       console.error('방 목록 조회 오류:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadJoinedRooms = async (userId) => {
+    try {
+      // localStorage에서 참가 이력 가져오기 (roomId 배열)
+      const joinedRoomIds = JSON.parse(localStorage.getItem(`joinedRooms_${userId}`) || '[]');
+
+      if (joinedRoomIds.length === 0) {
+        setJoinedRooms([]);
+        return;
+      }
+
+      // 각 방 정보 가져오기
+      const joinedRoomsList = [];
+      for (const roomId of joinedRoomIds) {
+        try {
+          const roomDoc = await getDoc(doc(db, 'collaborationRooms', roomId));
+          if (roomDoc.exists()) {
+            const roomData = roomDoc.data();
+            // 내가 만든 방은 제외 (운영중인 방에 이미 표시됨)
+            if (roomData.ownerId !== userId) {
+              joinedRoomsList.push({
+                id: roomDoc.id,
+                ...roomData,
+                isActive: roomData.status === 'active', // 방이 활성 상태인지
+              });
+            }
+          } else {
+            // 방이 삭제된 경우 - 비활성으로 표시
+            joinedRoomsList.push({
+              id: roomId,
+              memoTitle: '(삭제된 방)',
+              isActive: false,
+              isDeleted: true,
+            });
+          }
+        } catch (error) {
+          console.error(`방 ${roomId} 조회 실패:`, error);
+        }
+      }
+
+      setJoinedRooms(joinedRoomsList);
+      console.log('📜 참가 이력 방:', joinedRoomsList.length, '개');
+    } catch (error) {
+      console.error('참가 이력 조회 오류:', error);
+      setJoinedRooms([]);
     }
   };
 
@@ -859,13 +915,34 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
     });
   };
 
-  const filteredRooms = rooms.filter(room => {
-    if (activeTab === 'all') return true;
-    if (activeTab === 'open') return room.roomType === 'open' && room.status === 'active';
-    if (activeTab === 'restricted') return room.roomType === 'restricted' && room.status === 'active';
-    if (activeTab === 'archived') return room.status === 'archived';
+  // 내가 운영중인 방 필터링
+  const filteredOwnedRooms = rooms.filter(room => {
+    if (ownedRoomTab === 'all') return true;
+    if (ownedRoomTab === 'open') return room.roomType === 'open' && room.status === 'active';
+    if (ownedRoomTab === 'restricted') return room.roomType === 'restricted' && room.status === 'active';
+    if (ownedRoomTab === 'archived') return room.status === 'archived';
     return true;
   });
+
+  // 방 탐색에서 방 선택 핸들러
+  const handleRoomBrowserSelect = async (room) => {
+    setIsRoomBrowserOpen(false);
+
+    // 참가 이력에 추가
+    const userId = localStorage.getItem('firebaseUserId');
+    if (userId && room.id) {
+      const joinedRoomIds = JSON.parse(localStorage.getItem(`joinedRooms_${userId}`) || '[]');
+      if (!joinedRoomIds.includes(room.id)) {
+        joinedRoomIds.push(room.id);
+        localStorage.setItem(`joinedRooms_${userId}`, JSON.stringify(joinedRoomIds));
+      }
+    }
+
+    // 방 입장
+    if (onRoomSelect) {
+      onRoomSelect(room);
+    }
+  };
 
   return (
     <>
@@ -879,10 +956,10 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
           ) : (
             <Container>
               <Header>
-                <Title>내 워크스페이스</Title>
-                <Subtitle>내가 만든 모든 협업방을 관리할 수 있습니다</Subtitle>
+                <Title>협업 라운지</Title>
+                <Subtitle>모든 협업방을 한 곳에서 관리하세요</Subtitle>
 
-                {workspace && (
+                {workspace && mainTab === 'owned' && (
                   <WorkspaceInfo>
                     <WorkspaceCodeSection>
                       <CodeRow>
@@ -898,24 +975,43 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                 )}
               </Header>
 
+              {/* 메인 탭 */}
               <TabContainer>
-                <Tab $active={activeTab === 'all'} onClick={() => setActiveTab('all')}>
-                  전체 <span>{rooms.length}</span>
+                <Tab $active={mainTab === 'owned'} onClick={() => setMainTab('owned')}>
+                  내가 운영중인 방 <span>{rooms.length}</span>
                 </Tab>
-                <Tab $active={activeTab === 'open'} onClick={() => setActiveTab('open')}>
-                  개방형 <span>{rooms.filter(r => r.roomType === 'open' && r.status === 'active').length}</span>
+                <Tab $active={mainTab === 'joined'} onClick={() => setMainTab('joined')}>
+                  참가 이력 <span>{joinedRooms.length}</span>
                 </Tab>
-                <Tab $active={activeTab === 'restricted'} onClick={() => setActiveTab('restricted')}>
-                  제한형 <span>{rooms.filter(r => r.roomType === 'restricted' && r.status === 'active').length}</span>
-                </Tab>
-                <Tab $active={activeTab === 'archived'} onClick={() => setActiveTab('archived')}>
-                  폐쇄방 <span>{rooms.filter(r => r.status === 'archived').length}</span>
+                <Tab $active={mainTab === 'browse'} onClick={() => setMainTab('browse')}>
+                  방 탐색
                 </Tab>
               </TabContainer>
 
-              {filteredRooms.length > 0 ? (
-                <RoomsList>
-                  {filteredRooms.map(room => (
+              {/* 내가 운영중인 방 - 서브탭 */}
+              {mainTab === 'owned' && (
+                <TabContainer style={{ marginTop: '10px' }}>
+                  <Tab $active={ownedRoomTab === 'all'} onClick={() => setOwnedRoomTab('all')}>
+                    전체 <span>{rooms.length}</span>
+                  </Tab>
+                  <Tab $active={ownedRoomTab === 'open'} onClick={() => setOwnedRoomTab('open')}>
+                    개방형 <span>{rooms.filter(r => r.roomType === 'open' && r.status === 'active').length}</span>
+                  </Tab>
+                  <Tab $active={ownedRoomTab === 'restricted'} onClick={() => setOwnedRoomTab('restricted')}>
+                    제한형 <span>{rooms.filter(r => r.roomType === 'restricted' && r.status === 'active').length}</span>
+                  </Tab>
+                  <Tab $active={ownedRoomTab === 'archived'} onClick={() => setOwnedRoomTab('archived')}>
+                    폐쇄방 <span>{rooms.filter(r => r.status === 'archived').length}</span>
+                  </Tab>
+                </TabContainer>
+              )}
+
+              {/* 내가 운영중인 방 목록 */}
+              {mainTab === 'owned' && (
+                <>
+                  {filteredOwnedRooms.length > 0 ? (
+                    <RoomsList>
+                      {filteredOwnedRooms.map(room => (
                     <RoomCard key={room.id}>
                       {/* 제목과 메타정보 영역: 길게 누르기로 공유 해제 */}
                       <div
@@ -1005,13 +1101,89 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                       </RoomActions>
                     </RoomCard>
                   ))}
-                </RoomsList>
-              ) : (
-                <EmptyState>
-                  {activeTab === 'all' && '아직 만든 방이 없습니다.'}
-                  {activeTab === 'open' && '개방형 방이 없습니다.'}
-                  {activeTab === 'restricted' && '제한형 방이 없습니다.'}
-                  {activeTab === 'archived' && '폐쇄된 방이 없습니다.'}
+                      </RoomsList>
+                    ) : (
+                      <EmptyState>
+                        {ownedRoomTab === 'all' && '아직 만든 방이 없습니다.'}
+                        {ownedRoomTab === 'open' && '개방형 방이 없습니다.'}
+                        {ownedRoomTab === 'restricted' && '제한형 방이 없습니다.'}
+                        {ownedRoomTab === 'archived' && '폐쇄된 방이 없습니다.'}
+                      </EmptyState>
+                    )}
+                </>
+              )}
+
+              {/* 참가 이력 방 목록 */}
+              {mainTab === 'joined' && (
+                <>
+                  {joinedRooms.length > 0 ? (
+                    <RoomsList>
+                      {joinedRooms.map(room => (
+                        <RoomCard
+                          key={room.id}
+                          style={{
+                            opacity: room.isDeleted || room.status === 'archived' ? 0.6 : 1,
+                            pointerEvents: room.isDeleted ? 'none' : 'auto'
+                          }}
+                        >
+                          <RoomHeader>
+                            <RoomTitle>
+                              {room.memoTitle}
+                              {room.isDeleted && ' (삭제됨)'}
+                              {!room.isDeleted && room.status === 'archived' && ' (폐쇄됨)'}
+                            </RoomTitle>
+                            {!room.isDeleted && (
+                              <RoomBadge
+                                $roomType={room.roomType}
+                                $status={room.status}
+                              >
+                                {room.status === 'archived' ? '폐쇄' : room.roomType === 'open' ? '개방형' : '제한형'}
+                              </RoomBadge>
+                            )}
+                          </RoomHeader>
+
+                          {!room.isDeleted && (
+                            <>
+                              <RoomMeta>
+                                방장: {room.ownerName || '알 수 없음'} · {(room.participants?.length || 0)}명 참여 중
+                              </RoomMeta>
+
+                              <RoomActions>
+                                <ActionButton
+                                  $variant="enter"
+                                  onClick={() => onRoomSelect && onRoomSelect(room)}
+                                  disabled={room.status === 'archived'}
+                                >
+                                  {room.status === 'archived' ? '입장 불가' : '입장'}
+                                </ActionButton>
+                              </RoomActions>
+                            </>
+                          )}
+                        </RoomCard>
+                      ))}
+                    </RoomsList>
+                  ) : (
+                    <EmptyState>
+                      참가한 방이 없습니다.<br />
+                      방 탐색에서 방 코드로 참가해보세요.
+                    </EmptyState>
+                  )}
+                </>
+              )}
+
+              {/* 방 탐색 */}
+              {mainTab === 'browse' && (
+                <EmptyState style={{ paddingTop: '40px' }}>
+                  <div style={{ marginBottom: '20px', fontSize: '18px', color: '#b0b0b0' }}>
+                    방 코드를 입력하여 협업방에 참가하세요
+                  </div>
+                  <ActionButton
+                    $variant="enter"
+                    onClick={() => setIsRoomBrowserOpen(true)}
+                    style={{ margin: '0 auto', maxWidth: '200px' }}
+                  >
+                    방 코드 입력하기
+                  </ActionButton>
                 </EmptyState>
               )}
             </Container>
@@ -1091,6 +1263,13 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
           </ConfirmModalBox>
         </ConfirmModalOverlay>
       )}
+
+      {/* 방 탐색 모달 */}
+      <RoomBrowser
+        isOpen={isRoomBrowserOpen}
+        onClose={() => setIsRoomBrowserOpen(false)}
+        onRoomSelect={handleRoomBrowserSelect}
+      />
     </>
   );
 };
