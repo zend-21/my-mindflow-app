@@ -319,43 +319,11 @@ export const leaveRoom = async (roomId) => {
   const workspaceId = room.workspaceId;
   const participants = room.participants.filter(p => p.userId !== userId);
 
-  // 참여자가 없으면 방 폭파 또는 아카이브
-  if (participants.length === 0) {
-    // 옵션 1: 방 삭제
-    await deleteDoc(roomRef);
-
-    // 워크스페이스 통계 업데이트
-    if (workspaceId) {
-      try {
-        await updateWorkspaceStats(workspaceId);
-      } catch (error) {
-        console.warn('워크스페이스 통계 업데이트 실패:', error);
-      }
-    }
-
-    // 옵션 2: 아카이브 (주석 해제 시 사용)
-    // await updateDoc(roomRef, {
-    //   status: 'archived',
-    //   participants: [],
-    //   updatedAt: new Date().toISOString()
-    // });
-  } else {
-    // 방장이 나가면 다음 참여자를 방장으로
-    if (room.ownerId === userId && participants.length > 0) {
-      participants[0].role = 'owner';
-      await updateDoc(roomRef, {
-        ownerId: participants[0].userId,
-        ownerName: participants[0].displayName,
-        participants,
-        updatedAt: new Date().toISOString()
-      });
-    } else {
-      await updateDoc(roomRef, {
-        participants,
-        updatedAt: new Date().toISOString()
-      });
-    }
-  }
+  // 참여자 목록에서만 제거, 방장 정보는 유지 (방장이 나가도 ownerId는 변경 안 됨)
+  await updateDoc(roomRef, {
+    participants,
+    updatedAt: new Date().toISOString()
+  });
 
   return true;
 };
@@ -604,6 +572,27 @@ export const lockRoom = async (roomId, isLocked) => {
 };
 
 /**
+ * 방 공개/비공개 설정 변경 (방장만 가능)
+ */
+export const toggleRoomPublicity = async (roomId, isPublic) => {
+  const userId = localStorage.getItem('firebaseUserId');
+  if (!userId) throw new Error('로그인이 필요합니다');
+
+  const roomRef = doc(db, 'collaborationRooms', roomId);
+  const roomDoc = await getDoc(roomRef);
+
+  if (!roomDoc.exists()) throw new Error('방을 찾을 수 없습니다');
+  if (roomDoc.data().ownerId !== userId) throw new Error('방장만 공개 설정을 변경할 수 있습니다');
+
+  await updateDoc(roomRef, {
+    isPublic,
+    updatedAt: new Date().toISOString()
+  });
+
+  return true;
+};
+
+/**
  * 내 협업방 목록 가져오기
  */
 export const getMyRooms = async () => {
@@ -827,6 +816,12 @@ export const joinRoomByInviteCode = async (inviteCode) => {
   const roomId = result.roomId;
   const room = result.data;
 
+  // 방이 잠겨있는지 확인 (이미 참여 중인 사용자는 제외)
+  const isAlreadyParticipant = room.participants.some(p => p.userId === userId);
+  if (room.isLocked && !isAlreadyParticipant) {
+    throw new Error('방이 잠겨있어 새로운 참여자를 받지 않습니다');
+  }
+
   // 차단된 사용자인지 확인
   const blockedUsers = room.blockedUsers || [];
   if (blockedUsers.includes(userId)) {
@@ -834,7 +829,6 @@ export const joinRoomByInviteCode = async (inviteCode) => {
   }
 
   // 이미 참여 중인지 확인
-  const isAlreadyParticipant = room.participants.some(p => p.userId === userId);
   if (isAlreadyParticipant) {
     return { success: true, roomId, message: '이미 참여 중인 방입니다' };
   }

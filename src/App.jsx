@@ -977,7 +977,8 @@ function App() {
                 widgets,
                 displayCount,
                 trashedItems: JSON.parse(localStorage.getItem('trashedItems_shared') || '[]'),
-                macroTexts: JSON.parse(localStorage.getItem('macroTexts') || '[]')
+                macroTexts: JSON.parse(localStorage.getItem('macroTexts') || '[]'),
+                memoFolders: JSON.parse(localStorage.getItem('memoFolders') || '[]')
             }
         };
 
@@ -1034,6 +1035,9 @@ function App() {
                     }
                     if (data.macroTexts) {
                         localStorage.setItem('macroTexts', JSON.stringify(data.macroTexts));
+                    }
+                    if (data.memoFolders) {
+                        localStorage.setItem('memoFolders', JSON.stringify(data.memoFolders));
                     }
                 } else if (Array.isArray(importedData)) {
                     // 구 형식 (메모만 있는 경우)
@@ -1643,6 +1647,7 @@ function App() {
                 widgets,
                 trashedItems: JSON.parse(localStorage.getItem('trashedItems_shared') || '[]'),
                 macroTexts: JSON.parse(localStorage.getItem('macroTexts') || '[]'),
+                memoFolders: JSON.parse(localStorage.getItem('memoFolders') || '[]'),
                 userEmail: profile.email,
             };
 
@@ -1761,6 +1766,7 @@ function App() {
                     displayCount,
                     widgets,
                     trashedItems: JSON.parse(localStorage.getItem('trashedItems_shared') || '[]'),
+                    memoFolders: JSON.parse(localStorage.getItem('memoFolders') || '[]'),
                     userEmail: profile.email,
                 };
 
@@ -1813,6 +1819,9 @@ function App() {
                 }
                 if (result.data.macroTexts) {
                     localStorage.setItem('macroTexts', JSON.stringify(result.data.macroTexts));
+                }
+                if (result.data.memoFolders) {
+                    localStorage.setItem('memoFolders', JSON.stringify(result.data.memoFolders));
                 }
 
                 addActivity('복원', 'Google Drive에서 복원 완료');

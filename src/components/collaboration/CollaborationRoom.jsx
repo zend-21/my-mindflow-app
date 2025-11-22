@@ -1,8 +1,8 @@
 // 협업방 - 채팅 + 슬라이딩 메모
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
-import { X, Send, ChevronUp, ChevronDown, Users, Lock, Edit3, Eye } from 'lucide-react';
-import { subscribeToRoom, updateRoomMemo, leaveRoom, setEditPermission, setAllEditPermission, lockRoom } from '../../services/collaborationRoomService';
+import { X, Send, ChevronUp, ChevronDown, Users, Lock, Edit3, Eye, Globe, LockKeyhole } from 'lucide-react';
+import { subscribeToRoom, updateRoomMemo, leaveRoom, setEditPermission, setAllEditPermission, lockRoom, toggleRoomPublicity } from '../../services/collaborationRoomService';
 import { subscribeToMessages, sendMessage, sendSystemMessage, sendEditNotification } from '../../services/chatService';
 
 const CollaborationRoom = ({ roomId, onClose, showToast }) => {
@@ -13,6 +13,7 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
   const [memoContent, setMemoContent] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
+  const [showPublicityConfirm, setShowPublicityConfirm] = useState(false);
 
   const messagesEndRef = useRef(null);
   const currentUserId = localStorage.getItem('firebaseUserId');
@@ -115,6 +116,22 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
     } catch (err) {
       console.error(err);
       showToast?.(err.message);
+    }
+  };
+
+  const handlePublicityClick = () => {
+    setShowPublicityConfirm(true);
+  };
+
+  const confirmTogglePublicity = async () => {
+    try {
+      await toggleRoomPublicity(roomId, !room.isPublic);
+      showToast?.(room.isPublic ? '비공개 방으로 변경' : '공개 방으로 변경');
+      setShowPublicityConfirm(false);
+    } catch (err) {
+      console.error(err);
+      showToast?.(err.message);
+      setShowPublicityConfirm(false);
     }
   };
 
@@ -236,15 +253,22 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
 
         {/* 참여자 패널 */}
         {showParticipants && (
-          <ParticipantsPanel>
-            <PanelHeader>
-              <PanelTitle>참여자 ({room.participants.length})</PanelTitle>
-              {isOwner && (
-                <PermissionToggle onClick={toggleAllEditPermission}>
-                  {room.permissions.allCanEdit ? '모두 편집 불가' : '모두 편집 가능'}
-                </PermissionToggle>
-              )}
-            </PanelHeader>
+          <>
+            <PanelOverlay onClick={() => setShowParticipants(false)} />
+            <ParticipantsPanel>
+              <PanelHeader>
+                <PanelTitle>참여자 ({room.participants.length})</PanelTitle>
+                <PanelHeaderRight>
+                  {isOwner && (
+                    <PermissionToggle onClick={toggleAllEditPermission}>
+                      {room.permissions.allCanEdit ? '모두 편집 불가' : '모두 편집 가능'}
+                    </PermissionToggle>
+                  )}
+                  <CloseButton onClick={() => setShowParticipants(false)}>
+                    <X size={18} />
+                  </CloseButton>
+                </PanelHeaderRight>
+              </PanelHeader>
 
             {room.participants.map(participant => (
               <ParticipantItem key={participant.userId}>
@@ -274,18 +298,49 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
               </ParticipantItem>
             ))}
 
-            {isOwner && (
-              <PanelFooter>
-                <LockButton onClick={toggleLock} $isLocked={room.isLocked}>
-                  <Lock size={16} />
-                  {room.isLocked ? '방 잠금 해제' : '방 잠그기'}
-                </LockButton>
-                <LeaveButton onClick={handleLeaveRoom}>
-                  방 나가기
-                </LeaveButton>
-              </PanelFooter>
-            )}
-          </ParticipantsPanel>
+            <PanelFooter>
+              {isOwner && (
+                <>
+                  <PublicityButton onClick={handlePublicityClick} $isPublic={room.isPublic}>
+                    {room.isPublic ? <Globe size={16} /> : <LockKeyhole size={16} />}
+                    {room.isPublic ? '공개 방' : '비공개 방'}
+                  </PublicityButton>
+                  <LockButton onClick={toggleLock} $isLocked={room.isLocked}>
+                    <Lock size={16} />
+                    {room.isLocked ? '방 잠금 해제' : '방 잠그기'}
+                  </LockButton>
+                </>
+              )}
+              <LeaveButton onClick={handleLeaveRoom}>
+                방 나가기
+              </LeaveButton>
+            </PanelFooter>
+            </ParticipantsPanel>
+          </>
+        )}
+
+        {/* 공개/비공개 전환 확인 모달 */}
+        {showPublicityConfirm && (
+          <ConfirmModalOverlay onClick={() => setShowPublicityConfirm(false)}>
+            <ConfirmModalBox onClick={(e) => e.stopPropagation()}>
+              <ConfirmModalTitle>공개 설정 변경</ConfirmModalTitle>
+              <ConfirmModalMessage>
+                이 방을 <strong>{room.isPublic ? '비공개' : '공개'}</strong> 방으로 변경하시겠습니까?
+                {'\n\n'}
+                {room.isPublic
+                  ? '비공개로 변경하면 방 코드를 가진 사람만 참여할 수 있습니다.'
+                  : '공개로 변경하면 모든 사용자가 방 코드로 참여할 수 있습니다.'}
+              </ConfirmModalMessage>
+              <ConfirmModalButtons>
+                <CancelButton onClick={() => setShowPublicityConfirm(false)}>
+                  취소
+                </CancelButton>
+                <ConfirmButton onClick={confirmTogglePublicity}>
+                  {room.isPublic ? '비공개로 변경' : '공개로 변경'}
+                </ConfirmButton>
+              </ConfirmModalButtons>
+            </ConfirmModalBox>
+          </ConfirmModalOverlay>
         )}
       </Container>
     </Overlay>
@@ -564,11 +619,20 @@ const SendButton = styled.button`
   &:hover { background: #4fa01f; }
 `;
 
+const PanelOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 99;
+`;
+
 const ParticipantsPanel = styled.div`
   position: absolute;
   top: 70px;
   right: 24px;
-  width: 280px;
+  width: 360px;
   background: rgba(0, 0, 0, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 12px;
@@ -588,6 +652,26 @@ const PanelTitle = styled.div`
   color: white;
   font-size: 14px;
   font-weight: 600;
+`;
+
+const PanelHeaderRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const CloseButton = styled.button`
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  &:hover { background: rgba(255, 255, 255, 0.2); }
 `;
 
 const PermissionToggle = styled.button`
@@ -651,9 +735,28 @@ const PermissionButton = styled.button`
 
 const PanelFooter = styled.div`
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   padding: 12px 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const PublicityButton = styled.button`
+  flex: 1;
+  min-width: 100px;
+  padding: 10px;
+  background: ${props => props.$isPublic ? 'rgba(74, 144, 226, 0.2)' : 'rgba(239, 83, 80, 0.2)'};
+  border: 1px solid ${props => props.$isPublic ? '#4a90e2' : '#ef5350'};
+  color: ${props => props.$isPublic ? '#4a90e2' : '#ef5350'};
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  &:hover { opacity: 0.8; }
 `;
 
 const LockButton = styled.button`
@@ -690,6 +793,84 @@ const LoadingText = styled.div`
   color: rgba(255, 255, 255, 0.6);
   text-align: center;
   padding: 40px;
+`;
+
+const ConfirmModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+`;
+
+const ConfirmModalBox = styled.div`
+  background: linear-gradient(135deg, #1a1d24 0%, #2d3139 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+`;
+
+const ConfirmModalTitle = styled.h3`
+  color: white;
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 16px 0;
+  text-align: center;
+`;
+
+const ConfirmModalMessage = styled.p`
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0 0 24px 0;
+  white-space: pre-line;
+  text-align: center;
+
+  strong {
+    color: white;
+    font-weight: 600;
+  }
+`;
+
+const ConfirmModalButtons = styled.div`
+  display: flex;
+  gap: 12px;
+`;
+
+const CancelButton = styled.button`
+  flex: 1;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  &:hover { background: rgba(255, 255, 255, 0.15); }
+`;
+
+const ConfirmButton = styled.button`
+  flex: 1;
+  padding: 12px;
+  background: #5ebe26;
+  border: none;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+  &:hover { background: #4fa01f; }
 `;
 
 export default CollaborationRoom;

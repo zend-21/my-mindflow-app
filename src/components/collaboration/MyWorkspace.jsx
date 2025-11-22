@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { getWorkspaceByUserId, changeWorkspaceCode } from '../../services/workspaceService';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { deleteRoom, closeRoom, reopenRoom, regenerateRoomInviteCode } from '../../services/collaborationRoomService';
 
@@ -546,7 +546,7 @@ const LoadingState = styled.div`
   font-size: 16px;
 `;
 
-const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder }) => {
+const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) => {
   const [workspace, setWorkspace] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -562,6 +562,26 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder }) => {
 
   useEffect(() => {
     loadWorkspaceAndRooms();
+
+    // 실시간 방 목록 구독 (참여자 수 실시간 업데이트)
+    const userId = localStorage.getItem('firebaseUserId');
+    if (!userId) return;
+
+    const q = query(
+      collection(db, 'collaborationRooms'),
+      where('ownerId', '==', userId),
+      orderBy('updatedAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const roomsList = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setRooms(roomsList);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // ESC 키로 닫기
@@ -621,11 +641,7 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder }) => {
   const handleCopyCode = () => {
     if (workspace?.workspaceCode) {
       navigator.clipboard.writeText(workspace.workspaceCode);
-      setAlertModal({
-        title: '복사 완료',
-        message: '워크스페이스 코드가 클립보드에 복사되었습니다.',
-        variant: 'success'
-      });
+      showToast?.('WS 코드가 복사되었습니다');
     }
   };
 
