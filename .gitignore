@@ -76,3 +76,6 @@ ENV/
 env/
 .venv
 nul
+
+# Claude Code 설정 파일 (개인 작업 가이드라인)
+.claude/

@@ -670,7 +670,7 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
                 memo.id,
                 settings.title, // 사용자가 입력한 제목
                 editedContent, // 현재 편집 중인 내용
-                settings.isPublic, // 공개 여부
+                settings.roomType, // 방 타입: 'open' (개방형) | 'restricted' (제한형)
                 settings.allowEdit // 모두 편집 가능 여부
             );
 

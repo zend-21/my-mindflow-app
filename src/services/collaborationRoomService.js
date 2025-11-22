@@ -15,23 +15,38 @@ import { getWorkspaceByUserId, updateWorkspaceStats } from './workspaceService';
 
 /**
  * 독립적인 방 초대 코드 생성 (워크스페이스 코드와 분리)
- * - 공개방: OR-XXXXXX (Open Room)
- * - 비공개방: SR-XXXXXX (Secret Room)
- * - 6자리 = 36^6 = 21억 개 가능
+ * - 개방형: PU-XXXX-XX-XXXXXX (Public/Open - 초대 코드를 아는 누구나 참여 가능)
+ * - 제한형: PR-XXXX-XX-XXXXXX (Private/Restricted - 지정된 사람만 참여 가능)
+ * - 12자리 = 36^12 = 약 4.7경 개 가능 (무차별 대입 공격 방지)
  * - 워크스페이스 코드 노출 없음 (보안)
- * @param {boolean} isPublic - 공개방 여부
+ * @param {string} roomType - 'open' | 'restricted'
  * @returns {string} 초대 코드
  */
-const generateRoomInviteCode = (isPublic) => {
-  const roomType = isPublic ? 'OR' : 'SR'; // Open Room / Secret Room
+const generateRoomInviteCode = (roomType) => {
+  const prefix = roomType === 'open' ? 'PU' : 'PR'; // Public(개방형) / Private(제한형)
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let code = roomType + '-';
 
+  // PU-XXXX-XX-XXXXXX 형식 생성
+  let code = prefix + '-';
+
+  // 첫 번째 블록: 4자리
+  for (let i = 0; i < 4; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  code += '-';
+
+  // 두 번째 블록: 2자리
+  for (let i = 0; i < 2; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  code += '-';
+
+  // 세 번째 블록: 6자리
   for (let i = 0; i < 6; i++) {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
 
-  return code; // 예: OR-A3B7X9, SR-K2M8P1
+  return code; // 예: PU-A3B7-X9-K2M8P1, PR-F5H2-N4-Q9W7E3
 };
 
 /**
@@ -53,17 +68,17 @@ const isRoomInviteCodeUnique = async (code) => {
 
 /**
  * 고유한 방 초대 코드 생성 (중복 체크 포함)
- * @param {boolean} isPublic - 공개방 여부
+ * @param {string} roomType - 'open' | 'restricted'
  * @returns {Promise<string>} 고유한 초대 코드
  */
-const generateUniqueRoomInviteCode = async (isPublic) => {
+const generateUniqueRoomInviteCode = async (roomType) => {
   let code;
   let isUnique = false;
   let attempts = 0;
   const maxAttempts = 10;
 
   while (!isUnique && attempts < maxAttempts) {
-    code = generateRoomInviteCode(isPublic); // 독립적인 코드 생성
+    code = generateRoomInviteCode(roomType); // 독립적인 코드 생성
     isUnique = await isRoomInviteCodeUnique(code);
     attempts++;
   }
@@ -80,11 +95,11 @@ const generateUniqueRoomInviteCode = async (isPublic) => {
  * @param {string} memoId - 공유할 메모 ID
  * @param {string} memoTitle - 메모 제목
  * @param {string} memoContent - 메모 내용
- * @param {boolean} isPublic - 공개 방 여부
+ * @param {string} roomType - 'open' (개방형: 초대 코드로 누구나 참여) | 'restricted' (제한형: 지정된 사람만 참여)
  * @param {boolean} allCanEdit - 모두 편집 가능 여부
  * @returns {string} roomId
  */
-export const createCollaborationRoom = async (memoId, memoTitle, memoContent, isPublic = false, allCanEdit = false) => {
+export const createCollaborationRoom = async (memoId, memoTitle, memoContent, roomType = 'restricted', allCanEdit = false) => {
   const userId = localStorage.getItem('firebaseUserId');
   const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
 
@@ -130,8 +145,8 @@ export const createCollaborationRoom = async (memoId, memoTitle, memoContent, is
     // 기본 워크스페이스 ID 사용
   }
 
-  // 모든 방에 초대 코드 생성 (공개방: OR-XXXXXX, 비공개방: SR-XXXXXX)
-  const inviteCode = await generateUniqueRoomInviteCode(isPublic);
+  // 모든 방에 초대 코드 생성 (개방형: PU-XXXX-XX-XXXXXX, 제한형: PR-XXXX-XX-XXXXXX)
+  const inviteCode = await generateUniqueRoomInviteCode(roomType);
 
   const roomData = {
     // 방 기본 정보
@@ -164,10 +179,16 @@ export const createCollaborationRoom = async (memoId, memoTitle, memoContent, is
     // 방 상태
     status: 'active', // 'active' | 'archived' | 'locked'
     isLocked: false,
-    isPublic: isPublic, // 공개 방 여부 (설정값 반영)
+    roomType: roomType, // 'open' (개방형: 초대 코드로 누구나) | 'restricted' (제한형: 지정된 사람만)
+
+    // 하위 호환성: 기존 isPublic 필드 유지 (추후 제거 예정)
+    isPublic: roomType === 'open',
 
     // 초대 코드 (모든 방)
-    inviteCode: inviteCode, // 'OR-XXXXXX' (공개방) 또는 'SR-XXXXXX' (비공개방)
+    inviteCode: inviteCode, // 'PU-XXXX-XX-XXXXXX' (개방형) 또는 'PR-XXXX-XX-XXXXXX' (제한형)
+
+    // 제한형 방의 허용된 사용자 목록
+    allowedUsers: roomType === 'restricted' ? [userId] : [], // 제한형: 방장은 기본 포함, 개방형: 빈 배열
 
     // 차단된 사용자 목록
     blockedUsers: [], // 방 접근이 차단된 사용자 ID 배열
@@ -572,9 +593,11 @@ export const lockRoom = async (roomId, isLocked) => {
 };
 
 /**
- * 방 공개/비공개 설정 변경 (방장만 가능)
+ * 방 개방형/제한형 설정 변경 (방장만 가능)
+ * @param {string} roomId - 방 ID
+ * @param {string} newRoomType - 'open' (개방형) | 'restricted' (제한형)
  */
-export const toggleRoomPublicity = async (roomId, isPublic) => {
+export const toggleRoomType = async (roomId, newRoomType) => {
   const userId = localStorage.getItem('firebaseUserId');
   if (!userId) throw new Error('로그인이 필요합니다');
 
@@ -582,14 +605,37 @@ export const toggleRoomPublicity = async (roomId, isPublic) => {
   const roomDoc = await getDoc(roomRef);
 
   if (!roomDoc.exists()) throw new Error('방을 찾을 수 없습니다');
-  if (roomDoc.data().ownerId !== userId) throw new Error('방장만 공개 설정을 변경할 수 있습니다');
+
+  const room = roomDoc.data();
+  if (room.ownerId !== userId) throw new Error('방장만 방 타입을 변경할 수 있습니다');
+
+  // 제한형으로 변경 시, allowedUsers에 현재 참여자 모두 추가
+  let allowedUsers = room.allowedUsers || [];
+  if (newRoomType === 'restricted') {
+    const participantIds = room.participants.map(p => p.userId);
+    allowedUsers = [...new Set([...allowedUsers, ...participantIds])]; // 중복 제거
+  } else {
+    // 개방형으로 변경 시, allowedUsers 초기화
+    allowedUsers = [];
+  }
 
   await updateDoc(roomRef, {
-    isPublic,
+    roomType: newRoomType,
+    isPublic: newRoomType === 'open', // 하위 호환성
+    allowedUsers,
     updatedAt: new Date().toISOString()
   });
 
   return true;
+};
+
+/**
+ * 하위 호환성: 기존 toggleRoomPublicity를 toggleRoomType으로 리디렉션
+ * @deprecated Use toggleRoomType instead
+ */
+export const toggleRoomPublicity = async (roomId, isPublic) => {
+  const newRoomType = isPublic ? 'open' : 'restricted';
+  return toggleRoomType(roomId, newRoomType);
 };
 
 /**
@@ -655,8 +701,11 @@ export const regenerateRoomInviteCode = async (roomId) => {
     throw new Error('방장만 초대 코드를 재생성할 수 있습니다');
   }
 
-  // 새로운 초대 코드 생성 (공개방: OR-XXXXXX, 비공개방: SR-XXXXXX)
-  const newInviteCode = await generateUniqueRoomInviteCode(room.isPublic);
+  // roomType 우선 사용, 없으면 isPublic으로 판단 (하위 호환성)
+  const roomType = room.roomType || (room.isPublic ? 'open' : 'restricted');
+
+  // 새로운 초대 코드 생성 (개방형: PU-XXXX-XX-XXXXXX, 제한형: PR-XXXX-XX-XXXXXX)
+  const newInviteCode = await generateUniqueRoomInviteCode(roomType);
 
   // 초대 코드 업데이트
   await updateDoc(roomRef, {
@@ -828,6 +877,19 @@ export const joinRoomByInviteCode = async (inviteCode) => {
     throw new Error('이 방에 접근할 수 없습니다');
   }
 
+  // roomType 우선 사용, 없으면 isPublic으로 판단 (하위 호환성)
+  const roomType = room.roomType || (room.isPublic ? 'open' : 'restricted');
+
+  // 제한형 방인 경우, allowedUsers 확인
+  if (roomType === 'restricted') {
+    const allowedUsers = room.allowedUsers || [];
+    const isOwner = room.ownerId === userId;
+
+    if (!isOwner && !isAlreadyParticipant && !allowedUsers.includes(userId)) {
+      throw new Error('이 방은 제한형 방으로, 초대된 사용자만 참여할 수 있습니다');
+    }
+  }
+
   // 이미 참여 중인지 확인
   if (isAlreadyParticipant) {
     return { success: true, roomId, message: '이미 참여 중인 방입니다' };
@@ -856,7 +918,7 @@ export const joinRoomByInviteCode = async (inviteCode) => {
  * 워크스페이스의 모든 방 초대 코드 재생성 (이사 효과)
  * - 워크스페이스 코드 변경 시 호출
  * - 모든 방의 초대 코드를 새로 생성하여 기존 코드 무효화
- * - 공개방, 비공개방 모두 재생성
+ * - 개방형, 제한형 모두 재생성
  * @param {string} workspaceId - 워크스페이스 ID
  * @returns {Promise<{success: boolean, regeneratedCount: number}>}
  */
@@ -883,7 +945,10 @@ export const regenerateAllRoomCodesInWorkspace = async (workspaceId) => {
     // 각 방의 초대 코드 재생성
     for (const roomDoc of snapshot.docs) {
       const room = roomDoc.data();
-      const newInviteCode = await generateUniqueRoomInviteCode(room.isPublic);
+
+      // roomType 우선 사용, 없으면 isPublic으로 판단 (하위 호환성)
+      const roomType = room.roomType || (room.isPublic ? 'open' : 'restricted');
+      const newInviteCode = await generateUniqueRoomInviteCode(roomType);
 
       await updateDoc(doc(db, 'collaborationRooms', roomDoc.id), {
         inviteCode: newInviteCode,

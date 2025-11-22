@@ -125,8 +125,12 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
 
   const confirmTogglePublicity = async () => {
     try {
-      await toggleRoomPublicity(roomId, !room.isPublic);
-      showToast?.(room.isPublic ? '비공개 방으로 변경' : '공개 방으로 변경');
+      // roomType 우선 사용, 없으면 isPublic으로 판단 (하위 호환성)
+      const currentRoomType = room.roomType || (room.isPublic ? 'open' : 'restricted');
+      const newRoomType = currentRoomType === 'open' ? 'restricted' : 'open';
+
+      await toggleRoomPublicity(roomId, newRoomType === 'open');
+      showToast?.(newRoomType === 'restricted' ? '제한형 방으로 변경' : '개방형 방으로 변경');
       setShowPublicityConfirm(false);
     } catch (err) {
       console.error(err);
@@ -301,9 +305,9 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
             <PanelFooter>
               {isOwner && (
                 <>
-                  <PublicityButton onClick={handlePublicityClick} $isPublic={room.isPublic}>
-                    {room.isPublic ? <Globe size={16} /> : <LockKeyhole size={16} />}
-                    {room.isPublic ? '공개 방' : '비공개 방'}
+                  <PublicityButton onClick={handlePublicityClick} $isOpen={(room.roomType || (room.isPublic ? 'open' : 'restricted')) === 'open'}>
+                    {(room.roomType || (room.isPublic ? 'open' : 'restricted')) === 'open' ? <Globe size={16} /> : <LockKeyhole size={16} />}
+                    {(room.roomType || (room.isPublic ? 'open' : 'restricted')) === 'open' ? '개방형' : '제한형'}
                   </PublicityButton>
                   <LockButton onClick={toggleLock} $isLocked={room.isLocked}>
                     <Lock size={16} />
@@ -319,29 +323,34 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
           </>
         )}
 
-        {/* 공개/비공개 전환 확인 모달 */}
-        {showPublicityConfirm && (
-          <ConfirmModalOverlay onClick={() => setShowPublicityConfirm(false)}>
-            <ConfirmModalBox onClick={(e) => e.stopPropagation()}>
-              <ConfirmModalTitle>공개 설정 변경</ConfirmModalTitle>
-              <ConfirmModalMessage>
-                이 방을 <strong>{room.isPublic ? '비공개' : '공개'}</strong> 방으로 변경하시겠습니까?
-                {'\n\n'}
-                {room.isPublic
-                  ? '비공개로 변경하면 방 코드를 가진 사람만 참여할 수 있습니다.'
-                  : '공개로 변경하면 모든 사용자가 방 코드로 참여할 수 있습니다.'}
-              </ConfirmModalMessage>
-              <ConfirmModalButtons>
-                <CancelButton onClick={() => setShowPublicityConfirm(false)}>
-                  취소
-                </CancelButton>
-                <ConfirmButton onClick={confirmTogglePublicity}>
-                  {room.isPublic ? '비공개로 변경' : '공개로 변경'}
-                </ConfirmButton>
-              </ConfirmModalButtons>
-            </ConfirmModalBox>
-          </ConfirmModalOverlay>
-        )}
+        {/* 개방형/제한형 전환 확인 모달 */}
+        {showPublicityConfirm && (() => {
+          const currentRoomType = room.roomType || (room.isPublic ? 'open' : 'restricted');
+          const isCurrentlyOpen = currentRoomType === 'open';
+
+          return (
+            <ConfirmModalOverlay onClick={() => setShowPublicityConfirm(false)}>
+              <ConfirmModalBox onClick={(e) => e.stopPropagation()}>
+                <ConfirmModalTitle>방 타입 변경</ConfirmModalTitle>
+                <ConfirmModalMessage>
+                  이 방을 <strong>{isCurrentlyOpen ? '제한형' : '개방형'}</strong> 방으로 변경하시겠습니까?
+                  {'\n\n'}
+                  {isCurrentlyOpen
+                    ? '제한형으로 변경하면 방장이 지정한 사용자만 참여할 수 있습니다.'
+                    : '개방형으로 변경하면 초대 코드를 아는 누구나 참여할 수 있습니다.'}
+                </ConfirmModalMessage>
+                <ConfirmModalButtons>
+                  <CancelButton onClick={() => setShowPublicityConfirm(false)}>
+                    취소
+                  </CancelButton>
+                  <ConfirmButton onClick={confirmTogglePublicity}>
+                    {isCurrentlyOpen ? '제한형으로 변경' : '개방형으로 변경'}
+                  </ConfirmButton>
+                </ConfirmModalButtons>
+              </ConfirmModalBox>
+            </ConfirmModalOverlay>
+          );
+        })()}
       </Container>
     </Overlay>
   );
@@ -745,9 +754,9 @@ const PublicityButton = styled.button`
   flex: 1;
   min-width: 100px;
   padding: 10px;
-  background: ${props => props.$isPublic ? 'rgba(74, 144, 226, 0.2)' : 'rgba(239, 83, 80, 0.2)'};
-  border: 1px solid ${props => props.$isPublic ? '#4a90e2' : '#ef5350'};
-  color: ${props => props.$isPublic ? '#4a90e2' : '#ef5350'};
+  background: ${props => props.$isOpen ? 'rgba(74, 144, 226, 0.2)' : 'rgba(239, 83, 80, 0.2)'};
+  border: 1px solid ${props => props.$isOpen ? '#4a90e2' : '#ef5350'};
+  color: ${props => props.$isOpen ? '#4a90e2' : '#ef5350'};
   font-size: 12px;
   font-weight: 600;
   border-radius: 8px;

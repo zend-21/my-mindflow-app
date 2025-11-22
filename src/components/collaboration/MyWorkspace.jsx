@@ -398,17 +398,17 @@ const RoomTitle = styled.h3`
 const RoomBadge = styled.span`
   background: ${props => {
     if (props.$status === 'archived') return 'rgba(231, 76, 60, 0.2)';
-    if (props.$isPublic) return 'rgba(46, 204, 113, 0.2)';
+    if (props.$roomType === 'open') return 'rgba(46, 204, 113, 0.2)';
     return 'rgba(155, 89, 182, 0.2)';
   }};
   color: ${props => {
     if (props.$status === 'archived') return '#e74c3c';
-    if (props.$isPublic) return '#2ecc71';
+    if (props.$roomType === 'open') return '#2ecc71';
     return '#9b59b6';
   }};
   border: 1px solid ${props => {
     if (props.$status === 'archived') return 'rgba(231, 76, 60, 0.4)';
-    if (props.$isPublic) return 'rgba(46, 204, 113, 0.4)';
+    if (props.$roomType === 'open') return 'rgba(46, 204, 113, 0.4)';
     return 'rgba(155, 89, 182, 0.4)';
   }};
   padding: 4px 8px;
@@ -550,7 +550,7 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
   const [workspace, setWorkspace] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('all'); // all, public, private, archived
+  const [activeTab, setActiveTab] = useState('all'); // all, open, restricted, archived
 
   // 모달 상태
   const [confirmModal, setConfirmModal] = useState(null); // { title, message, onConfirm, variant }
@@ -700,11 +700,11 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
     }
   };
 
-  const handleRegenerateInviteCode = (roomId, roomTitle, isPublic) => {
-    const roomType = isPublic ? '공개방' : '비공개방';
+  const handleRegenerateInviteCode = (roomId, roomTitle, roomType) => {
+    const roomTypeLabel = roomType === 'open' ? '개방형' : '제한형';
     setConfirmModal({
       title: '방 코드 재생성',
-      message: `"${roomTitle}" ${roomType}의 코드를 재생성하시겠습니까?\n\n⚠️ 이전 코드는 더 이상 사용할 수 없습니다.\n✅ 기존 참여자는 유지되며, 새로운 코드로만 새 멤버가 입장할 수 있습니다.`,
+      message: `"${roomTitle}" ${roomTypeLabel}의 코드를 재생성하시겠습니까?\n\n⚠️ 이전 코드는 더 이상 사용할 수 없습니다.\n✅ 기존 참여자는 유지되며, 새로운 코드로만 새 멤버가 입장할 수 있습니다.`,
       variant: 'confirm',
       onConfirm: async () => {
         try {
@@ -860,8 +860,8 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
 
   const filteredRooms = rooms.filter(room => {
     if (activeTab === 'all') return true;
-    if (activeTab === 'public') return room.isPublic === true && room.status === 'active';
-    if (activeTab === 'private') return room.isPublic === false && room.status === 'active';
+    if (activeTab === 'open') return room.roomType === 'open' && room.status === 'active';
+    if (activeTab === 'restricted') return room.roomType === 'restricted' && room.status === 'active';
     if (activeTab === 'archived') return room.status === 'archived';
     return true;
   });
@@ -901,11 +901,11 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                 <Tab $active={activeTab === 'all'} onClick={() => setActiveTab('all')}>
                   전체 <span>{rooms.length}</span>
                 </Tab>
-                <Tab $active={activeTab === 'public'} onClick={() => setActiveTab('public')}>
-                  공개방 <span>{rooms.filter(r => r.isPublic === true && r.status === 'active').length}</span>
+                <Tab $active={activeTab === 'open'} onClick={() => setActiveTab('open')}>
+                  개방형 <span>{rooms.filter(r => r.roomType === 'open' && r.status === 'active').length}</span>
                 </Tab>
-                <Tab $active={activeTab === 'private'} onClick={() => setActiveTab('private')}>
-                  비공개방 <span>{rooms.filter(r => r.isPublic === false && r.status === 'active').length}</span>
+                <Tab $active={activeTab === 'restricted'} onClick={() => setActiveTab('restricted')}>
+                  제한형 <span>{rooms.filter(r => r.roomType === 'restricted' && r.status === 'active').length}</span>
                 </Tab>
                 <Tab $active={activeTab === 'archived'} onClick={() => setActiveTab('archived')}>
                   폐쇄방 <span>{rooms.filter(r => r.status === 'archived').length}</span>
@@ -928,12 +928,12 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                         <RoomHeader>
                           <RoomTitle>{room.memoTitle}</RoomTitle>
                           <RoomBadge
-                            $isPublic={room.isPublic}
+                            $roomType={room.roomType}
                             $status={room.status}
                             onTouchStart={(e) => e.stopPropagation()}
                             onMouseDown={(e) => e.stopPropagation()}
                           >
-                            {room.status === 'archived' ? '폐쇄' : room.isPublic ? '공개' : '비공개'}
+                            {room.status === 'archived' ? '폐쇄' : room.roomType === 'open' ? '개방형' : '제한형'}
                           </RoomBadge>
                         </RoomHeader>
 
@@ -948,7 +948,7 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                         <InviteCodeSection>
                           <InviteCodeInfo>
                             <InviteCodeLabel>
-                              {room.isPublic ? '방 코드 (공개)' : '방 코드 (비공개)'}
+                              {room.roomType === 'open' ? '방 코드 (개방형)' : '방 코드 (제한형)'}
                             </InviteCodeLabel>
                             <InviteCodeValue>{room.inviteCode}</InviteCodeValue>
                           </InviteCodeInfo>
@@ -961,7 +961,7 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                             </SmallButton>
                             <SmallButton
                               $variant="regenerate"
-                              onClick={() => handleRegenerateInviteCode(room.id, room.memoTitle, room.isPublic)}
+                              onClick={() => handleRegenerateInviteCode(room.id, room.memoTitle, room.roomType)}
                             >
                               재생성
                             </SmallButton>
@@ -1008,8 +1008,8 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
               ) : (
                 <EmptyState>
                   {activeTab === 'all' && '아직 만든 방이 없습니다.'}
-                  {activeTab === 'public' && '공개 방이 없습니다.'}
-                  {activeTab === 'private' && '비공개 방이 없습니다.'}
+                  {activeTab === 'open' && '개방형 방이 없습니다.'}
+                  {activeTab === 'restricted' && '제한형 방이 없습니다.'}
                   {activeTab === 'archived' && '폐쇄된 방이 없습니다.'}
                 </EmptyState>
               )}

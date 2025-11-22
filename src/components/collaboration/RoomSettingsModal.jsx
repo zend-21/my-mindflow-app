@@ -261,7 +261,7 @@ const RoomSettingsModal = ({ isOpen, onClose, onConfirm, defaultTitle = '' }) =>
   const firstLine = defaultTitle.split('\n')[0].trim().substring(0, 20);
 
   const [roomTitle, setRoomTitle] = useState(firstLine); // 첫 줄로 자동 입력
-  const [isPublic, setIsPublic] = useState(false);
+  const [roomType, setRoomType] = useState('restricted'); // 'open' | 'restricted'
 
   // 모달 열릴 때마다 첫 줄로 초기화
   React.useEffect(() => {
@@ -280,7 +280,7 @@ const RoomSettingsModal = ({ isOpen, onClose, onConfirm, defaultTitle = '' }) =>
 
     onConfirm({
       title: roomTitle.trim(),
-      isPublic,
+      roomType,
       allowEdit: false // 기본값: 방장만 편집 가능
     });
   };
@@ -332,22 +332,22 @@ const RoomSettingsModal = ({ isOpen, onClose, onConfirm, defaultTitle = '' }) =>
           </Section>
 
           <Section>
-            <Label>공개 설정</Label>
+            <Label>방 타입</Label>
 
             <ToggleOption>
               <ToggleLabel>
-                <ToggleTitle>{isPublic ? '공개' : '비공개'}</ToggleTitle>
+                <ToggleTitle>{roomType === 'open' ? '개방형' : '제한형'}</ToggleTitle>
                 <ToggleDescription>
-                  {isPublic
-                    ? '내 WS 코드를 아는 사용자에게 표시됩니다'
-                    : '초대 코드를 가진 사람만 입장할 수 있습니다'}
+                  {roomType === 'open'
+                    ? '초대 코드를 아는 누구나 참여할 수 있습니다'
+                    : '방장이 지정한 사용자만 참여할 수 있습니다'}
                 </ToggleDescription>
               </ToggleLabel>
               <ToggleSwitch>
                 <ToggleInput
                   type="checkbox"
-                  checked={isPublic}
-                  onChange={(e) => setIsPublic(e.target.checked)}
+                  checked={roomType === 'open'}
+                  onChange={(e) => setRoomType(e.target.checked ? 'open' : 'restricted')}
                 />
                 <ToggleSlider />
               </ToggleSwitch>

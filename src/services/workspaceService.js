@@ -107,6 +107,9 @@ export const createWorkspace = async (userId, userName, userEmail) => {
       },
       stats: {
         totalRooms: 0,
+        openRooms: 0, // roomType === 'open'
+        restrictedRooms: 0, // roomType === 'restricted'
+        // Deprecated - 하위 호환성 유지
         publicRooms: 0,
         privateRooms: 0,
       }
@@ -278,14 +281,14 @@ export const updateWorkspaceSettings = async (workspaceId, userId, settings) => 
 };
 
 /**
- * 워크스페이스의 공개 방 목록 가져오기
+ * 워크스페이스의 개방형 방 목록 가져오기
  */
 export const getPublicRoomsInWorkspace = async (workspaceId) => {
   try {
     const q = query(
       collection(db, 'collaborationRooms'),
       where('workspaceId', '==', workspaceId),
-      where('isPublic', '==', true),
+      where('roomType', '==', 'open'),
       where('status', '==', 'active'),
       orderBy('updatedAt', 'desc')
     );
@@ -298,7 +301,7 @@ export const getPublicRoomsInWorkspace = async (workspaceId) => {
 
     return { success: true, rooms };
   } catch (error) {
-    console.error('공개 방 목록 조회 오류:', error);
+    console.error('개방형 방 목록 조회 오류:', error);
     throw error;
   }
 };
@@ -319,15 +322,18 @@ export const updateWorkspaceStats = async (workspaceId) => {
     const rooms = snapshot.docs.map(doc => doc.data());
 
     const totalRooms = rooms.length;
-    const publicRooms = rooms.filter(r => r.isPublic === true).length;
-    const privateRooms = rooms.filter(r => r.isPublic === false).length;
+    const openRooms = rooms.filter(r => r.roomType === 'open').length;
+    const restrictedRooms = rooms.filter(r => r.roomType === 'restricted').length;
 
     // 워크스페이스 통계 업데이트
     const workspaceRef = doc(db, 'workspaces', workspaceId);
     await updateDoc(workspaceRef, {
       'stats.totalRooms': totalRooms,
-      'stats.publicRooms': publicRooms,
-      'stats.privateRooms': privateRooms,
+      'stats.openRooms': openRooms,
+      'stats.restrictedRooms': restrictedRooms,
+      // Deprecated - 하위 호환성 유지
+      'stats.publicRooms': openRooms,
+      'stats.privateRooms': restrictedRooms,
       updatedAt: Timestamp.now(),
     });
 
