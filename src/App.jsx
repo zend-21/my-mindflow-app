@@ -1617,7 +1617,13 @@ function App() {
 
             // GAPI에 토큰 설정
             if (isGapiReady) {
+                console.log('🔑 로그인 성공 - GAPI에 토큰 설정');
                 setAccessToken(accessToken);
+                // 토큰 설정 후 짧은 대기 시간 (GAPI 내부 처리 대기)
+                await new Promise(resolve => setTimeout(resolve, 200));
+                console.log('✅ GAPI 토큰 설정 완료');
+            } else {
+                console.warn('⚠️ GAPI가 아직 준비되지 않음 - 토큰은 저장됨');
             }
 
             setIsLoginModalOpen(false);
@@ -1661,7 +1667,7 @@ function App() {
 
     const performSync = async (isManual = false) => {
         console.log('🔧 performSync 시작 - isManual:', isManual);
-        
+
         if (!profile || !accessToken) {
             console.log('❌ 로그인 안 됨');
             if (isManual) {
@@ -1682,6 +1688,11 @@ function App() {
 
         try {
             console.log('✅ 동기화 조건 충족 - 시작');
+
+            // 🔑 동기화 전에 GAPI에 토큰 재설정 (타이밍 이슈 방지)
+            console.log('🔑 GAPI에 토큰 재설정 중...');
+            setAccessToken(accessToken);
+            await new Promise(resolve => setTimeout(resolve, 100)); // GAPI 토큰 설정 대기
             
             if (isManual) {
                 console.log('🎯 수동 동기화 - 스피너 표시');

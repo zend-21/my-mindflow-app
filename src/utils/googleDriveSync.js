@@ -65,6 +65,9 @@ export const setAccessToken = (token) => {
   if (window.gapi && window.gapi.client) {
     window.gapi.client.setToken({ access_token: token });
     console.log('✅ Access Token 설정 완료');
+    console.log('🔍 설정된 토큰 확인:', window.gapi.client.getToken()?.access_token?.substring(0, 20) + '...');
+  } else {
+    console.error('❌ GAPI 클라이언트가 없어서 토큰 설정 실패');
   }
 };
 
@@ -126,6 +129,15 @@ export const syncToGoogleDrive = async (data) => {
   try {
     if (!window.gapi || !window.gapi.client) {
       throw new Error('GAPI 클라이언트가 초기화되지 않았습니다.');
+    }
+
+    // 🔍 토큰 확인
+    const currentToken = window.gapi.client.getToken();
+    console.log('🔍 동기화 시작 - 현재 GAPI 토큰:', currentToken?.access_token?.substring(0, 20) + '...');
+
+    if (!currentToken || !currentToken.access_token) {
+      console.error('❌ GAPI에 토큰이 설정되어 있지 않음!');
+      throw new Error('토큰이 설정되지 않았습니다.');
     }
 
     const folderId = await getOrCreateFolder();
