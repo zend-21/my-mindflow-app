@@ -50,6 +50,7 @@ import ReviewPage from './pages/ReviewPage.jsx';
 import AppRouter from './components/AppRouter.jsx';
 import './utils/createWorkspaceManually'; // 워크스페이스 수동 생성 유틸리티
 import { createWorkspace, checkWorkspaceExists } from './services/workspaceService'; // 자동 워크스페이스 생성
+import CollaborationRoom from './components/collaboration/CollaborationRoom.jsx'; // 협업방 컴포넌트
 
 // ★★★ 토스트 메시지 스타일 ★★★
 const fadeIn = keyframes`
@@ -358,6 +359,10 @@ function App() {
     const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
     const [restoreType, setRestoreType] = useState('phone'); // 'phone' or 'google'
     const [pendingRestoreFile, setPendingRestoreFile] = useState(null);
+
+    // 협업방 상태
+    const [isCollaborationRoomOpen, setIsCollaborationRoomOpen] = useState(false);
+    const [selectedRoomId, setSelectedRoomId] = useState(null);
 
     const [isDragging, setIsDragging] = useState(false);
     const pullStartTime = useRef(0);
@@ -1249,6 +1254,19 @@ function App() {
             })
         );
         quietSync(); // 변경사항 동기화
+    };
+
+    // 협업방 선택 핸들러 (MyWorkspace, RoomBrowser에서 호출)
+    const handleRoomSelect = (room) => {
+        console.log('방 입장:', room);
+        setSelectedRoomId(room.id);
+        setIsCollaborationRoomOpen(true);
+    };
+
+    // 협업방 닫기 핸들러
+    const handleCloseCollaborationRoom = () => {
+        setIsCollaborationRoomOpen(false);
+        setSelectedRoomId(null);
     };
 
     const requestDeleteSelectedMemos = () => {
@@ -2255,6 +2273,7 @@ function App() {
                             setActiveTab('secret');
                         }}
                         onRestoreMemoFolder={handleRestoreMemoFolder}
+                        onRoomSelect={handleRoomSelect}
                     />
                 </>
             </Screen>
@@ -2390,6 +2409,14 @@ function App() {
             {/* ⏱️ 타이머 모달 */}
             {isTimerOpen && (
                 <Timer onClose={() => setIsTimerOpen(false)} />
+            )}
+
+            {/* 🏠 협업방 모달 */}
+            {isCollaborationRoomOpen && selectedRoomId && (
+                <CollaborationRoom
+                    roomId={selectedRoomId}
+                    onClose={handleCloseCollaborationRoom}
+                />
             )}
 
             {/* 👤 프로필 페이지 모달 */}

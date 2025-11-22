@@ -322,7 +322,8 @@ const SideMenu = ({
     onOpenTimer,  // ⏱️ 타이머 기능 추가
     onOpenTrash,  // 🗑️ 휴지통 기능 추가
     onRestoreMemoFolder,  // 📁 메모 폴더 복원 기능
-    showToast  // 토스트 메시지 표시 함수
+    showToast,  // 토스트 메시지 표시 함수
+    onRoomSelect  // 🏠 방 선택 핸들러
 }) => {
     const fileInputRef = useRef(null);
     const [imageError, setImageError] = useState(false); // ✅ 추가: 이미지 로드 오류 상태
@@ -550,9 +551,10 @@ const SideMenu = ({
             {isMyWorkspaceOpen && (
                 <MyWorkspace
                     onRoomSelect={(room) => {
-                        // TODO: 방 입장 로직 연결
-                        console.log('선택된 방:', room);
                         setIsMyWorkspaceOpen(false);
+                        if (onRoomSelect) {
+                            onRoomSelect(room);
+                        }
                     }}
                     onClose={() => setIsMyWorkspaceOpen(false)}
                     onRestoreMemoFolder={onRestoreMemoFolder}
@@ -564,9 +566,10 @@ const SideMenu = ({
                 isOpen={isRoomBrowserOpen}
                 onClose={() => setIsRoomBrowserOpen(false)}
                 onRoomSelect={(room) => {
-                    // TODO: 방 입장 로직 연결
-                    console.log('선택된 방:', room);
                     setIsRoomBrowserOpen(false);
+                    if (onRoomSelect) {
+                        onRoomSelect(room);
+                    }
                 }}
             />
         </>
