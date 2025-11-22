@@ -329,6 +329,22 @@ const ShareButton = styled.button`
     }
 `;
 
+// 폴더명 뱃지 스타일
+const FolderBadge = styled.div`
+    background: rgba(156, 39, 176, 0.15);
+    border: 1px solid rgba(156, 39, 176, 0.3);
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: #ba68c8;
+    font-size: 13px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+`;
+
 // 공유됨 뱃지 스타일
 const SharedBadge = styled.div`
     background: rgba(74, 144, 226, 0.2);
@@ -465,7 +481,7 @@ const FolderSelect = styled.select`
 /* --- 스타일 추가 완료 --- */
 
 
-const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) => {
+const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, onUpdateMemoFolder }) => {
     const [editedContent, setEditedContent] = useState('');
     const [isImportant, setIsImportant] = useState(false);
     const [history, setHistory] = useState([]);
@@ -652,6 +668,12 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
                 settings.allowEdit // 모두 편집 가능 여부
             );
 
+            // 메모를 공유 폴더로 자동 이동 (원래 폴더 정보 저장)
+            if (onUpdateMemoFolder) {
+                onUpdateMemoFolder(memo.id, 'shared', true); // savePrevious = true
+                setSelectedFolderId('shared'); // UI 업데이트
+            }
+
             setCurrentRoomId(roomId);
             setIsRoomSettingsOpen(false);
 
@@ -714,13 +736,25 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
 
                     {/* 2. 새로운 두 번째 줄 - 중요와 공유 */}
                     <SecondRowContainer>
-                        {/* 중요 체크박스 */}
-                        <ImportantCheckWrapper onClick={handleImportantToggle}>
-                            <ImportantRadioButton $isImportant={isImportant}>
-                                <RadioInnerCircle $isImportant={isImportant} />
-                            </ImportantRadioButton>
-                            중요
-                        </ImportantCheckWrapper>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '50px', flex: 1 }}>
+                            {/* 중요 체크박스 */}
+                            <ImportantCheckWrapper onClick={handleImportantToggle}>
+                                <ImportantRadioButton $isImportant={isImportant}>
+                                    <RadioInnerCircle $isImportant={isImportant} />
+                                </ImportantRadioButton>
+                                중요
+                            </ImportantCheckWrapper>
+
+                            {/* 폴더명 뱃지 - 폴더가 있을 때만 표시 */}
+                            {selectedFolderId && (() => {
+                                const currentFolder = folders.find(f => f.id === selectedFolderId);
+                                return currentFolder ? (
+                                    <FolderBadge>
+                                        {currentFolder.icon} {currentFolder.name}
+                                    </FolderBadge>
+                                ) : null;
+                            })()}
+                        </div>
 
                         {/* 공유 버튼 또는 공유됨 뱃지 */}
                         {isShared ? (
@@ -741,23 +775,7 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel }) 
                         )}
                     </SecondRowContainer>
 
-                    {/* 폴더 선택 */}
-                    <FolderSelectContainer>
-                        <FolderLabel>📁 폴더:</FolderLabel>
-                        <FolderSelect
-                            value={selectedFolderId || ''}
-                            onChange={(e) => setSelectedFolderId(e.target.value || null)}
-                        >
-                            <option value="">없음</option>
-                            {folders.filter(f => f.id !== 'all' && f.id !== 'shared').map(folder => (
-                                <option key={folder.id} value={folder.id}>
-                                    {folder.icon} {folder.name}
-                                </option>
-                            ))}
-                        </FolderSelect>
-                    </FolderSelectContainer>
-
-                    {/* 3. 날짜 정보 - 별도 줄 */}
+                    {/* 날짜 정보 */}
                     <DateText>
                         {memo.createdAt && (
                             <>

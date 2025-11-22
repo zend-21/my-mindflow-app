@@ -320,7 +320,8 @@ const SideMenu = ({
     onOpenMacro,  // ⚙️ 매크로 기능 추가
     onOpenFortune,
     onOpenTimer,  // ⏱️ 타이머 기능 추가
-    onOpenTrash  // 🗑️ 휴지통 기능 추가
+    onOpenTrash,  // 🗑️ 휴지통 기능 추가
+    onRestoreMemoFolder  // 📁 메모 폴더 복원 기능
 }) => {
     const fileInputRef = useRef(null);
     const [imageError, setImageError] = useState(false); // ✅ 추가: 이미지 로드 오류 상태
@@ -553,6 +554,7 @@ const SideMenu = ({
                         setIsMyWorkspaceOpen(false);
                     }}
                     onClose={() => setIsMyWorkspaceOpen(false)}
+                    onRestoreMemoFolder={onRestoreMemoFolder}
                 />
             )}
 

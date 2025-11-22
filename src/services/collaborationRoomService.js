@@ -940,3 +940,37 @@ export const checkMemoSharedStatus = async (memoId) => {
     return { isShared: false, room: null };
   }
 };
+
+/**
+ * 메모 ID로 협업방 가져오기 (공유 해제용)
+ * @param {string} memoId - 메모 ID
+ * @returns {Promise<{success: boolean, room: Object|null}>}
+ */
+export const getRoomByMemoId = async (memoId) => {
+  try {
+    if (!memoId) {
+      throw new Error('메모 ID가 필요합니다');
+    }
+
+    const q = query(
+      collection(db, 'collaborationRooms'),
+      where('memoId', '==', memoId),
+      where('status', '==', 'active')
+    );
+
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      return { success: false, room: null };
+    }
+
+    const roomDoc = snapshot.docs[0];
+    return {
+      success: true,
+      room: { id: roomDoc.id, ...roomDoc.data() }
+    };
+  } catch (error) {
+    console.error('메모 ID로 방 조회 오류:', error);
+    throw error;
+  }
+};

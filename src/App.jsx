@@ -1067,16 +1067,18 @@ function App() {
                 createdAt: now,
                 updatedAt: now,
                 displayDate: new Date(now).toLocaleString(),
-                isImportant: isImportant
+                isImportant: isImportant,
+                folderId: newMemoFolderId || null // 폴더 ID 저장 (null이면 미분류)
             };
             setMemos(prevMemos => [newMemo, ...prevMemos]);
             addActivity('메모 작성', newMemoContent, newId);
             setIsNewMemoModalOpen(false);
+            setNewMemoFolderId(null); // 폴더 ID 초기화
             showToast("✓ 메모가 저장되었습니다");
             quietSync(); // ✅ 추가
         };
 
-    const handleEditMemo = (id, newContent, isImportant, folderId) => {
+    const handleEditMemo = (id, newContent, isImportant, folderId, previousFolderId) => {
             const now = Date.now();
             setMemos(prevMemos =>
                 prevMemos.map(memo => {
@@ -1089,7 +1091,8 @@ function App() {
                             updatedAt: now,
                             displayDate: new Date(now).toLocaleString(),
                             isImportant: isImportant,
-                            folderId: folderId !== undefined ? folderId : memo.folderId // 폴더 ID 저장
+                            folderId: folderId !== undefined ? folderId : memo.folderId, // 폴더 ID 저장
+                            previousFolderId: previousFolderId !== undefined ? previousFolderId : memo.previousFolderId // 이전 폴더 ID 저장
                         };
                     }
                     return memo;
@@ -1208,12 +1211,85 @@ function App() {
         handleExitSelectionMode();
     };
 
+    // 메모 폴더 변경
+    const handleUpdateMemoFolder = (memoId, folderId, savePrevious = false) => {
+        setMemos(prevMemos =>
+            prevMemos.map(memo => {
+                if (memo.id === memoId) {
+                    const updates = { folderId };
+                    // 공유 폴더로 이동할 때 원래 폴더 정보 저장
+                    if (savePrevious && folderId === 'shared') {
+                        updates.previousFolderId = memo.folderId || null;
+                    }
+                    return { ...memo, ...updates };
+                }
+                return memo;
+            })
+        );
+        quietSync(); // 변경사항 동기화
+    };
+
+    // 메모 폴더 복원 (공유 해제 시)
+    const handleRestoreMemoFolder = (memoId) => {
+        setMemos(prevMemos =>
+            prevMemos.map(memo => {
+                if (memo.id === memoId) {
+                    // previousFolderId가 있으면 복원, 없으면 미분류(null)로
+                    return {
+                        ...memo,
+                        folderId: memo.previousFolderId || null,
+                        previousFolderId: undefined // 복원 후 제거
+                    };
+                }
+                return memo;
+            })
+        );
+        quietSync(); // 변경사항 동기화
+    };
+
     const requestDeleteSelectedMemos = () => {
         if (selectedMemoIds.size === 0) return;
         const idsToDelete = Array.from(selectedMemoIds);
         console.log("삭제 요청된 메모 ID들:", idsToDelete); // ★★★ 추가
         setMemoToDelete(idsToDelete);
         setIsDeleteModalOpen(true);
+    };
+
+    // 선택된 메모 공유 해제 요청
+    const requestUnshareSelectedMemos = async () => {
+        if (selectedMemoIds.size === 0) return;
+
+        const confirmed = window.confirm(`선택한 ${selectedMemoIds.size}개 메모의 공유를 해제하시겠습니까?\n\n협업방이 삭제되고 메모는 원래 폴더로 복원됩니다.`);
+        if (!confirmed) return;
+
+        try {
+            const {getRoomByMemoId, deleteRoom} = await import('./services/collaborationRoomService.js');
+
+            let successCount = 0;
+            const selectedIds = Array.from(selectedMemoIds);
+
+            for (const memoId of selectedIds) {
+                try {
+                    // 메모 ID로 협업방 찾기
+                    const roomResult = await getRoomByMemoId(memoId);
+                    if (roomResult.success && roomResult.room) {
+                        // 협업방 삭제
+                        await deleteRoom(roomResult.room.id);
+                        // 메모 폴더 복원
+                        handleRestoreMemoFolder(memoId);
+                        successCount++;
+                    }
+                } catch (error) {
+                    console.error(`메모 ${memoId} 공유 해제 실패:`, error);
+                }
+            }
+
+            handleExitSelectionMode();
+            showToast(`${successCount}개 메모의 공유가 해제되었습니다.`);
+        } catch (error) {
+            console.error('공유 해제 실패:', error);
+            showToast('공유 해제에 실패했습니다.');
+        }
     };
 
     const handleDeleteConfirm = () => {
@@ -1924,13 +2000,18 @@ function App() {
     const [loginService, setLoginService] = useState('none');
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     
-    const handleOpenNewMemoFromPage = () => {
-        setMemoOpenSource('page'); 
+    // 새 메모 작성 시 저장할 폴더 ID
+    const [newMemoFolderId, setNewMemoFolderId] = useState(null);
+
+    const handleOpenNewMemoFromPage = (folderId = null) => {
+        setMemoOpenSource('page');
+        setNewMemoFolderId(folderId); // 폴더 ID 저장
         setIsNewMemoModalOpen(true);
     };
 
     const handleOpenNewMemoFromFAB = () => {
-        setMemoOpenSource('fab'); 
+        setMemoOpenSource('fab');
+        setNewMemoFolderId(null); // FAB에서 열 때는 미분류로 저장
         setIsNewMemoModalOpen(true);
     };
 
@@ -2103,6 +2184,8 @@ function App() {
                                 onToggleSelectedMemosImportance={handleToggleSelectedMemosImportance}
                                 onToggleSelectedMemosStealth={handleToggleSelectedMemosStealth}
                                 onRequestDeleteSelectedMemos={requestDeleteSelectedMemos}
+                                onUpdateMemoFolder={handleUpdateMemoFolder}
+                                onRequestUnshareSelectedMemos={requestUnshareSelectedMemos}
                             />
                         }
                         {activeTab === 'todo' && <div>할 일 페이지</div>}
@@ -2149,6 +2232,7 @@ function App() {
                             setIsMenuOpen(false);
                             setActiveTab('secret');
                         }}
+                        onRestoreMemoFolder={handleRestoreMemoFolder}
                     />
                 </>
             </Screen>
@@ -2223,6 +2307,7 @@ function App() {
                 onCancel={() => {
                     setIsNewMemoModalOpen(false);
                     setMemoOpenSource(null);
+                    setNewMemoFolderId(null); // 폴더 ID 초기화
                 }}
             />
 
@@ -2231,6 +2316,7 @@ function App() {
                 memo={selectedMemo}
                 onSave={handleEditMemo}
                 onCancel={() => setIsDetailModalOpen(false)}
+                onUpdateMemoFolder={handleUpdateMemoFolder}
             />
             
             {isDeleteModalOpen && (

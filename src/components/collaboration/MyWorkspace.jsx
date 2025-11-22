@@ -546,7 +546,7 @@ const LoadingState = styled.div`
   font-size: 16px;
 `;
 
-const MyWorkspace = ({ onRoomSelect, onClose }) => {
+const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder }) => {
   const [workspace, setWorkspace] = useState(null);
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -555,6 +555,10 @@ const MyWorkspace = ({ onRoomSelect, onClose }) => {
   // 모달 상태
   const [confirmModal, setConfirmModal] = useState(null); // { title, message, onConfirm, variant }
   const [alertModal, setAlertModal] = useState(null); // { title, message, variant }
+  const [unshareModal, setUnshareModal] = useState(null); // { roomId, roomTitle }
+
+  // 길게 누르기 상태
+  const [longPressTimer, setLongPressTimer] = useState(null);
 
   useEffect(() => {
     loadWorkspaceAndRooms();
@@ -602,6 +606,9 @@ const MyWorkspace = ({ onRoomSelect, onClose }) => {
         id: doc.id,
         ...doc.data(),
       }));
+
+      console.log('🏠 워크스페이스 방 목록:', roomsList.length, '개');
+      console.log('방 상세:', roomsList.map(r => ({ id: r.id, memoId: r.memoId, title: r.memoTitle, status: r.status })));
 
       setRooms(roomsList);
     } catch (error) {
@@ -749,6 +756,55 @@ const MyWorkspace = ({ onRoomSelect, onClose }) => {
     }
   };
 
+  // 길게 누르기 시작
+  const handleLongPressStart = (roomId, roomTitle) => {
+    const timer = setTimeout(() => {
+      setUnshareModal({ roomId, roomTitle });
+    }, 500); // 500ms 길게 누르기
+    setLongPressTimer(timer);
+  };
+
+  // 길게 누르기 취소
+  const handleLongPressEnd = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      setLongPressTimer(null);
+    }
+  };
+
+  // 공유 해제 확인
+  const handleUnshareConfirm = async () => {
+    if (!unshareModal) return;
+
+    try {
+      const room = rooms.find(r => r.id === unshareModal.roomId);
+      const originalMemoId = room?.originalMemoId || room?.memoId;
+
+      // 방 삭제 (공유 해제)
+      await deleteRoom(unshareModal.roomId);
+
+      // 메모 폴더 복원
+      if (originalMemoId && onRestoreMemoFolder) {
+        onRestoreMemoFolder(originalMemoId);
+      }
+
+      setAlertModal({
+        title: '공유 해제 완료',
+        message: '메모가 원래 폴더로 복원되었습니다.',
+        variant: 'success'
+      });
+      setUnshareModal(null);
+      await loadWorkspaceAndRooms();
+    } catch (error) {
+      console.error('공유 해제 오류:', error);
+      setAlertModal({
+        title: '오류',
+        message: '공유 해제에 실패했습니다.',
+        variant: 'danger'
+      });
+    }
+  };
+
   const handleDeleteRoom = (roomId) => {
     setConfirmModal({
       title: '방 삭제',
@@ -756,7 +812,18 @@ const MyWorkspace = ({ onRoomSelect, onClose }) => {
       variant: 'danger',
       onConfirm: async () => {
         try {
+          // 방 정보에서 원본 메모 ID 가져오기
+          const room = rooms.find(r => r.id === roomId);
+          const originalMemoId = room?.originalMemoId || room?.memoId;
+
+          // 방 삭제
           await deleteRoom(roomId);
+
+          // 메모 폴더 복원 (공유 해제)
+          if (originalMemoId && onRestoreMemoFolder) {
+            onRestoreMemoFolder(originalMemoId);
+          }
+
           setAlertModal({
             title: '삭제 완료',
             message: '방이 삭제되었습니다.',
@@ -833,17 +900,32 @@ const MyWorkspace = ({ onRoomSelect, onClose }) => {
                 <RoomsList>
                   {filteredRooms.map(room => (
                     <RoomCard key={room.id}>
-                      <RoomHeader>
-                        <RoomTitle>{room.memoTitle}</RoomTitle>
-                        <RoomBadge $isPublic={room.isPublic} $status={room.status}>
-                          {room.status === 'archived' ? '폐쇄' : room.isPublic ? '공개' : '비공개'}
-                        </RoomBadge>
-                      </RoomHeader>
+                      {/* 제목과 메타정보 영역: 길게 누르기로 공유 해제 */}
+                      <div
+                        onTouchStart={() => handleLongPressStart(room.id, room.memoTitle)}
+                        onTouchEnd={handleLongPressEnd}
+                        onMouseDown={() => handleLongPressStart(room.id, room.memoTitle)}
+                        onMouseUp={handleLongPressEnd}
+                        onMouseLeave={handleLongPressEnd}
+                        style={{ cursor: 'default' }}
+                      >
+                        <RoomHeader>
+                          <RoomTitle>{room.memoTitle}</RoomTitle>
+                          <RoomBadge
+                            $isPublic={room.isPublic}
+                            $status={room.status}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                          >
+                            {room.status === 'archived' ? '폐쇄' : room.isPublic ? '공개' : '비공개'}
+                          </RoomBadge>
+                        </RoomHeader>
 
-                      <RoomMeta>
-                        {room.participants?.length || 0}명 참여 중 ·{' '}
-                        {new Date(room.createdAt).toLocaleDateString('ko-KR')}
-                      </RoomMeta>
+                        <RoomMeta>
+                          {room.participants?.length || 0}명 참여 중 ·{' '}
+                          {new Date(room.createdAt).toLocaleDateString('ko-KR')}
+                        </RoomMeta>
+                      </div>
 
                       {/* 모든 활성 방에 초대 코드 표시 */}
                       {room.inviteCode && room.status === 'active' && (
@@ -963,6 +1045,33 @@ const MyWorkspace = ({ onRoomSelect, onClose }) => {
               </ConfirmButton>
             </AlertModalButtons>
           </AlertModalBox>
+        </ConfirmModalOverlay>
+      )}
+
+      {/* 공유 해제 모달 */}
+      {unshareModal && (
+        <ConfirmModalOverlay onClick={(e) => e.target === e.currentTarget && setUnshareModal(null)}>
+          <ConfirmModalBox>
+            <ConfirmModalTitle>공유 해제</ConfirmModalTitle>
+            <ConfirmModalMessage>
+              '{unshareModal.roomTitle}'의 공유를 해제하시겠습니까?{'\n\n'}
+              협업방이 삭제되고 메모는 원래 폴더로 복원됩니다.
+            </ConfirmModalMessage>
+            <ConfirmModalButtons>
+              <ConfirmButton
+                $variant="cancel"
+                onClick={() => setUnshareModal(null)}
+              >
+                취소
+              </ConfirmButton>
+              <ConfirmButton
+                $variant="confirm"
+                onClick={handleUnshareConfirm}
+              >
+                공유 해제
+              </ConfirmButton>
+            </ConfirmModalButtons>
+          </ConfirmModalBox>
         </ConfirmModalOverlay>
       )}
     </>

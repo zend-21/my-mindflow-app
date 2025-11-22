@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 const STORAGE_KEY = 'memoFolders';
+const MAX_CUSTOM_FOLDERS = 5; // 사용자 정의 폴더 최대 개수
 
 // 기본 폴더 (삭제 불가)
 const DEFAULT_FOLDERS = [
@@ -48,8 +49,15 @@ export const useMemoFolders = () => {
     }
   }, [folders]);
 
-  // 폴더 추가
+  // 폴더 추가 (최대 개수 제한)
   const addFolder = useCallback((name, icon = '📁') => {
+    // 사용자 정의 폴더 개수 확인
+    const customCount = folders.filter(f => !f.isDefault).length;
+    if (customCount >= MAX_CUSTOM_FOLDERS) {
+      console.warn(`폴더는 최대 ${MAX_CUSTOM_FOLDERS}개까지만 생성할 수 있습니다.`);
+      return null;
+    }
+
     const id = `folder_${Date.now()}`;
     const newFolder = {
       id,
@@ -61,7 +69,7 @@ export const useMemoFolders = () => {
     };
     setFolders(prev => [...prev, newFolder]);
     return newFolder;
-  }, [folders.length]);
+  }, [folders]);
 
   // 폴더 수정
   const updateFolder = useCallback((folderId, updates) => {
@@ -103,6 +111,9 @@ export const useMemoFolders = () => {
   // 사용자 정의 폴더만 반환
   const customFolders = folders.filter(f => !f.isDefault);
 
+  // 폴더 추가 가능 여부
+  const canAddFolder = customFolders.length < MAX_CUSTOM_FOLDERS;
+
   return {
     folders,
     customFolders,
@@ -111,7 +122,9 @@ export const useMemoFolders = () => {
     addFolder,
     updateFolder,
     deleteFolder,
-    reorderFolders
+    reorderFolders,
+    canAddFolder,
+    maxFolders: MAX_CUSTOM_FOLDERS
   };
 };
 

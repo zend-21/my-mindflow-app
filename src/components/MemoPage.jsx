@@ -30,9 +30,11 @@ const BadgeContainer = styled.div`
     z-index: 10;
 `;
 
+// NEW 뱃지 - 형광 라임 그린
 const NewBadge = styled.span`
-    background-color: #5ebe26ff;
-    color: white;
+    background: rgba(94, 190, 38, 0.2);
+    border: 1px solid rgba(94, 190, 38, 0.3);
+    color: #7fff00;
     font-size: 10px;
     font-weight: bold;
     padding: 4px 8px;
@@ -94,29 +96,44 @@ const SelectionButtonsContainer = styled.div`
 `;
 
 const SelectionButton = styled.button`
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: white;
+    background: ${props => props.$variant === 'unshare'
+        ? 'rgba(139, 69, 19, 0.2)'
+        : 'rgba(255, 255, 255, 0.2)'};
+    border: 1px solid ${props => props.$variant === 'unshare'
+        ? 'rgba(139, 69, 19, 0.6)'
+        : 'rgba(255, 255, 255, 0.3)'};
+    color: ${props => props.$variant === 'unshare' ? '#6b3410' : 'white'};
     padding: 6px 12px;
     border-radius: 6px;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: ${props => props.$variant === 'unshare' ? '600' : '500'};
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
 
-    &:hover {
-        background: rgba(255, 255, 255, 0.3);
-        border-color: rgba(255, 255, 255, 0.5);
+    &:hover:not(:disabled) {
+        background: ${props => props.$variant === 'unshare'
+            ? 'rgba(139, 69, 19, 0.2)'
+            : 'rgba(255, 255, 255, 0.3)'};
+        border-color: ${props => props.$variant === 'unshare'
+            ? 'rgba(139, 69, 19, 0.6)'
+            : 'rgba(255, 255, 255, 0.5)'};
     }
 
-    &:active {
+    &:active:not(:disabled) {
         transform: scale(0.95);
     }
 
     &:disabled {
-        opacity: 0.5;
+        opacity: 0.3;
         cursor: not-allowed;
+        background: ${props => props.$variant === 'unshare'
+            ? 'rgba(139, 69, 19, 0.05)'
+            : 'rgba(255, 255, 255, 0.05)'};
+        border-color: ${props => props.$variant === 'unshare'
+            ? 'rgba(139, 69, 19, 0.2)'
+            : 'rgba(255, 255, 255, 0.15)'};
+        color: ${props => props.$variant === 'unshare' ? 'rgba(139, 69, 19, 0.5)' : 'rgba(255, 255, 255, 0.4)'};
     }
 `;
 
@@ -425,11 +442,26 @@ const MemoCard = styled.div`
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
     `}
+
+    /* 그리드 뷰일 때 */
+    ${props => props.$layoutView === 'grid' && `
+        height: 160px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding-top: 20px;
+    `}
 `;
 const MemoHeader = styled.div`
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+
+    /* 그리드 뷰일 때 */
+    ${props => props.$layoutView === 'grid' && `
+        flex-grow: 1;
+        overflow: hidden;
+    `}
 `;
 const MemoText = styled.p`
     font-size: 16px;
@@ -438,12 +470,39 @@ const MemoText = styled.p`
     white-space: pre-wrap;
     word-break: break-word;
     padding-right: 2px;
+
+    /* 리스트 뷰일 때 - 2줄 제한 */
+    ${props => props.$layoutView === 'list' && `
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding-top: 5px;
+    `}
+
+    /* 그리드 뷰일 때 - 6줄 제한 */
+    ${props => props.$layoutView === 'grid' && `
+        display: -webkit-box;
+        -webkit-line-clamp: 6;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        flex-grow: 0;
+        padding-top: 12px;
+    `}
 `;
 const DateText = styled.span`
     font-size: 12px;
     color: #b0b0b0;
     margin-top: 8px;
     display: block;
+
+    /* 그리드 뷰일 때 */
+    ${props => props.$layoutView === 'grid' && `
+        flex-shrink: 0;
+        margin-top: 8px;
+    `}
 `;
 const DeleteButton = styled.button`
     position: absolute;
@@ -496,18 +555,19 @@ const ToastBox = styled.div`
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
 `;
+// 중요도 뱃지 - 형광 골드/오렌지
 const ImportantIndicator = styled.span`
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background-color: #ff4444;
-    color: white;
+    background: rgba(255, 215, 0, 0.2);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    color: #ffd700;
     font-size: 14px;
     font-weight: bold;
     display: flex;
     justify-content: center;
     align-items: center;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 `;
 
 const StarIcon = styled.span`
@@ -515,16 +575,34 @@ const StarIcon = styled.span`
     transform: translate(0px, -1px);
 `;
 
+// 스텔스 뱃지 - 형광 시안/하늘색
 const StealthBadge = styled.span`
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: #60a5fa;
-    color: white;
+    background: rgba(96, 165, 250, 0.2);
+    border: 1px solid rgba(96, 165, 250, 0.3);
+    color: #60a5fa;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+`;
+
+// 공유 뱃지 (공개: 형광 그린, 비공개: 형광 레드) - 시크릿 카테고리 뱃지 스타일
+const ShareBadge = styled.span`
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: ${props => props.$isPublic
+        ? 'rgba(0, 255, 136, 0.2)'
+        : 'rgba(255, 107, 107, 0.2)'};
+    border: 1px solid ${props => props.$isPublic
+        ? 'rgba(0, 255, 136, 0.3)'
+        : 'rgba(255, 107, 107, 0.3)'};
+    color: ${props => props.$isPublic ? '#00ff88' : '#ff6b6b'};
+    display: flex;
+    align-items: center;
+    justify-content: center;
 `;
 const EmptyMessage = styled.p`
     color: #b0b0b0;
@@ -540,72 +618,45 @@ const MemoList = styled.div`
     width: 100%;
     margin-top: 35px;
     padding-bottom: 20px;
+`;
 
-    & ${MemoText} {
-        white-space: nowrap; 
-        overflow: hidden;
-        text-overflow: ellipsis;
-        flex-grow: 1; 
-    }
+// 일반 메모들만을 위한 wrapper (리스트/그리드 전환 적용)
+const MemoGridWrapper = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
 
-    /* ★★★ 반응형 그리드 레이아웃 수정 ★★★ */
+    /* 그리드 뷰일 때 */
     ${props => props.$layoutView === 'grid' && `
         display: grid;
         grid-template-columns: repeat(2, 1fr);
         gap: 12px;
 
-        & ${MemoCard} {
-            height: 160px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between; 
-            padding-top: 20px;
-        }
-
-        & ${MemoHeader} {
-             flex-grow: 1; 
-             overflow: hidden; 
-        }
-
-        & ${MemoText} {
-            white-space: pre-wrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            display: -webkit-box;
-            -webkit-line-clamp: 6;
-            -webkit-box-orient: vertical;
-            word-break: break-word;
-            flex-grow: 0;
-            padding-top: 12px;
-        }
-        
-         & ${DateText} {
-             flex-shrink: 0; 
-             margin-top: 8px; 
-         }
-    `}
-
-    /* ★★★ 태블릿 및 데스크탑용 미디어 쿼리 추가 ★★★ */
-    @media (min-width: 768px) {
-        ${props => props.$layoutView === 'grid' && `
+        @media (min-width: 768px) {
             grid-template-columns: repeat(2, 1fr);
             gap: 16px;
-        `}
-    }
+        }
 
-    @media (min-width: 1024px) {
-        ${props => props.$layoutView === 'grid' && `
+        @media (min-width: 1024px) {
             grid-template-columns: repeat(3, 1fr);
             gap: 20px;
-        `}
-    }
+        }
 
-    @media (min-width: 1440px) {
-        ${props => props.$layoutView === 'grid' && `
+        @media (min-width: 1440px) {
             grid-template-columns: repeat(3, 1fr);
             gap: 24px;
-        `}
-    }
+        }
+    `}
+`;
+
+// 폴더 그리드 컨테이너
+const FolderGridContainer = styled.div`
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    width: 100%;
+    margin-bottom: 0;
 `;
 
 const LeftHeaderGroup = styled.div`
@@ -636,67 +687,222 @@ const StyledCheckIcon = styled(BsCheckCircleFill)`
     transform: translateY(0px);
 `;
 
-// 폴더 탭 스타일
-const FolderTabContainer = styled.div`
+const FolderCard = styled.div`
+    background: linear-gradient(135deg, #2a2d35, #333842);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 2px solid ${props => props.$isShared
+        ? 'rgba(0, 255, 136, 0.3)'
+        : 'transparent'};
     display: flex;
+    flex-direction: column;
+    align-items: center;
     gap: 8px;
-    margin-bottom: 16px;
-    overflow-x: auto;
-    padding-bottom: 4px;
+    min-height: 100px;
+    justify-content: center;
+    ${props => props.$isShared && `
+        box-shadow: 0 0 15px rgba(0, 255, 136, 0.15);
+    `}
 
-    &::-webkit-scrollbar {
-        height: 4px;
+    &:hover {
+        transform: translateY(-2px);
+        box-shadow: ${props => props.$isShared
+            ? '0 4px 20px rgba(0, 255, 136, 0.3)'
+            : '0 4px 12px rgba(74, 144, 226, 0.2)'};
+        border-color: ${props => props.$isShared
+            ? 'rgba(0, 255, 136, 0.5)'
+            : 'rgba(74, 144, 226, 0.3)'};
     }
-    &::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 2px;
-    }
-    &::-webkit-scrollbar-thumb {
-        background: rgba(74, 144, 226, 0.3);
-        border-radius: 2px;
+
+    &:active {
+        transform: scale(0.98);
     }
 `;
 
-const FolderTab = styled.button`
+const FolderIconWrapper = styled.div`
+    font-size: 40px;
+    line-height: 1;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+`;
+
+// 공유 폴더 아이콘 (형광 그린)
+const SharedFolderIcon = styled.div`
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(0, 255, 136, 0.15);
+    border: 2px solid rgba(0, 255, 136, 0.4);
+    color: #00ff88;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 12px rgba(0, 255, 136, 0.2);
+`;
+
+const FolderName = styled.span`
+    color: #e0e0e0;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+    word-break: break-word;
+    max-width: 100%;
+`;
+
+const FolderMemoCount = styled.span`
+    background: rgba(74, 144, 226, 0.2);
+    border: 1px solid rgba(74, 144, 226, 0.3);
+    color: #4a90e2;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+`;
+
+const FolderEmptyBadge = styled.span`
+    background: rgba(255, 255, 255, 0.1);
+    color: #666;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+`;
+
+const AddFolderCard = styled(FolderCard)`
+    border: 2px dashed rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.02);
+    opacity: ${props => props.$disabled ? 0.4 : 1};
+    cursor: ${props => props.$disabled ? 'not-allowed' : 'pointer'};
+
+    &:hover {
+        border-color: ${props => props.$disabled ? 'rgba(255, 255, 255, 0.15)' : 'rgba(74, 144, 226, 0.5)'};
+        background: ${props => props.$disabled ? 'rgba(255, 255, 255, 0.02)' : 'rgba(74, 144, 226, 0.1)'};
+        transform: ${props => props.$disabled ? 'none' : 'translateY(-2px)'};
+        box-shadow: ${props => props.$disabled ? 'none' : '0 4px 12px rgba(74, 144, 226, 0.2)'};
+    }
+`;
+
+const AddFolderIcon = styled.div`
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: #666;
+`;
+
+const AddFolderText = styled.span`
+    color: #666;
+    font-size: 13px;
+    margin-bottom: 20px;
+`;
+
+// 섹션 구분선
+const SectionDivider = styled.div`
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 10px 0;
+    color: #888;
+    font-size: 13px;
+
+    &::before, &::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: rgba(255, 255, 255, 0.1);
+    }
+`;
+
+// 뒤로가기 버튼
+const BackToMainButton = styled.button`
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(74, 144, 226, 0.1);
+    border: 1px solid rgba(74, 144, 226, 0.3);
+    color: #4a90e2;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    margin-bottom: 16px;
+    transition: all 0.2s;
+
+    &:hover {
+        background: rgba(74, 144, 226, 0.2);
+        border-color: rgba(74, 144, 226, 0.5);
+    }
+`;
+
+// 폴더 수정 버튼 (폴더 내부에서) - 형광 오렌지
+const FolderEditButton = styled.button`
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(255, 165, 0, 0.15);
+    border: 1px solid rgba(255, 165, 0, 0.4);
+    color: #ffa500;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 4px 10px;
+    margin-left: 8px;
+    border-radius: 6px;
+    box-shadow: 0 0 8px rgba(255, 165, 0, 0.2);
+
+    &:active {
+        transform: scale(0.95);
+    }
+`;
+
+// 폴더 나가기 버튼 - 형광 시안
+const FolderExitButton = styled.button`
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 14px;
-    border-radius: 20px;
-    border: 1px solid ${props => props.$active ? 'rgba(74, 144, 226, 0.5)' : 'rgba(255, 255, 255, 0.1)'};
-    background: ${props => props.$active ? 'rgba(74, 144, 226, 0.15)' : 'rgba(255, 255, 255, 0.03)'};
-    color: ${props => props.$active ? '#4a90e2' : '#888'};
+    background: rgba(0, 200, 255, 0.15);
+    border: 1px solid rgba(0, 200, 255, 0.4);
+    color: #00c8ff;
+    padding: 6px 12px;
+    border-radius: 6px;
     font-size: 13px;
-    font-weight: ${props => props.$active ? '600' : '500'};
     cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-    flex-shrink: 0;
+    box-shadow: 0 0 10px rgba(0, 200, 255, 0.2);
 
-    &:hover {
-        background: rgba(74, 144, 226, 0.1);
-        border-color: rgba(74, 144, 226, 0.3);
-        color: #4a90e2;
-    }
-
-    span.count {
-        background: ${props => props.$active ? 'rgba(74, 144, 226, 0.3)' : 'rgba(255, 255, 255, 0.1)'};
-        padding: 2px 6px;
-        border-radius: 10px;
-        font-size: 11px;
-        min-width: 18px;
-        text-align: center;
+    &:active {
+        transform: scale(0.95);
     }
 `;
 
-const AddFolderTab = styled(FolderTab)`
-    border-style: dashed;
-    color: #666;
+// 현재 폴더 정보 표시
+const CurrentFolderHeader = styled.div`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, #2a2d35, #333842);
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+`;
 
-    &:hover {
-        color: #4a90e2;
-        border-color: rgba(74, 144, 226, 0.5);
-    }
+const CurrentFolderInfo = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 10px;
+`;
+
+const CurrentFolderIcon = styled.span`
+    font-size: 24px;
+`;
+
+const CurrentFolderName = styled.span`
+    color: #e0e0e0;
+    font-size: 16px;
+    font-weight: 600;
 `;
 
 // 폴더 모달 스타일
@@ -808,19 +1014,222 @@ const FolderModalButton = styled.button`
     `}
 `;
 
-const FolderEditButton = styled.button`
+// 메모 선택 모달 (폴더에 메모 추가)
+const MemoSelectModalOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    flex-direction: column;
+    z-index: 10001;
+    animation: ${fadeIn} 0.2s ease-out;
+`;
+
+const MemoSelectHeader = styled.div`
+    background: linear-gradient(135deg, #2a2d35, #333842);
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const MemoSelectTitle = styled.h3`
+    color: #e0e0e0;
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+`;
+
+const MemoSelectCloseBtn = styled.button`
     background: transparent;
     border: none;
-    color: #666;
-    font-size: 12px;
+    color: #999;
+    font-size: 24px;
     cursor: pointer;
-    padding: 2px 6px;
-    margin-left: 4px;
-    border-radius: 4px;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     &:hover {
+        color: #e0e0e0;
+    }
+`;
+
+const MemoSelectList = styled.div`
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+`;
+
+const MemoSelectItem = styled.div`
+    background: ${props => props.$isShared
+        ? 'rgba(255, 107, 107, 0.05)'
+        : props.$selected
+            ? 'rgba(74, 144, 226, 0.2)'
+            : 'rgba(255, 255, 255, 0.05)'};
+    border: 1px solid ${props => props.$isShared
+        ? 'rgba(255, 107, 107, 0.3)'
+        : props.$selected
+            ? 'rgba(74, 144, 226, 0.5)'
+            : 'rgba(255, 255, 255, 0.1)'};
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    cursor: ${props => props.$disabled ? 'not-allowed' : 'pointer'};
+    opacity: ${props => props.$disabled ? 0.5 : 1};
+    transition: all 0.2s;
+    position: relative;
+
+    /* 공유 메모일 때 대각선 줄무늬 배경 */
+    ${props => props.$isShared && `
+        &::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: repeating-linear-gradient(
+                -45deg,
+                transparent,
+                transparent 10px,
+                rgba(255, 107, 107, 0.03) 10px,
+                rgba(255, 107, 107, 0.03) 20px
+            );
+            border-radius: 10px;
+            pointer-events: none;
+        }
+    `}
+
+    &:hover {
+        background: ${props => props.$disabled
+            ? props.$isShared
+                ? 'rgba(255, 107, 107, 0.05)'
+                : 'rgba(255, 255, 255, 0.05)'
+            : props.$selected
+                ? 'rgba(74, 144, 226, 0.25)'
+                : 'rgba(255, 255, 255, 0.08)'};
+    }
+`;
+
+const MemoSelectItemHeader = styled.div`
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 6px;
+`;
+
+const MemoSelectItemText = styled.p`
+    color: #e0e0e0;
+    font-size: 14px;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+`;
+
+const MemoSelectBadgeGroup = styled.div`
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: 8px;
+`;
+
+const MemoFolderBadge = styled.span`
+    background: rgba(167, 139, 250, 0.2);
+    border: 1px solid rgba(167, 139, 250, 0.3);
+    color: #a78bfa;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    white-space: nowrap;
+`;
+
+const MemoSharedBadge = styled.span`
+    background: rgba(255, 107, 107, 0.2);
+    border: 1px solid rgba(255, 107, 107, 0.3);
+    color: #ff6b6b;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 8px;
+    white-space: nowrap;
+`;
+
+const MemoSelectFooter = styled.div`
+    background: linear-gradient(135deg, #2a2d35, #333842);
+    padding: 16px 20px;
+    display: flex;
+    gap: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const MemoSelectBtn = styled.button`
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+
+    ${props => props.$variant === 'cancel' && `
         background: rgba(255, 255, 255, 0.1);
-        color: #4a90e2;
+        color: #b0b0b0;
+        &:hover { background: rgba(255, 255, 255, 0.15); }
+    `}
+
+    ${props => props.$variant === 'confirm' && `
+        background: #4a90e2;
+        color: white;
+        &:hover { background: #3b78c4; }
+        &:disabled {
+            background: rgba(255, 255, 255, 0.1);
+            color: #888;
+            cursor: not-allowed;
+        }
+    `}
+`;
+
+const MemoSelectInfo = styled.div`
+    color: #888;
+    font-size: 12px;
+    text-align: center;
+    padding: 8px;
+`;
+
+// 탭 컨테이너
+const TabContainer = styled.div`
+    display: flex;
+    background: linear-gradient(135deg, #2a2d35, #333842);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const Tab = styled.button`
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    background: ${props => props.$active ? 'rgba(74, 144, 226, 0.2)' : 'transparent'};
+    color: ${props => props.$active ? '#4a90e2' : '#999'};
+    font-size: 14px;
+    font-weight: ${props => props.$active ? '600' : '500'};
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 2px solid ${props => props.$active ? '#4a90e2' : 'transparent'};
+
+    &:hover {
+        background: ${props => props.$active ? 'rgba(74, 144, 226, 0.25)' : 'rgba(255, 255, 255, 0.05)'};
     }
 `;
 
@@ -842,7 +1251,8 @@ const MemoPage = ({
     onToggleSelectedMemosImportance,
     onToggleSelectedMemosStealth,
     onRequestDeleteSelectedMemos,
-    onUpdateMemoFolder
+    onUpdateMemoFolder,
+    onRequestUnshareSelectedMemos
 }) => {
     const [layoutView, setLayoutView] = useLocalStorage('memoLayoutView', 'list');
     const [searchQuery, setSearchQuery] = React.useState('');
@@ -854,38 +1264,54 @@ const MemoPage = ({
     // 폴더 관련 상태
     const {
         folders,
+        customFolders,
         activeFolder,
         setActiveFolder,
         addFolder,
         updateFolder,
-        deleteFolder
+        deleteFolder,
+        canAddFolder,
+        maxFolders
     } = useMemoFolders();
 
-    // 공유된 메모 ID 목록
-    const [sharedMemoIds, setSharedMemoIds] = useState(new Set());
+    // 공유된 메모 정보 (Map: memoId -> { isPublic: boolean })
+    const [sharedMemoInfo, setSharedMemoInfo] = useState(new Map());
 
     // 폴더 모달 상태
     const [folderModal, setFolderModal] = useState(null); // null | { mode: 'add' | 'edit', folder?: object }
     const [folderName, setFolderName] = useState('');
     const [folderIcon, setFolderIcon] = useState('📁');
 
+    // 폴더 삭제 확인 모달
+    const [deleteFolderModal, setDeleteFolderModal] = useState(null); // null | { folder: object }
+    const folderLongPressTimer = useRef(null);
+
+    // 메모 이동 모달 상태
+    const [moveMemosModal, setMoveMemosModal] = useState(null); // null | { folder: object }
+    const [moveModalTab, setMoveModalTab] = useState('outside'); // 'inside' | 'outside'
+    const [selectedMemosForMove, setSelectedMemosForMove] = useState(new Set());
+    const folderHeaderLongPressTimer = useRef(null);
+
+    // 메모 이동 확인 모달
+    const [moveConfirmModal, setMoveConfirmModal] = useState(null); // null | { action: 'move' | 'remove', count: number }
+
     // 공유 상태 확인 (메모 목록이 변경될 때)
     useEffect(() => {
         const checkSharedMemos = async () => {
             if (!memos || memos.length === 0) return;
 
-            const sharedIds = new Set();
+            const sharedInfo = new Map();
             for (const memo of memos) {
                 try {
                     const result = await checkMemoSharedStatus(memo.id);
-                    if (result.isShared) {
-                        sharedIds.add(memo.id);
+                    if (result.isShared && result.room) {
+                        sharedInfo.set(memo.id, { isPublic: result.room.isPublic === true });
                     }
                 } catch (e) {
                     // 에러 무시
                 }
             }
-            setSharedMemoIds(sharedIds);
+            setSharedMemoInfo(sharedInfo);
         };
 
         checkSharedMemos();
@@ -893,6 +1319,10 @@ const MemoPage = ({
 
     // 폴더 모달 열기
     const openAddFolderModal = () => {
+        if (!canAddFolder) {
+            alert(`폴더는 최대 ${maxFolders}개까지만 생성할 수 있습니다.`);
+            return;
+        }
         setFolderModal({ mode: 'add' });
         setFolderName('');
         setFolderIcon('📁');
@@ -916,8 +1346,8 @@ const MemoPage = ({
         setFolderModal(null);
     };
 
-    // 폴더 삭제
-    const handleDeleteFolder = () => {
+    // 폴더 삭제 (수정 모달에서)
+    const handleDeleteFolderFromEdit = () => {
         if (folderModal?.folder) {
             deleteFolder(folderModal.folder.id);
             setFolderModal(null);
@@ -928,12 +1358,110 @@ const MemoPage = ({
     const getFolderMemoCount = (folderId) => {
         if (!memos) return 0;
         if (folderId === 'all') return memos.length;
-        if (folderId === 'shared') return sharedMemoIds.size;
+        if (folderId === 'shared') return sharedMemoInfo.size;
         return memos.filter(memo => memo.folderId === folderId).length;
     };
 
+    // 폴더 이름 가져오기
+    const getFolderName = (folderId) => {
+        const folder = folders.find(f => f.id === folderId);
+        return folder ? folder.name : null;
+    };
+
+    // 폴더 길게 누르기 핸들러 (삭제 확인 모달 열기)
+    const handleFolderLongPress = (folder) => {
+        // 기본 폴더(전체, 공유)는 제외
+        if (folder.isDefault) return;
+        setDeleteFolderModal({ folder });
+    };
+
+    // 폴더 삭제 확인
+    const handleConfirmDeleteFolder = () => {
+        if (!deleteFolderModal?.folder) return;
+
+        const folderId = deleteFolderModal.folder.id;
+
+        // 폴더 내 메모들을 미분류로 이동
+        if (memos && onUpdateMemoFolder) {
+            memos.forEach(memo => {
+                if (memo.folderId === folderId) {
+                    onUpdateMemoFolder(memo.id, null); // null = 미분류
+                }
+            });
+        }
+
+        // 폴더 삭제
+        deleteFolder(folderId);
+        setDeleteFolderModal(null);
+    };
+
+    // 폴더 헤더 길게 누르기 (폴더 수정 모달 열기)
+    const handleFolderHeaderLongPress = (folder) => {
+        openEditFolderModal(folder);
+    };
+
+    // 메모 이동 모달 열기
+    const openMoveMemosModal = (folder) => {
+        setMoveMemosModal({ folder });
+        setMoveModalTab('outside'); // 기본값: 미분류 메모 탭
+        setSelectedMemosForMove(new Set());
+    };
+
+    // 메모 이동 모달 닫기
+    const closeMoveMemosModal = () => {
+        setMoveMemosModal(null);
+        setSelectedMemosForMove(new Set());
+    };
+
+    // 메모 선택 토글
+    const toggleMemoForMove = (memoId) => {
+        setSelectedMemosForMove(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(memoId)) {
+                newSet.delete(memoId);
+            } else {
+                newSet.add(memoId);
+            }
+            return newSet;
+        });
+    };
+
+    // 메모 이동 확인 모달 열기
+    const handleRequestMove = () => {
+        if (selectedMemosForMove.size === 0) return;
+
+        setMoveConfirmModal({
+            action: moveModalTab === 'outside' ? 'move' : 'remove',
+            count: selectedMemosForMove.size
+        });
+    };
+
+    // 메모 이동 실행
+    const handleConfirmMove = () => {
+        if (!moveMemosModal?.folder || selectedMemosForMove.size === 0) return;
+
+        const folderId = moveMemosModal.folder.id;
+
+        selectedMemosForMove.forEach(memoId => {
+            if (onUpdateMemoFolder) {
+                if (moveModalTab === 'outside') {
+                    // 미분류 메모 -> 폴더로 이동
+                    onUpdateMemoFolder(memoId, folderId);
+                } else {
+                    // 폴더 내 메모 -> 미분류로 이동
+                    onUpdateMemoFolder(memoId, null);
+                }
+            }
+        });
+
+        setMoveConfirmModal(null);
+        closeMoveMemosModal();
+    };
+
     const handleAddMemoClick = () => {
-        onOpenNewMemo();
+        // 폴더 안에서 메모 작성 시 해당 폴더 ID 전달 (전체/공유 폴더는 미분류로 저장)
+        const targetFolderId = (activeFolder !== 'all' && activeFolder !== 'shared') ? activeFolder : null;
+        onOpenNewMemo(targetFolderId);
     };
 
     const handleTouchStart = (e, memoId) => {
@@ -991,9 +1519,12 @@ const MemoPage = ({
     if (memos && Array.isArray(memos)) {
         // 1. 폴더 필터링
         filteredAndSortedMemos = memos.filter(memo => {
-            if (activeFolder === 'all') return true;
-            if (activeFolder === 'shared') return sharedMemoIds.has(memo.id);
-            return memo.folderId === activeFolder;
+            // "전체"일 때는 폴더에 속하지 않은 미분류 메모만 표시 (공유된 메모 제외)
+            if (activeFolder === 'all') return !memo.folderId && !sharedMemoInfo.has(memo.id);
+            // "공유"일 때는 folderId가 'shared'이거나 sharedMemoInfo에 있는 메모 표시
+            if (activeFolder === 'shared') return memo.folderId === 'shared' || sharedMemoInfo.has(memo.id);
+            // 다른 커스텀 폴더일 때는 해당 폴더 ID와 일치하고 공유되지 않은 메모만 표시
+            return memo.folderId === activeFolder && !sharedMemoInfo.has(memo.id);
         });
 
         // 2. 검색 필터링
@@ -1047,6 +1578,16 @@ const MemoPage = ({
                             {selectedCount}개 선택됨
                         </SelectionInfo>
                         <SelectionButtonsContainer>
+                            {/* 공유 폴더일 때만 공유해제 버튼 표시 */}
+                            {activeFolder === 'shared' && (
+                                <SelectionButton
+                                    $variant="unshare"
+                                    disabled={selectedCount === 0}
+                                    onClick={onRequestUnshareSelectedMemos}
+                                >
+                                    공유해제
+                                </SelectionButton>
+                            )}
                             <SelectionButton onClick={() => {
                                 // 전체선택/해제 로직: SecretPage와 동일
                                 const allFilteredIds = filteredAndSortedMemos.map(memo => memo.id);
@@ -1134,34 +1675,67 @@ const MemoPage = ({
                         </HeaderButtonWrapper>
                     </SectionHeader>
 
-                    {/* 폴더 탭 */}
-                    <FolderTabContainer>
-                        {folders.map(folder => (
-                            <FolderTab
-                                key={folder.id}
-                                $active={activeFolder === folder.id}
-                                onClick={() => setActiveFolder(folder.id)}
-                            >
-                                <span>{folder.icon}</span>
-                                <span>{folder.name}</span>
-                                <span className="count">{getFolderMemoCount(folder.id)}</span>
-                                {!folder.isDefault && activeFolder === folder.id && (
-                                    <FolderEditButton
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            openEditFolderModal(folder);
-                                        }}
-                                    >
-                                        ✏️
+                    {/* 공유 폴더 내부일 때 폴더 정보 */}
+                    {activeFolder === 'shared' && (
+                        <CurrentFolderHeader>
+                            <CurrentFolderInfo>
+                                <CurrentFolderIcon style={{ display: 'flex', alignItems: 'center', color: '#00ff88' }}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M18 16.08C17.24 16.08 16.56 16.38 16.04 16.85L8.91 12.7C8.96 12.47 9 12.24 9 12C9 11.76 8.96 11.53 8.91 11.3L15.96 7.19C16.5 7.69 17.21 8 18 8C19.66 8 21 6.66 21 5C21 3.34 19.66 2 18 2C16.34 2 15 3.34 15 5C15 5.24 15.04 5.47 15.09 5.7L8.04 9.81C7.5 9.31 6.79 9 6 9C4.34 9 3 10.34 3 12C3 13.66 4.34 15 6 15C6.79 15 7.5 14.69 8.04 14.19L15.16 18.35C15.11 18.56 15.08 18.78 15.08 19C15.08 20.61 16.39 21.92 18 21.92C19.61 21.92 20.92 20.61 20.92 19C20.92 17.39 19.61 16.08 18 16.08Z" fill="currentColor"/>
+                                    </svg>
+                                </CurrentFolderIcon>
+                                <CurrentFolderName>공유 폴더</CurrentFolderName>
+                            </CurrentFolderInfo>
+                            <FolderExitButton onClick={() => setActiveFolder('all')}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M13 17L14.4 15.6L11.8 13H22V11H11.8L14.4 8.4L13 7L8 12L13 17ZM4 5H13V3H4C2.9 3 2 3.9 2 5V19C2 20.1 2.9 21 4 21H13V19H4V5Z" fill="currentColor"/>
+                                </svg>
+                                폴더 나가기
+                            </FolderExitButton>
+                        </CurrentFolderHeader>
+                    )}
+
+                    {/* 사용자 폴더 내부일 때 폴더 정보 */}
+                    {activeFolder !== 'all' && activeFolder !== 'shared' && (() => {
+                        const currentFolder = customFolders.find(f => f.id === activeFolder);
+                        if (!currentFolder) return null;
+                        return (
+                            <CurrentFolderHeader>
+                                <CurrentFolderInfo
+                                    onTouchStart={() => {
+                                        folderHeaderLongPressTimer.current = setTimeout(() => {
+                                            handleFolderHeaderLongPress(currentFolder);
+                                        }, PRESS_DURATION);
+                                    }}
+                                    onTouchEnd={() => clearTimeout(folderHeaderLongPressTimer.current)}
+                                    onTouchMove={() => clearTimeout(folderHeaderLongPressTimer.current)}
+                                    onMouseDown={() => {
+                                        folderHeaderLongPressTimer.current = setTimeout(() => {
+                                            handleFolderHeaderLongPress(currentFolder);
+                                        }, PRESS_DURATION);
+                                    }}
+                                    onMouseUp={() => clearTimeout(folderHeaderLongPressTimer.current)}
+                                    onMouseLeave={() => clearTimeout(folderHeaderLongPressTimer.current)}
+                                    style={{ cursor: 'pointer' }}
+                                    title="길게 눌러서 폴더 수정"
+                                >
+                                    <CurrentFolderIcon>{currentFolder.icon}</CurrentFolderIcon>
+                                    <CurrentFolderName>{currentFolder.name}</CurrentFolderName>
+                                </CurrentFolderInfo>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <FolderEditButton onClick={() => openMoveMemosModal(currentFolder)}>
+                                        📋 메모 이동
                                     </FolderEditButton>
-                                )}
-                            </FolderTab>
-                        ))}
-                        <AddFolderTab onClick={openAddFolderModal}>
-                            <span>+</span>
-                            <span>새 폴더</span>
-                        </AddFolderTab>
-                    </FolderTabContainer>
+                                    <FolderExitButton onClick={() => setActiveFolder('all')}>
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M13 17L14.4 15.6 L11.8 13H22V11H11.8L14.4 8.4L13 7L8 12L13 17ZM4 5H13V3H4C2.9 3 2 3.9 2 5V19C2 20.1 2.9 21 4 21H13V19H4V5Z" fill="currentColor"/>
+                                        </svg>
+                                        폴더 나가기
+                                    </FolderExitButton>
+                                </div>
+                            </CurrentFolderHeader>
+                        );
+                    })()}
 
                     <SearchBar>
                         <SearchInput
@@ -1208,9 +1782,88 @@ const MemoPage = ({
                 </>
             )}
 
-            <MemoList $layoutView={layoutView}>
-                {filteredAndSortedMemos.length > 0 ? (
-                    filteredAndSortedMemos.map(memo => {
+            <MemoList>
+                {/* 전체 보기일 때만 폴더 표시 */}
+                {activeFolder === 'all' && (
+                    <>
+                        <FolderGridContainer>
+                            {/* 공유 폴더 - 항상 맨 앞에 표시 (형광 그린 스타일) */}
+                            <FolderCard
+                                $isShared
+                                onClick={() => setActiveFolder('shared')}
+                                title="공유된 메모 보기"
+                            >
+                                <SharedFolderIcon>
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M18 16.08C17.24 16.08 16.56 16.38 16.04 16.85L8.91 12.7C8.96 12.47 9 12.24 9 12C9 11.76 8.96 11.53 8.91 11.3L15.96 7.19C16.5 7.69 17.21 8 18 8C19.66 8 21 6.66 21 5C21 3.34 19.66 2 18 2C16.34 2 15 3.34 15 5C15 5.24 15.04 5.47 15.09 5.7L8.04 9.81C7.5 9.31 6.79 9 6 9C4.34 9 3 10.34 3 12C3 13.66 4.34 15 6 15C6.79 15 7.5 14.69 8.04 14.19L15.16 18.35C15.11 18.56 15.08 18.78 15.08 19C15.08 20.61 16.39 21.92 18 21.92C19.61 21.92 20.92 20.61 20.92 19C20.92 17.39 19.61 16.08 18 16.08Z" fill="currentColor"/>
+                                    </svg>
+                                </SharedFolderIcon>
+                                <FolderName>공유 폴더</FolderName>
+                                {sharedMemoInfo.size > 0 ? (
+                                    <FolderMemoCount>{sharedMemoInfo.size}개 문서</FolderMemoCount>
+                                ) : (
+                                    <FolderEmptyBadge>비어있음</FolderEmptyBadge>
+                                )}
+                            </FolderCard>
+
+                            {/* 사용자 정의 폴더들 */}
+                            {customFolders.map(folder => {
+                                const folderMemoCount = getFolderMemoCount(folder.id);
+                                return (
+                                    <FolderCard
+                                        key={folder.id}
+                                        onClick={() => setActiveFolder(folder.id)}
+                                        onTouchStart={() => {
+                                            folderLongPressTimer.current = setTimeout(() => {
+                                                handleFolderLongPress(folder);
+                                            }, PRESS_DURATION);
+                                        }}
+                                        onTouchEnd={() => clearTimeout(folderLongPressTimer.current)}
+                                        onTouchMove={() => clearTimeout(folderLongPressTimer.current)}
+                                        onMouseDown={() => {
+                                            folderLongPressTimer.current = setTimeout(() => {
+                                                handleFolderLongPress(folder);
+                                            }, PRESS_DURATION);
+                                        }}
+                                        onMouseUp={() => clearTimeout(folderLongPressTimer.current)}
+                                        onMouseLeave={() => clearTimeout(folderLongPressTimer.current)}
+                                        title="길게 눌러서 삭제"
+                                    >
+                                        <FolderIconWrapper>{folder.icon}</FolderIconWrapper>
+                                        <FolderName>{folder.name}</FolderName>
+                                        {folderMemoCount > 0 ? (
+                                            <FolderMemoCount>{folderMemoCount}개 문서</FolderMemoCount>
+                                        ) : (
+                                            <FolderEmptyBadge>비어있음</FolderEmptyBadge>
+                                        )}
+                                    </FolderCard>
+                                );
+                            })}
+
+                            {/* 새 폴더 만들기 카드 */}
+                            <AddFolderCard
+                                onClick={canAddFolder ? openAddFolderModal : undefined}
+                                $disabled={!canAddFolder}
+                                title={canAddFolder ? '새 폴더 만들기' : `폴더는 최대 ${maxFolders}개까지 생성 가능`}
+                            >
+                                <AddFolderIcon>+</AddFolderIcon>
+                                <AddFolderText>
+                                    {canAddFolder ? '새 폴더' : `${maxFolders}/${maxFolders}`}
+                                </AddFolderText>
+                            </AddFolderCard>
+                        </FolderGridContainer>
+
+                        {/* 구분선 - 미분류 메모가 있을 때만 표시 */}
+                        {filteredAndSortedMemos.length > 0 && (
+                            <SectionDivider>미분류 메모</SectionDivider>
+                        )}
+                    </>
+                )}
+
+                {/* 일반 메모들만 레이아웃 전환 적용 */}
+                <MemoGridWrapper $layoutView={layoutView}>
+                    {filteredAndSortedMemos.length > 0 ? (
+                        filteredAndSortedMemos.map(memo => {
                         if (!memo || !memo.id) {
                             return null;
                         }
@@ -1218,8 +1871,8 @@ const MemoPage = ({
                         const isSelected = selectedMemoIds.has(memo.id);
                         
                         return (
-                            <MemoCard 
-                                key={memo.id} 
+                            <MemoCard
+                                key={memo.id}
                                 onClick={(e) => {
                                     e.stopPropagation();
                                     if(isSelectionMode) {
@@ -1227,7 +1880,7 @@ const MemoPage = ({
                                     } else {
                                         onOpenDetailMemo(memo);
                                     }
-                                }} 
+                                }}
                                 onTouchStart={(e) => {
                                     longPressTimer.current = setTimeout(() => {
                                         onStartSelectionMode(memo.id);
@@ -1251,12 +1904,13 @@ const MemoPage = ({
                                 $isImportant={memo.isImportant}
                                 $isSelectionMode={isSelectionMode}
                                 $isSelected={isSelected}
+                                $layoutView={layoutView}
                             >
                                 <CheckboxContainer $isVisible={isSelectionMode} $isSelected={isSelected}>
                                     {isSelected ? <StyledCheckIcon /> : <BsCircle />}
                                 </CheckboxContainer>
 
-                                {/* 뱃지 컨테이너: NEW → 중요도 → 스텔스 순서로 자동 정렬 */}
+                                {/* 뱃지 컨테이너: NEW → 중요도 → 스텔스 → 공유 순서로 자동 정렬 */}
                                 <BadgeContainer>
                                     {isNew && <NewBadge>NEW</NewBadge>}
                                     {memo.isImportant && (
@@ -1269,24 +1923,35 @@ const MemoPage = ({
                                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                 {/* 고스트 몸통 */}
                                                 <path d="M12 2C7.58 2 4 5.58 4 10V18C4 18.55 4.45 19 5 19C5.55 19 6 18.55 6 18V17C6 16.45 6.45 16 7 16C7.55 16 8 16.45 8 17V18.5C8 19.05 8.45 19.5 9 19.5C9.55 19.5 10 19.05 10 18.5V17C10 16.45 10.45 16 11 16C11.55 16 12 16.45 12 17V18.5C12 19.05 12.45 19.5 13 19.5C13.55 19.5 14 19.05 14 18.5V17C14 16.45 14.45 16 15 16C15.55 16 16 16.45 16 17V18.5C16 19.05 16.45 19.5 17 19.5C17.55 19.5 18 19.05 18 18.5V17C18 16.45 18.45 16 19 16C19.55 16 20 16.45 20 17V18C20 18.55 19.55 19 19 19C18.45 19 18 18.55 18 18V10C18 5.58 14.42 2 12 2Z"
-                                                      fill="white"
+                                                      fill="#60a5fa"
                                                       opacity="0.9"/>
                                                 {/* 눈 */}
-                                                <circle cx="9" cy="9" r="1.5" fill="#667eea"/>
-                                                <circle cx="15" cy="9" r="1.5" fill="#667eea"/>
+                                                <circle cx="9" cy="9" r="1.5" fill="#1a1d24"/>
+                                                <circle cx="15" cy="9" r="1.5" fill="#1a1d24"/>
                                             </svg>
                                         </StealthBadge>
                                     )}
+                                    {/* 공유 뱃지: 공개(형광 그린), 비공개(형광 레드) */}
+                                    {sharedMemoInfo.has(memo.id) && (
+                                        <ShareBadge
+                                            $isPublic={sharedMemoInfo.get(memo.id)?.isPublic}
+                                            title={sharedMemoInfo.get(memo.id)?.isPublic ? '공개 공유 중' : '비공개 공유 중'}
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M18 16.08C17.24 16.08 16.56 16.38 16.04 16.85L8.91 12.7C8.96 12.47 9 12.24 9 12C9 11.76 8.96 11.53 8.91 11.3L15.96 7.19C16.5 7.69 17.21 8 18 8C19.66 8 21 6.66 21 5C21 3.34 19.66 2 18 2C16.34 2 15 3.34 15 5C15 5.24 15.04 5.47 15.09 5.7L8.04 9.81C7.5 9.31 6.79 9 6 9C4.34 9 3 10.34 3 12C3 13.66 4.34 15 6 15C6.79 15 7.5 14.69 8.04 14.19L15.16 18.35C15.11 18.56 15.08 18.78 15.08 19C15.08 20.61 16.39 21.92 18 21.92C19.61 21.92 20.92 20.61 20.92 19C20.92 17.39 19.61 16.08 18 16.08Z" fill="currentColor"/>
+                                            </svg>
+                                        </ShareBadge>
+                                    )}
                                 </BadgeContainer>
-                                <MemoHeader>
-                                    <MemoText>
+                                <MemoHeader $layoutView={layoutView}>
+                                    <MemoText $layoutView={layoutView}>
                                         {memo.isStealth ? (memo.stealthPhrase || '비공개 메모') : (memo.content || '')}
                                     </MemoText>
                                     <DeleteButton onClick={(e) => handleDeleteClick(e, memo.id)} $isSelectionMode={isSelectionMode}>
                                         &times;
                                     </DeleteButton>
                                 </MemoHeader>
-                                <DateText>
+                                <DateText $layoutView={layoutView}>
                                     {memo.updatedAt && memo.createdAt && memo.updatedAt !== memo.createdAt ? (
                                         <>수정일: {new Date(memo.updatedAt).toLocaleString('ko-KR', {
                                             year: 'numeric',
@@ -1317,6 +1982,7 @@ const MemoPage = ({
                         {searchQuery ? '검색 결과가 없습니다.' : '작성된 메모가 없습니다.'}
                     </EmptyMessage>
                 )}
+                </MemoGridWrapper>
             </MemoList>
 
             {/* 폴더 추가/수정 모달 */}
@@ -1353,7 +2019,7 @@ const MemoPage = ({
                                 취소
                             </FolderModalButton>
                             {folderModal.mode === 'edit' && (
-                                <FolderModalButton $variant="delete" onClick={handleDeleteFolder}>
+                                <FolderModalButton $variant="delete" onClick={handleDeleteFolderFromEdit}>
                                     삭제
                                 </FolderModalButton>
                             )}
@@ -1367,6 +2033,160 @@ const MemoPage = ({
                         </FolderModalButtons>
                     </FolderModalBox>
                 </FolderModalOverlay>
+            )}
+
+            {/* 폴더 삭제 확인 모달 */}
+            {deleteFolderModal && (
+                <FolderModalOverlay onClick={() => setDeleteFolderModal(null)}>
+                    <FolderModalBox onClick={(e) => e.stopPropagation()}>
+                        <FolderModalTitle>
+                            폴더 삭제
+                        </FolderModalTitle>
+
+                        <div style={{ color: '#e0e0e0', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
+                            <p style={{ margin: '0 0 12px 0' }}>
+                                <strong>"{deleteFolderModal.folder.name}"</strong> 폴더를 삭제하시겠습니까?
+                            </p>
+                            <p style={{ margin: '0', color: '#4a90e2' }}>
+                                ⚠️ 폴더 내부의 메모들은 삭제되지 않고 미분류 메모로 자동 이동됩니다.
+                            </p>
+                        </div>
+
+                        <FolderModalButtons>
+                            <FolderModalButton $variant="cancel" onClick={() => setDeleteFolderModal(null)}>
+                                취소
+                            </FolderModalButton>
+                            <FolderModalButton $variant="delete" onClick={handleConfirmDeleteFolder}>
+                                폴더 삭제
+                            </FolderModalButton>
+                        </FolderModalButtons>
+                    </FolderModalBox>
+                </FolderModalOverlay>
+            )}
+
+            {/* 메모 이동 확인 모달 */}
+            {moveConfirmModal && (
+                <FolderModalOverlay onClick={() => setMoveConfirmModal(null)} style={{ zIndex: 10002 }}>
+                    <FolderModalBox onClick={(e) => e.stopPropagation()}>
+                        <FolderModalTitle>
+                            {moveConfirmModal.action === 'move' ? '메모 이동' : '폴더에서 제거'}
+                        </FolderModalTitle>
+
+                        <div style={{ color: '#e0e0e0', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
+                            <p style={{ margin: '0 0 12px 0' }}>
+                                {moveConfirmModal.action === 'move'
+                                    ? `선택한 ${moveConfirmModal.count}개의 메모를 "${moveMemosModal?.folder.name}" 폴더로 이동하시겠습니까?`
+                                    : `선택한 ${moveConfirmModal.count}개의 메모를 폴더에서 제거하시겠습니까?`}
+                            </p>
+                            {moveConfirmModal.action === 'remove' && (
+                                <p style={{ margin: '0', color: '#4a90e2' }}>
+                                    ⚠️ 메모는 삭제되지 않고 미분류 메모로 이동됩니다.
+                                </p>
+                            )}
+                        </div>
+
+                        <FolderModalButtons>
+                            <FolderModalButton $variant="cancel" onClick={() => setMoveConfirmModal(null)}>
+                                취소
+                            </FolderModalButton>
+                            <FolderModalButton $variant="confirm" onClick={handleConfirmMove}>
+                                {moveConfirmModal.action === 'move' ? '이동' : '제거'}
+                            </FolderModalButton>
+                        </FolderModalButtons>
+                    </FolderModalBox>
+                </FolderModalOverlay>
+            )}
+
+            {/* 메모 이동 모달 */}
+            {moveMemosModal && (
+                <MemoSelectModalOverlay>
+                    <MemoSelectHeader>
+                        <MemoSelectTitle>
+                            {moveMemosModal.folder.icon} "{moveMemosModal.folder.name}" 메모 이동
+                        </MemoSelectTitle>
+                        <MemoSelectCloseBtn onClick={closeMoveMemosModal}>×</MemoSelectCloseBtn>
+                    </MemoSelectHeader>
+
+                    {/* 탭 */}
+                    <TabContainer>
+                        <Tab
+                            $active={moveModalTab === 'outside'}
+                            onClick={() => {
+                                setMoveModalTab('outside');
+                                setSelectedMemosForMove(new Set());
+                            }}
+                        >
+                            미분류 메모
+                        </Tab>
+                        <Tab
+                            $active={moveModalTab === 'inside'}
+                            onClick={() => {
+                                setMoveModalTab('inside');
+                                setSelectedMemosForMove(new Set());
+                            }}
+                        >
+                            폴더 내 메모
+                        </Tab>
+                    </TabContainer>
+
+                    {/* 버튼 영역 */}
+                    <div style={{
+                        padding: '12px 20px',
+                        display: 'flex',
+                        gap: '8px',
+                        background: '#2c2f38',
+                        borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
+                    }}>
+                        <MemoSelectBtn
+                            $variant="confirm"
+                            onClick={handleRequestMove}
+                            disabled={selectedMemosForMove.size === 0}
+                            style={{ flex: 1 }}
+                        >
+                            {moveModalTab === 'outside'
+                                ? `이 폴더로 이동 ${selectedMemosForMove.size > 0 ? `(${selectedMemosForMove.size}개)` : ''}`
+                                : `폴더에서 제거 ${selectedMemosForMove.size > 0 ? `(${selectedMemosForMove.size}개)` : ''}`}
+                        </MemoSelectBtn>
+                        <MemoSelectBtn $variant="cancel" onClick={closeMoveMemosModal}>
+                            닫기
+                        </MemoSelectBtn>
+                    </div>
+
+                    <MemoSelectList>
+                        {(() => {
+                            const targetMemos = moveModalTab === 'outside'
+                                ? memos?.filter(memo => !memo.folderId && !sharedMemoInfo.has(memo.id)) || []
+                                : memos?.filter(memo => memo.folderId === moveMemosModal.folder.id) || [];
+
+                            if (targetMemos.length === 0) {
+                                return (
+                                    <MemoSelectInfo>
+                                        {moveModalTab === 'outside' ? '미분류 메모가 없습니다.' : '폴더 내 메모가 없습니다.'}
+                                    </MemoSelectInfo>
+                                );
+                            }
+
+                            return targetMemos.map(memo => {
+                                const isSelected = selectedMemosForMove.has(memo.id);
+                                // 메모 이동 모달에서는 스텔스 여부와 관계없이 실제 내용 표시
+                                const displayContent = memo.content?.split('\n')[0] || '(내용 없음)';
+                                return (
+                                    <MemoSelectItem
+                                        key={memo.id}
+                                        $selected={isSelected}
+                                        onClick={() => toggleMemoForMove(memo.id)}
+                                    >
+                                        <MemoSelectItemHeader>
+                                            <MemoSelectItemText>
+                                                {displayContent}
+                                            </MemoSelectItemText>
+                                        </MemoSelectItemHeader>
+                                    </MemoSelectItem>
+                                );
+                            });
+                        })()}
+                    </MemoSelectList>
+                </MemoSelectModalOverlay>
             )}
         </MemoContainer>
     );
