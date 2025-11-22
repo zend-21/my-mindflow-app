@@ -121,10 +121,14 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
                 const userInfo = await userInfoResponse.json();
                 console.log('사용자 정보:', userInfo);
 
-                // onSuccess 콜백 호출
+                // onSuccess 콜백 호출 (토큰 만료 시간 포함)
+                // Google OAuth 액세스 토큰은 기본적으로 3600초(1시간) 유효
+                const expiresAt = Date.now() + (tokenResponse.expires_in || 3600) * 1000;
+
                 onSuccess({
                     accessToken: tokenResponse.access_token,
                     userInfo: userInfo,
+                    expiresAt: expiresAt, // 만료 시간 추가
                 });
             } catch (error) {
                 console.error('사용자 정보 가져오기 실패:', error);
@@ -136,7 +140,6 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
             onError();
         },
         scope: 'https://www.googleapis.com/auth/drive.file',
-        flow: 'implicit',
     });
 
     return (

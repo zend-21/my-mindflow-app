@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { GlobalStyle } from './styles.js';
-import { GoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, useGoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import { GoogleAuthProvider, signInWithCredential, signOut } from 'firebase/auth';
 import { auth } from './firebase/config';
@@ -343,13 +343,35 @@ function App() {
     const [isLoading, setIsLoading] = useState(true);
     const [profile, setProfile] = useState(null);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-    
+
     // ✅ 새로 추가되는 상태들
     const [accessToken, setAccessTokenState] = useState(null);
     const [lastSyncTime, setLastSyncTime] = useState(null);
     const syncIntervalRef = useRef(null);
     const syncDebounceRef = useRef(null);
     const [isGapiReady, setIsGapiReady] = useState(false);
+
+    // ✅ 토큰 자동 갱신을 위한 useGoogleLogin 훅
+    const refreshToken = useGoogleLogin({
+        onSuccess: async (tokenResponse) => {
+            console.log('🔄 토큰 자동 갱신 성공');
+            const expiresAt = Date.now() + (tokenResponse.expires_in || 3600) * 1000;
+
+            // 새 토큰 저장
+            setAccessTokenState(tokenResponse.access_token);
+            localStorage.setItem('accessToken', tokenResponse.access_token);
+            localStorage.setItem('tokenExpiresAt', expiresAt.toString());
+
+            // GAPI에 새 토큰 설정
+            if (isGapiReady) {
+                setAccessToken(tokenResponse.access_token);
+            }
+        },
+        onError: (error) => {
+            console.error('❌ 토큰 자동 갱신 실패:', error);
+        },
+        scope: 'https://www.googleapis.com/auth/drive.file',
+    });
     
     const [activeTab, setActiveTab] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -363,6 +385,7 @@ function App() {
     // 협업방 상태
     const [isCollaborationRoomOpen, setIsCollaborationRoomOpen] = useState(false);
     const [selectedRoomId, setSelectedRoomId] = useState(null);
+    const [previousTab, setPreviousTab] = useState(null); // 방 입장 전 탭 저장
 
     const [isDragging, setIsDragging] = useState(false);
     const pullStartTime = useRef(0);
@@ -1259,6 +1282,7 @@ function App() {
     // 협업방 선택 핸들러 (MyWorkspace, RoomBrowser에서 호출)
     const handleRoomSelect = (room) => {
         console.log('방 입장:', room);
+        setPreviousTab(activeTab); // 현재 탭 저장
         setSelectedRoomId(room.id);
         setIsCollaborationRoomOpen(true);
     };
@@ -1267,6 +1291,11 @@ function App() {
     const handleCloseCollaborationRoom = () => {
         setIsCollaborationRoomOpen(false);
         setSelectedRoomId(null);
+        // 이전 탭으로 복귀
+        if (previousTab) {
+            setActiveTab(previousTab);
+            setPreviousTab(null);
+        }
     };
 
     const requestDeleteSelectedMemos = () => {
@@ -1442,11 +1471,14 @@ function App() {
     useEffect(() => {
         const savedProfile = localStorage.getItem('userProfile');
         const savedToken = localStorage.getItem('accessToken');
+        const savedTokenExpiresAt = localStorage.getItem('tokenExpiresAt');
         const savedNickname = localStorage.getItem('userNickname');
         const savedCustomPicture = localStorage.getItem('customProfilePicture');
 
-        if (savedProfile && savedToken) {
+        if (savedProfile) {
+            // 프로필은 항상 복원 (로그인 상태 유지)
             const profileData = JSON.parse(savedProfile);
+
             // 저장된 닉네임이 있으면 profile에 추가
             if (savedNickname) {
                 profileData.nickname = savedNickname;
@@ -1455,12 +1487,34 @@ function App() {
             if (savedCustomPicture) {
                 profileData.customPicture = savedCustomPicture;
             }
-            setProfile(profileData);
-            setAccessTokenState(savedToken);
 
-            // GAPI가 준비되면 토큰 설정
-            if (isGapiReady) {
-                setAccessToken(savedToken);
+            setProfile(profileData);
+
+            // 토큰 검증 및 설정
+            if (savedToken && savedTokenExpiresAt) {
+                const expiresAt = parseInt(savedTokenExpiresAt, 10);
+                const now = Date.now();
+
+                // 토큰이 만료되었는지 확인 (5분 여유를 둠)
+                if (now >= expiresAt - 5 * 60 * 1000) {
+                    console.log('⚠️ 저장된 토큰이 만료되었습니다. 동기화 시 재인증이 필요합니다.');
+                    // 만료된 토큰만 삭제 (프로필은 유지)
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('tokenExpiresAt');
+                    setAccessTokenState(null);
+                } else {
+                    // 토큰이 유효함
+                    console.log('✅ 유효한 토큰으로 복원됨');
+                    setAccessTokenState(savedToken);
+
+                    // GAPI가 준비되면 토큰 설정
+                    if (isGapiReady) {
+                        setAccessToken(savedToken);
+                    }
+                }
+            } else {
+                console.log('⚠️ 토큰이 없습니다. 동기화 시 재인증이 필요합니다.');
+                setAccessTokenState(null);
             }
         }
 
@@ -1514,7 +1568,7 @@ function App() {
     // ✅ 로그인 성공 시 처리 (기존 handleLoginSuccess를 확장)
     const handleLoginSuccess = async (response) => {
         try {
-            const { accessToken, userInfo } = response;
+            const { accessToken, userInfo, expiresAt } = response;
 
             // ★★★ 수정: 강력한 URL HTTPS 강제 변환 로직 ★★★
             let pictureUrl = userInfo.picture;
@@ -1550,6 +1604,7 @@ function App() {
 
             localStorage.setItem('userProfile', JSON.stringify(profileData));
             localStorage.setItem('accessToken', accessToken);
+            localStorage.setItem('tokenExpiresAt', expiresAt.toString()); // 토큰 만료 시간 저장
             localStorage.setItem('firebaseUserId', firebaseUserId); // 🔥 협업 기능용 사용자 ID 저장
 
             console.log('✅ 로그인 완료 - firebaseUserId:', firebaseUserId);
@@ -1691,14 +1746,22 @@ function App() {
             } else {
                 console.error('❌ 동기화 실패:', result);
                 if (result.error === 'TOKEN_EXPIRED') {
-                    // ✅ 자동 로그아웃 대신 재로그인 유도
-                    if (isManual) {
-                        showToast('🔐 로그인이 만료되었습니다. 다시 로그인해주세요.');
-                        setTimeout(() => {
-                            setIsLoginModalOpen(true);
-                        }, 1500);
+                    // ✅ 토큰 자동 갱신 시도
+                    console.log('🔄 토큰 만료 감지 - 자동 갱신 시도');
+                    try {
+                        refreshToken(); // 자동으로 토큰 갱신 팝업 열기
+                        if (isManual) {
+                            showToast('🔐 재인증 중...');
+                        }
+                    } catch (error) {
+                        console.error('❌ 토큰 갱신 실패:', error);
+                        if (isManual) {
+                            showToast('🔐 재로그인이 필요합니다.');
+                            setTimeout(() => {
+                                setIsLoginModalOpen(true);
+                            }, 1500);
+                        }
                     }
-                    // handleLogout()을 호출하지 않음!
                 } else {
                     if (isManual) {
                         showToast('❌ 동기화 실패');
