@@ -6,6 +6,9 @@ import { collection, query, where, orderBy, getDocs, onSnapshot, doc, getDoc } f
 import { db } from '../../firebase/config';
 import { deleteRoom, closeRoom, reopenRoom, regenerateRoomInviteCode, getRoomByInviteCode } from '../../services/collaborationRoomService';
 import RoomBrowser from './RoomBrowser';
+import QRCodeModal from './QRCodeModal';
+import QRScannerModal from './QRScannerModal';
+import { getMyFriends, removeFriend } from '../../services/friendService';
 
 const fadeIn = keyframes`
   from { opacity: 0; }
@@ -553,7 +556,7 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
   const [rooms, setRooms] = useState([]); // 내가 운영중인 방
   const [joinedRooms, setJoinedRooms] = useState([]); // 참가 이력 방
   const [loading, setLoading] = useState(true);
-  const [mainTab, setMainTab] = useState('owned'); // owned, joined, browse
+  const [mainTab, setMainTab] = useState('owned'); // owned, joined, browse, friends
 
   // 내가 운영중인 방 - 서브탭
   const [ownedRoomTab, setOwnedRoomTab] = useState('all'); // all, open, restricted, archived
@@ -566,6 +569,11 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
 
   // 길게 누르기 상태
   const [longPressTimer, setLongPressTimer] = useState(null);
+
+  // 친구 관련 상태
+  const [friends, setFriends] = useState([]);
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   useEffect(() => {
     loadWorkspaceAndRooms();
@@ -693,6 +701,71 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
       console.error('참가 이력 조회 오류:', error);
       setJoinedRooms([]);
     }
+  };
+
+  // 친구 목록 로드
+  const loadFriends = async () => {
+    try {
+      const userId = localStorage.getItem('firebaseUserId');
+      if (!userId) return;
+
+      const friendsList = await getMyFriends(userId);
+      console.log('👥 친구 목록:', friendsList.length, '명');
+      setFriends(friendsList);
+    } catch (error) {
+      console.error('친구 목록 조회 오류:', error);
+      setFriends([]);
+    }
+  };
+
+  // 친구 탭이 활성화될 때 친구 목록 로드
+  useEffect(() => {
+    if (mainTab === 'friends') {
+      loadFriends();
+    }
+  }, [mainTab]);
+
+  // 친구 삭제 핸들러
+  const handleRemoveFriend = (friendId, friendName) => {
+    setConfirmModal({
+      title: '친구 삭제',
+      message: `${friendName}님을 친구 목록에서 삭제하시겠습니까?\n\n⚠️ 양쪽 모두에서 친구가 해제됩니다.`,
+      variant: 'danger',
+      onConfirm: async () => {
+        try {
+          const userId = localStorage.getItem('firebaseUserId');
+          const result = await removeFriend(userId, friendId);
+
+          if (result.success) {
+            setAlertModal({
+              title: '삭제 완료',
+              message: '친구가 삭제되었습니다.',
+              variant: 'success'
+            });
+            await loadFriends(); // 친구 목록 새로고침
+          } else {
+            setAlertModal({
+              title: '오류',
+              message: result.error || '친구 삭제에 실패했습니다.',
+              variant: 'danger'
+            });
+          }
+        } catch (error) {
+          console.error('친구 삭제 오류:', error);
+          setAlertModal({
+            title: '오류',
+            message: '친구 삭제에 실패했습니다.',
+            variant: 'danger'
+          });
+        }
+      }
+    });
+  };
+
+  // QR 스캔 성공 시 친구 목록 새로고침
+  const handleFriendAdded = (friend) => {
+    showToast?.(`${friend.name}님이 친구로 추가되었습니다!`);
+    loadFriends();
   };
 
   const handleCopyCode = () => {
@@ -959,7 +1032,7 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                 <Title>협업 라운지</Title>
                 <Subtitle>모든 협업방을 한 곳에서 관리하세요</Subtitle>
 
-                {workspace && mainTab === 'owned' && (
+                {workspace && (mainTab === 'owned' || mainTab === 'friends') && (
                   <WorkspaceInfo>
                     <WorkspaceCodeSection>
                       <CodeRow>
@@ -968,7 +1041,15 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                       </CodeRow>
                       <ButtonRow>
                         <CodeButton onClick={handleCopyCode}>복사</CodeButton>
-                        <ChangeCodeButton onClick={handleChangeCode}>변경</ChangeCodeButton>
+                        {mainTab === 'owned' && (
+                          <ChangeCodeButton onClick={handleChangeCode}>변경</ChangeCodeButton>
+                        )}
+                        {mainTab === 'friends' && (
+                          <>
+                            <CodeButton onClick={() => setShowQRCode(true)}>QR 보기</CodeButton>
+                            <CodeButton onClick={() => setShowQRScanner(true)}>QR 스캔</CodeButton>
+                          </>
+                        )}
                       </ButtonRow>
                     </WorkspaceCodeSection>
                   </WorkspaceInfo>
@@ -985,6 +1066,9 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                 </Tab>
                 <Tab $active={mainTab === 'browse'} onClick={() => setMainTab('browse')}>
                   방 탐색
+                </Tab>
+                <Tab $active={mainTab === 'friends'} onClick={() => setMainTab('friends')}>
+                  친구 <span>{friends.length}</span>
                 </Tab>
               </TabContainer>
 
@@ -1186,6 +1270,44 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                   </ActionButton>
                 </EmptyState>
               )}
+
+              {/* 친구 목록 */}
+              {mainTab === 'friends' && (
+                <>
+                  {friends.length > 0 ? (
+                    <RoomListContainer>
+                      {friends.map(friend => (
+                        <RoomCard key={friend.id}>
+                          <RoomCardHeader>
+                            <div>
+                              <RoomTitle>{friend.friendName}</RoomTitle>
+                              <RoomMeta>
+                                <MetaItem>WS: {friend.friendWorkspaceCode}</MetaItem>
+                                {friend.friendEmail && (
+                                  <MetaItem>{friend.friendEmail}</MetaItem>
+                                )}
+                              </RoomMeta>
+                            </div>
+                          </RoomCardHeader>
+                          <RoomCardActions>
+                            <ActionButton
+                              $variant="delete"
+                              onClick={() => handleRemoveFriend(friend.friendId, friend.friendName)}
+                            >
+                              삭제
+                            </ActionButton>
+                          </RoomCardActions>
+                        </RoomCard>
+                      ))}
+                    </RoomListContainer>
+                  ) : (
+                    <EmptyState>
+                      친구가 없습니다.<br />
+                      QR 스캔 버튼으로 친구를 추가해보세요.
+                    </EmptyState>
+                  )}
+                </>
+              )}
             </Container>
           )}
           </ScrollableContent>
@@ -1270,6 +1392,23 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
         onClose={() => setIsRoomBrowserOpen(false)}
         onRoomSelect={handleRoomBrowserSelect}
       />
+
+      {/* QR 코드 표시 모달 */}
+      {showQRCode && workspace && (
+        <QRCodeModal
+          workspaceCode={workspace.workspaceCode}
+          onClose={() => setShowQRCode(false)}
+        />
+      )}
+
+      {/* QR 스캐너 모달 */}
+      {showQRScanner && (
+        <QRScannerModal
+          userId={localStorage.getItem('firebaseUserId')}
+          onClose={() => setShowQRScanner(false)}
+          onFriendAdded={handleFriendAdded}
+        />
+      )}
     </>
   );
 };

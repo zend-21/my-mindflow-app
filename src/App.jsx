@@ -1639,6 +1639,42 @@ function App() {
         setIsLoginModalOpen(false);
     };
 
+    // ✅ 토큰 자동 갱신 체크 (토큰 만료 10분 전에 확인)
+    useEffect(() => {
+        if (!accessToken) return;
+
+        const checkTokenExpiry = () => {
+            const expiresAtStr = localStorage.getItem('tokenExpiresAt');
+            if (!expiresAtStr) return;
+
+            const expiresAt = parseInt(expiresAtStr, 10);
+            const now = Date.now();
+            const timeUntilExpiry = expiresAt - now;
+
+            // 토큰이 10분 이내에 만료될 예정
+            if (timeUntilExpiry < 10 * 60 * 1000 && timeUntilExpiry > 0) {
+                console.log(`⏰ 토큰이 ${Math.floor(timeUntilExpiry / 1000 / 60)}분 후 만료 예정 - 자동 갱신 필요`);
+                // 토큰 삭제하여 다음 동기화 시 재로그인 유도
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('tokenExpiresAt');
+                setAccessTokenState(null);
+                console.log('🔐 토큰 제거됨 - 다음 동기화 시 재로그인 필요');
+            } else if (timeUntilExpiry <= 0) {
+                console.log('❌ 토큰이 이미 만료됨 - 제거');
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('tokenExpiresAt');
+                setAccessTokenState(null);
+            }
+        };
+
+        // 초기 체크
+        checkTokenExpiry();
+
+        // 5분마다 체크
+        const interval = setInterval(checkTokenExpiry, 5 * 60 * 1000);
+
+        return () => clearInterval(interval);
+    }, [accessToken]);
 
     // ✅ handleSync 함수 (performSync(true) 호출 확인)
     const handleSync = async () => {
@@ -1671,8 +1707,12 @@ function App() {
         if (!profile || !accessToken) {
             console.log('❌ 로그인 안 됨');
             if (isManual) {
-                showToast('⚠️ 로그인 필요');
-                console.log('Toast 표시: 로그인 필요');
+                showToast('🔐 로그인 세션이 만료되었습니다');
+                console.log('Toast 표시: 로그인 세션이 만료되었습니다');
+                // 1.5초 후 로그인 모달 표시
+                setTimeout(() => {
+                    setIsLoginModalOpen(true);
+                }, 1500);
             }
             return false;
         }

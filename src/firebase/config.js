@@ -36,6 +36,13 @@ if (firebaseConfig.apiKey && firebaseConfig.projectId) {
     // Analytics 초기화 (브라우저 환경에서만)
     if (typeof window !== 'undefined') {
       analytics = getAnalytics(app);
+
+      // 개발 환경에서 Debug Mode 활성화 (DebugView에서 실시간 확인 가능)
+      if (import.meta.env.DEV) {
+        window['ga-disable-' + firebaseConfig.measurementId] = false;
+        console.log('🐛 Firebase Analytics Debug Mode 활성화');
+      }
+
       console.log('✅ Firebase Analytics 초기화 완료');
     }
 

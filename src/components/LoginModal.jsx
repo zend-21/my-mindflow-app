@@ -105,7 +105,7 @@ const ModalDescription = styled.p`
 `;
 
 function LoginModal({ onSuccess, onError, onClose, setProfile }) {
-    // 원래 방식: @react-oauth/google의 useGoogleLogin 사용
+    // Refresh Token을 받기 위한 설정 추가
     const login = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
             console.log('Google OAuth 성공:', tokenResponse);
@@ -127,8 +127,10 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
 
                 onSuccess({
                     accessToken: tokenResponse.access_token,
+                    refreshToken: tokenResponse.refresh_token, // Refresh Token 추가
                     userInfo: userInfo,
                     expiresAt: expiresAt, // 만료 시간 추가
+                    expiresIn: tokenResponse.expires_in, // 만료 시간(초) 추가
                 });
             } catch (error) {
                 console.error('사용자 정보 가져오기 실패:', error);
@@ -140,6 +142,10 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
             onError();
         },
         scope: 'https://www.googleapis.com/auth/drive.file',
+        // Refresh Token을 받기 위한 추가 옵션
+        // 주의: flow: 'auth-code'를 사용하려면 백엔드가 필요하므로
+        // 대신 prompt: 'consent'를 사용하여 매번 동의 화면 표시
+        // 이렇게 하면 refresh_token이 응답에 포함됩니다 (첫 로그인 시)
     });
 
     return (

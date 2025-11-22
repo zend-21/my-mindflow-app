@@ -52,6 +52,11 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isOwner(userId);
       allow update, delete: if isOwner(userId);
+
+      // 🆕 친구 서브컬렉션 - 본인만 읽기/쓰기 가능
+      match /friends/{friendId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     // ========================================
