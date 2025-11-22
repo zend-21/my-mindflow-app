@@ -55,6 +55,7 @@ const AddFriendPage = () => {
 
     try {
       setSending(true);
+      setError(''); // 이전 에러 초기화
       await sendFriendRequest(user.id, user.displayName);
       setSuccess(true);
 
@@ -64,7 +65,8 @@ const AddFriendPage = () => {
       }, 3000);
     } catch (err) {
       console.error(err);
-      alert(err.message || '친구 요청에 실패했습니다');
+      setError(err.message || '친구 요청에 실패했습니다');
+      setUser(null); // 에러 발생 시 사용자 정보 초기화하여 에러 섹션 표시
     } finally {
       setSending(false);
     }

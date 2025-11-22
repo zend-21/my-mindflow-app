@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { getUserReviews, searchReviews, deleteReview, toggleReviewPublic, checkCanMakePublic, setPendingStatus } from '../services/reviewService';
 import { getUserInfo, RANK_INFO } from '../services/userService';
 import { REVIEW_SORT_OPTIONS } from '../types/review';
+import ConfirmModal from '../components/ConfirmModal';
 import './ReviewList.css';
 
 const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, onNavigateToCommunity, showToast, setShowHeader }) => {
@@ -34,6 +35,7 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, onNavigateToCommunity
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [selectedReviewId, setSelectedReviewId] = useState(null);
   const [fakeDaysOffset, setFakeDaysOffset] = useState(0); // 음수면 과거로, 양수면 미래로
+  const [deleteConfirmReviewId, setDeleteConfirmReviewId] = useState(null); // 삭제 확인 모달용
 
   // 사용자 정보
   const [userInfo, setUserInfo] = useState(null);
@@ -262,18 +264,22 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, onNavigateToCommunity
     }
   };
 
-  const handleDelete = async (reviewId) => {
-    if (!window.confirm('정말 이 리뷰를 삭제하시겠습니까?')) {
-      return;
-    }
+  const handleDelete = (reviewId) => {
+    setDeleteConfirmReviewId(reviewId);
+  };
+
+  const executeDelete = async () => {
+    if (!deleteConfirmReviewId) return;
 
     try {
-      await deleteReview(reviewId, userId);
+      await deleteReview(deleteConfirmReviewId, userId);
       showToast?.('리뷰가 삭제되었습니다.');
+      setDeleteConfirmReviewId(null);
       loadReviews();
     } catch (error) {
       console.error('리뷰 삭제 실패:', error);
       showToast?.('리뷰 삭제에 실패했습니다.');
+      setDeleteConfirmReviewId(null);
     }
   };
 
@@ -819,6 +825,15 @@ const ReviewList = ({ onNavigateToWrite, onNavigateToEdit, onNavigateToCommunity
             </div>
           </div>
         </div>
+      )}
+
+      {/* 삭제 확인 모달 */}
+      {deleteConfirmReviewId && (
+        <ConfirmModal
+          message="정말 이 리뷰를 삭제하시겠습니까?"
+          onConfirm={executeDelete}
+          onCancel={() => setDeleteConfirmReviewId(null)}
+        />
       )}
 
     </div>

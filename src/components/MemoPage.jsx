@@ -285,7 +285,7 @@ const ClearSearchButton = styled.button`
 const SortBar = styled.div`
     display: flex;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-bottom: -8px;
     width: 100%;
 `;
 
@@ -317,7 +317,7 @@ const GuidanceMessage = styled.div`
     border: 1px solid rgba(74, 144, 226, 0.3);
     padding: 10px 16px;
     text-align: center;
-    margin-bottom: 16px;
+    margin-bottom: 3px;
     border-radius: 8px;
     color: rgba(255, 255, 255, 0.6);
     font-size: 12px;
@@ -616,7 +616,7 @@ const MemoList = styled.div`
     flex-direction: column;
     gap: 16px;
     width: 100%;
-    margin-top: 35px;
+    margin-top: 20px;
     padding-bottom: 20px;
 `;
 
@@ -798,7 +798,7 @@ const SectionDivider = styled.div`
     display: flex;
     align-items: center;
     gap: 12px;
-    margin: 10px 0;
+    margin: 10px 0 8px 0;
     color: #888;
     font-size: 13px;
 
@@ -1511,22 +1511,40 @@ const MemoPage = ({
     // 검색 및 정렬 로직
     let filteredAndSortedMemos = [];
     if (memos && Array.isArray(memos)) {
-        // 1. 폴더 필터링
-        filteredAndSortedMemos = memos.filter(memo => {
-            // "전체"일 때는 폴더에 속하지 않은 미분류 메모만 표시 (공유된 메모 제외)
-            if (activeFolder === 'all') return !memo.folderId && !sharedMemoInfo.has(memo.id);
-            // "공유"일 때는 folderId가 'shared'이거나 sharedMemoInfo에 있는 메모 표시
-            if (activeFolder === 'shared') return memo.folderId === 'shared' || sharedMemoInfo.has(memo.id);
-            // 다른 커스텀 폴더일 때는 해당 폴더 ID와 일치하고 공유되지 않은 메모만 표시
-            return memo.folderId === activeFolder && !sharedMemoInfo.has(memo.id);
-        });
-
-        // 2. 검색 필터링
-        filteredAndSortedMemos = filteredAndSortedMemos.filter(memo => {
-            if (!searchQuery.trim()) return true;
+        // 검색어가 있을 때의 처리
+        if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
-            return memo.content?.toLowerCase().includes(query);
-        });
+
+            if (activeFolder === 'all') {
+                // 메인 페이지: 모든 메모 검색 (공유 메모 제외)
+                filteredAndSortedMemos = memos.filter(memo => {
+                    return !sharedMemoInfo.has(memo.id) && memo.content?.toLowerCase().includes(query);
+                });
+            } else if (activeFolder === 'shared') {
+                // 공유 폴더: 공유된 메모만 검색
+                filteredAndSortedMemos = memos.filter(memo => {
+                    return (memo.folderId === 'shared' || sharedMemoInfo.has(memo.id)) &&
+                           memo.content?.toLowerCase().includes(query);
+                });
+            } else {
+                // 사용자 정의 폴더: 해당 폴더 내 메모만 검색
+                filteredAndSortedMemos = memos.filter(memo => {
+                    return memo.folderId === activeFolder &&
+                           !sharedMemoInfo.has(memo.id) &&
+                           memo.content?.toLowerCase().includes(query);
+                });
+            }
+        } else {
+            // 검색어가 없을 때는 기존 로직대로 폴더 필터링
+            filteredAndSortedMemos = memos.filter(memo => {
+                // "전체"일 때는 폴더에 속하지 않은 미분류 메모만 표시 (공유된 메모 제외)
+                if (activeFolder === 'all') return !memo.folderId && !sharedMemoInfo.has(memo.id);
+                // "공유"일 때는 folderId가 'shared'이거나 sharedMemoInfo에 있는 메모 표시
+                if (activeFolder === 'shared') return memo.folderId === 'shared' || sharedMemoInfo.has(memo.id);
+                // 다른 커스텀 폴더일 때는 해당 폴더 ID와 일치하고 공유되지 않은 메모만 표시
+                return memo.folderId === activeFolder && !sharedMemoInfo.has(memo.id);
+            });
+        }
 
         // 3. 정렬
         filteredAndSortedMemos = [...filteredAndSortedMemos].sort((a, b) => {
@@ -1730,7 +1748,7 @@ const MemoPage = ({
                     <SearchBar>
                         <SearchInput
                             type="text"
-                            placeholder="메모 검색..."
+                            placeholder={activeFolder === 'all' ? "메모 검색..." : "폴더내 검색..."}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             $hasValue={searchQuery.length > 0}
@@ -1745,34 +1763,68 @@ const MemoPage = ({
                         )}
                     </SearchBar>
 
-                    <SortBar>
-                        <SortButton
-                            $active={sortOrder === 'date'}
-                            onClick={() => handleSortToggle('date')}
-                        >
-                            등록일순 {sortOrder === 'date' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
-                        </SortButton>
-                        <SortButton
-                            $active={sortOrder === 'updated'}
-                            onClick={() => handleSortToggle('updated')}
-                        >
-                            수정일순 {sortOrder === 'updated' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
-                        </SortButton>
-                        <SortButton
-                            $active={sortOrder === 'importance'}
-                            onClick={() => handleSortToggle('importance')}
-                        >
-                            중요도순 {sortOrder === 'importance' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
-                        </SortButton>
-                    </SortBar>
+                    {/* 공유 폴더일 때 정렬 버튼과 안내문 */}
+                    {activeFolder === 'shared' && (
+                        <div style={{ marginTop: '15px' }}>
+                            <SortBar>
+                                <SortButton
+                                    $active={sortOrder === 'date'}
+                                    onClick={() => handleSortToggle('date')}
+                                >
+                                    등록일순 {sortOrder === 'date' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                                </SortButton>
+                                <SortButton
+                                    $active={sortOrder === 'updated'}
+                                    onClick={() => handleSortToggle('updated')}
+                                >
+                                    수정일순 {sortOrder === 'updated' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                                </SortButton>
+                                <SortButton
+                                    $active={sortOrder === 'importance'}
+                                    onClick={() => handleSortToggle('importance')}
+                                >
+                                    중요도순 {sortOrder === 'importance' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                                </SortButton>
+                            </SortBar>
 
-                    {/* 사용자 정의 폴더 내부일 때는 '문서 이동' 버튼, 그 외에는 안내 메시지 */}
-                    {activeFolder !== 'all' && activeFolder !== 'shared' ? (
-                        (() => {
-                            const currentFolder = customFolders.find(f => f.id === activeFolder);
-                            if (!currentFolder) return null;
-                            return (
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '4px', marginBottom: '-10px' }}>
+                            <GuidanceMessage style={{ marginTop: '15px' }}>
+                                하단의 목록창을 길게 누르면 다중 선택 모드가 활성화 됩니다.
+                            </GuidanceMessage>
+                        </div>
+                    )}
+
+                    {/* 사용자 정의 폴더일 때 정렬 버튼, 안내문, 문서 이동 버튼 */}
+                    {activeFolder !== 'all' && activeFolder !== 'shared' && (() => {
+                        const currentFolder = customFolders.find(f => f.id === activeFolder);
+                        if (!currentFolder) return null;
+                        return (
+                            <div style={{ marginTop: '15px' }}>
+                                <SortBar>
+                                    <SortButton
+                                        $active={sortOrder === 'date'}
+                                        onClick={() => handleSortToggle('date')}
+                                    >
+                                        등록일순 {sortOrder === 'date' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                                    </SortButton>
+                                    <SortButton
+                                        $active={sortOrder === 'updated'}
+                                        onClick={() => handleSortToggle('updated')}
+                                    >
+                                        수정일순 {sortOrder === 'updated' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                                    </SortButton>
+                                    <SortButton
+                                        $active={sortOrder === 'importance'}
+                                        onClick={() => handleSortToggle('importance')}
+                                    >
+                                        중요도순 {sortOrder === 'importance' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                                    </SortButton>
+                                </SortBar>
+
+                                <GuidanceMessage style={{ marginTop: '15px' }}>
+                                    하단의 목록창을 길게 누르면 다중 선택 모드가 활성화 됩니다.
+                                </GuidanceMessage>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '9px', marginBottom: '5px' }}>
                                     <FolderEditButton onClick={() => openMoveMemosModal(currentFolder)}>
                                         📋 문서 이동
                                     </FolderEditButton>
@@ -1780,16 +1832,13 @@ const MemoPage = ({
                                         width: '100%',
                                         height: '1px',
                                         background: 'rgba(255, 255, 255, 0.1)',
-                                        marginTop: '15px'
+                                        marginTop: '15px',
+                                        marginBottom: '10px'
                                     }} />
                                 </div>
-                            );
-                        })()
-                    ) : (
-                        <GuidanceMessage>
-                            하단의 목록창을 길게 누르면 다중 선택 모드가 활성화 됩니다.
-                        </GuidanceMessage>
-                    )}
+                            </div>
+                        );
+                    })()}
                 </>
             )}
 
@@ -1866,7 +1915,36 @@ const MemoPage = ({
 
                         {/* 구분선 - 미분류 메모가 있을 때만 표시 */}
                         {filteredAndSortedMemos.length > 0 && (
-                            <SectionDivider>미분류 메모</SectionDivider>
+                            <>
+                                <SectionDivider>미분류 메모</SectionDivider>
+
+                                {/* 정렬 버튼 */}
+                                <SortBar>
+                                    <SortButton
+                                        $active={sortOrder === 'date'}
+                                        onClick={() => handleSortToggle('date')}
+                                    >
+                                        등록일순 {sortOrder === 'date' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                                    </SortButton>
+                                    <SortButton
+                                        $active={sortOrder === 'updated'}
+                                        onClick={() => handleSortToggle('updated')}
+                                    >
+                                        수정일순 {sortOrder === 'updated' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                                    </SortButton>
+                                    <SortButton
+                                        $active={sortOrder === 'importance'}
+                                        onClick={() => handleSortToggle('importance')}
+                                    >
+                                        중요도순 {sortOrder === 'importance' ? (sortDirection === 'desc' ? '↓' : '↑') : ''}
+                                    </SortButton>
+                                </SortBar>
+
+                                {/* 안내 메시지 */}
+                                <GuidanceMessage>
+                                    하단의 목록창을 길게 누르면 다중 선택 모드가 활성화 됩니다.
+                                </GuidanceMessage>
+                            </>
                         )}
                     </>
                 )}

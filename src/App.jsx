@@ -359,6 +359,7 @@ function App() {
     const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
     const [restoreType, setRestoreType] = useState('phone'); // 'phone' or 'google'
     const [pendingRestoreFile, setPendingRestoreFile] = useState(null);
+    const [isUnshareConfirmOpen, setIsUnshareConfirmOpen] = useState(false);
 
     // 협업방 상태
     const [isCollaborationRoomOpen, setIsCollaborationRoomOpen] = useState(false);
@@ -1285,11 +1286,14 @@ function App() {
     };
 
     // 선택된 메모 공유 해제 요청
-    const requestUnshareSelectedMemos = async () => {
+    const requestUnshareSelectedMemos = () => {
         if (selectedMemoIds.size === 0) return;
+        setIsUnshareConfirmOpen(true);
+    };
 
-        const confirmed = window.confirm(`선택한 ${selectedMemoIds.size}개 메모의 공유를 해제하시겠습니까?\n\n협업방이 삭제되고 메모는 원래 폴더로 복원됩니다.`);
-        if (!confirmed) return;
+    // 선택된 메모 공유 해제 실행
+    const executeUnshareSelectedMemos = async () => {
+        setIsUnshareConfirmOpen(false);
 
         try {
             const {getRoomByMemoId, deleteRoom} = await import('./services/collaborationRoomService.js');
@@ -2473,6 +2477,15 @@ function App() {
                     }
                     onConfirm={executeCalendarDelete}
                     onCancel={() => setIsCalendarConfirmOpen(false)}
+                />
+            )}
+
+            {isUnshareConfirmOpen && (
+                <ConfirmModal
+                    title="공유 해제"
+                    message={`선택한 ${selectedMemoIds.size}개의 문서 공유를 해제 할까요?\n\n해제시 해당문서와 연계된 대화방은\n삭제되며 문서는 원래 폴더로 복원됩니다.`}
+                    onConfirm={executeUnshareSelectedMemos}
+                    onCancel={() => setIsUnshareConfirmOpen(false)}
                 />
             )}
             <AlarmModal

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import AddressInput from './AddressInput';
+import ConfirmModal from './ConfirmModal';
 import { SAVED_ADDRESSES_KEY } from './RestaurantAutocomplete';
 
 const Section = styled.div`
@@ -116,6 +117,7 @@ const EmptyState = styled.div`
 const AddressManagement = ({ showToast }) => {
   const [savedAddresses, setSavedAddresses] = useState([]);
   const [editingSlot, setEditingSlot] = useState(null); // 0, 1, 2 또는 null
+  const [deleteConfirmSlot, setDeleteConfirmSlot] = useState(null); // 삭제 확인 모달용
 
   // 저장된 주소들 불러오기
   useEffect(() => {
@@ -158,16 +160,22 @@ const AddressManagement = ({ showToast }) => {
     showToast?.('주소가 저장되었습니다.');
   };
 
-  // 주소 삭제
+  // 주소 삭제 요청
   const handleDeleteAddress = (slotIndex) => {
-    if (window.confirm('저장된 주소를 삭제하시겠습니까?')) {
-      const newAddresses = [...savedAddresses];
-      newAddresses[slotIndex] = null;
+    setDeleteConfirmSlot(slotIndex);
+  };
 
-      localStorage.setItem(SAVED_ADDRESSES_KEY, JSON.stringify(newAddresses));
-      setSavedAddresses(newAddresses);
-      showToast?.('주소가 삭제되었습니다.');
-    }
+  // 주소 삭제 실행
+  const executeDeleteAddress = () => {
+    if (deleteConfirmSlot === null) return;
+
+    const newAddresses = [...savedAddresses];
+    newAddresses[deleteConfirmSlot] = null;
+
+    localStorage.setItem(SAVED_ADDRESSES_KEY, JSON.stringify(newAddresses));
+    setSavedAddresses(newAddresses);
+    setDeleteConfirmSlot(null);
+    showToast?.('주소가 삭제되었습니다.');
   };
 
   return (
@@ -234,6 +242,14 @@ const AddressManagement = ({ showToast }) => {
             );
           })}
         </>
+      )}
+
+      {deleteConfirmSlot !== null && (
+        <ConfirmModal
+          message="저장된 주소를 삭제하시겠습니까?"
+          onConfirm={executeDeleteAddress}
+          onCancel={() => setDeleteConfirmSlot(null)}
+        />
       )}
     </Section>
   );
