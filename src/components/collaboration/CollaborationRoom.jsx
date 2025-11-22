@@ -164,7 +164,7 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
               <Users size={20} />
               <Badge>{room.participants.length}</Badge>
             </IconButton>
-            <IconButton onClick={onClose}>
+            <IconButton onClick={handleLeaveRoom}>
               <X size={24} />
             </IconButton>
           </HeaderRight>

@@ -938,7 +938,7 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                         </RoomHeader>
 
                         <RoomMeta>
-                          {room.participants?.length || 0}명 참여 중 ·{' '}
+                          {(room.participants?.length || 0)}명 참여 중 ·{' '}
                           {new Date(room.createdAt).toLocaleDateString('ko-KR')}
                         </RoomMeta>
                       </div>

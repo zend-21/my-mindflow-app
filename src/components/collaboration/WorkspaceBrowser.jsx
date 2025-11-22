@@ -281,7 +281,7 @@ const WorkspaceBrowser = ({ isOpen, onClose, onRoomSelect }) => {
             <InputWrapper>
               <Input
                 type="text"
-                placeholder="예: WORK-A3F9"
+                placeholder="예: WS-A3F9"
                 value={workspaceCode}
                 onChange={(e) => setWorkspaceCode(e.target.value.toUpperCase())}
                 onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
