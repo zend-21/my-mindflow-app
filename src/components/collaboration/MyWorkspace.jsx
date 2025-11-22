@@ -1,6 +1,7 @@
 // 내 워크스페이스 관리 페이지 - 내가 만든 모든 방 보기 및 관리
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
+import { QRCodeSVG } from 'qrcode.react';
 import { getWorkspaceByUserId, changeWorkspaceCode } from '../../services/workspaceService';
 import { collection, query, where, orderBy, getDocs, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -145,8 +146,15 @@ const WorkspaceInfo = styled.div`
 
 const WorkspaceCodeSection = styled.div`
   display: flex;
+  align-items: center;
+  gap: 16px;
+`;
+
+const CodeInfoSection = styled.div`
+  display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  flex: 1;
 `;
 
 const CodeRow = styled.div`
@@ -157,7 +165,81 @@ const CodeRow = styled.div`
 
 const ButtonRow = styled.div`
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: 72px; /* "WS 코드:" 라벨 너비만큼 들여쓰기하여 W 아래 정렬 */
+`;
+
+const QRCodeWrapper = styled.div`
+  width: 60px;
+  height: 60px;
+  background: white;
+  padding: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+
+  &:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+`;
+
+const QRModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  animation: ${fadeIn} 0.2s ease-out;
+`;
+
+const QRModalContent = styled.div`
+  background: white;
+  padding: 32px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  max-width: 90%;
+`;
+
+const QRModalTitle = styled.h3`
+  color: #333;
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+`;
+
+const QRModalButton = styled.button`
+  background: rgba(74, 144, 226, 1);
+  border: none;
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(74, 144, 226, 0.8);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
 `;
 
 const CodeLabel = styled.span`
@@ -574,6 +656,8 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
   const [friends, setFriends] = useState([]);
   const [showQRCode, setShowQRCode] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const qrCodeRef = useRef(null);
 
   useEffect(() => {
     loadWorkspaceAndRooms();
@@ -772,6 +856,60 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
     if (workspace?.workspaceCode) {
       navigator.clipboard.writeText(workspace.workspaceCode);
       showToast?.('WS 코드가 복사되었습니다');
+    }
+  };
+
+  const handleCopyQRCode = async () => {
+    if (!qrCodeRef.current) return;
+
+    try {
+      const svg = qrCodeRef.current.querySelector('svg');
+      if (!svg) return;
+
+      // SVG를 Canvas로 변환 (테두리 추가)
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const svgData = new XMLSerializer().serializeToString(svg);
+      const img = new Image();
+
+      img.onload = () => {
+        // 테두리를 위한 패딩 추가 (각 방향 10px)
+        const padding = 10;
+        canvas.width = img.width + padding * 2;
+        canvas.height = img.height + padding * 2;
+
+        // 흰색 배경으로 캔버스 전체를 채움 (테두리 효과)
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // QR 코드를 패딩만큼 안쪽에 그림
+        ctx.drawImage(img, padding, padding);
+
+        // 검은색 테두리 추가 (도장 스타일)
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
+
+        canvas.toBlob(async (blob) => {
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({
+                'image/png': blob
+              })
+            ]);
+            showToast?.('QR 코드가 복사되었습니다');
+            setShowQRModal(false);
+          } catch (err) {
+            console.error('클립보드 복사 실패:', err);
+            showToast?.('QR 코드 복사에 실패했습니다');
+          }
+        });
+      };
+
+      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+    } catch (err) {
+      console.error('QR 코드 복사 실패:', err);
+      showToast?.('QR 코드 복사에 실패했습니다');
     }
   };
 
@@ -1035,22 +1173,26 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                 {workspace && (mainTab === 'owned' || mainTab === 'friends') && (
                   <WorkspaceInfo>
                     <WorkspaceCodeSection>
-                      <CodeRow>
-                        <CodeLabel>WS 코드:</CodeLabel>
-                        <CodeValue>{workspace.workspaceCode}</CodeValue>
-                      </CodeRow>
-                      <ButtonRow>
-                        <CodeButton onClick={handleCopyCode}>복사</CodeButton>
-                        {mainTab === 'owned' && (
-                          <ChangeCodeButton onClick={handleChangeCode}>변경</ChangeCodeButton>
-                        )}
-                        {mainTab === 'friends' && (
-                          <>
-                            <CodeButton onClick={() => setShowQRCode(true)}>QR 보기</CodeButton>
+                      <CodeInfoSection>
+                        <CodeRow>
+                          <CodeLabel>WS 코드:</CodeLabel>
+                          <CodeValue>{workspace.workspaceCode}</CodeValue>
+                        </CodeRow>
+                        <ButtonRow>
+                          <CodeButton onClick={handleCopyCode}>코드복사</CodeButton>
+                          {mainTab === 'friends' && (
                             <CodeButton onClick={() => setShowQRScanner(true)}>QR 스캔</CodeButton>
-                          </>
-                        )}
-                      </ButtonRow>
+                          )}
+                        </ButtonRow>
+                      </CodeInfoSection>
+                      <QRCodeWrapper onClick={() => setShowQRModal(true)}>
+                        <QRCodeSVG
+                          value={workspace.workspaceCode}
+                          size={48}
+                          level="H"
+                          includeMargin={false}
+                        />
+                      </QRCodeWrapper>
                     </WorkspaceCodeSection>
                   </WorkspaceInfo>
                 )}
@@ -1408,6 +1550,31 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
           onClose={() => setShowQRScanner(false)}
           onFriendAdded={handleFriendAdded}
         />
+      )}
+
+      {/* WS 코드 QR 확대 모달 */}
+      {showQRModal && workspace && (
+        <QRModalOverlay onClick={() => setShowQRModal(false)}>
+          <QRModalContent onClick={(e) => e.stopPropagation()}>
+            <QRModalTitle>WS 코드: {workspace.workspaceCode}</QRModalTitle>
+            <div ref={qrCodeRef}>
+              <QRCodeSVG
+                value={workspace.workspaceCode}
+                size={280}
+                level="H"
+                includeMargin={true}
+              />
+            </div>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <QRModalButton onClick={handleCopyQRCode}>
+                이미지로 복사
+              </QRModalButton>
+              <QRModalButton onClick={() => setShowQRModal(false)} style={{ background: '#808080' }}>
+                닫기
+              </QRModalButton>
+            </div>
+          </QRModalContent>
+        </QRModalOverlay>
       )}
     </>
   );
