@@ -234,13 +234,7 @@ const CategoryNameEditModal = ({ category, currentName, currentIcon, onSave, onC
     const [activeTab, setActiveTab] = useState(1);
     const inputRef = useRef(null);
 
-    useEffect(() => {
-        // 모달이 열릴 때 입력창에 포커스
-        setTimeout(() => {
-            inputRef.current?.focus();
-            inputRef.current?.select();
-        }, 100);
-    }, []);
+    // 자동 포커스 제거 - 모바일에서 자판이 자동으로 올라오는 것을 방지
 
     // 한글 2글자, 영문/숫자 4글자 제한
     const getMaxLength = (text) => {

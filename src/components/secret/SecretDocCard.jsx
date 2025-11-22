@@ -353,13 +353,8 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
         e.stopPropagation();
         e.preventDefault();
 
-        // 다중 선택 모드에서는 카테고리 변경 불가
-        if (selectionMode) return;
-
-        // 길게 누르기 타이머 취소
-        clearTimeout(longPressTimerRef.current);
-        isLongPressRef.current = false;
-        setShowDropdown(!showDropdown);
+        // 뱃지 짧게 탭했을 때는 아무 반응 없음
+        // 길게 눌렀을 때만 onPointerDown에서 모달이 열림
     };
 
     const handleCategoryChange = async (e, newCategory) => {
@@ -422,6 +417,12 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
     const handlePointerUp = (e) => {
         clearTimeout(longPressTimerRef.current);
 
+        // 카테고리 모달이 열려있으면 카드 클릭 이벤트 무시
+        if (showDropdown) {
+            isLongPressRef.current = false;
+            return;
+        }
+
         // 터치와 마우스 이벤트 모두 지원 (터치는 changedTouches 사용)
         const clientX = e.changedTouches ? e.changedTouches[0].clientX : e.clientX;
         const clientY = e.changedTouches ? e.changedTouches[0].clientY : e.clientY;
@@ -445,6 +446,9 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
     };
 
     const handleCardClick = (e) => {
+        // 카테고리 모달이 열려있으면 카드 클릭 이벤트 무시
+        if (showDropdown) return;
+
         // selectionMode일 때만 클릭으로 선택/해제
         if (selectionMode && onClick) {
             onClick(doc);
