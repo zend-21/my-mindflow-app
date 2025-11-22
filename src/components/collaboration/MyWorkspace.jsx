@@ -431,9 +431,8 @@ const InviteCodeSection = styled.div`
   padding: 12px;
   margin-bottom: 12px;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  flex-direction: column;
+  gap: 8px;
 `;
 
 const InviteCodeInfo = styled.div`
@@ -451,15 +450,17 @@ const InviteCodeLabel = styled.span`
 
 const InviteCodeValue = styled.span`
   color: #4a90e2;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   font-family: 'Roboto Mono', monospace;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
+  word-break: break-all;
 `;
 
 const InviteCodeButtons = styled.div`
   display: flex;
   gap: 6px;
+  justify-content: flex-end;
 `;
 
 const SmallButton = styled.button`

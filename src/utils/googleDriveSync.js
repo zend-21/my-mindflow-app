@@ -190,11 +190,48 @@ export const syncToGoogleDrive = async (data) => {
     };
   } catch (error) {
     console.error('❌ Google Drive 동기화 실패:', error);
-    
-    if (error.status === 401 || error.status === 403) {
+
+    // 🔍 상세한 에러 분석
+    if (error.status === 401) {
+      console.error('🔐 401 Unauthorized - 토큰 인증 실패');
       return { success: false, error: 'TOKEN_EXPIRED' };
     }
-    
+
+    if (error.status === 403) {
+      // 403은 다양한 이유로 발생 가능
+      // 1. 토큰 만료
+      // 2. API 권한 부족 (scope 문제)
+      // 3. API가 비활성화됨
+      // 4. 할당량 초과
+
+      console.error('🚫 403 Forbidden - 상세 에러:', error.result);
+
+      // result.error.message에서 실제 원인 확인
+      const errorMessage = error.result?.error?.message || '';
+      console.error('📝 에러 메시지:', errorMessage);
+
+      // 토큰 만료가 아닌 경우 다른 에러 반환
+      if (errorMessage.toLowerCase().includes('expired') ||
+          errorMessage.toLowerCase().includes('invalid credentials')) {
+        return { success: false, error: 'TOKEN_EXPIRED' };
+      }
+
+      // API 활성화 문제
+      if (errorMessage.toLowerCase().includes('api has not been used') ||
+          errorMessage.toLowerCase().includes('api is not enabled')) {
+        return { success: false, error: 'API_NOT_ENABLED', message: 'Google Drive API가 활성화되지 않았습니다.' };
+      }
+
+      // 권한 부족
+      if (errorMessage.toLowerCase().includes('insufficient') ||
+          errorMessage.toLowerCase().includes('permission')) {
+        return { success: false, error: 'INSUFFICIENT_PERMISSION', message: '권한이 부족합니다. 다시 로그인해주세요.' };
+      }
+
+      // 기타 403 에러
+      return { success: false, error: 'FORBIDDEN', message: errorMessage || '접근이 거부되었습니다.' };
+    }
+
     return { success: false, error: error.message };
   }
 };
