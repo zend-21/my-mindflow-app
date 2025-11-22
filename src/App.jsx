@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { GlobalStyle } from './styles.js';
-import { GoogleLogin, useGoogleLogin } from '@react-oauth/google';
+import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import { GoogleAuthProvider, signInWithCredential, signOut } from 'firebase/auth';
 import { auth } from './firebase/config';
@@ -350,28 +350,6 @@ function App() {
     const syncIntervalRef = useRef(null);
     const syncDebounceRef = useRef(null);
     const [isGapiReady, setIsGapiReady] = useState(false);
-
-    // ✅ 토큰 자동 갱신을 위한 useGoogleLogin 훅
-    const refreshToken = useGoogleLogin({
-        onSuccess: async (tokenResponse) => {
-            console.log('🔄 토큰 자동 갱신 성공');
-            const expiresAt = Date.now() + (tokenResponse.expires_in || 3600) * 1000;
-
-            // 새 토큰 저장
-            setAccessTokenState(tokenResponse.access_token);
-            localStorage.setItem('accessToken', tokenResponse.access_token);
-            localStorage.setItem('tokenExpiresAt', expiresAt.toString());
-
-            // GAPI에 새 토큰 설정
-            if (isGapiReady) {
-                setAccessToken(tokenResponse.access_token);
-            }
-        },
-        onError: (error) => {
-            console.error('❌ 토큰 자동 갱신 실패:', error);
-        },
-        scope: 'https://www.googleapis.com/auth/drive.file',
-    });
     
     const [activeTab, setActiveTab] = useState('home');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -1746,21 +1724,17 @@ function App() {
             } else {
                 console.error('❌ 동기화 실패:', result);
                 if (result.error === 'TOKEN_EXPIRED') {
-                    // ✅ 토큰 자동 갱신 시도
-                    console.log('🔄 토큰 만료 감지 - 자동 갱신 시도');
-                    try {
-                        refreshToken(); // 자동으로 토큰 갱신 팝업 열기
-                        if (isManual) {
-                            showToast('🔐 재인증 중...');
-                        }
-                    } catch (error) {
-                        console.error('❌ 토큰 갱신 실패:', error);
-                        if (isManual) {
-                            showToast('🔐 재로그인이 필요합니다.');
-                            setTimeout(() => {
-                                setIsLoginModalOpen(true);
-                            }, 1500);
-                        }
+                    // ✅ 토큰 만료 - 토큰만 삭제하고 재로그인 유도
+                    console.log('🔄 토큰 만료 감지 - 토큰 삭제');
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('tokenExpiresAt');
+                    setAccessTokenState(null);
+
+                    if (isManual) {
+                        showToast('🔐 로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
+                        setTimeout(() => {
+                            setIsLoginModalOpen(true);
+                        }, 1500);
                     }
                 } else {
                     if (isManual) {

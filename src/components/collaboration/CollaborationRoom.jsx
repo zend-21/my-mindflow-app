@@ -14,6 +14,7 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [showParticipants, setShowParticipants] = useState(false);
   const [showPublicityConfirm, setShowPublicityConfirm] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   const messagesEndRef = useRef(null);
   const currentUserId = localStorage.getItem('firebaseUserId');
@@ -74,9 +75,11 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
     }
   };
 
-  const handleLeaveRoom = async () => {
-    if (!confirm('방을 나가시겠습니까?')) return;
+  const handleLeaveRoom = () => {
+    setShowLeaveConfirm(true);
+  };
 
+  const confirmLeaveRoom = async () => {
     try {
       const userName = room.participants.find(p => p.userId === currentUserId)?.displayName || '알 수 없음';
       await sendSystemMessage(roomId, `${userName}님이 나갔습니다`);
@@ -85,6 +88,7 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
     } catch (err) {
       console.error(err);
       showToast?.('방 나가기 실패');
+      setShowLeaveConfirm(false);
     }
   };
 
@@ -351,6 +355,28 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
             </ConfirmModalOverlay>
           );
         })()}
+
+        {/* 방 나가기 확인 모달 */}
+        {showLeaveConfirm && (
+          <ConfirmModalOverlay onClick={() => setShowLeaveConfirm(false)}>
+            <ConfirmModalBox onClick={(e) => e.stopPropagation()}>
+              <ConfirmModalTitle>방 나가기</ConfirmModalTitle>
+              <ConfirmModalMessage>
+                정말 이 방을 나가시겠습니까?
+                {'\n\n'}
+                방을 나가면 채팅 기록은 유지되지만, 다시 참여하려면 초대 코드가 필요합니다.
+              </ConfirmModalMessage>
+              <ConfirmModalButtons>
+                <CancelButton onClick={() => setShowLeaveConfirm(false)}>
+                  취소
+                </CancelButton>
+                <ConfirmButton onClick={confirmLeaveRoom}>
+                  나가기
+                </ConfirmButton>
+              </ConfirmModalButtons>
+            </ConfirmModalBox>
+          </ConfirmModalOverlay>
+        )}
       </Container>
     </Overlay>
   );
