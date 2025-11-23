@@ -9,12 +9,11 @@ import FortuneFlow from './FortuneFlow';
 import { syncProfilePictureToGoogleDrive, loadProfilePictureFromGoogleDrive } from '../utils/googleDriveSync';
 import AvatarSelector from './AvatarSelector';
 import { avatarList } from './avatars/AvatarIcons';
-import ChangeUniqueIdModal from './collaboration/ChangeUniqueIdModal';
-import QRScanner from './collaboration/QRScanner';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import QRCode from 'qrcode';
-import { Copy, QrCode, Share2, Scan } from 'lucide-react';
+import { Copy } from 'lucide-react';
+import { checkNicknameAvailability, updateNickname } from '../services/nicknameService';
 
 // 🎨 Styled Components
 
@@ -315,6 +314,205 @@ const Email = styled.p`
     color: #b0b0b0;
 `;
 
+const InfoRowInHeader = styled.div`
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    gap: 12px;
+`;
+
+const InfoTextInHeader = styled.span`
+    font-size: 16px;
+    color: #e0e0e0;
+    font-weight: 400;
+    text-align: center;
+`;
+
+const WsCodeQrContainer = styled.div`
+    display: flex;
+    width: 100%;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 12px;
+    align-items: center;
+`;
+
+const WsCodeSection = styled.div`
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+`;
+
+const WsCodeText = styled.div`
+    font-size: 16px;
+    color: #e0e0e0;
+    font-weight: 400;
+    text-align: center;
+`;
+
+const CopyButtonInHeader = styled.button`
+    background: rgba(74, 144, 226, 0.1);
+    border: 1px solid rgba(74, 144, 226, 0.3);
+    color: #4a90e2;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: fit-content;
+
+    &:hover {
+        background: rgba(74, 144, 226, 0.2);
+        border-color: rgba(74, 144, 226, 0.5);
+        transform: translateY(-1px);
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
+`;
+
+const QrImageSection = styled.div`
+    width: 70px;
+    height: 70px;
+    background: white;
+    border-radius: 8px;
+    padding: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    margin-right: 15px;
+
+    &:hover {
+        transform: scale(1.05);
+        box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+    }
+
+    &:active {
+        transform: scale(0.98);
+    }
+`;
+
+const QrImageSmall = styled.img`
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: 4px;
+`;
+
+const QRModalOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20000;
+    padding: 20px;
+`;
+
+const QRModalContent = styled.div`
+    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
+    border-radius: 20px;
+    padding: 24px;
+    max-width: 300px;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+`;
+
+const QRModalTitle = styled.h3`
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: #ffffff;
+    text-align: center;
+`;
+
+const QRImageWrapper = styled.div`
+    background: white;
+    padding: 16px;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+`;
+
+const QRImageLarge = styled.img`
+    width: 200px;
+    height: 200px;
+    display: block;
+    border-radius: 6px;
+`;
+
+const QRModalButtons = styled.div`
+    display: flex;
+    gap: 12px;
+    width: 100%;
+`;
+
+const QRModalButton = styled.button`
+    flex: 1;
+    padding: 14px;
+    background: ${props => props.$primary
+        ? 'linear-gradient(135deg, rgba(94, 190, 38, 0.3), rgba(94, 190, 38, 0.2))'
+        : 'rgba(255, 255, 255, 0.05)'};
+    border: 1px solid ${props => props.$primary
+        ? 'rgba(94, 190, 38, 0.5)'
+        : 'rgba(255, 255, 255, 0.15)'};
+    border-radius: 12px;
+    color: ${props => props.$primary ? '#5ebe26' : '#b0b0b0'};
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    &:hover {
+        background: ${props => props.$primary
+            ? 'linear-gradient(135deg, rgba(94, 190, 38, 0.4), rgba(94, 190, 38, 0.3))'
+            : 'rgba(255, 255, 255, 0.08)'};
+        border-color: ${props => props.$primary
+            ? 'rgba(94, 190, 38, 0.7)'
+            : 'rgba(255, 255, 255, 0.25)'};
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px ${props => props.$primary
+            ? 'rgba(94, 190, 38, 0.2)'
+            : 'rgba(0, 0, 0, 0.2)'};
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
+`;
+
 const SectionTitle = styled.h3`
     margin: 0 0 16px 0;
     font-size: 18px;
@@ -519,40 +717,6 @@ const ActionButton = styled.button`
             border-color: rgba(255, 255, 255, 0.2);
         }
     `}
-`;
-
-const ProfilePictureSyncSection = styled.div`
-    display: flex;
-    gap: 18px;
-    margin-top: 2px;
-`;
-
-const SyncButton = styled.button`
-    flex: 1;
-    padding: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 10px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    background: rgba(255, 255, 255, 0.05);
-    color: #d0d0d0;
-    white-space: nowrap;
-    position: relative;
-    z-index: 1;
-
-    &:hover {
-        background: rgba(240, 147, 251, 0.1);
-        border-color: rgba(240, 147, 251, 0.3);
-        color: #f093fb;
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(240, 147, 251, 0.2);
-    }
-
-    &:active {
-        transform: translateY(0);
-    }
 `;
 
 const BirthdayReminderSection = styled.div`
@@ -819,17 +983,17 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     const [selectedAvatarId, setSelectedAvatarId] = useState(localStorage.getItem('selectedAvatarId') || null);
     const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
     const [avatarBgColor, setAvatarBgColor] = useState(localStorage.getItem('avatarBgColor') || 'none');
+    const [customPicture, setCustomPicture] = useState(localStorage.getItem('customProfilePicture') || null);
 
     // 생년월일 마스킹 관련 상태
     const [isBirthDateRevealed, setIsBirthDateRevealed] = useState(false);
     const birthDateTimerRef = useRef(null);
 
-    // 협업 ID 관련 상태
-    const [uniqueId, setUniqueId] = useState(null);
+    // WS 코드 (친구 코드) 관련 상태
+    const [wsCode, setWsCode] = useState(null);
     const [qrCodeUrl, setQrCodeUrl] = useState(null);
-    const [isChangeIdModalOpen, setIsChangeIdModalOpen] = useState(false);
     const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
-    const [isCollabExpanded, setIsCollabExpanded] = useState(false);
+    const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
     // 운세 프로필 정보
     const fortuneProfile = getUserProfile();
@@ -850,21 +1014,66 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     const importantMemos = memos?.filter(m => m.isImportant).length || 0;
 
     // 닉네임 저장
-    const handleSaveNickname = () => {
-        if (nickname.trim()) {
-            const savedNickname = localStorage.getItem('userNickname');
-            const newNickname = nickname.trim();
+    const handleSaveNickname = async () => {
+        if (!nickname.trim()) {
+            setIsEditingNickname(false);
+            return;
+        }
 
+        const savedNickname = localStorage.getItem('userNickname');
+        const newNickname = nickname.trim();
+
+        // 닉네임이 변경되지 않았으면 그냥 종료
+        if (savedNickname === newNickname) {
+            setIsEditingNickname(false);
+            return;
+        }
+
+        try {
+            // Firebase userId 가져오기
+            const userId = localStorage.getItem('firebaseUserId');
+            if (!userId) {
+                showToast?.('⚠️ 사용자 정보를 찾을 수 없습니다');
+                setIsEditingNickname(false);
+                return;
+            }
+
+            // 닉네임 중복 체크
+            const isAvailable = await checkNicknameAvailability(newNickname);
+            if (!isAvailable) {
+                showToast?.('⚠️ 이미 사용 중인 닉네임입니다');
+                // 이전 닉네임으로 되돌리기
+                setNickname(savedNickname || '');
+                setIsEditingNickname(false);
+                return;
+            }
+
+            // Firestore에 닉네임 등록/업데이트
+            const success = await updateNickname(userId, newNickname);
+            if (!success) {
+                showToast?.('⚠️ 닉네임 저장에 실패했습니다');
+                setNickname(savedNickname || '');
+                setIsEditingNickname(false);
+                return;
+            }
+
+            // localStorage에 저장
             localStorage.setItem('userNickname', newNickname);
 
-            // 닉네임이 실제로 변경된 경우에만 토스트 메시지 표시
-            if (savedNickname !== newNickname) {
-                showToast?.('닉네임이 변경되었습니다');
-                // profile 상태 업데이트를 위해 이벤트 발생
-                window.dispatchEvent(new CustomEvent('nicknameChanged', { detail: newNickname }));
-            }
+            // nickname state 업데이트 (즉시 UI 반영)
+            setNickname(newNickname);
+
+            showToast?.('✅ 닉네임이 변경되었습니다');
+
+            // profile 상태 업데이트를 위해 이벤트 발생
+            window.dispatchEvent(new CustomEvent('nicknameChanged', { detail: newNickname }));
+        } catch (error) {
+            console.error('닉네임 저장 오류:', error);
+            showToast?.('❌ 닉네임 저장 중 오류가 발생했습니다');
+            setNickname(savedNickname || '');
+        } finally {
+            setIsEditingNickname(false);
         }
-        setIsEditingNickname(false);
     };
 
     // 프로필 이미지 에러 처리
@@ -878,13 +1087,15 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
 
     // 이미지 타입 변경 핸들러
     const handleImageTypeChange = (type) => {
+        console.log('🔄 프로필 이미지 타입 변경:', type);
         setProfileImageType(type);
         localStorage.setItem('profileImageType', type);
 
-        if (type === 'avatar' && !selectedAvatarId) {
-            // 아바타를 선택했는데 아직 선택된 아바타가 없으면 모달 열기
-            setIsAvatarSelectorOpen(true);
-        }
+        // Header에 알림
+        window.dispatchEvent(new CustomEvent('profileImageTypeChanged', { detail: type }));
+
+        // 버튼 클릭 시에는 모달을 열지 않고 타입만 변경
+        // 아바타 모드에서 프로필 사진을 클릭하면 모달이 열림
     };
 
     // 아바타 선택 핸들러
@@ -934,23 +1145,26 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
         return () => window.removeEventListener('avatarBgColorChanged', handleBgColorChange);
     }, []);
 
-    // 고유 ID 로드
+    // WS 코드 (친구 코드) 로드
     useEffect(() => {
-        const loadUniqueId = async () => {
+        const loadWsCode = async () => {
             // localStorage에서 userId 가져오기
             const userId = localStorage.getItem('firebaseUserId');
             if (!userId || !profile) return;
 
             try {
-                const userRef = doc(db, 'users', userId);
-                const userDoc = await getDoc(userRef);
-                if (userDoc.exists()) {
-                    const id = userDoc.data().uniqueId;
-                    setUniqueId(id);
+                // workspaces 컬렉션에서 WS 코드 가져오기
+                const workspaceId = `workspace_${userId}`;
+                const workspaceRef = doc(db, 'workspaces', workspaceId);
+                const workspaceDoc = await getDoc(workspaceRef);
+
+                if (workspaceDoc.exists()) {
+                    const code = workspaceDoc.data().workspaceCode;
+                    setWsCode(code);
 
                     // QR 코드 생성
-                    if (id) {
-                        const qrUrl = await QRCode.toDataURL(id, {
+                    if (code) {
+                        const qrUrl = await QRCode.toDataURL(code, {
                             width: 200,
                             margin: 2,
                             color: {
@@ -962,14 +1176,22 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                     }
                 }
             } catch (err) {
-                console.error('고유 ID 로드 오류:', err);
+                console.error('WS 코드 로드 오류:', err);
             }
         };
 
         if (profile) {
-            loadUniqueId();
+            loadWsCode();
         }
     }, [profile]);
+
+    // 닉네임 초기화 (localStorage에서 로드)
+    useEffect(() => {
+        const savedNickname = localStorage.getItem('userNickname');
+        if (savedNickname) {
+            setNickname(savedNickname);
+        }
+    }, []);
 
     // 생년월일 마스킹 함수
     const maskBirthDate = (year, month, day) => {
@@ -1101,6 +1323,9 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                 return;
             }
 
+            // 프로필 상태 업데이트
+            setCustomPicture(compressedBase64);
+
             // 프로필 상태 업데이트 이벤트 발생
             window.dispatchEvent(new CustomEvent('profilePictureChanged', {
                 detail: { picture: compressedBase64, hash }
@@ -1145,112 +1370,75 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
         }
     };
 
-    // 프로필 사진 Google Drive에 동기화
-    const handleSyncProfilePicture = async () => {
-        const customPicture = localStorage.getItem('customProfilePicture');
-        const customPictureHash = localStorage.getItem('customProfilePictureHash');
-
-        if (!customPicture || !customPictureHash) {
-            showToast?.('⚠️ 동기화할 프로필 사진이 없습니다');
-            return;
+    // 아이디 복사 (WS 코드의 6자리 부분만)
+    const handleCopyWsCode = () => {
+        if (wsCode) {
+            // "WS-Y3T1ZM"에서 "Y3T1ZM"만 추출
+            const idOnly = wsCode.split('-')[1] || wsCode;
+            navigator.clipboard.writeText(idOnly);
+            showToast?.('아이디가 복사되었습니다');
         }
+    };
 
-        showToast?.('📸 프로필 사진 업로드 중...');
+    // 이메일 복사
+    const handleCopyEmail = () => {
+        if (profile?.email) {
+            navigator.clipboard.writeText(profile.email);
+            showToast?.('이메일이 복사되었습니다');
+        }
+    };
+
+    // QR 이미지 저장
+    const handleSaveQRImage = () => {
+        if (!qrCodeUrl) return;
+
+        // Base64 이미지를 다운로드
+        const link = document.createElement('a');
+        link.href = qrCodeUrl;
+        const idOnly = wsCode ? wsCode.split('-')[1] || wsCode : 'QR';
+        link.download = `아이디_${idOnly}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showToast?.('QR 코드가 저장되었습니다');
+    };
+
+    // QR 이미지를 클립보드에 복사
+    const handleCopyQRImage = async () => {
+        if (!qrCodeUrl) return;
 
         try {
-            const result = await syncProfilePictureToGoogleDrive(customPicture, customPictureHash);
+            // Base64를 Blob으로 변환
+            const response = await fetch(qrCodeUrl);
+            const blob = await response.blob();
 
-            if (result.success) {
-                showToast?.('✅ 프로필 사진이 Drive에 동기화되었습니다');
-            } else if (result.error === 'TOKEN_EXPIRED') {
-                showToast?.('🔐 로그인이 만료되었습니다. 다시 로그인해주세요');
-            } else {
-                showToast?.('❌ 동기화 실패');
-            }
+            // 클립보드에 이미지 복사
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    [blob.type]: blob
+                })
+            ]);
+
+            showToast?.('QR 코드가 클립보드에 복사되었습니다');
         } catch (error) {
-            console.error('프로필 사진 동기화 오류:', error);
-            showToast?.('❌ 동기화 중 오류가 발생했습니다');
+            console.error('QR 이미지 복사 오류:', error);
+            showToast?.('QR 코드 복사에 실패했습니다');
         }
     };
 
-    // 프로필 사진 Google Drive에서 복원
-    const handleRestoreProfilePicture = async () => {
-        showToast?.('📸 프로필 사진 다운로드 중...');
+    // 이메일 마스킹 함수
+    const maskEmail = (email) => {
+        if (!email) return '';
 
-        try {
-            const result = await loadProfilePictureFromGoogleDrive();
+        const [localPart, domain] = email.split('@');
+        if (!localPart || !domain) return email;
 
-            if (result.success && result.data) {
-                const { base64, hash } = result.data;
+        // 앞 3자리만 표시하고 나머지는 * 처리
+        const visiblePart = localPart.substring(0, 3);
+        const maskedPart = '*'.repeat(Math.max(0, localPart.length - 3));
 
-                // 로컬 해시와 비교
-                const localHash = localStorage.getItem('customProfilePictureHash');
-
-                if (localHash === hash) {
-                    showToast?.('✅ 이미 최신 프로필 사진입니다');
-                    return;
-                }
-
-                // Drive의 사진으로 로컬 업데이트
-                localStorage.setItem('customProfilePicture', base64);
-                localStorage.setItem('customProfilePictureHash', hash);
-
-                // 프로필 업데이트 이벤트 발생
-                window.dispatchEvent(new CustomEvent('profilePictureChanged', {
-                    detail: { picture: base64, hash }
-                }));
-
-                showToast?.('✅ 프로필 사진이 복원되었습니다');
-                setImageError(false);
-            } else if (result.message === 'NO_FILE') {
-                showToast?.('📭 Drive에 저장된 프로필 사진이 없습니다');
-            } else if (result.error === 'TOKEN_EXPIRED') {
-                showToast?.('🔐 로그인이 만료되었습니다. 다시 로그인해주세요');
-            } else {
-                showToast?.('❌ 복원 실패');
-            }
-        } catch (error) {
-            console.error('프로필 사진 복원 오류:', error);
-            showToast?.('❌ 복원 중 오류가 발생했습니다');
-        }
-    };
-
-    // 고유 ID 복사
-    const handleCopyId = () => {
-        if (uniqueId) {
-            navigator.clipboard.writeText(uniqueId);
-            showToast?.('ID가 클립보드에 복사되었습니다');
-        }
-    };
-
-    // 초대 링크 복사
-    const handleCopyInviteLink = () => {
-        if (!uniqueId) return;
-
-        // 환경 변수에서 앱 URL 가져오기 (없으면 현재 origin 사용)
-        const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-        const inviteLink = `${appUrl}/add/${uniqueId}`;
-
-        navigator.clipboard.writeText(inviteLink);
-        showToast?.('초대 링크가 복사되었습니다! 카톡에 붙여넣기 하세요');
-    };
-
-    // ID 변경 성공 핸들러
-    const handleIdChangeSuccess = async (newId) => {
-        setUniqueId(newId);
-
-        // QR 코드 재생성
-        const qrUrl = await QRCode.toDataURL(newId, {
-            width: 200,
-            margin: 2,
-            color: {
-                dark: '#000000',
-                light: '#FFFFFF'
-            }
-        });
-        setQrCodeUrl(qrUrl);
-
-        showToast?.('고유 ID가 변경되었습니다!');
+        return `${visiblePart}${maskedPart}@${domain}`;
     };
 
     return (
@@ -1273,16 +1461,29 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                                     <AvatarIconWrapper $bgColor={typeof BACKGROUND_COLORS[avatarBgColor] === 'function' ? BACKGROUND_COLORS[avatarBgColor]() : BACKGROUND_COLORS[avatarBgColor]}>
                                         {renderAvatarIcon()}
                                     </AvatarIconWrapper>
+                                ) : !nickname && profile?.picture && !imageError ? (
+                                    <ProfileImage
+                                        src={profile.picture}
+                                        alt="Profile"
+                                        onError={handleImageError}
+                                        crossOrigin="anonymous"
+                                    />
                                 ) : (
                                     <DefaultProfileIcon>{profileInitial}</DefaultProfileIcon>
                                 )
                             ) : (
-                                (profile?.customPicture || profile?.picture) && !imageError ? (
+                                customPicture && !imageError ? (
                                     <ProfileImage
-                                        src={profile.customPicture || profile.picture}
+                                        src={customPicture}
                                         alt="Profile"
                                         onError={handleImageError}
-                                        crossOrigin={profile.customPicture ? undefined : "anonymous"}
+                                    />
+                                ) : !nickname && profile?.picture && !imageError ? (
+                                    <ProfileImage
+                                        src={profile.picture}
+                                        alt="Profile"
+                                        onError={handleImageError}
+                                        crossOrigin="anonymous"
                                     />
                                 ) : (
                                     <DefaultProfileIcon>{profileInitial}</DefaultProfileIcon>
@@ -1309,7 +1510,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                                     handleImageTypeChange('photo');
                                 }}
                             >
-                                📸 사진
+                                📸 이미지
                             </ImageTypeButton>
                         </ProfileImageTypeSelector>
 
@@ -1321,18 +1522,6 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                             onChange={handleFileChange}
                             style={{ display: 'none' }}
                         />
-
-                        {/* 프로필 사진 동기화/복원 버튼 (사진 모드일 때만 표시) */}
-                        {profileImageType === 'photo' && (
-                            <ProfilePictureSyncSection>
-                                <SyncButton onClick={handleSyncProfilePicture}>
-                                    ☁️ 프사 저장
-                                </SyncButton>
-                                <SyncButton onClick={handleRestoreProfilePicture}>
-                                    📥 프사 복원
-                                </SyncButton>
-                            </ProfilePictureSyncSection>
-                        )}
 
                         <NicknameContainer>
                             {isEditingNickname ? (
@@ -1355,7 +1544,33 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                             )}
                         </NicknameContainer>
 
-                        <Email>{profile?.email || '게스트 모드'}</Email>
+                        {/* 이메일 행 - 마스킹 처리 */}
+                        {profile && (
+                            <InfoRowInHeader>
+                                <InfoTextInHeader>계정: {maskEmail(profile.email)}</InfoTextInHeader>
+                            </InfoRowInHeader>
+                        )}
+
+                        {/* 아이디 + QR 섹션 */}
+                        {profile && wsCode && qrCodeUrl && (
+                            <WsCodeQrContainer>
+                                <WsCodeSection>
+                                    <WsCodeText>ID: {wsCode.split('-')[1] || wsCode}</WsCodeText>
+                                    <CopyButtonInHeader onClick={handleCopyWsCode}>
+                                        <Copy size={14} />
+                                        복사
+                                    </CopyButtonInHeader>
+                                </WsCodeSection>
+                                <QrImageSection onClick={() => setIsQRModalOpen(true)}>
+                                    <QrImageSmall src={qrCodeUrl} alt="내 아이디 QR" />
+                                </QrImageSection>
+                            </WsCodeQrContainer>
+                        )}
+
+                        {/* 게스트 모드일 때 이메일만 표시 */}
+                        {!profile && (
+                            <Email>게스트 모드</Email>
+                        )}
                     </ProfileHeader>
                 </Section>
 
@@ -1381,64 +1596,6 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                         </StatItem>
                     </StatsGrid>
                 </Section>
-
-                {/* 협업 ID 관리 (로그인 시에만 표시) */}
-                {profile && (
-                    <Section>
-                        <FortuneSection onClick={() => setIsCollabExpanded(!isCollabExpanded)}>
-                            <FortuneSectionHeader>
-                                <SectionTitle style={{ margin: 0 }}>👥 협업 고유 ID</SectionTitle>
-                                <CollapseIcon $isExpanded={isCollabExpanded}>▼</CollapseIcon>
-                            </FortuneSectionHeader>
-                        </FortuneSection>
-
-                        <CollabContent $isExpanded={isCollabExpanded}>
-                            <FortuneInfo>
-                                <InfoRow>
-                                    <InfoLabel>내 고유 ID</InfoLabel>
-                                </InfoRow>
-                                <IdDisplayBox>
-                                    <IdText>
-                                        <IdPrefix>@</IdPrefix>
-                                        {uniqueId || '설정되지 않음'}
-                                    </IdText>
-                                    {uniqueId && (
-                                        <IconButton onClick={handleCopyId} title="ID 복사">
-                                            <Copy size={18} />
-                                        </IconButton>
-                                    )}
-                                </IdDisplayBox>
-                            </FortuneInfo>
-
-                            {uniqueId && qrCodeUrl && (
-                                <QRCodeContainer>
-                                    <QRCodeImage src={qrCodeUrl} alt="QR Code" />
-                                    <QRActions>
-                                        <QRButton onClick={handleCopyInviteLink}>
-                                            <Copy size={16} />
-                                            초대 링크 복사
-                                        </QRButton>
-                                    </QRActions>
-                                </QRCodeContainer>
-                            )}
-
-                            <ChangeIdButton
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    setIsChangeIdModalOpen(true);
-                                }}
-                            >
-                                고유 ID 변경하기
-                            </ChangeIdButton>
-
-                            <FortuneInfo style={{ marginTop: '12px' }}>
-                                <InfoLabel style={{ fontSize: '13px', color: 'rgba(255, 255, 255, 0.6)' }}>
-                                    💬 초대 링크를 카톡으로 보내거나, 대면 시 QR 코드를 상대방이 스캔하면 바로 친구 추가할 수 있습니다.
-                                </InfoLabel>
-                            </FortuneInfo>
-                        </CollabContent>
-                    </Section>
-                )}
 
                 {/* 운세 정보 관리 */}
                 <Section>
@@ -1590,27 +1747,26 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                 />
             )}
 
-            {/* 고유 ID 변경 모달 */}
-            {isChangeIdModalOpen && (
-                <ChangeUniqueIdModal
-                    isOpen={isChangeIdModalOpen}
-                    onClose={() => setIsChangeIdModalOpen(false)}
-                    currentId={uniqueId}
-                    onSuccess={handleIdChangeSuccess}
-                />
+            {/* QR 코드 모달 */}
+            {isQRModalOpen && qrCodeUrl && (
+                <QRModalOverlay onClick={() => setIsQRModalOpen(false)}>
+                    <QRModalContent onClick={(e) => e.stopPropagation()}>
+                        <QRModalTitle>내 아이디 QR</QRModalTitle>
+                        <QRImageWrapper>
+                            <QRImageLarge src={qrCodeUrl} alt="내 아이디 QR" />
+                        </QRImageWrapper>
+                        <QRModalButtons>
+                            <QRModalButton $primary onClick={handleCopyQRImage}>
+                                복사
+                            </QRModalButton>
+                            <QRModalButton onClick={() => setIsQRModalOpen(false)}>
+                                닫기
+                            </QRModalButton>
+                        </QRModalButtons>
+                    </QRModalContent>
+                </QRModalOverlay>
             )}
 
-            {/* QR 스캐너 */}
-            {isQRScannerOpen && (
-                <QRScanner
-                    isOpen={isQRScannerOpen}
-                    onClose={() => setIsQRScannerOpen(false)}
-                    onSuccess={() => {
-                        showToast?.('친구 요청을 보냈습니다!');
-                        setIsQRScannerOpen(false);
-                    }}
-                />
-            )}
         </>
     );
 };

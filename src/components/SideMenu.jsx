@@ -133,13 +133,15 @@ const PlaceholderIcon = styled.div`
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #4a4d55 0%, #35383f 100%);
+    background: linear-gradient(135deg, rgba(240, 147, 251, 0.3) 0%, rgba(245, 87, 108, 0.3) 100%);
     display: flex;
     justify-content: center;
     align-items: center;
-    color: #9ca3af;
+    color: white;
+    font-weight: bold;
     flex-shrink: 0;
-    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(240, 147, 251, 0.5);
+    box-shadow: 0 2px 8px rgba(240, 147, 251, 0.3);
 `;
 
 const AvatarIconWrapper = styled.div`
@@ -330,6 +332,7 @@ const SideMenu = ({
     const [profileImageType, setProfileImageType] = useState('avatar');
     const [selectedAvatarId, setSelectedAvatarId] = useState(null);
     const [avatarBgColor, setAvatarBgColor] = useState('none');
+    const [customPicture, setCustomPicture] = useState(null);
     // 협업 관련 상태
     const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
     const [isSharedNotesPageOpen, setIsSharedNotesPageOpen] = useState(false);
@@ -346,6 +349,7 @@ const SideMenu = ({
             setProfileImageType(localStorage.getItem('profileImageType') || 'avatar');
             setSelectedAvatarId(localStorage.getItem('selectedAvatarId') || null);
             setAvatarBgColor(localStorage.getItem('avatarBgColor') || 'none');
+            setCustomPicture(localStorage.getItem('customProfilePicture') || null);
         }
     }, [isOpen]);
 
@@ -366,6 +370,24 @@ const SideMenu = ({
         };
         window.addEventListener('avatarChanged', handleAvatarChange);
         return () => window.removeEventListener('avatarChanged', handleAvatarChange);
+    }, []);
+
+    // 프로필 이미지 타입 변경 이벤트 리스너
+    React.useEffect(() => {
+        const handleProfileImageTypeChange = (e) => {
+            setProfileImageType(e.detail);
+        };
+        window.addEventListener('profileImageTypeChanged', handleProfileImageTypeChange);
+        return () => window.removeEventListener('profileImageTypeChanged', handleProfileImageTypeChange);
+    }, []);
+
+    // 커스텀 프로필 사진 변경 이벤트 리스너
+    React.useEffect(() => {
+        const handleProfilePictureChange = () => {
+            setCustomPicture(localStorage.getItem('customProfilePicture') || null);
+        };
+        window.addEventListener('profilePictureChanged', handleProfilePictureChange);
+        return () => window.removeEventListener('profilePictureChanged', handleProfilePictureChange);
     }, []);
 
     // 아바타 렌더링 함수
@@ -397,18 +419,31 @@ const SideMenu = ({
                                             <AvatarIconWrapper $bgColor={typeof BACKGROUND_COLORS[avatarBgColor] === 'function' ? BACKGROUND_COLORS[avatarBgColor]() : BACKGROUND_COLORS[avatarBgColor]}>
                                                 {renderAvatarIcon()}
                                             </AvatarIconWrapper>
+                                        ) : !profile.nickname && profile?.picture && !imageError ? (
+                                            <ProfileImage
+                                                src={profile.picture}
+                                                alt={profile.name || "Profile"}
+                                                onError={handleError}
+                                                crossOrigin="anonymous"
+                                            />
                                         ) : (
                                             <PlaceholderIcon>
                                                 {(profile.nickname || profile.name)?.charAt(0).toUpperCase() || '?'}
                                             </PlaceholderIcon>
                                         )
                                     ) : (
-                                        (profile.customPicture || profile.picture) && !imageError ? (
+                                        customPicture && !imageError ? (
                                             <ProfileImage
-                                                src={profile.customPicture || profile.picture}
+                                                src={customPicture}
                                                 alt={profile.name || "Profile"}
                                                 onError={handleError}
-                                                crossOrigin={profile.customPicture ? undefined : "anonymous"}
+                                            />
+                                        ) : !profile.nickname && profile?.picture && !imageError ? (
+                                            <ProfileImage
+                                                src={profile.picture}
+                                                alt={profile.name || "Profile"}
+                                                onError={handleError}
+                                                crossOrigin="anonymous"
                                             />
                                         ) : (
                                             <PlaceholderIcon>

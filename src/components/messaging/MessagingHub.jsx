@@ -14,7 +14,7 @@ const Container = styled.div`
 
 // 헤더
 const Header = styled.div`
-  padding: 20px 20px 0 20px;
+  padding: 0px 20px 0 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
@@ -46,7 +46,7 @@ const Tab = styled.button`
   border: none;
   border-bottom: 3px solid ${props => props.$active ? '#4a90e2' : 'transparent'};
   color: ${props => props.$active ? '#4a90e2' : '#888'};
-  padding: 14px 16px;
+  padding: 6px 16px;
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -63,7 +63,7 @@ const Tab = styled.button`
 
   @media (max-width: 768px) {
     font-size: 14px;
-    padding: 12px 12px;
+    padding: 4px 12px;
   }
 `;
 
@@ -82,6 +82,7 @@ const Content = styled.div`
   flex: 1;
   overflow-y: auto;
   padding: 0;
+  margin-bottom: 130px; /* 푸터(80px) + 광고 배너(50px) = 130px */
 
   /* 스크롤바 스타일 */
   &::-webkit-scrollbar {
@@ -108,9 +109,6 @@ const MessagingHub = ({ showToast }) => {
   return (
     <Container>
       <Header>
-        <Title>💬 대화</Title>
-        <Subtitle>친구들과 대화하고 그룹으로 협업하세요</Subtitle>
-
         <TabContainer>
           <Tab
             $active={activeTab === 'chat'}

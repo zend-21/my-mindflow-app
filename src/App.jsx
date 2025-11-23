@@ -48,6 +48,7 @@ import TrashPage from './components/TrashPage.jsx';
 import AppContent from './components/AppContent.jsx';
 import SecretPage from './components/secret/SecretPage.jsx';
 import MessagingHub from './components/messaging/MessagingHub.jsx';
+import AdBanner from './components/messaging/AdBanner.jsx';
 import AppRouter from './components/AppRouter.jsx';
 import './utils/createWorkspaceManually'; // 워크스페이스 수동 생성 유틸리티
 import { createWorkspace, checkWorkspaceExists } from './services/workspaceService'; // 자동 워크스페이스 생성
@@ -2364,6 +2365,7 @@ function App() {
                     </ContentArea>
 
                     <FloatingButton onClick={handleOpenNewMemoFromFAB} activeTab={activeTab} />
+                    {activeTab === 'chat' && <AdBanner />}
                     <BottomNav activeTab={activeTab} onSwitchTab={handleSwitchTab} />
                     <SideMenu
                         isOpen={isMenuOpen}

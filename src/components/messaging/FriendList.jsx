@@ -1,9 +1,9 @@
 // 👥 친구 탭 - 친구 관리 및 추가
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { QrCode, Search, UserPlus, MessageCircle, UserMinus, Check, X, Inbox } from 'lucide-react';
+import { QrCode, Search, UserPlus, MessageCircle, UserMinus, Check, X, Inbox, Copy } from 'lucide-react';
 import { getMyFriends } from '../../services/friendService';
-import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, getDocs, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 
 // 컨테이너
@@ -12,6 +12,71 @@ const Container = styled.div`
   flex-direction: column;
   height: 100%;
   background: transparent;
+`;
+
+// 내 친구 코드 섹션
+const MyCodeSection = styled.div`
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(74, 144, 226, 0.05);
+`;
+
+const MyCodeBox = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+`;
+
+const MyCodeLabel = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+`;
+
+const MyCodeTitle = styled.div`
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const MyCodeValue = styled.div`
+  font-size: 15px;
+  font-weight: 700;
+  color: #4a90e2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+`;
+
+const CopyButton = styled.button`
+  background: rgba(74, 144, 226, 0.1);
+  border: 1px solid rgba(74, 144, 226, 0.3);
+  color: #4a90e2;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(74, 144, 226, 0.2);
+    border-color: rgba(74, 144, 226, 0.5);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
 `;
 
 // 검색 섹션
@@ -361,11 +426,31 @@ const FriendList = ({ showToast }) => {
   const [friends, setFriends] = useState([]);
   const [friendRequests, setFriendRequests] = useState({ received: 0, sent: 0 });
   const [loading, setLoading] = useState(true);
+  const [myWsCode, setMyWsCode] = useState(null);
 
   useEffect(() => {
+    loadMyWsCode();
     loadFriends();
     loadFriendRequests();
   }, []);
+
+  const loadMyWsCode = async () => {
+    try {
+      const userId = localStorage.getItem('firebaseUserId');
+      if (!userId) return;
+
+      const workspaceId = `workspace_${userId}`;
+      const workspaceRef = doc(db, 'workspaces', workspaceId);
+      const workspaceDoc = await getDoc(workspaceRef);
+
+      if (workspaceDoc.exists()) {
+        const code = workspaceDoc.data().workspaceCode;
+        setMyWsCode(code);
+      }
+    } catch (error) {
+      console.error('WS 코드 로드 오류:', error);
+    }
+  };
 
   const loadFriends = async () => {
     try {
@@ -457,6 +542,13 @@ const FriendList = ({ showToast }) => {
     showToast?.('친구 삭제 기능 구현 예정');
   };
 
+  const handleCopyMyCode = () => {
+    if (myWsCode) {
+      navigator.clipboard.writeText(myWsCode);
+      showToast?.('친구 코드가 복사되었습니다');
+    }
+  };
+
   // 아바타 색상 생성
   const getAvatarColor = (userId) => {
     const colors = [
@@ -484,6 +576,22 @@ const FriendList = ({ showToast }) => {
 
   return (
     <Container>
+      {/* 내 친구 코드 */}
+      {myWsCode && (
+        <MyCodeSection>
+          <MyCodeBox>
+            <MyCodeLabel>
+              <MyCodeTitle>내 친구 코드</MyCodeTitle>
+              <MyCodeValue>{myWsCode}</MyCodeValue>
+            </MyCodeLabel>
+            <CopyButton onClick={handleCopyMyCode}>
+              <Copy size={14} />
+              복사
+            </CopyButton>
+          </MyCodeBox>
+        </MyCodeSection>
+      )}
+
       {/* 검색 바 */}
       <SearchSection>
         <SearchBar>

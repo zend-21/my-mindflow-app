@@ -51,11 +51,24 @@ export const sendMessage = async (roomId, message, type = 'text') => {
     throw new Error('유효하지 않은 메시지 타입입니다.');
   }
 
+  // 프로필 이미지 정보 가져오기
+  const profileImageType = localStorage.getItem('profileImageType') || 'avatar';
+  const selectedAvatarId = localStorage.getItem('selectedAvatarId') || null;
+  const avatarBgColor = localStorage.getItem('avatarBgColor') || 'none';
+  const customPicture = localStorage.getItem('customProfilePicture') || null;
+  const userNickname = localStorage.getItem('userNickname') || null;
+
   const messageData = {
     roomId,
     userId,
     userName: nameValidation.sanitized,
     userPhoto: userProfile.picture || null,
+    // 프로필 이미지 관련 정보 추가
+    profileImageType,
+    selectedAvatarId,
+    avatarBgColor,
+    customPicture,
+    userNickname,
     message: messageValidation.sanitized, // 🛡️ 살균된 메시지
     type,
     createdAt: new Date().toISOString(),

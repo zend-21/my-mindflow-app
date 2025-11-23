@@ -4,6 +4,24 @@ import styled from 'styled-components';
 import { X, Send, ChevronUp, ChevronDown, Users, Lock, Edit3, Eye, Globe, LockKeyhole } from 'lucide-react';
 import { subscribeToRoom, updateRoomMemo, leaveRoom, setEditPermission, setAllEditPermission, lockRoom, toggleRoomPublicity } from '../../services/collaborationRoomService';
 import { subscribeToMessages, sendMessage, sendSystemMessage, sendEditNotification } from '../../services/chatService';
+import { avatarList } from '../avatars/AvatarIcons';
+
+const BACKGROUND_COLORS = {
+  // 그라데이션
+  'none': 'transparent',
+  'lavender': 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+  'peach': 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+  'mint': 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+  'sunset': 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+  'ocean': 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+  // 비비드한 단색
+  'pink': '#FF69B4',
+  'blue': '#4169E1',
+  'yellow': '#FFD700',
+  'green': '#32CD32',
+  'purple': '#9370DB',
+  'custom': () => localStorage.getItem('avatarCustomColor') || '#FF1493',
+};
 
 const CollaborationRoom = ({ roomId, onClose, showToast }) => {
   const [room, setRoom] = useState(null);
@@ -18,6 +36,48 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
 
   const messagesEndRef = useRef(null);
   const currentUserId = localStorage.getItem('firebaseUserId');
+
+  // 아바타 렌더링 함수
+  const renderAvatarIcon = (avatarId) => {
+    if (!avatarId) return null;
+    const avatar = avatarList.find(a => a.id === avatarId);
+    if (!avatar) return null;
+    const AvatarComponent = avatar.component;
+    return <AvatarComponent />;
+  };
+
+  // 프로필 아바타 렌더링 함수
+  const renderProfileAvatar = (msg) => {
+    const profileImageType = msg.profileImageType || 'avatar';
+    const selectedAvatarId = msg.selectedAvatarId;
+    const avatarBgColor = msg.avatarBgColor || 'none';
+    const customPicture = msg.customPicture;
+    const userNickname = msg.userNickname;
+    const userPhoto = msg.userPhoto;
+    const userName = msg.userName;
+
+    if (profileImageType === 'avatar') {
+      if (selectedAvatarId) {
+        return (
+          <AvatarIconWrapper $bgColor={typeof BACKGROUND_COLORS[avatarBgColor] === 'function' ? BACKGROUND_COLORS[avatarBgColor]() : BACKGROUND_COLORS[avatarBgColor]}>
+            {renderAvatarIcon(selectedAvatarId)}
+          </AvatarIconWrapper>
+        );
+      } else if (!userNickname && userPhoto) {
+        return <Avatar src={userPhoto} alt={userName} />;
+      } else {
+        return <PlaceholderIcon>{(userNickname || userName)?.charAt(0).toUpperCase() || '?'}</PlaceholderIcon>;
+      }
+    } else { // photo
+      if (customPicture) {
+        return <Avatar src={customPicture} alt={userName} />;
+      } else if (!userNickname && userPhoto) {
+        return <Avatar src={userPhoto} alt={userName} />;
+      } else {
+        return <PlaceholderIcon>{(userNickname || userName)?.charAt(0).toUpperCase() || '?'}</PlaceholderIcon>;
+      }
+    }
+  };
 
   // 방 정보 실시간 구독
   useEffect(() => {
@@ -243,9 +303,7 @@ const CollaborationRoom = ({ roomId, onClose, showToast }) => {
                   <EditMessage>📝 {msg.message}</EditMessage>
                 ) : (
                   <>
-                    {msg.userId !== currentUserId && (
-                      <Avatar src={msg.userPhoto || '/default-avatar.png'} alt={msg.userName} />
-                    )}
+                    {msg.userId !== currentUserId && renderProfileAvatar(msg)}
                     <MessageBubble $isOwn={msg.userId === currentUserId}>
                       {msg.userId !== currentUserId && (
                         <MessageAuthor>{msg.userName}</MessageAuthor>
@@ -591,6 +649,39 @@ const Avatar = styled.img`
   object-fit: cover;
   background: rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
+`;
+
+const AvatarIconWrapper = styled.div`
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: ${props => props.$bgColor || 'linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)'};
+
+  svg {
+    width: 100%;
+    height: 100%;
+  }
+`;
+
+const PlaceholderIcon = styled.div`
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(240, 147, 251, 0.3) 0%, rgba(245, 87, 108, 0.3) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  flex-shrink: 0;
+  border: 2px solid rgba(240, 147, 251, 0.5);
+  box-shadow: 0 2px 8px rgba(240, 147, 251, 0.3);
 `;
 
 const MessageBubble = styled.div`
