@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { X, Search, UserPlus, Check, XCircle, Users, QrCode, UserCheck } from 'lucide-react';
+import { X, Search, UserPlus, Check, XCircle, Users, QrCode, UserCheck, MessageCircle } from 'lucide-react';
 import {
   searchUsers,
   sendFriendRequest,
@@ -10,11 +10,14 @@ import {
   acceptFriendRequest,
   rejectFriendRequest
 } from '../../services/collaborationService';
+import { createOrGetDMRoom } from '../../services/directMessageService';
 import QRScannerModal from './QRScannerModal';
+import DirectMessageRoom from './DirectMessageRoom';
+import DirectMessageList from './DirectMessageList';
 import { auth } from '../../firebase/config';
 
 const FriendsModal = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState('friends'); // 'friends' | 'search' | 'requests'
+  const [activeTab, setActiveTab] = useState('messages'); // 'messages' | 'friends' | 'search' | 'requests'
   const [friends, setFriends] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -22,6 +25,8 @@ const FriendsModal = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showQRScanner, setShowQRScanner] = useState(false);
+  const [currentDMRoom, setCurrentDMRoom] = useState(null); // 현재 열린 DM 방
+  const [showMessageList, setShowMessageList] = useState(false); // 대화 목록 표시 여부
 
   useEffect(() => {
     if (isOpen) {
@@ -146,7 +151,32 @@ const FriendsModal = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleStartChat = async (user) => {
+    try {
+      console.log('💬 1:1 대화 시작:', user);
+
+      const result = await createOrGetDMRoom(user.id, {
+        displayName: user.displayName,
+        email: user.email,
+        photoURL: user.photoURL
+      });
+
+      if (result.success) {
+        console.log('대화방 열기:', result.roomId);
+        setCurrentDMRoom(result.roomId); // 대화방 열기
+      }
+    } catch (err) {
+      alert(err.message || '대화방 생성 실패');
+      console.error(err);
+    }
+  };
+
   if (!isOpen) return null;
+
+  // 대화 목록이 열려있으면 전체 화면으로 표시
+  if (showMessageList) {
+    return <DirectMessageList onClose={() => setShowMessageList(false)} />;
+  }
 
   return (
     <Overlay onClick={onClose}>
@@ -159,6 +189,10 @@ const FriendsModal = ({ isOpen, onClose }) => {
         </Header>
 
         <TabBar>
+          <Tab active={activeTab === 'messages'} onClick={() => setShowMessageList(true)}>
+            <MessageCircle size={18} />
+            <span>대화</span>
+          </Tab>
           <Tab active={activeTab === 'friends'} onClick={() => setActiveTab('friends')}>
             <Users size={18} />
             <span>친구 목록</span>
@@ -240,10 +274,16 @@ const FriendsModal = ({ isOpen, onClose }) => {
                         </UserName>
                         <UserEmail>{user.email}</UserEmail>
                       </UserInfo>
-                      <AddButton onClick={() => handleSendRequest(user)}>
-                        <UserPlus size={18} />
-                        <span>추가</span>
-                      </AddButton>
+                      <ActionButtons>
+                        <ChatButton onClick={() => handleStartChat(user)}>
+                          <MessageCircle size={18} />
+                          <span>대화하기</span>
+                        </ChatButton>
+                        <AddButton onClick={() => handleSendRequest(user)}>
+                          <UserPlus size={18} />
+                          <span>친구 추가</span>
+                        </AddButton>
+                      </ActionButtons>
                     </UserItem>
                   ))
                 )}
@@ -296,6 +336,13 @@ const FriendsModal = ({ isOpen, onClose }) => {
             // 자동으로 검색 실행
             setTimeout(() => handleSearch(), 100);
           }}
+        />
+      )}
+
+      {currentDMRoom && (
+        <DirectMessageRoom
+          roomId={currentDMRoom}
+          onClose={() => setCurrentDMRoom(null)}
         />
       )}
     </Overlay>
@@ -558,6 +605,30 @@ const IncompleteBadge = styled.span`
 const UserEmail = styled.div`
   color: rgba(255, 255, 255, 0.5);
   font-size: 13px;
+`;
+
+const ActionButtons = styled.div`
+  display: flex;
+  gap: 8px;
+`;
+
+const ChatButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: rgba(33, 150, 243, 0.2);
+  border: 1px solid #2196f3;
+  border-radius: 8px;
+  color: #2196f3;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(33, 150, 243, 0.3);
+  }
 `;
 
 const AddButton = styled.button`
