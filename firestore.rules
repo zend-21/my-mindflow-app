@@ -227,5 +227,46 @@ service cloud.firestore {
       allow write: if isSignedIn() &&
         request.resource.data.userId == request.auth.uid;
     }
+
+    // ========================================
+    // 1:1 대화방 (Direct Messages)
+    // ========================================
+    match /directMessages/{roomId} {
+      // 대화방 생성: 로그인 + 참여자에 본인 포함
+      allow create: if isSignedIn() &&
+        request.auth.uid in request.resource.data.participants;
+
+      // 대화방 읽기: 참여자만
+      allow read: if isSignedIn() &&
+        request.auth.uid in resource.data.participants;
+
+      // 대화방 수정: 참여자만 (읽음 표시, 숨김 등)
+      allow update: if isSignedIn() &&
+        request.auth.uid in resource.data.participants;
+
+      // 대화방 삭제: 참여자만
+      allow delete: if isSignedIn() &&
+        request.auth.uid in resource.data.participants;
+
+      // 메시지 서브컬렉션
+      match /messages/{messageId} {
+        // 메시지 생성: 대화방 참여자만
+        allow create: if isSignedIn() &&
+          request.auth.uid in get(/databases/$(database)/documents/directMessages/$(roomId)).data.participants &&
+          request.resource.data.senderId == request.auth.uid;
+
+        // 메시지 읽기: 대화방 참여자만
+        allow read: if isSignedIn() &&
+          request.auth.uid in get(/databases/$(database)/documents/directMessages/$(roomId)).data.participants;
+
+        // 메시지 수정: 작성자만
+        allow update: if isSignedIn() &&
+          request.auth.uid == resource.data.senderId;
+
+        // 메시지 삭제: 작성자만
+        allow delete: if isSignedIn() &&
+          request.auth.uid == resource.data.senderId;
+      }
+    }
   }
 }

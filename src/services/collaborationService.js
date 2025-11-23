@@ -169,8 +169,10 @@ export const sendFriendRequest = async (friendId, friendName) => {
 
   const friendshipData = {
     id: friendshipId,
-    userId: auth.currentUser.uid,
-    friendId: friendId,
+    senderId: auth.currentUser.uid,
+    senderName: auth.currentUser.displayName || '익명',
+    recipientId: friendId,
+    recipientName: friendName || '익명',
     status: 'pending',
     createdAt: Date.now()
   };

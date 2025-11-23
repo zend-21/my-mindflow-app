@@ -189,19 +189,19 @@ const FriendsModal = ({ isOpen, onClose }) => {
         </Header>
 
         <TabBar>
-          <Tab active={activeTab === 'messages'} onClick={() => setShowMessageList(true)}>
+          <Tab $active={activeTab === 'messages'} onClick={() => setShowMessageList(true)}>
             <MessageCircle size={18} />
             <span>대화</span>
           </Tab>
-          <Tab active={activeTab === 'friends'} onClick={() => setActiveTab('friends')}>
+          <Tab $active={activeTab === 'friends'} onClick={() => setActiveTab('friends')}>
             <Users size={18} />
             <span>친구 목록</span>
           </Tab>
-          <Tab active={activeTab === 'search'} onClick={() => setActiveTab('search')}>
+          <Tab $active={activeTab === 'search'} onClick={() => setActiveTab('search')}>
             <Search size={18} />
             <span>친구 찾기</span>
           </Tab>
-          <Tab active={activeTab === 'requests'} onClick={() => setActiveTab('requests')}>
+          <Tab $active={activeTab === 'requests'} onClick={() => setActiveTab('requests')}>
             <UserCheck size={18} />
             <span>친구 요청</span>
             {friendRequests.length > 0 && <Badge>{friendRequests.length}</Badge>}
@@ -421,8 +421,8 @@ const Tab = styled.button`
   padding: 16px;
   background: none;
   border: none;
-  color: ${props => props.active ? '#5ebe26' : 'rgba(255, 255, 255, 0.5)'};
-  border-bottom: 2px solid ${props => props.active ? '#5ebe26' : 'transparent'};
+  color: ${props => props.$active ? '#5ebe26' : 'rgba(255, 255, 255, 0.5)'};
+  border-bottom: 2px solid ${props => props.$active ? '#5ebe26' : 'transparent'};
   cursor: pointer;
   transition: all 0.2s;
   font-size: 15px;
@@ -430,7 +430,7 @@ const Tab = styled.button`
   position: relative;
 
   &:hover {
-    color: ${props => props.active ? '#5ebe26' : 'rgba(255, 255, 255, 0.8)'};
+    color: ${props => props.$active ? '#5ebe26' : 'rgba(255, 255, 255, 0.8)'};
   }
 `;
 
