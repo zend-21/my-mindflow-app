@@ -1,8 +1,10 @@
-// 💬 채팅 탭 - 최근 대화 목록
+// 💬 채팅 탭 - 최근 대화 목록 (1:1 + 그룹)
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { subscribeToMyDMRooms } from '../../services/directMessageService';
-import { Search, Plus, Pin } from 'lucide-react';
+import { subscribeToMyGroupChats } from '../../services/groupChatService';
+import { Search, Plus, Pin, Users } from 'lucide-react';
+import CreateGroupModal from './CreateGroupModal';
 
 // 컨테이너
 const Container = styled.div`
@@ -61,22 +63,56 @@ const SearchInput = styled.input`
   }
 `;
 
+const ActionButtons = styled.div`
+  display: flex;
+  gap: 8px;
+`;
+
 const NewChatButton = styled.button`
   background: linear-gradient(135deg, #4a90e2, #357abd);
   border: none;
   color: #ffffff;
-  padding: 10px;
+  padding: 10px 14px;
   border-radius: 12px;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+  font-size: 13px;
+  font-weight: 600;
 
   &:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 16px rgba(74, 144, 226, 0.4);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+`;
+
+const NewGroupButton = styled.button`
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border: none;
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  font-size: 13px;
+  font-weight: 600;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
   }
 
   &:active {
@@ -194,6 +230,19 @@ const ChatPreview = styled.div`
   font-weight: ${props => props.$unread ? '500' : '400'};
 `;
 
+const GroupBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  background: rgba(102, 126, 234, 0.15);
+  border-radius: 6px;
+  color: #667eea;
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 6px;
+`;
+
 const UnreadBadge = styled.div`
   position: absolute;
   top: 50%;
@@ -251,23 +300,38 @@ const EmptyDescription = styled.div`
 const ChatList = ({ showToast }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [chatRooms, setChatRooms] = useState([]);
+  const [groupChats, setGroupChats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
 
   useEffect(() => {
+    let dmLoaded = false;
+    let groupLoaded = false;
+
     // 1:1 대화방 목록 실시간 구독
-    const unsubscribe = subscribeToMyDMRooms((rooms) => {
-      console.log('📬 대화방 목록 업데이트:', rooms);
+    const unsubscribeDM = subscribeToMyDMRooms((rooms) => {
+      console.log('📬 1:1 대화방 목록 업데이트:', rooms);
       setChatRooms(rooms);
-      setLoading(false);
+      dmLoaded = true;
+      if (groupLoaded) setLoading(false);
+    });
+
+    // 그룹 채팅방 목록 실시간 구독
+    const unsubscribeGroup = subscribeToMyGroupChats((groups) => {
+      console.log('📁 그룹 채팅방 목록 업데이트:', groups);
+      setGroupChats(groups);
+      groupLoaded = true;
+      if (dmLoaded) setLoading(false);
     });
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (unsubscribeDM) unsubscribeDM();
+      if (unsubscribeGroup) unsubscribeGroup();
     };
   }, []);
 
-  // 검색 필터링
-  const filteredChats = chatRooms.filter(room => {
+  // 1:1 대화 검색 필터링
+  const filteredDMs = chatRooms.filter(room => {
     if (!searchQuery) return true;
 
     const otherUserId = room.participants?.find(id => id !== localStorage.getItem('firebaseUserId'));
@@ -277,19 +341,43 @@ const ChatList = ({ showToast }) => {
     return displayName.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  // 고정된 대화와 일반 대화 분리 (나중에 구현)
-  const pinnedChats = filteredChats.filter(chat => chat.pinned);
-  const regularChats = filteredChats.filter(chat => !chat.pinned);
+  // 그룹 채팅 검색 필터링
+  const filteredGroups = groupChats.filter(group => {
+    if (!searchQuery) return true;
+    return group.groupName?.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
-  const handleChatClick = (room) => {
+  // 전체 대화 목록 (1:1 + 그룹) - 최신순 정렬
+  const allChats = [
+    ...filteredDMs.map(room => ({ ...room, type: 'dm' })),
+    ...filteredGroups.map(group => ({ ...group, type: 'group' }))
+  ].sort((a, b) => {
+    const aTime = a.lastMessageTime?.toMillis?.() || 0;
+    const bTime = b.lastMessageTime?.toMillis?.() || 0;
+    return bTime - aTime;
+  });
+
+  // 고정된 대화와 일반 대화 분리
+  const pinnedChats = allChats.filter(chat => chat.pinned);
+  const regularChats = allChats.filter(chat => !chat.pinned);
+
+  const handleChatClick = (chat) => {
     // TODO: 대화방 열기
-    console.log('대화방 클릭:', room);
-    showToast?.('대화방 기능 구현 예정');
+    console.log('대화방 클릭:', chat);
+    if (chat.type === 'group') {
+      showToast?.('그룹 채팅 기능 구현 예정');
+    } else {
+      showToast?.('1:1 대화 기능 구현 예정');
+    }
   };
 
   const handleNewChat = () => {
     // TODO: 새 대화 시작
     showToast?.('새 대화 시작 기능 구현 예정');
+  };
+
+  const handleNewGroup = () => {
+    setShowCreateGroupModal(true);
   };
 
   // 시간 포맷 함수
@@ -350,15 +438,20 @@ const ChatList = ({ showToast }) => {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </SearchInputWrapper>
-          <NewChatButton onClick={handleNewChat}>
-            <Plus size={20} />
-          </NewChatButton>
+          <ActionButtons>
+            <NewChatButton onClick={handleNewChat} title="새 대화">
+              <Plus size={18} />
+            </NewChatButton>
+            <NewGroupButton onClick={handleNewGroup} title="그룹 만들기">
+              <Users size={18} />
+            </NewGroupButton>
+          </ActionButtons>
         </SearchBar>
       </SearchSection>
 
       {/* 대화 목록 */}
       <ChatListContainer>
-        {filteredChats.length === 0 ? (
+        {allChats.length === 0 ? (
           <EmptyState>
             <EmptyIcon>💬</EmptyIcon>
             <EmptyTitle>
@@ -379,30 +472,71 @@ const ChatList = ({ showToast }) => {
                   <PinIcon />
                   고정된 대화
                 </SectionTitle>
-                {pinnedChats.map(room => {
+                {pinnedChats.map(chat => {
                   const currentUserId = localStorage.getItem('firebaseUserId');
-                  const otherUserId = room.participants?.find(id => id !== currentUserId);
-                  const otherUserInfo = room.participantsInfo?.[otherUserId];
-                  const displayName = otherUserInfo?.displayName || '익명';
-                  const unreadCount = room.unreadCount?.[currentUserId] || 0;
+
+                  // 1:1 대화인 경우
+                  if (chat.type === 'dm') {
+                    const otherUserId = chat.participants?.find(id => id !== currentUserId);
+                    const otherUserInfo = chat.participantsInfo?.[otherUserId];
+                    const displayName = otherUserInfo?.displayName || '익명';
+                    const unreadCount = chat.unreadCount?.[currentUserId] || 0;
+
+                    return (
+                      <ChatItem
+                        key={chat.id}
+                        $unread={unreadCount > 0}
+                        onClick={() => handleChatClick(chat)}
+                      >
+                        <ChatItemContent>
+                          <Avatar $color={getAvatarColor(otherUserId)}>
+                            {displayName.charAt(0).toUpperCase()}
+                          </Avatar>
+                          <ChatInfo>
+                            <ChatHeader>
+                              <ChatName>{displayName}</ChatName>
+                              <ChatTime>{formatTime(chat.lastMessageTime)}</ChatTime>
+                            </ChatHeader>
+                            <ChatPreview $unread={unreadCount > 0}>
+                              {chat.lastMessage || '대화를 시작해보세요'}
+                            </ChatPreview>
+                          </ChatInfo>
+                        </ChatItemContent>
+                        {unreadCount > 0 && (
+                          <UnreadBadge>{unreadCount > 99 ? '99+' : unreadCount}</UnreadBadge>
+                        )}
+                      </ChatItem>
+                    );
+                  }
+
+                  // 그룹 채팅인 경우
+                  const groupName = chat.groupName || '이름 없는 그룹';
+                  const unreadCount = chat.unreadCount?.[currentUserId] || 0;
+                  const memberCount = chat.members?.length || 0;
 
                   return (
                     <ChatItem
-                      key={room.id}
+                      key={chat.id}
                       $unread={unreadCount > 0}
-                      onClick={() => handleChatClick(room)}
+                      onClick={() => handleChatClick(chat)}
                     >
                       <ChatItemContent>
-                        <Avatar $color={getAvatarColor(otherUserId)}>
-                          {displayName.charAt(0).toUpperCase()}
+                        <Avatar $color="linear-gradient(135deg, #667eea, #764ba2)">
+                          <Users size={24} />
                         </Avatar>
                         <ChatInfo>
                           <ChatHeader>
-                            <ChatName>{displayName}</ChatName>
-                            <ChatTime>{formatTime(room.lastMessageTime)}</ChatTime>
+                            <ChatName>
+                              {groupName}
+                              <GroupBadge>
+                                <Users size={10} />
+                                {memberCount}
+                              </GroupBadge>
+                            </ChatName>
+                            <ChatTime>{formatTime(chat.lastMessageTime)}</ChatTime>
                           </ChatHeader>
                           <ChatPreview $unread={unreadCount > 0}>
-                            {room.lastMessage || '대화를 시작해보세요'}
+                            {chat.lastMessage || '대화를 시작해보세요'}
                           </ChatPreview>
                         </ChatInfo>
                       </ChatItemContent>
@@ -419,30 +553,71 @@ const ChatList = ({ showToast }) => {
             {regularChats.length > 0 && (
               <>
                 <SectionTitle>최근 대화</SectionTitle>
-                {regularChats.map(room => {
+                {regularChats.map(chat => {
                   const currentUserId = localStorage.getItem('firebaseUserId');
-                  const otherUserId = room.participants?.find(id => id !== currentUserId);
-                  const otherUserInfo = room.participantsInfo?.[otherUserId];
-                  const displayName = otherUserInfo?.displayName || '익명';
-                  const unreadCount = room.unreadCount?.[currentUserId] || 0;
+
+                  // 1:1 대화인 경우
+                  if (chat.type === 'dm') {
+                    const otherUserId = chat.participants?.find(id => id !== currentUserId);
+                    const otherUserInfo = chat.participantsInfo?.[otherUserId];
+                    const displayName = otherUserInfo?.displayName || '익명';
+                    const unreadCount = chat.unreadCount?.[currentUserId] || 0;
+
+                    return (
+                      <ChatItem
+                        key={chat.id}
+                        $unread={unreadCount > 0}
+                        onClick={() => handleChatClick(chat)}
+                      >
+                        <ChatItemContent>
+                          <Avatar $color={getAvatarColor(otherUserId)}>
+                            {displayName.charAt(0).toUpperCase()}
+                          </Avatar>
+                          <ChatInfo>
+                            <ChatHeader>
+                              <ChatName>{displayName}</ChatName>
+                              <ChatTime>{formatTime(chat.lastMessageTime)}</ChatTime>
+                            </ChatHeader>
+                            <ChatPreview $unread={unreadCount > 0}>
+                              {chat.lastMessage || '대화를 시작해보세요'}
+                            </ChatPreview>
+                          </ChatInfo>
+                        </ChatItemContent>
+                        {unreadCount > 0 && (
+                          <UnreadBadge>{unreadCount > 99 ? '99+' : unreadCount}</UnreadBadge>
+                        )}
+                      </ChatItem>
+                    );
+                  }
+
+                  // 그룹 채팅인 경우
+                  const groupName = chat.groupName || '이름 없는 그룹';
+                  const unreadCount = chat.unreadCount?.[currentUserId] || 0;
+                  const memberCount = chat.members?.length || 0;
 
                   return (
                     <ChatItem
-                      key={room.id}
+                      key={chat.id}
                       $unread={unreadCount > 0}
-                      onClick={() => handleChatClick(room)}
+                      onClick={() => handleChatClick(chat)}
                     >
                       <ChatItemContent>
-                        <Avatar $color={getAvatarColor(otherUserId)}>
-                          {displayName.charAt(0).toUpperCase()}
+                        <Avatar $color="linear-gradient(135deg, #667eea, #764ba2)">
+                          <Users size={24} />
                         </Avatar>
                         <ChatInfo>
                           <ChatHeader>
-                            <ChatName>{displayName}</ChatName>
-                            <ChatTime>{formatTime(room.lastMessageTime)}</ChatTime>
+                            <ChatName>
+                              {groupName}
+                              <GroupBadge>
+                                <Users size={10} />
+                                {memberCount}
+                              </GroupBadge>
+                            </ChatName>
+                            <ChatTime>{formatTime(chat.lastMessageTime)}</ChatTime>
                           </ChatHeader>
                           <ChatPreview $unread={unreadCount > 0}>
-                            {room.lastMessage || '대화를 시작해보세요'}
+                            {chat.lastMessage || '대화를 시작해보세요'}
                           </ChatPreview>
                         </ChatInfo>
                       </ChatItemContent>
@@ -457,6 +632,14 @@ const ChatList = ({ showToast }) => {
           </>
         )}
       </ChatListContainer>
+
+      {/* 그룹 생성 모달 */}
+      {showCreateGroupModal && (
+        <CreateGroupModal
+          onClose={() => setShowCreateGroupModal(false)}
+          showToast={showToast}
+        />
+      )}
     </Container>
   );
 };
