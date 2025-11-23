@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { X, Search, UserPlus, Check, XCircle, Users, QrCode } from 'lucide-react';
+import { X, Search, UserPlus, Check, XCircle, Users, QrCode, UserCheck } from 'lucide-react';
 import {
   searchUsers,
   sendFriendRequest,
@@ -18,13 +18,18 @@ const FriendsModal = ({ isOpen, onClose }) => {
   const [friends, setFriends] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [friendRequests, setFriendRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showQRScanner, setShowQRScanner] = useState(false);
 
   useEffect(() => {
-    if (isOpen && activeTab === 'friends') {
-      loadFriends();
+    if (isOpen) {
+      if (activeTab === 'friends') {
+        loadFriends();
+      } else if (activeTab === 'requests') {
+        loadFriendRequests();
+      }
     }
   }, [isOpen, activeTab]);
 
@@ -35,6 +40,45 @@ const FriendsModal = ({ isOpen, onClose }) => {
       setFriends(friendsList);
     } catch (err) {
       setError('친구 목록을 불러오는데 실패했습니다');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadFriendRequests = async () => {
+    try {
+      setLoading(true);
+      // getFriendRequests 함수를 사용하여 받은 친구 요청 불러오기
+      const { db, auth: firebaseAuth } = await import('../../firebase/config');
+      const { collection, query, where, getDocs } = await import('firebase/firestore');
+
+      const q = query(
+        collection(db, 'friendships'),
+        where('recipientId', '==', auth.currentUser.uid),
+        where('status', '==', 'pending')
+      );
+
+      const snapshot = await getDocs(q);
+      const requests = await Promise.all(
+        snapshot.docs.map(async (docSnap) => {
+          const data = docSnap.data();
+          // 요청 보낸 사람 정보 가져오기
+          const { doc, getDoc } = await import('firebase/firestore');
+          const senderRef = doc(db, 'users', data.senderId);
+          const senderDoc = await getDoc(senderRef);
+
+          return {
+            id: docSnap.id,
+            ...data,
+            senderInfo: senderDoc.exists() ? senderDoc.data() : { displayName: data.senderName, email: '' }
+          };
+        })
+      );
+
+      setFriendRequests(requests);
+    } catch (err) {
+      setError('친구 요청을 불러오는데 실패했습니다');
       console.error(err);
     } finally {
       setLoading(false);
@@ -79,6 +123,29 @@ const FriendsModal = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleAcceptRequest = async (request) => {
+    try {
+      await acceptFriendRequest(request.senderId);
+      alert(`${request.senderInfo.displayName}님과 친구가 되었습니다`);
+      loadFriendRequests();
+      loadFriends();
+    } catch (err) {
+      alert(err.message || '친구 요청 수락 실패');
+      console.error(err);
+    }
+  };
+
+  const handleRejectRequest = async (request) => {
+    try {
+      await rejectFriendRequest(request.senderId);
+      alert('친구 요청을 거절했습니다');
+      loadFriendRequests();
+    } catch (err) {
+      alert(err.message || '친구 요청 거절 실패');
+      console.error(err);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -99,6 +166,11 @@ const FriendsModal = ({ isOpen, onClose }) => {
           <Tab active={activeTab === 'search'} onClick={() => setActiveTab('search')}>
             <Search size={18} />
             <span>친구 찾기</span>
+          </Tab>
+          <Tab active={activeTab === 'requests'} onClick={() => setActiveTab('requests')}>
+            <UserCheck size={18} />
+            <span>친구 요청</span>
+            {friendRequests.length > 0 && <Badge>{friendRequests.length}</Badge>}
           </Tab>
         </TabBar>
 
@@ -165,7 +237,6 @@ const FriendsModal = ({ isOpen, onClose }) => {
                       <UserInfo>
                         <UserName>
                           {user.displayName}
-                          {user.isProfileIncomplete && <IncompleteBadge> (미로그인)</IncompleteBadge>}
                         </UserName>
                         <UserEmail>{user.email}</UserEmail>
                       </UserInfo>
@@ -178,6 +249,39 @@ const FriendsModal = ({ isOpen, onClose }) => {
                 )}
               </SearchResults>
             </SearchSection>
+          )}
+
+          {activeTab === 'requests' && (
+            <FriendsList>
+              {loading ? (
+                <LoadingText>로딩 중...</LoadingText>
+              ) : friendRequests.length === 0 ? (
+                <EmptyText>받은 친구 요청이 없습니다</EmptyText>
+              ) : (
+                friendRequests.map(request => (
+                  <FriendItem key={request.id}>
+                    <Avatar
+                      src={request.senderInfo.photoURL || '/default-avatar.png'}
+                      alt={request.senderInfo.displayName}
+                    />
+                    <FriendInfo>
+                      <FriendName>{request.senderInfo.displayName}</FriendName>
+                      <FriendEmail>{request.senderInfo.email}</FriendEmail>
+                    </FriendInfo>
+                    <RequestActions>
+                      <AcceptButton onClick={() => handleAcceptRequest(request)}>
+                        <Check size={18} />
+                        <span>수락</span>
+                      </AcceptButton>
+                      <RejectButton onClick={() => handleRejectRequest(request)}>
+                        <XCircle size={18} />
+                        <span>거절</span>
+                      </RejectButton>
+                    </RequestActions>
+                  </FriendItem>
+                ))
+              )}
+            </FriendsList>
           )}
         </Content>
       </Modal>
@@ -276,10 +380,25 @@ const Tab = styled.button`
   transition: all 0.2s;
   font-size: 15px;
   font-weight: 600;
+  position: relative;
 
   &:hover {
     color: ${props => props.active ? '#5ebe26' : 'rgba(255, 255, 255, 0.8)'};
   }
+`;
+
+const Badge = styled.span`
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #ff4444;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
 `;
 
 const Content = styled.div`
@@ -481,6 +600,49 @@ const ErrorText = styled.div`
   background: rgba(255, 107, 107, 0.1);
   border-radius: 8px;
   text-align: center;
+`;
+
+const RequestActions = styled.div`
+  display: flex;
+  gap: 8px;
+`;
+
+const AcceptButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: rgba(94, 190, 38, 0.2);
+  border: 1px solid #5ebe26;
+  border-radius: 8px;
+  color: #5ebe26;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(94, 190, 38, 0.3);
+  }
+`;
+
+const RejectButton = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: rgba(255, 107, 107, 0.2);
+  border: 1px solid #ff6b6b;
+  border-radius: 8px;
+  color: #ff6b6b;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255, 107, 107, 0.3);
+  }
 `;
 
 export default FriendsModal;
