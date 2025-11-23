@@ -6,7 +6,8 @@ import { GlobalStyle } from './styles.js';
 import { GoogleLogin } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import { GoogleAuthProvider, signInWithCredential, signOut } from 'firebase/auth';
-import { auth } from './firebase/config';
+import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { auth, db } from './firebase/config';
 import { initializeGapiClient, setAccessToken, syncToGoogleDrive, loadFromGoogleDrive, loadProfilePictureFromGoogleDrive, syncProfilePictureToGoogleDrive } from './utils/googleDriveSync';
 import { backupToGoogleDrive } from './utils/googleDriveBackup';
 import { DndContext, closestCenter, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
@@ -1602,6 +1603,34 @@ function App() {
                 logLoginEvent('google');
             } catch (analyticsError) {
                 console.warn('⚠️ Analytics 설정 오류:', analyticsError);
+            }
+
+            // 👤 사용자 문서 생성/업데이트 (users 컬렉션)
+            try {
+                const userRef = doc(db, 'users', firebaseUserId);
+                const userDoc = await getDoc(userRef);
+
+                const userData = {
+                    displayName: userInfo.name,
+                    email: userInfo.email,
+                    photoURL: pictureUrl,
+                    updatedAt: Date.now()
+                };
+
+                if (!userDoc.exists()) {
+                    // 새 사용자 문서 생성
+                    await setDoc(userRef, {
+                        ...userData,
+                        createdAt: Date.now()
+                    });
+                    console.log('✅ 사용자 문서 생성 완료');
+                } else {
+                    // 기존 사용자 정보 업데이트
+                    await updateDoc(userRef, userData);
+                    console.log('✅ 사용자 정보 업데이트 완료');
+                }
+            } catch (userError) {
+                console.error('⚠️ 사용자 문서 생성/업데이트 오류:', userError);
             }
 
             // 🏠 워크스페이스 자동 생성 (없으면 생성)

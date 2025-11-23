@@ -1,13 +1,13 @@
 // 내 워크스페이스 관리 페이지 - 내가 만든 모든 방 보기 및 관리
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { QRCodeSVG } from 'qrcode.react';
-import { getWorkspaceByUserId, changeWorkspaceCode } from '../../services/workspaceService';
-import { collection, query, where, orderBy, getDocs, onSnapshot, doc, getDoc } from 'firebase/firestore';
+import { QrCode, Search } from 'lucide-react';
+import { getWorkspaceByUserId } from '../../services/workspaceService';
+import { collection, query, where, orderBy, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import { deleteRoom, closeRoom, reopenRoom, regenerateRoomInviteCode, getRoomByInviteCode } from '../../services/collaborationRoomService';
+import { deleteRoom, closeRoom, reopenRoom, regenerateRoomInviteCode } from '../../services/collaborationRoomService';
 import RoomBrowser from './RoomBrowser';
-import QRCodeModal from './QRCodeModal';
 import QRScannerModal from './QRScannerModal';
 import { getMyFriends, removeFriend } from '../../services/friendService';
 
@@ -27,35 +27,25 @@ const slideIn = keyframes`
   }
 `;
 
-// 모달 오버레이 (전체 화면 반투명 배경)
+// 모달 오버레이 (전체 화면)
 const ModalOverlay = styled.div`
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
   z-index: 9999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   animation: ${fadeIn} 0.3s ease-out;
-  overflow-y: auto;
-  padding: 20px;
 `;
 
 // 모달 컨테이너 (실제 내용)
 const ModalContainer = styled.div`
   width: 100%;
-  max-width: 1400px;
-  background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
-  border-radius: 20px;
+  height: 100%;
   position: relative;
-  animation: ${slideIn} 0.3s ease-out;
-  max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
 `;
 
 // 닫기 버튼
@@ -142,6 +132,243 @@ const WorkspaceInfo = styled.div`
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 20px;
+`;
+
+// 협업 라운지 박스 (방 탐색 + 친구 관리)
+const CommunityBox = styled.div`
+  background: linear-gradient(135deg, #2a2d35, #333842);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const CommunityTabContainer = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 12px;
+`;
+
+const CommunityTab = styled.button`
+  background: ${props => props.$active ? 'rgba(74, 144, 226, 0.15)' : 'transparent'};
+  border: none;
+  border-bottom: 2px solid ${props => props.$active ? '#4a90e2' : 'transparent'};
+  color: ${props => props.$active ? '#4a90e2' : '#888'};
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    color: #4a90e2;
+  }
+`;
+
+const CommunityContent = styled.div`
+  min-height: 200px;
+`;
+
+// 검색 바 영역
+const SearchBar = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+`;
+
+const SearchInput = styled.input`
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e0e0e0;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s;
+
+  &::placeholder {
+    color: #666;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: #4a90e2;
+    background: rgba(255, 255, 255, 0.08);
+  }
+`;
+
+const SearchButton = styled.button`
+  background: rgba(74, 144, 226, 0.2);
+  border: 1px solid rgba(74, 144, 226, 0.4);
+  color: #4a90e2;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(74, 144, 226, 0.3);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+// 정렬 버튼 영역
+const SortBar = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const SortButton = styled.button`
+  background: ${props => props.$active ? 'rgba(74, 144, 226, 0.2)' : 'transparent'};
+  border: 1px solid ${props => props.$active ? 'rgba(74, 144, 226, 0.4)' : 'rgba(255, 255, 255, 0.1)'};
+  color: ${props => props.$active ? '#4a90e2' : '#888'};
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    color: #4a90e2;
+    border-color: rgba(74, 144, 226, 0.4);
+  }
+`;
+
+// 테이블 스타일
+const Table = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const TableRow = styled.div`
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 120px;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+`;
+
+const TableHeader = styled(TableRow)`
+  background: rgba(74, 144, 226, 0.1);
+  border-color: rgba(74, 144, 226, 0.2);
+  font-weight: 600;
+  color: #4a90e2;
+
+  &:hover {
+    background: rgba(74, 144, 226, 0.1);
+  }
+`;
+
+const TableCell = styled.div`
+  color: ${props => props.$header ? '#4a90e2' : '#e0e0e0'};
+  font-size: ${props => props.$header ? '13px' : '14px'};
+  font-weight: ${props => props.$header ? '600' : '400'};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  @media (max-width: 768px) {
+    &::before {
+      content: ${props => props.$mobileLabel ? `'${props.$mobileLabel}: '` : '""'};
+      font-weight: 600;
+      color: #888;
+      margin-right: 8px;
+    }
+  }
+`;
+
+const TableActionButton = styled.button`
+  background: ${props => {
+    if (props.$variant === 'chat') return 'rgba(74, 144, 226, 0.2)';
+    if (props.$variant === 'add') return 'rgba(46, 213, 115, 0.2)';
+    return 'transparent';
+  }};
+  border: 1px solid ${props => {
+    if (props.$variant === 'chat') return 'rgba(74, 144, 226, 0.4)';
+    if (props.$variant === 'add') return 'rgba(46, 213, 115, 0.4)';
+    return 'rgba(255, 255, 255, 0.1)';
+  }};
+  color: ${props => {
+    if (props.$variant === 'chat') return '#4a90e2';
+    if (props.$variant === 'add') return '#2ed573';
+    return '#e0e0e0';
+  }};
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    opacity: 0.8;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+// 친구 요청 카운트 영역
+const FriendRequestSection = styled.div`
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const RequestCount = styled.div`
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+
+  span:first-child {
+    color: #b0b0b0;
+    font-size: 13px;
+  }
+
+  span:last-child {
+    color: #4a90e2;
+    font-size: 16px;
+    font-weight: 700;
+  }
 `;
 
 const WorkspaceCodeSection = styled.div`
@@ -270,22 +497,6 @@ const CodeButton = styled.button`
 
   &:hover {
     background: rgba(74, 144, 226, 0.3);
-  }
-`;
-
-const ChangeCodeButton = styled.button`
-  background: rgba(230, 126, 34, 0.2);
-  border: 1px solid rgba(230, 126, 34, 0.4);
-  color: #e67e22;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-
-  &:hover {
-    background: rgba(230, 126, 34, 0.3);
   }
 `;
 
@@ -633,12 +844,47 @@ const LoadingState = styled.div`
   font-size: 16px;
 `;
 
+const RoomListContainer = styled.div`
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+`;
+
+const RoomCardHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+`;
+
+const MetaItem = styled.span`
+  color: #888;
+  font-size: 13px;
+
+  &:not(:last-child)::after {
+    content: ' · ';
+    margin: 0 4px;
+  }
+`;
+
+const RoomCardActions = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
 const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) => {
   const [workspace, setWorkspace] = useState(null);
   const [rooms, setRooms] = useState([]); // 내가 운영중인 방
   const [joinedRooms, setJoinedRooms] = useState([]); // 참가 이력 방
   const [loading, setLoading] = useState(true);
-  const [mainTab, setMainTab] = useState('owned'); // owned, joined, browse, friends
+  const [mainTab, setMainTab] = useState('owned'); // owned, joined
+  const [communityTab, setCommunityTab] = useState('browse'); // browse, friends (새로 추가된 탭)
 
   // 내가 운영중인 방 - 서브탭
   const [ownedRoomTab, setOwnedRoomTab] = useState('all'); // all, open, restricted, archived
@@ -654,10 +900,17 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
 
   // 친구 관련 상태
   const [friends, setFriends] = useState([]);
-  const [showQRCode, setShowQRCode] = useState(false);
   const [showQRScanner, setShowQRScanner] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const qrCodeRef = useRef(null);
+
+  // 방 탐색 상태
+  const [roomSearchCode, setRoomSearchCode] = useState('');
+  const [roomSortBy, setRoomSortBy] = useState('recent'); // recent, name, participants
+
+  // 친구 검색 상태
+  const [friendSearchCode, setFriendSearchCode] = useState('');
+  const [friendRequests, setFriendRequests] = useState({ received: 0, sent: 0 });
 
   useEffect(() => {
     loadWorkspaceAndRooms();
@@ -754,6 +1007,7 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
       const joinedRoomsList = [];
       for (const roomId of joinedRoomIds) {
         try {
+          const { doc, getDoc } = await import('firebase/firestore');
           const roomDoc = await getDoc(doc(db, 'collaborationRooms', roomId));
           if (roomDoc.exists()) {
             const roomData = roomDoc.data();
@@ -762,7 +1016,7 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
               joinedRoomsList.push({
                 id: roomDoc.id,
                 ...roomData,
-                isActive: roomData.status === 'active', // 방이 활성 상태인지
+                isActive: roomData.status === 'active',
               });
             }
           } else {
@@ -804,10 +1058,10 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
 
   // 친구 탭이 활성화될 때 친구 목록 로드
   useEffect(() => {
-    if (mainTab === 'friends') {
+    if (communityTab === 'friends') {
       loadFriends();
     }
-  }, [mainTab]);
+  }, [communityTab]);
 
   // 친구 삭제 핸들러
   const handleRemoveFriend = (friendId, friendName) => {
@@ -911,50 +1165,6 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
       console.error('QR 코드 복사 실패:', err);
       showToast?.('QR 코드 복사에 실패했습니다');
     }
-  };
-
-  const handleChangeCode = () => {
-    setConfirmModal({
-      title: '워크스페이스 코드 변경 (이사)',
-      message: '워크스페이스 코드를 변경하시겠습니까?\n\n🚚 이사 효과:\n⚠️ 이전 워크스페이스 코드로는 더 이상 접근할 수 없습니다\n⚠️ 모든 방의 초대 코드도 자동으로 재생성됩니다\n⚠️ 기존 초대 코드를 가진 사람들은 접근할 수 없게 됩니다\n✅ 원하는 사람에게만 새 코드를 공유하세요',
-      variant: 'confirm',
-      onConfirm: async () => {
-        try {
-          const userId = localStorage.getItem('firebaseUserId');
-          if (!userId) {
-            setAlertModal({
-              title: '오류',
-              message: '로그인이 필요합니다.',
-              variant: 'danger'
-            });
-            return;
-          }
-
-          const workspaceId = `workspace_${userId}`;
-          const result = await changeWorkspaceCode(workspaceId, userId);
-
-          if (result.success) {
-            const regeneratedCount = result.regeneratedRoomCount || 0;
-            const warningMsg = result.warning ? `\n\n⚠️ ${result.warning}` : '';
-
-            setAlertModal({
-              title: '이사 완료',
-              message: `🚚 새 워크스페이스 코드: ${result.newCode}\n\n✅ ${regeneratedCount}개 방의 초대 코드가 재생성되었습니다\n💡 새 코드를 원하는 사람에게만 공유하세요${warningMsg}`,
-              variant: 'success'
-            });
-            // 워크스페이스 정보 다시 불러오기
-            await loadWorkspaceAndRooms();
-          }
-        } catch (error) {
-          console.error('코드 변경 오류:', error);
-          setAlertModal({
-            title: '오류',
-            message: '코드 변경에 실패했습니다.',
-            variant: 'danger'
-          });
-        }
-      }
-    });
   };
 
   const handleCopyInviteCode = (inviteCode) => {
@@ -1155,6 +1365,49 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
     }
   };
 
+  // 친구 검색 핸들러
+  const handleFriendSearch = async () => {
+    console.log('🔍 친구 검색 시작:', friendSearchCode);
+
+    if (friendSearchCode.length < 2) {
+      setAlertModal({
+        title: '검색 오류',
+        message: '2자 이상 입력해주세요',
+        variant: 'warning'
+      });
+      return;
+    }
+
+    try {
+      const { searchUsers } = await import('../../services/collaborationService');
+      const results = await searchUsers(friendSearchCode);
+      console.log('🔍 검색 결과:', results);
+
+      if (results.length === 0) {
+        setAlertModal({
+          title: '검색 결과 없음',
+          message: '해당 WS 코드를 가진 사용자를 찾을 수 없습니다.',
+          variant: 'info'
+        });
+      } else {
+        // TODO: 검색 결과 모달 표시 (나중에 구현)
+        console.log('검색 결과:', results);
+        setAlertModal({
+          title: '검색 완료',
+          message: `${results.length}명의 사용자를 찾았습니다.`,
+          variant: 'success'
+        });
+      }
+    } catch (error) {
+      console.error('🔍 검색 오류:', error);
+      setAlertModal({
+        title: '검색 실패',
+        message: '검색에 실패했습니다: ' + error.message,
+        variant: 'danger'
+      });
+    }
+  };
+
   return (
     <>
       <ModalOverlay>
@@ -1170,7 +1423,7 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                 <Title>협업 라운지</Title>
                 <Subtitle>모든 협업방을 한 곳에서 관리하세요</Subtitle>
 
-                {workspace && (mainTab === 'owned' || mainTab === 'friends') && (
+                {workspace && mainTab === 'owned' && (
                   <WorkspaceInfo>
                     <WorkspaceCodeSection>
                       <CodeInfoSection>
@@ -1180,9 +1433,6 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                         </CodeRow>
                         <ButtonRow>
                           <CodeButton onClick={handleCopyCode}>코드복사</CodeButton>
-                          {mainTab === 'friends' && (
-                            <CodeButton onClick={() => setShowQRScanner(true)}>QR 스캔</CodeButton>
-                          )}
                         </ButtonRow>
                       </CodeInfoSection>
                       <QRCodeWrapper onClick={() => setShowQRModal(true)}>
@@ -1196,6 +1446,191 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                     </WorkspaceCodeSection>
                   </WorkspaceInfo>
                 )}
+
+                {/* 협업 라운지 박스 (방 탐색 + 친구 관리) */}
+                {workspace && mainTab === 'owned' && (
+                  <CommunityBox>
+                    <CommunityTabContainer>
+                      <CommunityTab
+                        $active={communityTab === 'browse'}
+                        onClick={() => setCommunityTab('browse')}
+                      >
+                        방 탐색
+                      </CommunityTab>
+                      <CommunityTab
+                        $active={communityTab === 'friends'}
+                        onClick={() => setCommunityTab('friends')}
+                      >
+                        친구 관리
+                      </CommunityTab>
+                    </CommunityTabContainer>
+
+                    <CommunityContent>
+                      {/* 방 탐색 콘텐츠 */}
+                      {communityTab === 'browse' && (
+                        <div>
+                          {/* 검색 바 */}
+                          <SearchBar>
+                            <SearchInput
+                              type="text"
+                              placeholder="방 코드 입력"
+                              value={roomSearchCode}
+                              onChange={(e) => setRoomSearchCode(e.target.value)}
+                            />
+                            <SearchButton onClick={() => setIsRoomBrowserOpen(true)}>
+                              검색
+                            </SearchButton>
+                          </SearchBar>
+
+                          {/* 정렬 버튼 */}
+                          <SortBar>
+                            <SortButton
+                              $active={roomSortBy === 'recent'}
+                              onClick={() => setRoomSortBy('recent')}
+                            >
+                              최근순
+                            </SortButton>
+                            <SortButton
+                              $active={roomSortBy === 'name'}
+                              onClick={() => setRoomSortBy('name')}
+                            >
+                              이름순
+                            </SortButton>
+                            <SortButton
+                              $active={roomSortBy === 'participants'}
+                              onClick={() => setRoomSortBy('participants')}
+                            >
+                              참여자순
+                            </SortButton>
+                          </SortBar>
+
+                          {/* 방 목록 테이블 */}
+                          <Table>
+                            <TableHeader>
+                              <TableCell $header>방 이름</TableCell>
+                              <TableCell $header>유형</TableCell>
+                              <TableCell $header>참여자</TableCell>
+                              <TableCell $header>상태</TableCell>
+                              <TableCell $header>작업</TableCell>
+                            </TableHeader>
+
+                            {/* 내가 운영중인 방 + 참가중인 방 합쳐서 표시 */}
+                            {[...rooms, ...joinedRooms].length > 0 ? (
+                              [...rooms, ...joinedRooms].map(room => (
+                                <TableRow key={room.id}>
+                                  <TableCell $mobileLabel="방 이름">{room.memoTitle}</TableCell>
+                                  <TableCell $mobileLabel="유형">
+                                    {room.roomType === 'open' ? '개방형' : '제한형'}
+                                  </TableCell>
+                                  <TableCell $mobileLabel="참여자">
+                                    {room.participants?.length || 0}명
+                                  </TableCell>
+                                  <TableCell $mobileLabel="상태">
+                                    {room.status === 'active' ? '활성' : '폐쇄'}
+                                  </TableCell>
+                                  <TableCell>
+                                    <TableActionButton
+                                      onClick={() => onRoomSelect && onRoomSelect(room)}
+                                      disabled={room.status === 'archived'}
+                                    >
+                                      입장
+                                    </TableActionButton>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            ) : (
+                              <div style={{ textAlign: 'center', color: '#888', padding: '40px 20px' }}>
+                                참여중인 방이 없습니다.
+                              </div>
+                            )}
+                          </Table>
+                        </div>
+                      )}
+
+                      {/* 친구 관리 콘텐츠 */}
+                      {communityTab === 'friends' && (
+                        <div>
+                          {/* 친구 찾기 검색 바 */}
+                          <SearchBar>
+                            <SearchInput
+                              type="text"
+                              placeholder="친구 WS 코드 입력 (예: WS-Y3T1ZM)"
+                              value={friendSearchCode}
+                              onChange={(e) => setFriendSearchCode(e.target.value)}
+                              onKeyPress={(e) => {
+                                if (e.key === 'Enter' && friendSearchCode.trim()) {
+                                  handleFriendSearch();
+                                }
+                              }}
+                            />
+                            {friendSearchCode.trim().length > 0 ? (
+                              <SearchButton onClick={handleFriendSearch}>
+                                <Search size={20} />
+                              </SearchButton>
+                            ) : (
+                              <SearchButton onClick={() => setShowQRScanner(true)}>
+                                <QrCode size={20} />
+                              </SearchButton>
+                            )}
+                          </SearchBar>
+
+                          {/* 친구 요청 카운트 */}
+                          <FriendRequestSection>
+                            <RequestCount>
+                              <span>받은 요청</span>
+                              <span>{friendRequests.received}</span>
+                            </RequestCount>
+                            <RequestCount>
+                              <span>보낸 요청</span>
+                              <span>{friendRequests.sent}</span>
+                            </RequestCount>
+                          </FriendRequestSection>
+
+                          {/* 친구 목록 테이블 */}
+                          <Table>
+                            <TableHeader>
+                              <TableCell $header>이름</TableCell>
+                              <TableCell $header>WS 코드</TableCell>
+                              <TableCell $header>이메일</TableCell>
+                              <TableCell $header>상태</TableCell>
+                              <TableCell $header>작업</TableCell>
+                            </TableHeader>
+
+                            {friends.length > 0 ? (
+                              friends.map(friend => (
+                                <TableRow key={friend.id}>
+                                  <TableCell $mobileLabel="이름">{friend.friendName}</TableCell>
+                                  <TableCell $mobileLabel="WS 코드">{friend.friendWorkspaceCode}</TableCell>
+                                  <TableCell $mobileLabel="이메일">
+                                    {friend.friendEmail || '-'}
+                                  </TableCell>
+                                  <TableCell $mobileLabel="상태">온라인</TableCell>
+                                  <TableCell>
+                                    <div style={{ display: 'flex', gap: '4px' }}>
+                                      <TableActionButton $variant="chat">
+                                        대화하기
+                                      </TableActionButton>
+                                      <TableActionButton
+                                        onClick={() => handleRemoveFriend(friend.friendId, friend.friendName)}
+                                      >
+                                        삭제
+                                      </TableActionButton>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            ) : (
+                              <div style={{ textAlign: 'center', color: '#888', padding: '40px 20px' }}>
+                                친구가 없습니다.<br />
+                                위의 검색 바에서 친구 WS 코드를 입력하거나 QR 스캔으로 친구를 추가해보세요.
+                              </div>
+                            )}
+                          </Table>
+                        </div>
+                      )}
+                    </CommunityContent>
+                  </CommunityBox>
+                )}
               </Header>
 
               {/* 메인 탭 */}
@@ -1205,12 +1640,6 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                 </Tab>
                 <Tab $active={mainTab === 'joined'} onClick={() => setMainTab('joined')}>
                   참가 이력 <span>{joinedRooms.length}</span>
-                </Tab>
-                <Tab $active={mainTab === 'browse'} onClick={() => setMainTab('browse')}>
-                  방 탐색
-                </Tab>
-                <Tab $active={mainTab === 'friends'} onClick={() => setMainTab('friends')}>
-                  친구 <span>{friends.length}</span>
                 </Tab>
               </TabContainer>
 
@@ -1391,61 +1820,7 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
                   ) : (
                     <EmptyState>
                       참가한 방이 없습니다.<br />
-                      방 탐색에서 방 코드로 참가해보세요.
-                    </EmptyState>
-                  )}
-                </>
-              )}
-
-              {/* 방 탐색 */}
-              {mainTab === 'browse' && (
-                <EmptyState style={{ paddingTop: '40px' }}>
-                  <div style={{ marginBottom: '20px', fontSize: '18px', color: '#b0b0b0' }}>
-                    방 코드를 입력하여 협업방에 참가하세요
-                  </div>
-                  <ActionButton
-                    $variant="enter"
-                    onClick={() => setIsRoomBrowserOpen(true)}
-                    style={{ margin: '0 auto', maxWidth: '200px' }}
-                  >
-                    방 코드 입력하기
-                  </ActionButton>
-                </EmptyState>
-              )}
-
-              {/* 친구 목록 */}
-              {mainTab === 'friends' && (
-                <>
-                  {friends.length > 0 ? (
-                    <RoomListContainer>
-                      {friends.map(friend => (
-                        <RoomCard key={friend.id}>
-                          <RoomCardHeader>
-                            <div>
-                              <RoomTitle>{friend.friendName}</RoomTitle>
-                              <RoomMeta>
-                                <MetaItem>WS: {friend.friendWorkspaceCode}</MetaItem>
-                                {friend.friendEmail && (
-                                  <MetaItem>{friend.friendEmail}</MetaItem>
-                                )}
-                              </RoomMeta>
-                            </div>
-                          </RoomCardHeader>
-                          <RoomCardActions>
-                            <ActionButton
-                              $variant="delete"
-                              onClick={() => handleRemoveFriend(friend.friendId, friend.friendName)}
-                            >
-                              삭제
-                            </ActionButton>
-                          </RoomCardActions>
-                        </RoomCard>
-                      ))}
-                    </RoomListContainer>
-                  ) : (
-                    <EmptyState>
-                      친구가 없습니다.<br />
-                      QR 스캔 버튼으로 친구를 추가해보세요.
+                      협업 라운지 박스의 방 탐색에서 방 코드로 참가해보세요.
                     </EmptyState>
                   )}
                 </>
@@ -1534,14 +1909,6 @@ const MyWorkspace = ({ onRoomSelect, onClose, onRestoreMemoFolder, showToast }) 
         onClose={() => setIsRoomBrowserOpen(false)}
         onRoomSelect={handleRoomBrowserSelect}
       />
-
-      {/* QR 코드 표시 모달 */}
-      {showQRCode && workspace && (
-        <QRCodeModal
-          workspaceCode={workspace.workspaceCode}
-          onClose={() => setShowQRCode(false)}
-        />
-      )}
 
       {/* QR 스캐너 모달 */}
       {showQRScanner && (

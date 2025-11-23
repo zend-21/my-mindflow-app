@@ -27,7 +27,8 @@
       "Bash(powershell:*)",
       "Bash(netstat:*)",
       "Bash(taskkill:*)",
-      "Bash(npx firebase deploy:*)"
+      "Bash(npx firebase deploy:*)",
+      "Bash(echo:*)"
     ],
     "deny": [],
     "ask": []

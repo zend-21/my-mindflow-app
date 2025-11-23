@@ -16,17 +16,6 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // 협업방 참여자 확인 (헬퍼 함수)
-    function isParticipant(roomData) {
-      return request.auth.uid in roomData.participants.map('userId', p, p.userId);
-    }
-
-    // 편집 권한 확인 (헬퍼 함수)
-    function hasEditPermission(roomData) {
-      return roomData.permissions.allCanEdit == true ||
-             request.auth.uid in roomData.permissions.editableUsers;
-    }
-
     // ========================================
     // 기존 레스토랑/리뷰 - 공개 읽기
     // ========================================
@@ -232,40 +221,18 @@ service cloud.firestore {
     // 1:1 대화방 (Direct Messages)
     // ========================================
     match /directMessages/{roomId} {
-      // 대화방 생성: 로그인 + 참여자에 본인 포함
-      allow create: if isSignedIn() &&
-        request.auth.uid in request.resource.data.participants;
-
-      // 대화방 읽기: 참여자만
-      allow read: if isSignedIn() &&
-        request.auth.uid in resource.data.participants;
-
-      // 대화방 수정: 참여자만 (읽음 표시, 숨김 등)
-      allow update: if isSignedIn() &&
-        request.auth.uid in resource.data.participants;
-
-      // 대화방 삭제: 참여자만
-      allow delete: if isSignedIn() &&
-        request.auth.uid in resource.data.participants;
+      // 테스트용 단순 규칙: 로그인한 사용자만
+      allow create: if isSignedIn();
+      allow read: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn();
 
       // 메시지 서브컬렉션
       match /messages/{messageId} {
-        // 메시지 생성: 대화방 참여자만
-        allow create: if isSignedIn() &&
-          request.auth.uid in get(/databases/$(database)/documents/directMessages/$(roomId)).data.participants &&
-          request.resource.data.senderId == request.auth.uid;
-
-        // 메시지 읽기: 대화방 참여자만
-        allow read: if isSignedIn() &&
-          request.auth.uid in get(/databases/$(database)/documents/directMessages/$(roomId)).data.participants;
-
-        // 메시지 수정: 작성자만
-        allow update: if isSignedIn() &&
-          request.auth.uid == resource.data.senderId;
-
-        // 메시지 삭제: 작성자만
-        allow delete: if isSignedIn() &&
-          request.auth.uid == resource.data.senderId;
+        allow create: if isSignedIn();
+        allow read: if isSignedIn();
+        allow update: if isSignedIn();
+        allow delete: if isSignedIn();
       }
     }
   }

@@ -163,10 +163,10 @@ export const subscribeToMyDMRooms = (callback) => {
     return () => {};
   }
 
+  // 임시: orderBy 제거하고 클라이언트에서 정렬 (인덱스 생성 대기)
   const q = query(
     collection(db, 'directMessages'),
-    where('participants', 'array-contains', auth.currentUser.uid),
-    orderBy('lastMessageTime', 'desc')
+    where('participants', 'array-contains', auth.currentUser.uid)
   );
 
   return onSnapshot(q, (snapshot) => {
@@ -178,6 +178,12 @@ export const subscribeToMyDMRooms = (callback) => {
       .filter(room => {
         // 숨김 처리된 대화방 제외
         return !room.hidden?.[auth.currentUser.uid];
+      })
+      .sort((a, b) => {
+        // 클라이언트에서 정렬: lastMessageTime 내림차순
+        const aTime = a.lastMessageTime?.toMillis?.() || 0;
+        const bTime = b.lastMessageTime?.toMillis?.() || 0;
+        return bTime - aTime;
       });
 
     callback(rooms);
