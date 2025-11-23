@@ -163,7 +163,10 @@ const FriendsModal = ({ isOpen, onClose }) => {
                     <UserItem key={user.id}>
                       <Avatar src={user.photoURL || '/default-avatar.png'} alt={user.displayName} />
                       <UserInfo>
-                        <UserName>{user.displayName}</UserName>
+                        <UserName>
+                          {user.displayName}
+                          {user.isProfileIncomplete && <IncompleteBadge> (미로그인)</IncompleteBadge>}
+                        </UserName>
                         <UserEmail>{user.email}</UserEmail>
                       </UserInfo>
                       <AddButton onClick={() => handleSendRequest(user)}>
@@ -425,6 +428,12 @@ const UserName = styled.div`
   font-size: 16px;
   font-weight: 600;
   margin-bottom: 4px;
+`;
+
+const IncompleteBadge = styled.span`
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  font-weight: 400;
 `;
 
 const UserEmail = styled.div`

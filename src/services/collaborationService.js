@@ -120,9 +120,17 @@ export const searchUsers = async (searchTerm) => {
     console.log('🔍 사용자 문서 존재 여부:', userDoc.exists());
 
     if (!userDoc.exists()) {
-      console.log('❌ 사용자 정보를 찾을 수 없습니다 - users 컬렉션에 해당 문서가 없음');
-      console.log('💡 워크스페이스 소유자가 한 번도 로그인하지 않았거나, 사용자 프로필이 생성되지 않았습니다');
-      return [];
+      console.log('⚠️ 사용자 프로필이 없지만 워크스페이스 정보로 결과 반환');
+      // 사용자 프로필이 없어도 워크스페이스 정보로 검색 결과 제공
+      return [{
+        id: workspace.ownerId,
+        displayName: workspace.ownerName || `사용자 ${workspace.ownerId.substring(0, 8)}`,
+        email: workspace.ownerEmail || '이메일 정보 없음',
+        photoURL: null,
+        wsCode: workspace.wsCode || searchTerm,
+        // 프로필 미생성 사용자임을 표시
+        isProfileIncomplete: true
+      }];
     }
 
     const userData = userDoc.data();
@@ -130,7 +138,8 @@ export const searchUsers = async (searchTerm) => {
 
     return [{
       id: userDoc.id,
-      ...userData
+      ...userData,
+      isProfileIncomplete: false
     }];
   } catch (error) {
     console.error('❌ 사용자 검색 오류:', error);
