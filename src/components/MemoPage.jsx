@@ -695,7 +695,7 @@ const FolderCard = styled.div`
     transition: all 0.2s;
     border: 2px solid ${props => props.$isShared
         ? 'rgba(0, 255, 136, 0.3)'
-        : 'transparent'};
+        : 'rgba(101, 67, 33, 0.5)'};
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -708,10 +708,10 @@ const FolderCard = styled.div`
         transform: translateY(-2px);
         box-shadow: ${props => props.$isShared
             ? '0 4px 20px rgba(0, 255, 136, 0.3)'
-            : '0 4px 12px rgba(74, 144, 226, 0.2)'};
+            : '0 4px 12px rgba(101, 67, 33, 0.3)'};
         border-color: ${props => props.$isShared
             ? 'rgba(0, 255, 136, 0.5)'
-            : 'rgba(74, 144, 226, 0.3)'};
+            : 'rgba(101, 67, 33, 0.7)'};
     }
 
     &:active {
