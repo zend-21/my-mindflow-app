@@ -544,7 +544,7 @@ const FriendList = ({ showToast }) => {
 
   const handleCopyMyCode = () => {
     if (myWsCode) {
-      navigator.clipboard.writeText(myWsCode);
+      navigator.clipboard.writeText(myWsCode.toLowerCase());
       showToast?.('친구 코드가 복사되었습니다');
     }
   };
@@ -582,7 +582,7 @@ const FriendList = ({ showToast }) => {
           <MyCodeBox>
             <MyCodeLabel>
               <MyCodeTitle>내 친구 코드</MyCodeTitle>
-              <MyCodeValue>{myWsCode}</MyCodeValue>
+              <MyCodeValue>{myWsCode?.toLowerCase()}</MyCodeValue>
             </MyCodeLabel>
             <CopyButton onClick={handleCopyMyCode}>
               <Copy size={14} />
@@ -672,7 +672,7 @@ const FriendList = ({ showToast }) => {
                   <FriendInfo>
                     <FriendName>{friend.friendName || '익명'}</FriendName>
                     <FriendMeta>
-                      <span>{friend.friendWorkspaceCode || '-'}</span>
+                      <span>{friend.friendWorkspaceCode?.toLowerCase() || '-'}</span>
                       {friend.friendEmail && (
                         <>
                           <span>•</span>
