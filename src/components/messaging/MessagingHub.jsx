@@ -1,8 +1,7 @@
-// 💬 대화 탭 - 메시징 허브 (채팅, 방, 친구 통합)
+// 💬 대화 탭 - 메시징 허브 (채팅, 친구)
 import { useState } from 'react';
 import styled from 'styled-components';
 import ChatList from './ChatList';
-import RoomList from './RoomList';
 import FriendList from './FriendList';
 
 // 메인 컨테이너
@@ -104,13 +103,13 @@ const Content = styled.div`
 `;
 
 const MessagingHub = ({ showToast }) => {
-  const [activeTab, setActiveTab] = useState('chat'); // chat, rooms, friends
+  const [activeTab, setActiveTab] = useState('chat'); // chat, friends
 
   return (
     <Container>
       <Header>
         <Title>💬 대화</Title>
-        <Subtitle>친구들과 대화하고 방에서 협업하세요</Subtitle>
+        <Subtitle>친구들과 대화하고 그룹으로 협업하세요</Subtitle>
 
         <TabContainer>
           <Tab
@@ -119,13 +118,6 @@ const MessagingHub = ({ showToast }) => {
           >
             <TabIcon>💬</TabIcon>
             <TabLabel>채팅</TabLabel>
-          </Tab>
-          <Tab
-            $active={activeTab === 'rooms'}
-            onClick={() => setActiveTab('rooms')}
-          >
-            <TabIcon>📁</TabIcon>
-            <TabLabel>방</TabLabel>
           </Tab>
           <Tab
             $active={activeTab === 'friends'}
@@ -139,7 +131,6 @@ const MessagingHub = ({ showToast }) => {
 
       <Content>
         {activeTab === 'chat' && <ChatList showToast={showToast} />}
-        {activeTab === 'rooms' && <RoomList showToast={showToast} />}
         {activeTab === 'friends' && <FriendList showToast={showToast} />}
       </Content>
     </Container>
