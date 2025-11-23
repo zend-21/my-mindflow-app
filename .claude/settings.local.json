@@ -28,7 +28,8 @@
       "Bash(netstat:*)",
       "Bash(taskkill:*)",
       "Bash(npx firebase deploy:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(git merge:*)"
     ],
     "deny": [],
     "ask": []

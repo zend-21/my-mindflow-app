@@ -405,16 +405,17 @@ const SideMenu = ({
     // WS 코드 로드 (localStorage에서 먼저 확인, 없으면 Firebase에서 가져오기)
     useEffect(() => {
         const loadWsCode = async () => {
-            console.log('🔍 SideMenu - WS 코드 로드 시작:', profile?.uid);
+            const userId = localStorage.getItem('firebaseUserId');
+            console.log('🔍 SideMenu - WS 코드 로드 시작, userId:', userId);
 
-            if (!profile?.uid) {
-                console.log('❌ SideMenu - profile.uid 없음');
+            if (!userId || !profile) {
+                console.log('❌ SideMenu - userId 또는 profile 없음, userId:', userId, 'profile:', !!profile);
                 setWsCode(null);
                 return;
             }
 
             // 먼저 localStorage에서 확인
-            const cachedWsCode = localStorage.getItem(`wsCode_${profile.uid}`);
+            const cachedWsCode = localStorage.getItem(`wsCode_${userId}`);
             console.log('💾 SideMenu - localStorage에서 조회:', cachedWsCode);
 
             if (cachedWsCode) {
@@ -425,7 +426,7 @@ const SideMenu = ({
 
             // localStorage에 없으면 Firebase에서 가져오기 (workspaces 컬렉션)
             try {
-                const workspaceId = `workspace_${profile.uid}`;
+                const workspaceId = `workspace_${userId}`;
                 console.log('🔥 SideMenu - Firebase 조회 시작:', workspaceId);
 
                 const workspaceRef = doc(db, 'workspaces', workspaceId);
@@ -439,7 +440,7 @@ const SideMenu = ({
                     setWsCode(code);
                     // localStorage에 저장
                     if (code) {
-                        localStorage.setItem(`wsCode_${profile.uid}`, code);
+                        localStorage.setItem(`wsCode_${userId}`, code);
                         console.log('💾 SideMenu - localStorage에 저장 완료');
                     }
                 } else {
