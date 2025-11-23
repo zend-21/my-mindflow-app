@@ -8,10 +8,12 @@ const NavContainer = styled.nav`
     display: flex;
     justify-content: space-around;
     align-items: center;
-    position: absolute;
+    position: fixed;
     bottom: 0;
-    left: 0px;
-    right: 0px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 450px;
     z-index: 9999;
     height: 80px;
     background: rgba(31, 34, 41, 0.95);

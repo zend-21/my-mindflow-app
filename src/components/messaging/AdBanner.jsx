@@ -4,8 +4,10 @@ import styled from 'styled-components';
 const BannerContainer = styled.div`
   position: fixed;
   bottom: 80px; /* 푸터 위에 위치 (푸터 높이 80px) */
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 450px;
   height: 50px;
   background: rgba(26, 26, 26, 0.95);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
