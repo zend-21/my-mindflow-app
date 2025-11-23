@@ -1,12 +1,14 @@
 // src/components/SideMenu.jsx
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { avatarList } from './avatars/AvatarIcons';
 import FriendsModal from './collaboration/FriendsModal';
 import SharedNotesPage from './collaboration/SharedNotesPage';
 import MyWorkspace from './collaboration/MyWorkspace';
 import RoomBrowser from './collaboration/RoomBrowser';
+import { db } from '../firebase/config';
+import { doc, getDoc } from 'firebase/firestore';
 
 // 문제를 단순화하기 위해, 일단 Roulette 컴포넌트는 잠시 제외했습니다.
 // 이 코드로 오류가 사라진다면, 문제는 Roulette.jsx 파일에 있을 수 있습니다.
@@ -333,6 +335,7 @@ const SideMenu = ({
     const [selectedAvatarId, setSelectedAvatarId] = useState(null);
     const [avatarBgColor, setAvatarBgColor] = useState('none');
     const [customPicture, setCustomPicture] = useState(null);
+    const [wsCode, setWsCode] = useState(null); // WS 코드 (친구 코드)
     // 협업 관련 상태
     const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
     const [isSharedNotesPageOpen, setIsSharedNotesPageOpen] = useState(false);
@@ -399,6 +402,59 @@ const SideMenu = ({
         return <AvatarComponent />;
     };
 
+    // WS 코드 로드 (localStorage에서 먼저 확인, 없으면 Firebase에서 가져오기)
+    useEffect(() => {
+        const loadWsCode = async () => {
+            console.log('🔍 SideMenu - WS 코드 로드 시작:', profile?.uid);
+
+            if (!profile?.uid) {
+                console.log('❌ SideMenu - profile.uid 없음');
+                setWsCode(null);
+                return;
+            }
+
+            // 먼저 localStorage에서 확인
+            const cachedWsCode = localStorage.getItem(`wsCode_${profile.uid}`);
+            console.log('💾 SideMenu - localStorage에서 조회:', cachedWsCode);
+
+            if (cachedWsCode) {
+                console.log('✅ SideMenu - localStorage에서 로드 성공:', cachedWsCode);
+                setWsCode(cachedWsCode);
+                return;
+            }
+
+            // localStorage에 없으면 Firebase에서 가져오기 (workspaces 컬렉션)
+            try {
+                const workspaceId = `workspace_${profile.uid}`;
+                console.log('🔥 SideMenu - Firebase 조회 시작:', workspaceId);
+
+                const workspaceRef = doc(db, 'workspaces', workspaceId);
+                const workspaceDoc = await getDoc(workspaceRef);
+
+                console.log('🔥 SideMenu - Firebase 문서 존재:', workspaceDoc.exists());
+
+                if (workspaceDoc.exists()) {
+                    const code = workspaceDoc.data().workspaceCode;
+                    console.log('✅ SideMenu - Firebase에서 로드 성공:', code);
+                    setWsCode(code);
+                    // localStorage에 저장
+                    if (code) {
+                        localStorage.setItem(`wsCode_${profile.uid}`, code);
+                        console.log('💾 SideMenu - localStorage에 저장 완료');
+                    }
+                } else {
+                    console.log('❌ SideMenu - Firebase 문서가 존재하지 않음');
+                }
+            } catch (error) {
+                console.error('❌ SideMenu - WS 코드 로드 오류:', error);
+            }
+        };
+
+        if (profile) {
+            loadWsCode();
+        }
+    }, [profile]);
+
     const handleImportClick = () => {
         if (fileInputRef.current) {
             fileInputRef.current.click();
@@ -461,7 +517,9 @@ const SideMenu = ({
                                 )}
                                 <ProfileInfo>
                                     <ProfileName>{profile ? (profile.nickname || profile.name) : '로그인'}</ProfileName>
-                                    <ProfileEmail>{profile ? profile.email : '로그인이 필요합니다'}</ProfileEmail>
+                                    <ProfileEmail>
+                                        {profile ? (wsCode ? `ID: ${wsCode.split('-')[1] || wsCode}` : 'ID 로딩중...') : '로그인이 필요합니다'}
+                                    </ProfileEmail>
                                 </ProfileInfo>
                             </ProfileCluster>
                             <CloseButton onClick={onClose}>&times;</CloseButton>
