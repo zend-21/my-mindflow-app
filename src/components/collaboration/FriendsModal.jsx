@@ -42,6 +42,8 @@ const FriendsModal = ({ isOpen, onClose }) => {
   };
 
   const handleSearch = async () => {
+    console.log('🔍 검색 시작:', searchTerm);
+
     if (searchTerm.length < 2) {
       setError('2자 이상 입력해주세요');
       return;
@@ -50,11 +52,17 @@ const FriendsModal = ({ isOpen, onClose }) => {
     try {
       setLoading(true);
       setError('');
+      console.log('🔍 searchUsers 호출 중...');
       const results = await searchUsers(searchTerm);
+      console.log('🔍 검색 결과:', results);
       setSearchResults(results);
+
+      if (results.length === 0) {
+        setError('검색 결과가 없습니다');
+      }
     } catch (err) {
-      setError('검색에 실패했습니다');
-      console.error(err);
+      console.error('🔍 검색 오류:', err);
+      setError('검색에 실패했습니다: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -120,17 +128,27 @@ const FriendsModal = ({ isOpen, onClose }) => {
             <SearchSection>
               <SearchBar>
                 <SearchInput
-                  placeholder="WS 코드 입력 (예: WS-A3B7-9X)"
+                  placeholder="WS 코드 입력 (예: WS-Y3T1ZM)"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && searchTerm.trim()) {
+                      handleSearch();
+                    }
+                  }}
                 />
-                <QRButton onClick={() => setShowQRScanner(true)} title="QR 코드 스캔">
-                  <QrCode size={20} />
-                </QRButton>
-                <SearchButton onClick={handleSearch}>
-                  <Search size={20} />
-                </SearchButton>
+                {searchTerm.trim().length > 0 ? (
+                  <SearchButton onClick={handleSearch}>
+                    <Search size={20} />
+                  </SearchButton>
+                ) : (
+                  <QRButton onClick={() => {
+                    console.log('QR 버튼 클릭');
+                    setShowQRScanner(true);
+                  }} title="QR 코드 스캔">
+                    <QrCode size={20} />
+                  </QRButton>
+                )}
               </SearchBar>
 
               {error && <ErrorText>{error}</ErrorText>}
