@@ -26,7 +26,8 @@
       "Bash(npx vercel --prod)",
       "Bash(powershell:*)",
       "Bash(netstat:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(npx firebase deploy:*)"
     ],
     "deny": [],
     "ask": []

@@ -80,7 +80,7 @@ export const createOrGetDMRoom = async (targetUserId, targetUserInfo) => {
       createdAt: serverTimestamp(),
       createdBy: currentUserId,
       lastMessage: null,
-      lastMessageTime: null,
+      lastMessageTime: serverTimestamp(), // null 대신 초기 타임스탬프
       unreadCount: {
         [currentUserId]: 0,
         [targetUserId]: 0
