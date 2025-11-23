@@ -1549,6 +1549,14 @@ const MemoPage = ({
         // 3. 정렬
         filteredAndSortedMemos = [...filteredAndSortedMemos].sort((a, b) => {
             if (sortOrder === 'importance') {
+                // 중요 문서가 하나라도 있는지 확인
+                const hasImportantMemo = filteredAndSortedMemos.some(memo => memo.isImportant);
+
+                // 중요 문서가 없으면 정렬하지 않음 (현재 순서 유지)
+                if (!hasImportantMemo) {
+                    return 0;
+                }
+
                 // 중요도순 정렬
                 const aImportant = a.isImportant ? 1 : 0;
                 const bImportant = b.isImportant ? 1 : 0;

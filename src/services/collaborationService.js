@@ -18,7 +18,7 @@ import {
   increment
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
-import { createWorkspace, checkWorkspaceExists } from './workspaceService';
+import { createWorkspace, checkWorkspaceExists, getWorkspaceByCode } from './workspaceService';
 
 // ========================================
 // 1. 사용자 프로필 관리
@@ -78,47 +78,40 @@ export const updateOnlineStatus = async (status) => {
 };
 
 /**
- * 사용자 검색 (이메일 또는 이름)
+ * 사용자 검색 (워크스페이스 코드로)
  */
 export const searchUsers = async (searchTerm) => {
   if (!searchTerm || searchTerm.length < 2) return [];
 
-  const usersRef = collection(db, 'users');
+  try {
+    // 워크스페이스 코드로 검색
+    const workspace = await getWorkspaceByCode(searchTerm);
 
-  // 이메일로 검색
-  const emailQuery = query(
-    usersRef,
-    where('email', '>=', searchTerm),
-    where('email', '<=', searchTerm + '\uf8ff')
-  );
-
-  // 이름으로 검색
-  const nameQuery = query(
-    usersRef,
-    where('displayName', '>=', searchTerm),
-    where('displayName', '<=', searchTerm + '\uf8ff')
-  );
-
-  const [emailResults, nameResults] = await Promise.all([
-    getDocs(emailQuery),
-    getDocs(nameQuery)
-  ]);
-
-  const users = new Map();
-
-  emailResults.forEach(doc => {
-    if (doc.id !== auth.currentUser?.uid) {
-      users.set(doc.id, { id: doc.id, ...doc.data() });
+    if (!workspace || !workspace.ownerId) {
+      return [];
     }
-  });
 
-  nameResults.forEach(doc => {
-    if (doc.id !== auth.currentUser?.uid) {
-      users.set(doc.id, { id: doc.id, ...doc.data() });
+    // 자기 자신은 제외
+    if (workspace.ownerId === auth.currentUser?.uid) {
+      return [];
     }
-  });
 
-  return Array.from(users.values());
+    // 워크스페이스 소유자 정보 가져오기
+    const userRef = doc(db, 'users', workspace.ownerId);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) {
+      return [];
+    }
+
+    return [{
+      id: userDoc.id,
+      ...userDoc.data()
+    }];
+  } catch (error) {
+    console.error('사용자 검색 오류:', error);
+    return [];
+  }
 };
 
 // ========================================

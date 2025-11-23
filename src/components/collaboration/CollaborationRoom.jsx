@@ -497,6 +497,7 @@ const MemoPanelHeader = styled.div`
   align-items: center;
   padding: 14px 24px;
   cursor: pointer;
+  color: #5ebe26;
   &:hover { background: rgba(94, 190, 38, 0.08); }
 `;
 
@@ -594,7 +595,7 @@ const Avatar = styled.img`
 
 const MessageBubble = styled.div`
   max-width: 70%;
-  background: ${props => props.$isOwn ? '#5ebe26' : 'rgba(255, 255, 255, 0.1)'};
+  background: ${props => props.$isOwn ? 'rgba(94, 190, 38, 0.35)' : 'rgba(255, 255, 255, 0.1)'};
   padding: 10px 14px;
   border-radius: ${props => props.$isOwn ? '16px 16px 4px 16px' : '16px 16px 16px 4px'};
 `;

@@ -112,7 +112,7 @@ const InfoText = styled.div`
     line-height: 1.6;
 `;
 
-function QRScannerModal({ userId, onClose, onFriendAdded }) {
+function QRScannerModal({ userId, onClose, onFriendAdded, onCodeScanned }) {
     const scannerRef = useRef(null);
     const [scanning, setScanning] = useState(false);
     const [message, setMessage] = useState(null);
@@ -146,7 +146,14 @@ function QRScannerModal({ userId, onClose, onFriendAdded }) {
                         setScanning(false);
                         html5QrCode.stop();
 
-                        // 친구 추가 시도
+                        // onCodeScanned 콜백이 있으면 코드만 전달하고 종료 (친구 찾기 모드)
+                        if (onCodeScanned) {
+                            onCodeScanned(decodedText);
+                            onClose();
+                            return;
+                        }
+
+                        // 친구 추가 시도 (즉시 추가 모드)
                         setMessage({ type: 'info', text: '친구 추가 중...' });
 
                         const result = await addFriendInstantly(userId, decodedText);

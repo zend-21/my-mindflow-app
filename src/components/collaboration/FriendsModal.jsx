@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { X, Search, UserPlus, Check, XCircle, Users } from 'lucide-react';
+import { X, Search, UserPlus, Check, XCircle, Users, QrCode } from 'lucide-react';
 import {
   searchUsers,
   sendFriendRequest,
@@ -10,6 +10,7 @@ import {
   acceptFriendRequest,
   rejectFriendRequest
 } from '../../services/collaborationService';
+import QRScannerModal from './QRScannerModal';
 
 const FriendsModal = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState('friends'); // 'friends' | 'search' | 'requests'
@@ -18,6 +19,7 @@ const FriendsModal = ({ isOpen, onClose }) => {
   const [searchResults, setSearchResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   useEffect(() => {
     if (isOpen && activeTab === 'friends') {
@@ -66,6 +68,30 @@ const FriendsModal = ({ isOpen, onClose }) => {
       alert(err.message || '친구 요청 실패');
       console.error(err);
     }
+  };
+
+  const handleQRCodeScanned = async (code) => {
+    // QR 코드를 스캔하면 검색창에 자동 입력하고 검색 실행
+    setSearchTerm(code);
+    setShowQRScanner(false);
+
+    // 약간의 딜레이 후 자동 검색
+    setTimeout(async () => {
+      try {
+        setLoading(true);
+        setError('');
+        const results = await searchUsers(code);
+        setSearchResults(results);
+        if (results.length === 0) {
+          setError('해당 WS 코드를 가진 사용자를 찾을 수 없습니다');
+        }
+      } catch (err) {
+        setError('검색에 실패했습니다');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }, 100);
   };
 
   if (!isOpen) return null;
@@ -117,11 +143,14 @@ const FriendsModal = ({ isOpen, onClose }) => {
             <SearchSection>
               <SearchBar>
                 <SearchInput
-                  placeholder="이메일 또는 이름 검색"
+                  placeholder="WS 코드 입력 (예: WS-A3B7-9X)"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 />
+                <QRButton onClick={() => setShowQRScanner(true)}>
+                  <QrCode size={20} />
+                </QRButton>
                 <SearchButton onClick={handleSearch}>
                   <Search size={20} />
                 </SearchButton>
@@ -154,6 +183,14 @@ const FriendsModal = ({ isOpen, onClose }) => {
           )}
         </Content>
       </Modal>
+
+      {/* QR 스캐너 모달 */}
+      {showQRScanner && (
+        <QRScannerModal
+          onClose={() => setShowQRScanner(false)}
+          onCodeScanned={handleQRCodeScanned}
+        />
+      )}
     </Overlay>
   );
 };
@@ -327,6 +364,23 @@ const SearchInput = styled.input`
   &:focus {
     outline: none;
     border-color: #5ebe26;
+  }
+`;
+
+const QRButton = styled.button`
+  padding: 14px 16px;
+  background: rgba(94, 190, 38, 0.2);
+  border: 1px solid #5ebe26;
+  border-radius: 12px;
+  color: #5ebe26;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(94, 190, 38, 0.3);
   }
 `;
 
