@@ -67,7 +67,7 @@ const BottomNav = ({ activeTab, onSwitchTab }) => {
         { name: 'memo', label: '메모', icon: '📝' },
         { name: 'calendar', label: '캘린더', icon: '📅' },
         { name: 'secret', label: '시크릿', icon: '🔐' },
-        { name: 'review', label: '리뷰', icon: '🌟' }
+        { name: 'chat', label: '대화', icon: '💬' }
     ];
 
     return (
