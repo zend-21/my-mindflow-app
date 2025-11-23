@@ -1555,7 +1555,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                         {profile && wsCode && qrCodeUrl && (
                             <WsCodeQrContainer>
                                 <WsCodeSection>
-                                    <WsCodeText>ID: {wsCode.split('-')[1] || wsCode}</WsCodeText>
+                                    <WsCodeText>ID: {(wsCode.split('-')[1] || wsCode).toLowerCase()}</WsCodeText>
                                     <CopyButtonInHeader onClick={handleCopyWsCode}>
                                         <Copy size={14} />
                                         복사
