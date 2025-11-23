@@ -23,7 +23,10 @@
       "Bash(npx firebase deploy --only firestore:rules)",
       "Bash(firestore.indexes.json)",
       "Bash(firebase firestore:indexes:*)",
-      "Bash(npx vercel --prod)"
+      "Bash(npx vercel --prod)",
+      "Bash(powershell:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)"
     ],
     "deny": [],
     "ask": []

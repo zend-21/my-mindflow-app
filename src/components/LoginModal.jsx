@@ -105,10 +105,12 @@ const ModalDescription = styled.p`
 `;
 
 function LoginModal({ onSuccess, onError, onClose, setProfile }) {
+    console.log('🔧 LoginModal 렌더링');
+
     // Refresh Token을 받기 위한 설정 추가
     const login = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
-            console.log('Google OAuth 성공:', tokenResponse);
+            console.log('✅ Google OAuth 성공:', tokenResponse);
 
             try {
                 // Access Token으로 사용자 정보 가져오기
@@ -159,7 +161,17 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
                 </ModalDescription>
 
                 <GoogleButtonWrapper>
-                    <GoogleButton onClick={() => login()}>
+                    <GoogleButton onClick={() => {
+                        console.log('🔵 로그인 버튼 클릭됨');
+                        console.log('🔧 login 함수 타입:', typeof login);
+                        console.log('🔧 login 함수:', login);
+                        try {
+                            login();
+                            console.log('✅ login() 호출 완료');
+                        } catch (error) {
+                            console.error('❌ login() 호출 중 에러:', error);
+                        }
+                    }}>
                         <GoogleIcon>G</GoogleIcon>
                         Google로 로그인
                     </GoogleButton>

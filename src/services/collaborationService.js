@@ -85,14 +85,23 @@ export const searchUsers = async (searchTerm) => {
 
   try {
     // 워크스페이스 코드로 검색
-    const workspace = await getWorkspaceByCode(searchTerm);
+    const workspaceResult = await getWorkspaceByCode(searchTerm);
 
-    if (!workspace || !workspace.ownerId) {
+    if (!workspaceResult || !workspaceResult.success || !workspaceResult.data) {
+      console.log('워크스페이스를 찾을 수 없습니다');
+      return [];
+    }
+
+    const workspace = workspaceResult.data;
+
+    if (!workspace.ownerId) {
+      console.log('워크스페이스 소유자가 없습니다');
       return [];
     }
 
     // 자기 자신은 제외
     if (workspace.ownerId === auth.currentUser?.uid) {
+      console.log('자기 자신은 검색 결과에서 제외됩니다');
       return [];
     }
 
@@ -101,9 +110,11 @@ export const searchUsers = async (searchTerm) => {
     const userDoc = await getDoc(userRef);
 
     if (!userDoc.exists()) {
+      console.log('사용자 정보를 찾을 수 없습니다');
       return [];
     }
 
+    console.log('검색 결과:', userDoc.data());
     return [{
       id: userDoc.id,
       ...userDoc.data()

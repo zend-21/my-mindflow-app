@@ -11,6 +11,7 @@ import {
   rejectFriendRequest
 } from '../../services/collaborationService';
 import QRScannerModal from './QRScannerModal';
+import { auth } from '../../firebase/config';
 
 const FriendsModal = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState('friends'); // 'friends' | 'search' | 'requests'
@@ -70,30 +71,6 @@ const FriendsModal = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleQRCodeScanned = async (code) => {
-    // QR 코드를 스캔하면 검색창에 자동 입력하고 검색 실행
-    setSearchTerm(code);
-    setShowQRScanner(false);
-
-    // 약간의 딜레이 후 자동 검색
-    setTimeout(async () => {
-      try {
-        setLoading(true);
-        setError('');
-        const results = await searchUsers(code);
-        setSearchResults(results);
-        if (results.length === 0) {
-          setError('해당 WS 코드를 가진 사용자를 찾을 수 없습니다');
-        }
-      } catch (err) {
-        setError('검색에 실패했습니다');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }, 100);
-  };
-
   if (!isOpen) return null;
 
   return (
@@ -148,7 +125,7 @@ const FriendsModal = ({ isOpen, onClose }) => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                 />
-                <QRButton onClick={() => setShowQRScanner(true)}>
+                <QRButton onClick={() => setShowQRScanner(true)} title="QR 코드 스캔">
                   <QrCode size={20} />
                 </QRButton>
                 <SearchButton onClick={handleSearch}>
@@ -184,11 +161,16 @@ const FriendsModal = ({ isOpen, onClose }) => {
         </Content>
       </Modal>
 
-      {/* QR 스캐너 모달 */}
       {showQRScanner && (
         <QRScannerModal
+          userId={auth.currentUser?.uid}
           onClose={() => setShowQRScanner(false)}
-          onCodeScanned={handleQRCodeScanned}
+          onCodeScanned={(code) => {
+            setSearchTerm(code);
+            setShowQRScanner(false);
+            // 자동으로 검색 실행
+            setTimeout(() => handleSearch(), 100);
+          }}
         />
       )}
     </Overlay>
@@ -368,7 +350,7 @@ const SearchInput = styled.input`
 `;
 
 const QRButton = styled.button`
-  padding: 14px 16px;
+  padding: 14px 20px;
   background: rgba(94, 190, 38, 0.2);
   border: 1px solid #5ebe26;
   border-radius: 12px;
