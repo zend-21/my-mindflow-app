@@ -84,43 +84,56 @@ export const searchUsers = async (searchTerm) => {
   if (!searchTerm || searchTerm.length < 2) return [];
 
   try {
+    console.log('🔍 워크스페이스 검색 시작:', searchTerm);
+
     // 워크스페이스 코드로 검색
     const workspaceResult = await getWorkspaceByCode(searchTerm);
+    console.log('🔍 워크스페이스 검색 결과:', workspaceResult);
 
     if (!workspaceResult || !workspaceResult.success || !workspaceResult.data) {
-      console.log('워크스페이스를 찾을 수 없습니다');
+      console.log('❌ 워크스페이스를 찾을 수 없습니다');
       return [];
     }
 
     const workspace = workspaceResult.data;
+    console.log('🔍 워크스페이스 데이터:', workspace);
 
     if (!workspace.ownerId) {
-      console.log('워크스페이스 소유자가 없습니다');
+      console.log('❌ 워크스페이스 소유자가 없습니다');
       return [];
     }
 
+    console.log('🔍 워크스페이스 소유자 ID:', workspace.ownerId);
+    console.log('🔍 현재 사용자 ID:', auth.currentUser?.uid);
+
     // 자기 자신은 제외
     if (workspace.ownerId === auth.currentUser?.uid) {
-      console.log('자기 자신은 검색 결과에서 제외됩니다');
+      console.log('❌ 자기 자신은 검색 결과에서 제외됩니다');
       return [];
     }
 
     // 워크스페이스 소유자 정보 가져오기
     const userRef = doc(db, 'users', workspace.ownerId);
+    console.log('🔍 사용자 문서 경로:', `users/${workspace.ownerId}`);
+
     const userDoc = await getDoc(userRef);
+    console.log('🔍 사용자 문서 존재 여부:', userDoc.exists());
 
     if (!userDoc.exists()) {
-      console.log('사용자 정보를 찾을 수 없습니다');
+      console.log('❌ 사용자 정보를 찾을 수 없습니다 - users 컬렉션에 해당 문서가 없음');
+      console.log('💡 워크스페이스 소유자가 한 번도 로그인하지 않았거나, 사용자 프로필이 생성되지 않았습니다');
       return [];
     }
 
-    console.log('검색 결과:', userDoc.data());
+    const userData = userDoc.data();
+    console.log('✅ 사용자 정보 찾음:', userData);
+
     return [{
       id: userDoc.id,
-      ...userDoc.data()
+      ...userData
     }];
   } catch (error) {
-    console.error('사용자 검색 오류:', error);
+    console.error('❌ 사용자 검색 오류:', error);
     return [];
   }
 };
