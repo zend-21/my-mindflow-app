@@ -1,10 +1,13 @@
-// 👥 친구 탭 - 친구 관리 및 추가
+// 👥 친구 탭 - 친구 관리 (카카오톡 스타일)
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { QrCode, Search, UserPlus, MessageCircle, UserMinus, Check, X, Inbox, Copy } from 'lucide-react';
+import { Search, UserPlus, MessageCircle, UserMinus, Shield, ChevronRight, Settings, TestTube } from 'lucide-react';
 import { getMyFriends } from '../../services/friendService';
-import { collection, query, where, getDocs, onSnapshot, doc, getDoc } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { checkVerificationStatus } from '../../services/verificationService';
+import { createOrGetDMRoom } from '../../services/directMessageService';
+import { addTestFriend, removeAllTestFriends } from '../../services/testFriendService';
+import VerificationModal from './VerificationModal';
+import ChatRoom from './ChatRoom';
 
 // 컨테이너
 const Container = styled.div`
@@ -14,98 +17,23 @@ const Container = styled.div`
   background: transparent;
 `;
 
-// 내 친구 코드 섹션
-const MyCodeSection = styled.div`
+// 헤더 (검색 + 설정)
+const HeaderSection = styled.div`
   padding: 12px 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(74, 144, 226, 0.05);
-`;
-
-const MyCodeBox = styled.div`
+  background: rgba(255, 255, 255, 0.02);
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
 `;
 
-const MyCodeLabel = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-`;
-
-const MyCodeTitle = styled.div`
-  font-size: 11px;
-  font-weight: 600;
-  color: #888;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-`;
-
-const MyCodeValue = styled.div`
-  font-size: 15px;
-  font-weight: 700;
-  color: #4a90e2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const CopyButton = styled.button`
-  background: rgba(74, 144, 226, 0.1);
-  border: 1px solid rgba(74, 144, 226, 0.3);
-  color: #4a90e2;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-
-  &:hover {
-    background: rgba(74, 144, 226, 0.2);
-    border-color: rgba(74, 144, 226, 0.5);
-    transform: translateY(-1px);
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
-`;
-
-// 검색 섹션
-const SearchSection = styled.div`
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(255, 255, 255, 0.02);
-`;
-
-const SearchBar = styled.div`
-  display: flex;
-  gap: 8px;
-  align-items: center;
-`;
-
-const SearchInputWrapper = styled.div`
-  flex: 1;
-  position: relative;
-  display: flex;
-  align-items: center;
-`;
-
 const SearchInput = styled.input`
-  width: 100%;
+  flex: 1;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #e0e0e0;
   padding: 10px 16px 10px 40px;
-  border-radius: 12px;
+  border-radius: 20px;
   font-size: 14px;
   transition: all 0.2s;
 
@@ -120,99 +48,132 @@ const SearchInput = styled.input`
   }
 `;
 
+const SearchInputWrapper = styled.div`
+  position: relative;
+  flex: 1;
+`;
+
+const SearchIcon = styled(Search)`
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  width: 18px;
+  height: 18px;
+`;
+
 const IconButton = styled.button`
-  background: ${props => props.$primary ? 'linear-gradient(135deg, #4a90e2, #357abd)' : 'rgba(255, 255, 255, 0.05)'};
-  border: 1px solid ${props => props.$primary ? 'transparent' : 'rgba(255, 255, 255, 0.1)'};
-  color: ${props => props.$primary ? '#ffffff' : '#888'};
-  padding: 10px;
-  border-radius: 12px;
+  background: transparent;
+  border: none;
+  color: #888;
+  padding: 8px;
   cursor: pointer;
-  transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: ${props => props.$primary ? '0 4px 12px rgba(74, 144, 226, 0.3)' : 'none'};
+  border-radius: 8px;
+  transition: all 0.2s;
 
   &:hover {
-    background: ${props => props.$primary ? 'linear-gradient(135deg, #357abd, #2a5f8f)' : 'rgba(255, 255, 255, 0.08)'};
-    transform: ${props => props.$primary ? 'translateY(-2px)' : 'none'};
-  }
-
-  &:active {
-    transform: translateY(0);
+    background: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
   }
 `;
 
-// 친구 요청 알림 섹션
-const RequestNotice = styled.div`
-  margin: 16px 20px;
-  padding: 14px 16px;
-  background: linear-gradient(135deg, rgba(74, 144, 226, 0.1), rgba(53, 122, 189, 0.1));
-  border: 1px solid rgba(74, 144, 226, 0.2);
-  border-radius: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+// 내 프로필 섹션
+const MyProfileSection = styled.div`
+  padding: 20px;
+  border-bottom: 8px solid rgba(255, 255, 255, 0.03);
   cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
-    background: linear-gradient(135deg, rgba(74, 144, 226, 0.15), rgba(53, 122, 189, 0.15));
-    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.02);
   }
 `;
 
-const RequestInfo = styled.div`
+const MyProfileContent = styled.div`
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 `;
 
-const RequestIcon = styled.div`
-  width: 40px;
-  height: 40px;
+const MyAvatar = styled.div`
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: ${props => props.$color || 'linear-gradient(135deg, #667eea, #764ba2)'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  font-weight: 600;
+  color: #ffffff;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+`;
+
+const VerifiedBadge = styled.div`
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: linear-gradient(135deg, #4a90e2, #357abd);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  border: 2px solid #1a1a1a;
+  box-shadow: 0 2px 8px rgba(74, 144, 226, 0.4);
 `;
 
-const RequestText = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+const MyInfo = styled.div`
+  flex: 1;
+  min-width: 0;
 `;
 
-const RequestTitle = styled.div`
-  font-size: 14px;
+const MyName = styled.div`
+  font-size: 17px;
   font-weight: 600;
   color: #ffffff;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 `;
 
-const RequestSubtitle = styled.div`
-  font-size: 12px;
+const MyStatus = styled.div`
+  font-size: 13px;
   color: #888;
 `;
 
-const RequestBadge = styled.div`
-  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 700;
-  padding: 4px 10px;
+const VerifyButton = styled.button`
+  background: rgba(74, 144, 226, 0.15);
+  border: 1px solid rgba(74, 144, 226, 0.3);
+  color: #4a90e2;
+  padding: 6px 12px;
   border-radius: 12px;
-  min-width: 24px;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(255, 107, 107, 0.4);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  &:hover {
+    background: rgba(74, 144, 226, 0.25);
+    border-color: rgba(74, 144, 226, 0.5);
+  }
 `;
 
 // 친구 목록
 const FriendListContainer = styled.div`
   flex: 1;
   overflow-y: auto;
-  padding: 8px 0;
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -228,43 +189,40 @@ const FriendListContainer = styled.div`
   }
 `;
 
-// 섹션 타이틀
-const SectionTitle = styled.div`
-  padding: 12px 20px 8px 20px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #888;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+const SectionHeader = styled.div`
+  padding: 16px 20px 8px 20px;
   display: flex;
   justify-content: space-between;
   align-items: center;
 `;
 
-const FriendCount = styled.span`
-  color: #4a90e2;
-  font-weight: 700;
+const SectionTitle = styled.div`
+  font-size: 13px;
+  font-weight: 600;
+  color: #888;
 `;
 
-// 친구 카드
-const FriendCard = styled.div`
-  margin: 8px 20px;
-  padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+const FriendCount = styled.span`
+  color: #4a90e2;
+  margin-left: 6px;
+`;
+
+// 친구 아이템
+const FriendItem = styled.div`
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
   transition: all 0.2s;
 
   &:hover {
     background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(74, 144, 226, 0.3);
   }
-`;
 
-const FriendCardContent = styled.div`
-  display: flex;
-  gap: 12px;
-  align-items: center;
+  &:active {
+    background: rgba(255, 255, 255, 0.08);
+  }
 `;
 
 const Avatar = styled.div`
@@ -275,7 +233,7 @@ const Avatar = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   color: #ffffff;
   flex-shrink: 0;
@@ -283,70 +241,47 @@ const Avatar = styled.div`
   position: relative;
 `;
 
-const OnlineIndicator = styled.div`
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: ${props => props.$online ? '#2ed573' : '#666'};
-  border: 2px solid #1a1a1a;
-`;
-
 const FriendInfo = styled.div`
   flex: 1;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
 `;
 
 const FriendName = styled.div`
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
   color: #ffffff;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-`;
-
-const FriendMeta = styled.div`
-  font-size: 12px;
-  color: #888;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+`;
+
+const FriendStatus = styled.div`
+  font-size: 12px;
+  color: #666;
+  margin-top: 2px;
 `;
 
 const ActionButtons = styled.div`
   display: flex;
   gap: 6px;
-  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.2s;
+
+  ${FriendItem}:hover & {
+    opacity: 1;
+  }
 `;
 
 const ActionButton = styled.button`
-  background: ${props => {
-    if (props.$variant === 'primary') return 'rgba(74, 144, 226, 0.2)';
-    if (props.$variant === 'success') return 'rgba(46, 213, 115, 0.2)';
-    if (props.$variant === 'danger') return 'rgba(255, 107, 107, 0.2)';
-    return 'rgba(255, 255, 255, 0.05)';
-  }};
-  border: 1px solid ${props => {
-    if (props.$variant === 'primary') return 'rgba(74, 144, 226, 0.4)';
-    if (props.$variant === 'success') return 'rgba(46, 213, 115, 0.4)';
-    if (props.$variant === 'danger') return 'rgba(255, 107, 107, 0.4)';
-    return 'rgba(255, 255, 255, 0.1)';
-  }};
-  color: ${props => {
-    if (props.$variant === 'primary') return '#4a90e2';
-    if (props.$variant === 'success') return '#2ed573';
-    if (props.$variant === 'danger') return '#ff6b6b';
-    return '#888';
-  }};
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 13px;
+  background: ${props => props.$variant === 'primary' ? 'rgba(74, 144, 226, 0.2)' : 'rgba(255, 107, 107, 0.2)'};
+  border: 1px solid ${props => props.$variant === 'primary' ? 'rgba(74, 144, 226, 0.4)' : 'rgba(255, 107, 107, 0.4)'};
+  color: ${props => props.$variant === 'primary' ? '#4a90e2' : '#ff6b6b'};
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -356,11 +291,6 @@ const ActionButton = styled.button`
 
   &:hover {
     opacity: 0.8;
-    transform: translateY(-1px);
-  }
-
-  &:active {
-    transform: translateY(0);
   }
 `;
 
@@ -396,7 +326,7 @@ const EmptyDescription = styled.div`
   margin-bottom: 20px;
 `;
 
-const EmptyAction = styled.button`
+const AddFriendButton = styled.button`
   background: linear-gradient(135deg, #4a90e2, #357abd);
   border: none;
   color: #ffffff;
@@ -424,77 +354,57 @@ const EmptyAction = styled.button`
 const FriendList = ({ showToast }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [friends, setFriends] = useState([]);
-  const [friendRequests, setFriendRequests] = useState({ received: 0, sent: 0 });
   const [loading, setLoading] = useState(true);
-  const [myWsCode, setMyWsCode] = useState(null);
+  const [myProfile, setMyProfile] = useState(null);
+  const [isVerified, setIsVerified] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  const [selectedChat, setSelectedChat] = useState(null);
 
   useEffect(() => {
-    loadMyWsCode();
+    loadMyProfile();
     loadFriends();
-    loadFriendRequests();
   }, []);
 
-  const loadMyWsCode = async () => {
+  const loadMyProfile = async () => {
     try {
       const userId = localStorage.getItem('firebaseUserId');
-      if (!userId) return;
+      const nickname = localStorage.getItem('userNickname') || '나';
 
-      const workspaceId = `workspace_${userId}`;
-      const workspaceRef = doc(db, 'workspaces', workspaceId);
-      const workspaceDoc = await getDoc(workspaceRef);
+      // 본인인증 상태 확인
+      const verificationStatus = await checkVerificationStatus(userId);
+      setIsVerified(verificationStatus.verified);
 
-      if (workspaceDoc.exists()) {
-        const code = workspaceDoc.data().workspaceCode;
-        setMyWsCode(code);
-      }
+      setMyProfile({
+        nickname,
+        userId
+      });
     } catch (error) {
-      console.error('WS 코드 로드 오류:', error);
+      console.error('프로필 로드 오류:', error);
     }
   };
 
   const loadFriends = async () => {
     try {
-      const friendsList = await getMyFriends();
-      console.log('👥 친구 목록:', friendsList);
-      setFriends(friendsList);
+      const userId = localStorage.getItem('firebaseUserId');
+      const friendsList = await getMyFriends(userId);
+
+      // 각 친구의 인증 상태 확인
+      const friendsWithVerification = await Promise.all(
+        friendsList.map(async (friend) => {
+          const verificationStatus = await checkVerificationStatus(friend.friendId);
+          return {
+            ...friend,
+            verified: verificationStatus.verified
+          };
+        })
+      );
+
+      setFriends(friendsWithVerification);
       setLoading(false);
     } catch (error) {
       console.error('친구 목록 조회 오류:', error);
       setFriends([]);
       setLoading(false);
-    }
-  };
-
-  const loadFriendRequests = async () => {
-    try {
-      const userId = localStorage.getItem('firebaseUserId');
-      if (!userId) return;
-
-      // 받은 요청
-      const receivedQuery = query(
-        collection(db, 'friendRequests'),
-        where('receiverId', '==', userId),
-        where('status', '==', 'pending')
-      );
-
-      // 보낸 요청
-      const sentQuery = query(
-        collection(db, 'friendRequests'),
-        where('senderId', '==', userId),
-        where('status', '==', 'pending')
-      );
-
-      const [receivedSnapshot, sentSnapshot] = await Promise.all([
-        getDocs(receivedQuery),
-        getDocs(sentQuery)
-      ]);
-
-      setFriendRequests({
-        received: receivedSnapshot.size,
-        sent: sentSnapshot.size
-      });
-    } catch (error) {
-      console.error('친구 요청 조회 오류:', error);
     }
   };
 
@@ -504,48 +414,82 @@ const FriendList = ({ showToast }) => {
 
     const name = friend.friendName?.toLowerCase() || '';
     const wsCode = friend.friendWorkspaceCode?.toLowerCase() || '';
-    const email = friend.friendEmail?.toLowerCase() || '';
 
     return name.includes(searchQuery.toLowerCase()) ||
-           wsCode.includes(searchQuery.toLowerCase()) ||
-           email.includes(searchQuery.toLowerCase());
+           wsCode.includes(searchQuery.toLowerCase());
   });
 
-  const handleSearch = () => {
-    if (searchQuery.trim().length === 0) {
-      showToast?.('검색어를 입력해주세요');
-      return;
+  const handleStartChat = async (friend) => {
+    try {
+      showToast?.('대화방을 여는 중...');
+
+      // 1:1 대화방 생성 또는 가져오기
+      const result = await createOrGetDMRoom(friend.friendId, {
+        displayName: friend.friendName,
+        email: friend.friendEmail,
+        photoURL: ''
+      });
+
+      if (result.success) {
+        // ChatRoom 열기
+        setSelectedChat({
+          id: result.roomId,
+          type: 'dm',
+          ...result.data
+        });
+      }
+    } catch (error) {
+      console.error('대화 시작 오류:', error);
+      showToast?.('대화 시작에 실패했습니다');
     }
-    // TODO: 친구 검색 모달 열기
-    showToast?.('친구 검색 기능 구현 예정');
-  };
-
-  const handleQRScan = () => {
-    // TODO: QR 스캔 모달 열기
-    showToast?.('QR 스캔 기능 구현 예정');
-  };
-
-  const handleViewRequests = () => {
-    // TODO: 친구 요청 모달 열기
-    showToast?.('친구 요청 확인 기능 구현 예정');
-  };
-
-  const handleStartChat = (friend) => {
-    // TODO: 1:1 대화 시작
-    console.log('대화 시작:', friend);
-    showToast?.('대화 시작 기능 구현 예정');
   };
 
   const handleRemoveFriend = (friend) => {
-    // TODO: 친구 삭제
     console.log('친구 삭제:', friend);
     showToast?.('친구 삭제 기능 구현 예정');
   };
 
-  const handleCopyMyCode = () => {
-    if (myWsCode) {
-      navigator.clipboard.writeText(myWsCode.toLowerCase());
-      showToast?.('친구 코드가 복사되었습니다');
+  const handleAddFriend = () => {
+    showToast?.('친구 추가 기능 구현 예정');
+  };
+
+  const handleAddTestFriends = async () => {
+    try {
+      const userId = localStorage.getItem('firebaseUserId');
+      showToast?.('테스트 친구를 추가하는 중...');
+
+      const result = await addTestFriend(userId);
+
+      if (result.success) {
+        showToast?.(result.message);
+        // 친구 목록 새로고침
+        await loadFriends();
+      } else {
+        showToast?.(result.message);
+      }
+    } catch (error) {
+      console.error('테스트 친구 추가 오류:', error);
+      showToast?.('테스트 친구 추가에 실패했습니다');
+    }
+  };
+
+  const handleRemoveTestFriends = async () => {
+    try {
+      const userId = localStorage.getItem('firebaseUserId');
+      showToast?.('테스트 친구를 삭제하는 중...');
+
+      const result = await removeAllTestFriends(userId);
+
+      if (result.success) {
+        showToast?.(result.message);
+        // 친구 목록 새로고침
+        await loadFriends();
+      } else {
+        showToast?.(result.message);
+      }
+    } catch (error) {
+      console.error('테스트 친구 삭제 오류:', error);
+      showToast?.('테스트 친구 삭제에 실패했습니다');
     }
   };
 
@@ -576,62 +520,57 @@ const FriendList = ({ showToast }) => {
 
   return (
     <Container>
-      {/* 내 친구 코드 */}
-      {myWsCode && (
-        <MyCodeSection>
-          <MyCodeBox>
-            <MyCodeLabel>
-              <MyCodeTitle>내 친구 코드</MyCodeTitle>
-              <MyCodeValue>{myWsCode?.toLowerCase()}</MyCodeValue>
-            </MyCodeLabel>
-            <CopyButton onClick={handleCopyMyCode}>
-              <Copy size={14} />
-              복사
-            </CopyButton>
-          </MyCodeBox>
-        </MyCodeSection>
-      )}
+      {/* 헤더 */}
+      <HeaderSection>
+        <SearchInputWrapper>
+          <SearchIcon />
+          <SearchInput
+            type="text"
+            placeholder="친구 검색"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </SearchInputWrapper>
+        <IconButton onClick={handleAddTestFriends} title="테스트 친구 추가" style={{ color: '#4a90e2' }}>
+          <TestTube size={20} />
+        </IconButton>
+        <IconButton onClick={handleAddFriend} title="친구 추가">
+          <UserPlus size={20} />
+        </IconButton>
+        <IconButton title="설정">
+          <Settings size={20} />
+        </IconButton>
+      </HeaderSection>
 
-      {/* 검색 바 */}
-      <SearchSection>
-        <SearchBar>
-          <SearchInputWrapper>
-            <SearchInput
-              type="text"
-              placeholder="친구 WS 코드 입력 (예: WS-Y3T1ZM)"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') handleSearch();
-              }}
-            />
-          </SearchInputWrapper>
-          {searchQuery.trim().length > 0 ? (
-            <IconButton $primary onClick={handleSearch}>
-              <Search size={20} />
-            </IconButton>
-          ) : (
-            <IconButton onClick={handleQRScan}>
-              <QrCode size={20} />
-            </IconButton>
-          )}
-        </SearchBar>
-      </SearchSection>
-
-      {/* 친구 요청 알림 */}
-      {friendRequests.received > 0 && (
-        <RequestNotice onClick={handleViewRequests}>
-          <RequestInfo>
-            <RequestIcon>
-              <Inbox size={20} />
-            </RequestIcon>
-            <RequestText>
-              <RequestTitle>새로운 친구 요청</RequestTitle>
-              <RequestSubtitle>받은 요청 {friendRequests.received}건</RequestSubtitle>
-            </RequestText>
-          </RequestInfo>
-          <RequestBadge>{friendRequests.received}</RequestBadge>
-        </RequestNotice>
+      {/* 내 프로필 */}
+      {myProfile && (
+        <MyProfileSection>
+          <MyProfileContent>
+            <MyAvatar $color={getAvatarColor(myProfile.userId)}>
+              {myProfile.nickname?.charAt(0).toUpperCase() || '나'}
+              {isVerified && (
+                <VerifiedBadge>
+                  <Shield size={12} />
+                </VerifiedBadge>
+              )}
+            </MyAvatar>
+            <MyInfo>
+              <MyName>
+                {myProfile.nickname}
+                {!isVerified && (
+                  <VerifyButton onClick={() => setShowVerificationModal(true)}>
+                    <Shield size={12} />
+                    본인인증
+                  </VerifyButton>
+                )}
+              </MyName>
+              {isVerified && (
+                <MyStatus>인증된 사용자</MyStatus>
+              )}
+            </MyInfo>
+            <ChevronRight size={20} color="#666" />
+          </MyProfileContent>
+        </MyProfileSection>
       )}
 
       {/* 친구 목록 */}
@@ -648,61 +587,82 @@ const FriendList = ({ showToast }) => {
                 : 'WS 코드를 입력하거나 QR 스캔으로\n친구를 추가해보세요'}
             </EmptyDescription>
             {!searchQuery && (
-              <EmptyAction onClick={handleQRScan}>
-                <QrCode size={18} />
-                QR 코드로 친구 추가
-              </EmptyAction>
+              <AddFriendButton onClick={handleAddFriend}>
+                <UserPlus size={18} />
+                친구 추가
+              </AddFriendButton>
             )}
           </EmptyState>
         ) : (
           <>
-            <SectionTitle>
-              내 친구
-              <FriendCount>{filteredFriends.length}</FriendCount>
-            </SectionTitle>
+            <SectionHeader>
+              <SectionTitle>
+                친구
+                <FriendCount>{filteredFriends.length}</FriendCount>
+              </SectionTitle>
+            </SectionHeader>
 
             {filteredFriends.map(friend => (
-              <FriendCard key={friend.id}>
-                <FriendCardContent>
-                  <Avatar $color={getAvatarColor(friend.friendId)}>
-                    {friend.friendName?.charAt(0).toUpperCase() || '?'}
-                    <OnlineIndicator $online={false} />
-                  </Avatar>
+              <FriendItem key={friend.id}>
+                <Avatar $color={getAvatarColor(friend.friendId)}>
+                  {friend.friendName?.charAt(0).toUpperCase() || '?'}
+                  {friend.verified && (
+                    <VerifiedBadge>
+                      <Shield size={10} />
+                    </VerifiedBadge>
+                  )}
+                </Avatar>
 
-                  <FriendInfo>
-                    <FriendName>{friend.friendName || '익명'}</FriendName>
-                    <FriendMeta>
-                      <span>{friend.friendWorkspaceCode?.toLowerCase() || '-'}</span>
-                      {friend.friendEmail && (
-                        <>
-                          <span>•</span>
-                          <span>{friend.friendEmail}</span>
-                        </>
-                      )}
-                    </FriendMeta>
-                  </FriendInfo>
+                <FriendInfo>
+                  <FriendName>
+                    {friend.friendName || '익명'}
+                  </FriendName>
+                  <FriendStatus>
+                    {friend.friendWorkspaceCode?.toLowerCase() || '-'}
+                    {friend.verified && ' • 인증됨'}
+                  </FriendStatus>
+                </FriendInfo>
 
-                  <ActionButtons>
-                    <ActionButton
-                      $variant="primary"
-                      onClick={() => handleStartChat(friend)}
-                    >
-                      <MessageCircle size={16} />
-                      대화
-                    </ActionButton>
-                    <ActionButton
-                      $variant="danger"
-                      onClick={() => handleRemoveFriend(friend)}
-                    >
-                      <UserMinus size={16} />
-                    </ActionButton>
-                  </ActionButtons>
-                </FriendCardContent>
-              </FriendCard>
+                <ActionButtons>
+                  <ActionButton
+                    $variant="primary"
+                    onClick={() => handleStartChat(friend)}
+                  >
+                    <MessageCircle size={14} />
+                  </ActionButton>
+                  <ActionButton
+                    onClick={() => handleRemoveFriend(friend)}
+                  >
+                    <UserMinus size={14} />
+                  </ActionButton>
+                </ActionButtons>
+              </FriendItem>
             ))}
           </>
         )}
       </FriendListContainer>
+
+      {/* 본인인증 모달 */}
+      {showVerificationModal && (
+        <VerificationModal
+          onClose={() => setShowVerificationModal(false)}
+          onVerified={() => {
+            setIsVerified(true);
+            loadMyProfile();
+            loadFriends(); // 친구 목록도 새로고침
+          }}
+          showToast={showToast}
+        />
+      )}
+
+      {/* 채팅방 */}
+      {selectedChat && (
+        <ChatRoom
+          chat={selectedChat}
+          onClose={() => setSelectedChat(null)}
+          showToast={showToast}
+        />
+      )}
     </Container>
   );
 };

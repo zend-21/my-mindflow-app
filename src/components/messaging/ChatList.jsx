@@ -5,6 +5,7 @@ import { subscribeToMyDMRooms } from '../../services/directMessageService';
 import { subscribeToMyGroupChats } from '../../services/groupChatService';
 import { Search, Plus, Pin, Users } from 'lucide-react';
 import CreateGroupModal from './CreateGroupModal';
+import ChatRoom from './ChatRoom';
 
 // 컨테이너
 const Container = styled.div`
@@ -303,6 +304,7 @@ const ChatList = ({ showToast }) => {
   const [groupChats, setGroupChats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+  const [selectedChat, setSelectedChat] = useState(null);
 
   useEffect(() => {
     let dmLoaded = false;
@@ -362,13 +364,8 @@ const ChatList = ({ showToast }) => {
   const regularChats = allChats.filter(chat => !chat.pinned);
 
   const handleChatClick = (chat) => {
-    // TODO: 대화방 열기
     console.log('대화방 클릭:', chat);
-    if (chat.type === 'group') {
-      showToast?.('그룹 채팅 기능 구현 예정');
-    } else {
-      showToast?.('1:1 대화 기능 구현 예정');
-    }
+    setSelectedChat(chat);
   };
 
   const handleNewChat = () => {
@@ -637,6 +634,15 @@ const ChatList = ({ showToast }) => {
       {showCreateGroupModal && (
         <CreateGroupModal
           onClose={() => setShowCreateGroupModal(false)}
+          showToast={showToast}
+        />
+      )}
+
+      {/* 채팅방 전체화면 */}
+      {selectedChat && (
+        <ChatRoom
+          chat={selectedChat}
+          onClose={() => setSelectedChat(null)}
           showToast={showToast}
         />
       )}

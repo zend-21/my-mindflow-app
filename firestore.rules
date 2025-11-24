@@ -272,5 +272,40 @@ service cloud.firestore {
       allow delete: if isSignedIn() &&
         request.auth.uid == userId;
     }
+
+    // ========================================
+    // 본인인증 (Verifications)
+    // ========================================
+    match /verifications/{userId} {
+      // 읽기: 모든 로그인한 사용자 (인증 뱃지 표시용)
+      allow read: if isSignedIn();
+      // 생성/수정: 본인만 (userId가 문서 ID와 일치)
+      allow create, update: if isSignedIn() &&
+        request.auth.uid == userId &&
+        request.resource.data.userId == userId;
+      // 삭제: 관리자만 (추후 구현)
+      allow delete: if false;
+    }
+
+    // ========================================
+    // 메모 (Memos)
+    // ========================================
+    match /memos/{memoId} {
+      // 생성: 로그인한 사용자 (본인의 메모만)
+      allow create: if isSignedIn() &&
+        request.resource.data.userId == request.auth.uid;
+
+      // 읽기: 본인의 메모만
+      allow read: if isSignedIn() &&
+        resource.data.userId == request.auth.uid;
+
+      // 수정: 본인의 메모만
+      allow update: if isSignedIn() &&
+        resource.data.userId == request.auth.uid;
+
+      // 삭제: 본인의 메모만
+      allow delete: if isSignedIn() &&
+        resource.data.userId == request.auth.uid;
+    }
   }
 }

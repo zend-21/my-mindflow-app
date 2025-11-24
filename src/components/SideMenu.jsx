@@ -7,6 +7,7 @@ import FriendsModal from './collaboration/FriendsModal';
 import SharedNotesPage from './collaboration/SharedNotesPage';
 import MyWorkspace from './collaboration/MyWorkspace';
 import RoomBrowser from './collaboration/RoomBrowser';
+import SecurityDocViewer from './SecurityDocViewer';
 import { db } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -341,6 +342,7 @@ const SideMenu = ({
     const [isSharedNotesPageOpen, setIsSharedNotesPageOpen] = useState(false);
     const [isMyWorkspaceOpen, setIsMyWorkspaceOpen] = useState(false);
     const [isRoomBrowserOpen, setIsRoomBrowserOpen] = useState(false);
+    const [isSecurityDocViewerOpen, setIsSecurityDocViewerOpen] = useState(false);
 
     const handleError = () => { // 에러 발생 시 상태 변경
         setImageError(true);
@@ -614,6 +616,12 @@ const SideMenu = ({
                                 </MenuItem>
                                 <MenuItem onClick={() => {
                                     onClose();
+                                    setIsSecurityDocViewerOpen(true);
+                                }}>
+                                    <span className="icon">🔒</span> 보안 & 개인정보
+                                </MenuItem>
+                                <MenuItem onClick={() => {
+                                    onClose();
                                     if (onOpenTrash) onOpenTrash();
                                 }}>
                                     <span className="icon">🗑️</span> 휴지통
@@ -666,6 +674,13 @@ const SideMenu = ({
                     }
                 }}
             />
+
+            {/* 보안 문서 뷰어 */}
+            {isSecurityDocViewerOpen && (
+                <SecurityDocViewer
+                    onClose={() => setIsSecurityDocViewerOpen(false)}
+                />
+            )}
         </>
     );
 };

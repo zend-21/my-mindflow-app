@@ -30,6 +30,8 @@ dist-ssr
 # 특정 폴더 전체 무시
 private/
 
+images/
+
 # 구글 클라이언트 ID 파일 업로드 방지
 구글 클라이언트 ID.txt
 

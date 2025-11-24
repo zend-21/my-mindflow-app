@@ -1,8 +1,9 @@
 // 📄 접었다 폈다 할 수 있는 문서 편집기
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { ChevronDown, ChevronUp, Save, X, Users, Lock, Eye } from 'lucide-react';
-import { updateDocument, updateDocumentTitle, grantEditPermission, revokeEditPermission } from '../../services/chatDocumentService';
+import { ChevronDown, ChevronUp, Save, X, Users, Lock, Eye, FolderOpen } from 'lucide-react';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { db } from '../../firebase/config';
 
 // 문서 편집기 컨테이너 (접었을 때는 작게, 펼쳤을 때는 크게)
 const EditorContainer = styled.div`
@@ -205,6 +206,22 @@ const SaveButton = styled(ToolbarButton)`
   }
 `;
 
+const LoadButton = styled(ToolbarButton)`
+  background: rgba(74, 144, 226, 0.15);
+  border: 1px solid rgba(74, 144, 226, 0.3);
+  color: #4a90e2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 6px 10px;
+
+  &:hover:not(:disabled) {
+    background: rgba(74, 144, 226, 0.25);
+    border-color: rgba(74, 144, 226, 0.4);
+  }
+`;
+
 // 편집기 텍스트 영역
 const TextArea = styled.textarea`
   flex: 1;
@@ -268,35 +285,47 @@ const Footer = styled.div`
 
 const CollapsibleDocumentEditor = ({
   document,
-  chatRoomId,
-  chatType,
   currentUserId,
+  isRoomOwner, // 방장 여부
   showToast,
-  onClose
+  onClose,
+  onDocumentUpdated, // 문서 업데이트 시 콜백
+  onLoadFromShared // 공유 폴더에서 불러오기 콜백
 }) => {
   const [collapsed, setCollapsed] = useState(false);
-  const [title, setTitle] = useState(document.title);
-  const [content, setContent] = useState(document.content);
+  const [title, setTitle] = useState(document?.title || '');
+  const [content, setContent] = useState(document?.content || '');
   const [saving, setSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [originalMemoId, setOriginalMemoId] = useState(document?.originalMemoId || null);
 
-  // 권한 확인
-  const isOwner = document.permissions?.owner === currentUserId;
-  const isEditor = document.permissions?.editors?.includes(currentUserId);
-  const canEdit = isOwner || isEditor;
+  // 문서 변경 시 상태 업데이트
+  useEffect(() => {
+    if (document) {
+      setTitle(document.title || '');
+      setContent(document.content || '');
+      setOriginalMemoId(document.originalMemoId || null);
+      setHasUnsavedChanges(false);
+    }
+  }, [document]);
 
   // 문서 변경 감지
   useEffect(() => {
     const hasChanges =
-      title !== document.title ||
-      content !== document.content;
+      title !== (document?.title || '') ||
+      content !== (document?.content || '');
     setHasUnsavedChanges(hasChanges);
   }, [title, content, document]);
 
-  // 저장 핸들러
+  // 저장 핸들러 - 방장만 가능하며, 공유 폴더에 수정본 생성
   const handleSave = async () => {
-    if (!canEdit) {
-      showToast?.('편집 권한이 없습니다');
+    if (!isRoomOwner) {
+      showToast?.('방장만 저장할 수 있습니다');
+      return;
+    }
+
+    if (!title.trim()) {
+      showToast?.('제목을 입력하세요');
       return;
     }
 
@@ -308,18 +337,41 @@ const CollapsibleDocumentEditor = ({
     setSaving(true);
 
     try {
-      // 제목 변경
-      if (title !== document.title) {
-        await updateDocumentTitle(chatRoomId, chatType, document.id, currentUserId, title);
+      // 공유 폴더에 수정본 저장
+      const memosRef = collection(db, 'memos');
+
+      // 수정본 제목 생성
+      let modifiedTitle = title;
+      if (originalMemoId && !title.endsWith('-수정본')) {
+        modifiedTitle = `${title}-수정본`;
       }
 
-      // 내용 변경
-      if (content !== document.content) {
-        await updateDocument(chatRoomId, chatType, document.id, currentUserId, content);
+      const newMemo = {
+        title: modifiedTitle,
+        content: content,
+        folder: 'shared', // 폴더 ID는 'shared'
+        userId: currentUserId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        tags: ['대화방수정본'],
+        originalMemoId: originalMemoId || null, // 원본 메모 ID 저장
+        modifiedInChatRoom: true
+      };
+
+      await addDoc(memosRef, newMemo);
+
+      // 로컬 상태 업데이트
+      if (onDocumentUpdated) {
+        onDocumentUpdated({
+          ...document,
+          title: modifiedTitle,
+          content: content
+        });
       }
 
+      setTitle(modifiedTitle);
       setHasUnsavedChanges(false);
-      showToast?.('문서가 저장되었습니다');
+      showToast?.('수정본이 공유 폴더에 저장되었습니다');
     } catch (error) {
       console.error('문서 저장 실패:', error);
       showToast?.('문서 저장에 실패했습니다');
@@ -329,9 +381,9 @@ const CollapsibleDocumentEditor = ({
   };
 
   // 권한 타입 결정
-  const permissionType = isOwner ? 'owner' : isEditor ? 'editor' : 'viewer';
-  const permissionLabel = isOwner ? '소유자' : isEditor ? '편집자' : '보기 전용';
-  const PermissionIcon = isOwner ? Lock : isEditor ? Users : Eye;
+  const permissionType = isRoomOwner ? 'owner' : 'editor';
+  const permissionLabel = isRoomOwner ? '방장' : '멤버';
+  const PermissionIcon = isRoomOwner ? Lock : Users;
 
   // 포맷팅 시간
   const formatTime = (timestamp) => {
@@ -361,8 +413,7 @@ const CollapsibleDocumentEditor = ({
             <TitleInput
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              disabled={!canEdit}
-              placeholder="문서 제목"
+              placeholder="문서 제목을 입력하세요"
               onClick={(e) => e.stopPropagation()}
             />
           )}
@@ -397,16 +448,28 @@ const CollapsibleDocumentEditor = ({
         {/* 도구 모음 */}
         <Toolbar>
           <ToolbarLeft>
+            {onLoadFromShared && (
+              <LoadButton onClick={onLoadFromShared} title="공유 폴더에서 불러오기">
+                <FolderOpen size={14} />
+                불러오기
+              </LoadButton>
+            )}
             <SaveButton
               onClick={handleSave}
-              disabled={!canEdit || !hasUnsavedChanges || saving}
+              disabled={!isRoomOwner || !hasUnsavedChanges || saving}
+              title={!isRoomOwner ? '방장만 저장할 수 있습니다' : ''}
             >
               <Save size={16} />
-              {saving ? '저장 중...' : '저장'}
+              {saving ? '저장 중...' : '공유 폴더에 저장'}
             </SaveButton>
             {hasUnsavedChanges && (
               <span style={{ color: '#ff9800', fontSize: '12px' }}>
                 • 저장되지 않은 변경사항
+              </span>
+            )}
+            {!isRoomOwner && (
+              <span style={{ color: '#888', fontSize: '12px' }}>
+                • 방장만 저장 가능
               </span>
             )}
           </ToolbarLeft>
@@ -416,17 +479,17 @@ const CollapsibleDocumentEditor = ({
         <TextArea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          disabled={!canEdit}
-          placeholder={canEdit ? '문서 내용을 입력하세요...' : '보기 전용 문서입니다'}
+          placeholder="문서 내용을 입력하세요..."
         />
 
         {/* 하단 정보 */}
         <Footer>
           <span>
-            마지막 수정: {formatTime(document.updatedAt)}
+            {document?.updatedAt ? `마지막 수정: ${formatTime(document.updatedAt)}` : '새 문서'}
           </span>
           <span>
-            버전 {document.version || 1} • {content.length} 글자
+            {content.length} 글자
+            {originalMemoId && ' • 공유 폴더에서 불러온 문서'}
           </span>
         </Footer>
       </EditorContent>
