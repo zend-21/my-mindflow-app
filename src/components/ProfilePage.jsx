@@ -181,16 +181,15 @@ const ProfileHeader = styled.div`
 
 const ProfileImageWrapper = styled.div`
     position: relative;
-    cursor: pointer;
-
-    &:hover .edit-overlay {
-        opacity: 1;
-    }
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    min-height: 100px;
 `;
 
 const ProfileImage = styled.img`
     width: 100px;
-    height: 100px;
+    height: 96px;
     border-radius: 50%;
     object-fit: cover;
     border: 3px solid rgba(240, 147, 251, 0.5);
@@ -230,6 +229,15 @@ const DefaultProfileIcon = styled.div`
     box-shadow: 0 4px 16px rgba(240, 147, 251, 0.3);
 `;
 
+const ProfileImageClickable = styled.div`
+    position: relative;
+    cursor: pointer;
+
+    &:hover .edit-overlay {
+        opacity: 1;
+    }
+`;
+
 const EditOverlay = styled.div`
     position: absolute;
     top: 0;
@@ -246,6 +254,33 @@ const EditOverlay = styled.div`
     color: white;
     font-size: 14px;
     font-weight: 600;
+`;
+
+const RemoveButton = styled.button`
+    position: absolute;
+    right: -60px;
+    bottom: 0;
+    background: rgba(255, 87, 87, 0.1);
+    border: 1px solid rgba(255, 87, 87, 0.3);
+    color: #ff5757;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+
+    &:hover {
+        background: rgba(255, 87, 87, 0.2);
+        border-color: rgba(255, 87, 87, 0.5);
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(255, 87, 87, 0.2);
+    }
+
+    &:active {
+        transform: translateY(0);
+    }
 `;
 
 const ProfileImageTypeSelector = styled.div`
@@ -1270,6 +1305,37 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
         }
     };
 
+    // 프로필 사진/아바타 제거 (초기화)
+    const handleRemoveProfile = () => {
+        if (profileImageType === 'avatar') {
+            // 아바타 제거
+            setSelectedAvatarId(null);
+            localStorage.removeItem('selectedAvatarId');
+            localStorage.removeItem('avatarBgColor');
+            setAvatarBgColor('none');
+
+            // Header에 알림 (아바타 제거)
+            window.dispatchEvent(new CustomEvent('avatarChanged', {
+                detail: { avatarId: null, bgColor: 'none' }
+            }));
+
+            showToast?.('아바타가 제거되었습니다');
+        } else {
+            // 사진 제거
+            setCustomPicture(null);
+            localStorage.removeItem('customProfilePicture');
+            localStorage.removeItem('customProfilePictureHash');
+            setImageError(false);
+
+            // Header에 알림
+            window.dispatchEvent(new CustomEvent('profilePictureChanged', {
+                detail: { picture: null, hash: null }
+            }));
+
+            showToast?.('프로필 사진이 제거되었습니다');
+        }
+    };
+
     // 파일 선택 시 처리
     const handleFileChange = async (e) => {
         const file = e.target.files?.[0];
@@ -1455,41 +1521,50 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                 {/* 프로필 헤더 */}
                 <Section>
                     <ProfileHeader>
-                        <ProfileImageWrapper onClick={handleProfileImageClick}>
-                            {profileImageType === 'avatar' ? (
-                                selectedAvatarId ? (
-                                    <AvatarIconWrapper $bgColor={typeof BACKGROUND_COLORS[avatarBgColor] === 'function' ? BACKGROUND_COLORS[avatarBgColor]() : BACKGROUND_COLORS[avatarBgColor]}>
-                                        {renderAvatarIcon()}
-                                    </AvatarIconWrapper>
-                                ) : !nickname && profile?.picture && !imageError ? (
-                                    <ProfileImage
-                                        src={profile.picture}
-                                        alt="Profile"
-                                        onError={handleImageError}
-                                        crossOrigin="anonymous"
-                                    />
+                        <ProfileImageWrapper>
+                            <ProfileImageClickable onClick={handleProfileImageClick}>
+                                {profileImageType === 'avatar' ? (
+                                    selectedAvatarId ? (
+                                        <AvatarIconWrapper $bgColor={typeof BACKGROUND_COLORS[avatarBgColor] === 'function' ? BACKGROUND_COLORS[avatarBgColor]() : BACKGROUND_COLORS[avatarBgColor]}>
+                                            {renderAvatarIcon()}
+                                        </AvatarIconWrapper>
+                                    ) : !nickname && profile?.picture && !imageError ? (
+                                        <ProfileImage
+                                            src={profile.picture}
+                                            alt="Profile"
+                                            onError={handleImageError}
+                                            crossOrigin="anonymous"
+                                        />
+                                    ) : (
+                                        <DefaultProfileIcon>{profileInitial}</DefaultProfileIcon>
+                                    )
                                 ) : (
-                                    <DefaultProfileIcon>{profileInitial}</DefaultProfileIcon>
-                                )
-                            ) : (
-                                customPicture && !imageError ? (
-                                    <ProfileImage
-                                        src={customPicture}
-                                        alt="Profile"
-                                        onError={handleImageError}
-                                    />
-                                ) : !nickname && profile?.picture && !imageError ? (
-                                    <ProfileImage
-                                        src={profile.picture}
-                                        alt="Profile"
-                                        onError={handleImageError}
-                                        crossOrigin="anonymous"
-                                    />
-                                ) : (
-                                    <DefaultProfileIcon>{profileInitial}</DefaultProfileIcon>
-                                )
-                            )}
-                            <EditOverlay className="edit-overlay">변경</EditOverlay>
+                                    customPicture && !imageError ? (
+                                        <ProfileImage
+                                            src={customPicture}
+                                            alt="Profile"
+                                            onError={handleImageError}
+                                        />
+                                    ) : !nickname && profile?.picture && !imageError ? (
+                                        <ProfileImage
+                                            src={profile.picture}
+                                            alt="Profile"
+                                            onError={handleImageError}
+                                            crossOrigin="anonymous"
+                                        />
+                                    ) : (
+                                        <DefaultProfileIcon>{profileInitial}</DefaultProfileIcon>
+                                    )
+                                )}
+                                <EditOverlay className="edit-overlay">변경</EditOverlay>
+                            </ProfileImageClickable>
+
+                            {/* 제거 버튼 - 아바타가 선택되었거나 사진이 업로드된 경우에만 표시 */}
+                            {(profileImageType === 'avatar' && selectedAvatarId) || (profileImageType === 'photo' && customPicture) ? (
+                                <RemoveButton onClick={handleRemoveProfile}>
+                                    초기화
+                                </RemoveButton>
+                            ) : null}
                         </ProfileImageWrapper>
 
                         {/* 이미지 타입 선택 버튼 */}

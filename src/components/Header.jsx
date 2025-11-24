@@ -183,7 +183,9 @@ const Header = ({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, o
     // 아바타 변경 이벤트 리스너
     useEffect(() => {
         const handleAvatarChange = (e) => {
-            setSelectedAvatarId(e.detail);
+            // localStorage에서 직접 읽어오기 (SideMenu와 동일한 방식)
+            setSelectedAvatarId(localStorage.getItem('selectedAvatarId') || null);
+            setAvatarBgColor(localStorage.getItem('avatarBgColor') || 'none');
             setProfileImageType('avatar');
         };
         window.addEventListener('avatarChanged', handleAvatarChange);
