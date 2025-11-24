@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { X, Search, FileText, Calendar, Folder } from 'lucide-react';
 import { collection, query, orderBy, getDocs, where } from 'firebase/firestore';
 import { db } from '../../firebase/config';
+import { checkMemoSharedStatus } from '../../services/collaborationRoomService';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -272,23 +273,37 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast }) => {
         return;
       }
 
-      // 공유 폴더의 메모만 가져오기 (폴더 ID는 'shared')
+      // 1. 사용자의 모든 메모 가져오기
       const memosRef = collection(db, 'memos');
       const q = query(
         memosRef,
         where('userId', '==', userId),
-        where('folder', '==', 'shared'),
         orderBy('updatedAt', 'desc')
       );
 
       const snapshot = await getDocs(q);
-      const loadedMemos = snapshot.docs.map(doc => ({
+      const allMemos = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       }));
 
-      setMemos(loadedMemos);
-      setFilteredMemos(loadedMemos);
+      // 2. 공유된 메모 필터링 (메모 페이지와 동일한 로직)
+      const sharedMemos = [];
+      for (const memo of allMemos) {
+        // folderId가 'shared'이거나, collaborationRooms에 연결된 메모
+        if (memo.folder === 'shared' || memo.folderId === 'shared') {
+          sharedMemos.push(memo);
+        } else {
+          // collaborationRooms 확인
+          const result = await checkMemoSharedStatus(memo.id);
+          if (result.isShared && result.room) {
+            sharedMemos.push(memo);
+          }
+        }
+      }
+
+      setMemos(sharedMemos);
+      setFilteredMemos(sharedMemos);
     } catch (error) {
       console.error('공유 메모 불러오기 실패:', error);
       showToast?.('공유 메모를 불러오는데 실패했습니다');
