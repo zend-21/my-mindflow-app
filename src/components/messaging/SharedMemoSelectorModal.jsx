@@ -2,9 +2,6 @@
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { X, Search, FileText, Calendar, Folder } from 'lucide-react';
-import { collection, query, orderBy, getDocs, where } from 'firebase/firestore';
-import { db } from '../../firebase/config';
-import { checkMemoSharedStatus } from '../../services/collaborationRoomService';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -242,75 +239,25 @@ const LoadingState = styled.div`
   font-size: 14px;
 `;
 
-const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast }) => {
-  const [memos, setMemos] = useState([]);
+const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos }) => {
   const [filteredMemos, setFilteredMemos] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadSharedMemos();
-  }, []);
+  // allMemos에서 folderId === 'shared'인 메모만 필터링
+  const sharedMemos = allMemos?.filter(memo => memo.folderId === 'shared') || [];
 
   useEffect(() => {
     if (!searchQuery) {
-      setFilteredMemos(memos);
+      setFilteredMemos(sharedMemos);
     } else {
       const query = searchQuery.toLowerCase();
-      const filtered = memos.filter(memo =>
+      const filtered = sharedMemos.filter(memo =>
         memo.title?.toLowerCase().includes(query) ||
         memo.content?.toLowerCase().includes(query)
       );
       setFilteredMemos(filtered);
     }
-  }, [searchQuery, memos]);
-
-  const loadSharedMemos = async () => {
-    try {
-      const userId = localStorage.getItem('firebaseUserId');
-      if (!userId) {
-        showToast?.('사용자 정보를 찾을 수 없습니다');
-        return;
-      }
-
-      // 1. 사용자의 모든 메모 가져오기
-      const memosRef = collection(db, 'memos');
-      const q = query(
-        memosRef,
-        where('userId', '==', userId),
-        orderBy('updatedAt', 'desc')
-      );
-
-      const snapshot = await getDocs(q);
-      const allMemos = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-
-      // 2. 공유된 메모 필터링 (메모 페이지와 동일한 로직)
-      const sharedMemos = [];
-      for (const memo of allMemos) {
-        // folderId가 'shared'이거나, collaborationRooms에 연결된 메모
-        if (memo.folder === 'shared' || memo.folderId === 'shared') {
-          sharedMemos.push(memo);
-        } else {
-          // collaborationRooms 확인
-          const result = await checkMemoSharedStatus(memo.id);
-          if (result.isShared && result.room) {
-            sharedMemos.push(memo);
-          }
-        }
-      }
-
-      setMemos(sharedMemos);
-      setFilteredMemos(sharedMemos);
-    } catch (error) {
-      console.error('공유 메모 불러오기 실패:', error);
-      showToast?.('공유 메모를 불러오는데 실패했습니다');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [searchQuery, sharedMemos]);
 
   const handleSelectMemo = (memo) => {
     onSelectMemo(memo);
@@ -356,9 +303,7 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast }) => {
         </SearchContainer>
 
         <MemoList>
-          {loading ? (
-            <LoadingState>메모를 불러오는 중...</LoadingState>
-          ) : filteredMemos.length === 0 ? (
+          {filteredMemos.length === 0 ? (
             <EmptyState>
               <EmptyIcon>📂</EmptyIcon>
               <EmptyText>

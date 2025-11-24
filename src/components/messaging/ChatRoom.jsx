@@ -450,7 +450,7 @@ const EmptyDescription = styled.div`
   line-height: 1.5;
 `;
 
-const ChatRoom = ({ chat, onClose, showToast }) => {
+const ChatRoom = ({ chat, onClose, showToast, memos }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
@@ -816,6 +816,7 @@ const ChatRoom = ({ chat, onClose, showToast }) => {
           onClose={() => setShowSharedMemoSelector(false)}
           onSelectMemo={handleSelectSharedMemo}
           showToast={showToast}
+          allMemos={memos}
         />
       )}
     </FullScreenContainer>,

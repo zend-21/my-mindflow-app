@@ -487,7 +487,7 @@ const FolderSelect = styled.select`
 /* --- 스타일 추가 완료 --- */
 
 
-const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, onUpdateMemoFolder }) => {
+const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, onUpdateMemoFolder, showToast }) => {
     const [editedContent, setEditedContent] = useState('');
     const [isImportant, setIsImportant] = useState(false);
     const [history, setHistory] = useState([]);
@@ -656,10 +656,14 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
         }
     };
 
-    // 공유 버튼 클릭: 방 설정 모달 열기
+    // 공유 버튼 클릭: 공유 폴더로 이동
     const handleShareClick = () => {
-        // 메모 첫 50자를 기본 제목으로 제안
-        setIsRoomSettingsOpen(true);
+        // 메모를 공유 폴더로 이동
+        if (onUpdateMemoFolder) {
+            onUpdateMemoFolder(memo.id, 'shared', true); // savePrevious = true (원래 폴더 정보 저장)
+            setSelectedFolderId('shared'); // UI 업데이트
+            showToast?.('메모가 공유 폴더로 이동되었습니다');
+        }
     };
 
     // 방 설정 완료 후 방 생성 및 협업방 열기

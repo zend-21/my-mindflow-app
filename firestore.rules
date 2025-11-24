@@ -307,5 +307,13 @@ service cloud.firestore {
       allow delete: if isSignedIn() &&
         resource.data.userId == request.auth.uid;
     }
+
+    // ========================================
+    // 사용자 데이터 (User Data) - 새로 추가
+    // ========================================
+    match /users/{userId}/userData/{dataType} {
+      // 읽기/쓰기: 본인만
+      allow read, write: if isSignedIn() && isOwner(userId);
+    }
   }
 }

@@ -298,7 +298,7 @@ const EmptyDescription = styled.div`
   line-height: 1.5;
 `;
 
-const ChatList = ({ showToast }) => {
+const ChatList = ({ showToast, memos }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [chatRooms, setChatRooms] = useState([]);
   const [groupChats, setGroupChats] = useState([]);
@@ -644,6 +644,7 @@ const ChatList = ({ showToast }) => {
           chat={selectedChat}
           onClose={() => setSelectedChat(null)}
           showToast={showToast}
+          memos={memos}
         />
       )}
     </Container>

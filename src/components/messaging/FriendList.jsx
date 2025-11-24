@@ -351,7 +351,7 @@ const AddFriendButton = styled.button`
   }
 `;
 
-const FriendList = ({ showToast }) => {
+const FriendList = ({ showToast, memos }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -661,6 +661,7 @@ const FriendList = ({ showToast }) => {
           chat={selectedChat}
           onClose={() => setSelectedChat(null)}
           showToast={showToast}
+          memos={memos}
         />
       )}
     </Container>
