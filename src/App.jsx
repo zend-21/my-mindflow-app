@@ -54,6 +54,14 @@ import AppRouter from './components/AppRouter.jsx';
 import './utils/createWorkspaceManually'; // 워크스페이스 수동 생성 유틸리티
 import { createWorkspace, checkWorkspaceExists } from './services/workspaceService'; // 자동 워크스페이스 생성
 import Toast from './components/Toast.jsx';
+import PhoneVerification from './components/PhoneVerification.jsx';
+import {
+    findAccountByPhone,
+    findPhoneByFirebaseUID,
+    createMindFlowAccount,
+    linkGoogleToAccount,
+    isLegacyUser
+} from './services/authService';
 
 // ★★★ 스타일 컴포넌트 ★★★
 const fadeIn = keyframes`
@@ -313,6 +321,10 @@ function App() {
     const [isLoading, setIsLoading] = useState(true);
     const [profile, setProfile] = useState(null);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+    // 🔐 휴대폰 인증 관련 상태
+    const [isPhoneVerifying, setIsPhoneVerifying] = useState(false);
+    const [pendingAuthData, setPendingAuthData] = useState(null); // Google 로그인 후 대기 중인 데이터
 
     // ✅ 새로 추가되는 상태들
     const [accessToken, setAccessTokenState] = useState(null);
@@ -1641,7 +1653,7 @@ function App() {
         };
     }, []);
 
-    // ✅ 로그인 성공 시 처리 (기존 handleLoginSuccess를 확장)
+    // ✅ 로그인 성공 시 처리 - 휴대폰 인증 통합
     const handleLoginSuccess = async (response) => {
         try {
             const { accessToken, userInfo, expiresAt } = response;
@@ -1668,11 +1680,58 @@ function App() {
                 firebaseUserId = userInfo.sub || userInfo.id || btoa(userInfo.email).replace(/[^a-zA-Z0-9]/g, '').substring(0, 28);
             }
 
+            // 🔐 휴대폰 인증 플로우 시작
+            console.log('🔐 휴대폰 번호 확인 중...');
+
+            // 1. Firebase UID로 연결된 휴대폰 번호 조회
+            const existingPhone = await findPhoneByFirebaseUID(firebaseUserId);
+
+            if (existingPhone) {
+                // 이미 휴대폰 인증이 완료된 사용자
+                console.log('✅ 기존 인증 완료 사용자:', existingPhone);
+
+                // MindFlow Primary ID로 계속 진행
+                await completeMindFlowLogin(existingPhone, firebaseUserId, accessToken, userInfo, pictureUrl, expiresAt);
+            } else {
+                // 휴대폰 인증이 필요한 사용자
+                console.log('📱 휴대폰 인증 필요');
+
+                // 구 구조 사용자 확인
+                const isLegacy = await isLegacyUser(firebaseUserId);
+
+                if (isLegacy) {
+                    console.log('⚠️ 구 구조 사용자 감지 - 마이그레이션 필요');
+                    showToast('⚠ 계정 업그레이드가 필요합니다. 휴대폰 인증을 진행해주세요.');
+                }
+
+                // 휴대폰 인증 모달 열기
+                setPendingAuthData({
+                    firebaseUserId,
+                    accessToken,
+                    userInfo,
+                    pictureUrl,
+                    expiresAt
+                });
+                setIsPhoneVerifying(true);
+                setIsLoginModalOpen(false);
+            }
+        } catch (error) {
+            console.error('❌ 로그인 처리 중 오류:', error);
+            showToast('⚠ 로그인에 실패했습니다');
+        }
+    };
+
+    // 🔐 MindFlow 로그인 완료 처리 (휴대폰 인증 후 호출)
+    const completeMindFlowLogin = async (phoneNumber, firebaseUserId, accessToken, userInfo, pictureUrl, expiresAt) => {
+        try {
+            console.log('🔐 MindFlow 로그인 완료 처리 시작:', phoneNumber);
+
             // 사용자 프로필 설정
             const profileData = {
                 email: userInfo.email,
                 name: userInfo.name,
-                picture: pictureUrl, // 수정된 pictureUrl 사용
+                picture: pictureUrl,
+                phoneNumber: phoneNumber // Primary ID 추가
             };
 
             // ✅ 기존에 저장된 커스텀 닉네임 및 프로필 사진이 있으면 추가
@@ -1691,15 +1750,16 @@ function App() {
 
             localStorage.setItem('userProfile', JSON.stringify(profileData));
             localStorage.setItem('accessToken', accessToken);
-            localStorage.setItem('tokenExpiresAt', expiresAt.toString()); // 토큰 만료 시간 저장
-            localStorage.setItem('firebaseUserId', firebaseUserId); // 🔥 협업 기능용 사용자 ID 저장
+            localStorage.setItem('tokenExpiresAt', expiresAt.toString());
+            localStorage.setItem('firebaseUserId', firebaseUserId); // 협업 기능용
+            localStorage.setItem('mindflowUserId', phoneNumber); // 🔥 새로운 Primary ID
 
-            console.log('✅ 로그인 완료 - firebaseUserId:', firebaseUserId);
+            console.log('✅ 로그인 완료 - Primary ID:', phoneNumber);
 
             // 📊 Analytics 사용자 ID 및 속성 설정
             try {
                 const { setAnalyticsUserId, setAnalyticsUserProperties, logLoginEvent } = await import('./utils/analyticsUtils.js');
-                setAnalyticsUserId(firebaseUserId);
+                setAnalyticsUserId(phoneNumber); // Primary ID 사용
                 setAnalyticsUserProperties({
                     user_name: userInfo.name,
                     user_email: userInfo.email,
@@ -1709,7 +1769,7 @@ function App() {
                 console.warn('⚠️ Analytics 설정 오류:', analyticsError);
             }
 
-            // 👤 사용자 문서 생성/업데이트 (users 컬렉션)
+            // 👤 사용자 문서 생성/업데이트 (users 컬렉션 - 협업용)
             try {
                 const userRef = doc(db, 'users', firebaseUserId);
                 const userDoc = await getDoc(userRef);
@@ -1718,20 +1778,19 @@ function App() {
                     displayName: userInfo.name,
                     email: userInfo.email,
                     photoURL: pictureUrl,
+                    phoneNumber: phoneNumber,
                     updatedAt: Date.now()
                 };
 
                 if (!userDoc.exists()) {
-                    // 새 사용자 문서 생성
                     await setDoc(userRef, {
                         ...userData,
                         createdAt: Date.now()
                     });
-                    console.log('✅ 사용자 문서 생성 완료');
+                    console.log('✅ 협업용 사용자 문서 생성 완료');
                 } else {
-                    // 기존 사용자 정보 업데이트
                     await updateDoc(userRef, userData);
-                    console.log('✅ 사용자 정보 업데이트 완료');
+                    console.log('✅ 협업용 사용자 정보 업데이트 완료');
                 }
             } catch (userError) {
                 console.error('⚠️ 사용자 문서 생성/업데이트 오류:', userError);
@@ -1749,14 +1808,12 @@ function App() {
                 }
             } catch (workspaceError) {
                 console.error('⚠️ 워크스페이스 생성 오류 (로그인은 계속):', workspaceError);
-                // 워크스페이스 생성 실패해도 로그인은 계속 진행
             }
 
             // GAPI에 토큰 설정
             if (isGapiReady) {
                 console.log('🔑 로그인 성공 - GAPI에 토큰 설정');
                 setAccessToken(accessToken);
-                // 토큰 설정 후 짧은 대기 시간 (GAPI 내부 처리 대기)
                 await new Promise(resolve => setTimeout(resolve, 200));
                 console.log('✅ GAPI 토큰 설정 완료');
             } else {
@@ -1769,6 +1826,47 @@ function App() {
             console.error('로그인 처리 중 오류:', error);
             showToast('⚠ 로그인에 실패했습니다');
         }
+    };
+
+    // 🔐 휴대폰 인증 완료 핸들러
+    const handlePhoneVerified = async ({ phoneNumber, firebaseUID, userInfo }) => {
+        try {
+            console.log('📱 휴대폰 인증 완료:', phoneNumber);
+
+            // 1. 해당 휴대폰 번호로 기존 계정 확인
+            const existingAccount = await findAccountByPhone(phoneNumber);
+
+            if (existingAccount) {
+                // 기존 계정에 Google 로그인 연결
+                console.log('✅ 기존 계정 발견 - Google 로그인 연결');
+                await linkGoogleToAccount(phoneNumber, firebaseUID, userInfo);
+            } else {
+                // 새 계정 생성
+                console.log('🆕 새 계정 생성');
+                await createMindFlowAccount(phoneNumber, firebaseUID, userInfo);
+            }
+
+            // 2. 로그인 완료 처리
+            const { accessToken, pictureUrl, expiresAt } = pendingAuthData;
+            await completeMindFlowLogin(phoneNumber, firebaseUID, accessToken, userInfo, pictureUrl, expiresAt);
+
+            // 3. 상태 정리
+            setIsPhoneVerifying(false);
+            setPendingAuthData(null);
+
+            showToast('✓ 계정 인증이 완료되었습니다');
+        } catch (error) {
+            console.error('❌ 휴대폰 인증 처리 실패:', error);
+            showToast('⚠ 인증 처리에 실패했습니다');
+        }
+    };
+
+    // 🔐 휴대폰 인증 취소 핸들러
+    const handlePhoneCancelled = () => {
+        console.log('📱 휴대폰 인증 취소됨');
+        setIsPhoneVerifying(false);
+        setPendingAuthData(null);
+        showToast('인증이 취소되었습니다');
     };
 
     const handleLoginError = () => {
@@ -2702,6 +2800,15 @@ function App() {
                     calendarSchedules={calendarSchedules}
                     showToast={showToast}
                     onClose={() => setActiveTab('home')}
+                />
+            )}
+
+            {/* 📱 휴대폰 인증 모달 */}
+            {isPhoneVerifying && pendingAuthData && (
+                <PhoneVerification
+                    onVerified={handlePhoneVerified}
+                    onCancel={handlePhoneCancelled}
+                    userInfo={pendingAuthData.userInfo}
                 />
             )}
 

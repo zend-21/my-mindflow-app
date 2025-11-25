@@ -247,5 +247,64 @@ service cloud.firestore {
       // 읽기/쓰기: 본인만
       allow read, write: if isSignedIn() && isOwner(userId);
     }
+
+    // ========================================
+    // 🔐 휴대폰 기반 인증 구조
+    // ========================================
+
+    // MindFlow 사용자 계정 (Primary ID: 휴대폰 번호)
+    match /mindflowUsers/{phoneNumber} {
+      // 생성: 로그인한 사용자만 (본인 계정 생성 시)
+      allow create: if isSignedIn();
+
+      // 읽기: 본인만 또는 연결된 Firebase UID
+      allow read: if isSignedIn() && (
+        // 본인의 여러 로그인 방법 중 하나와 일치
+        request.auth.uid in resource.data.keys('loginMethods').google.firebaseUID ||
+        request.auth.uid in resource.data.keys('loginMethods').kakao.firebaseUID ||
+        request.auth.uid in resource.data.keys('loginMethods').naver.firebaseUID
+      );
+
+      // 수정: 본인만
+      allow update: if isSignedIn() && (
+        request.auth.uid in resource.data.keys('loginMethods').google.firebaseUID ||
+        request.auth.uid in resource.data.keys('loginMethods').kakao.firebaseUID ||
+        request.auth.uid in resource.data.keys('loginMethods').naver.firebaseUID
+      );
+
+      // 삭제: 본인만
+      allow delete: if isSignedIn() && (
+        request.auth.uid in resource.data.keys('loginMethods').google.firebaseUID ||
+        request.auth.uid in resource.data.keys('loginMethods').kakao.firebaseUID ||
+        request.auth.uid in resource.data.keys('loginMethods').naver.firebaseUID
+      );
+
+      // 사용자 데이터 서브컬렉션
+      match /userData/{dataType} {
+        allow read, write: if isSignedIn();
+      }
+    }
+
+    // 휴대폰 번호 -> 사용자 ID 매핑
+    match /phoneToUser/{phoneNumber} {
+      // 생성: 로그인한 사용자만
+      allow create: if isSignedIn();
+      // 읽기: 모든 로그인 사용자 (계정 조회용)
+      allow read: if isSignedIn();
+      // 수정/삭제: 금지 (불변 데이터)
+      allow update, delete: if false;
+    }
+
+    // Firebase UID -> 휴대폰 번호 매핑
+    match /firebaseUIDToPhone/{firebaseUID} {
+      // 생성: 로그인한 사용자만 (본인의 UID)
+      allow create: if isSignedIn() && firebaseUID == request.auth.uid;
+      // 읽기: 본인만
+      allow read: if isSignedIn() && firebaseUID == request.auth.uid;
+      // 수정: 본인만 (로그인 방법 추가 시)
+      allow update: if isSignedIn() && firebaseUID == request.auth.uid;
+      // 삭제: 본인만
+      allow delete: if isSignedIn() && firebaseUID == request.auth.uid;
+    }
   }
 }
