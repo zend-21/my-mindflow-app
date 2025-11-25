@@ -570,7 +570,7 @@ function App() {
     }, []);
 
     // 🔥 Firestore 동기화 훅 사용
-    const userId = localStorage.getItem('firebaseUserId');
+    const userId = localStorage.getItem('mindflowUserId'); // 휴대폰 번호 (Primary ID)
     const isAuthenticated = !!profile;
 
     const {

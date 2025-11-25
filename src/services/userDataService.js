@@ -3,8 +3,10 @@ import { db } from '../firebase/config';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 /**
- * 사용자 데이터 구조:
- * users/{userId}/userData/{dataType}
+ * 🔐 사용자 데이터 구조 (휴대폰 기반 인증)
+ * mindflowUsers/{phoneNumber}/userData/{dataType}
+ *
+ * Primary ID: 휴대폰 번호 (국제 형식, 예: +821012345678)
  *
  * dataType:
  * - memos: 메모 데이터
@@ -25,7 +27,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
  */
 export const fetchMemosFromFirestore = async (userId) => {
   try {
-    const docRef = doc(db, 'users', userId, 'userData', 'memos');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'memos');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -43,7 +45,7 @@ export const fetchMemosFromFirestore = async (userId) => {
  */
 export const saveMemosToFirestore = async (userId, memos) => {
   try {
-    const docRef = doc(db, 'users', userId, 'userData', 'memos');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'memos');
     await setDoc(docRef, {
       items: memos,
       updatedAt: serverTimestamp()
@@ -63,7 +65,7 @@ export const saveMemosToFirestore = async (userId, memos) => {
  */
 export const fetchFoldersFromFirestore = async (userId) => {
   try {
-    const docRef = doc(db, 'users', userId, 'userData', 'folders');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'folders');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -81,7 +83,7 @@ export const fetchFoldersFromFirestore = async (userId) => {
  */
 export const saveFoldersToFirestore = async (userId, folders) => {
   try {
-    const docRef = doc(db, 'users', userId, 'userData', 'folders');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'folders');
     await setDoc(docRef, {
       items: folders,
       updatedAt: serverTimestamp()
@@ -101,7 +103,7 @@ export const saveFoldersToFirestore = async (userId, folders) => {
  */
 export const fetchTrashFromFirestore = async (userId) => {
   try {
-    const docRef = doc(db, 'users', userId, 'userData', 'trash');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'trash');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -130,7 +132,7 @@ export const saveTrashToFirestore = async (userId, trash) => {
       return cleanedItem;
     });
 
-    const docRef = doc(db, 'users', userId, 'userData', 'trash');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'trash');
     await setDoc(docRef, {
       items: cleanedTrash,
       updatedAt: serverTimestamp()
@@ -150,7 +152,7 @@ export const saveTrashToFirestore = async (userId, trash) => {
  */
 export const fetchMacrosFromFirestore = async (userId) => {
   try {
-    const docRef = doc(db, 'users', userId, 'userData', 'macros');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'macros');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -168,7 +170,7 @@ export const fetchMacrosFromFirestore = async (userId) => {
  */
 export const saveMacrosToFirestore = async (userId, macros) => {
   try {
-    const docRef = doc(db, 'users', userId, 'userData', 'macros');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'macros');
     await setDoc(docRef, {
       items: macros,
       updatedAt: serverTimestamp()
@@ -188,7 +190,7 @@ export const saveMacrosToFirestore = async (userId, macros) => {
  */
 export const fetchCalendarFromFirestore = async (userId) => {
   try {
-    const docRef = doc(db, 'users', userId, 'userData', 'calendar');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'calendar');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -239,7 +241,7 @@ export const saveCalendarToFirestore = async (userId, schedules) => {
       }
     });
 
-    const docRef = doc(db, 'users', userId, 'userData', 'calendar');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'calendar');
     await setDoc(docRef, {
       schedules: cleanedSchedules,
       updatedAt: serverTimestamp()
@@ -259,7 +261,7 @@ export const saveCalendarToFirestore = async (userId, schedules) => {
  */
 export const fetchActivitiesFromFirestore = async (userId) => {
   try {
-    const docRef = doc(db, 'users', userId, 'userData', 'activities');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'activities');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -277,7 +279,7 @@ export const fetchActivitiesFromFirestore = async (userId) => {
  */
 export const saveActivitiesToFirestore = async (userId, activities) => {
   try {
-    const docRef = doc(db, 'users', userId, 'userData', 'activities');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'activities');
     await setDoc(docRef, {
       items: activities,
       updatedAt: serverTimestamp()
@@ -297,7 +299,7 @@ export const saveActivitiesToFirestore = async (userId, activities) => {
  */
 export const fetchSettingsFromFirestore = async (userId) => {
   try {
-    const docRef = doc(db, 'users', userId, 'userData', 'settings');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
@@ -322,7 +324,7 @@ export const fetchSettingsFromFirestore = async (userId) => {
  */
 export const saveSettingsToFirestore = async (userId, settings) => {
   try {
-    const docRef = doc(db, 'users', userId, 'userData', 'settings');
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
     await setDoc(docRef, {
       ...settings,
       updatedAt: serverTimestamp()
