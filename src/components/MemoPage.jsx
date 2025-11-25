@@ -166,6 +166,7 @@ const ActionButton = styled.button`
             case 'delete': return 'rgba(255, 107, 107, 0.1)';
             case 'importance': return 'rgba(255, 193, 7, 0.1)';
             case 'stealth': return 'rgba(96, 165, 250, 0.1)';
+            case 'share': return 'rgba(96, 165, 250, 0.1)';
             default: return 'rgba(255, 255, 255, 0.05)';
         }
     }};
@@ -174,6 +175,7 @@ const ActionButton = styled.button`
             case 'delete': return 'rgba(255, 107, 107, 0.3)';
             case 'importance': return 'rgba(255, 193, 7, 0.3)';
             case 'stealth': return 'rgba(96, 165, 250, 0.3)';
+            case 'share': return 'rgba(96, 165, 250, 0.3)';
             default: return 'rgba(255, 255, 255, 0.15)';
         }
     }};
@@ -182,6 +184,7 @@ const ActionButton = styled.button`
             case 'delete': return '#ff6b6b';
             case 'importance': return '#ffc107';
             case 'stealth': return '#60a5fa';
+            case 'share': return '#60a5fa';
             default: return '#e0e0e0';
         }
     }};
@@ -200,6 +203,7 @@ const ActionButton = styled.button`
                 case 'delete': return 'rgba(255, 107, 107, 0.2)';
                 case 'importance': return 'rgba(255, 193, 7, 0.2)';
                 case 'stealth': return 'rgba(96, 165, 250, 0.2)';
+                case 'share': return 'rgba(96, 165, 250, 0.2)';
                 default: return 'rgba(255, 255, 255, 0.08)';
             }
         }};
@@ -208,6 +212,7 @@ const ActionButton = styled.button`
                 case 'delete': return 'rgba(255, 107, 107, 0.5)';
                 case 'importance': return 'rgba(255, 193, 7, 0.5)';
                 case 'stealth': return 'rgba(96, 165, 250, 0.5)';
+                case 'share': return 'rgba(96, 165, 250, 0.5)';
                 default: return 'rgba(255, 255, 255, 0.25)';
             }
         }};
@@ -1245,6 +1250,8 @@ const MemoPage = ({
     onToggleSelectedMemosStealth,
     onRequestDeleteSelectedMemos,
     onUpdateMemoFolder,
+    onUpdateMemoFolderBatch,
+    onRequestShareSelectedMemos,
     onRequestUnshareSelectedMemos
 }) => {
     const [layoutView, setLayoutView] = useLocalStorage('memoLayoutView', 'list');
@@ -1289,20 +1296,28 @@ const MemoPage = ({
     const [moveConfirmModal, setMoveConfirmModal] = useState(null); // null | { action: 'move' | 'remove', count: number }
 
     // 공유 상태 확인 (메모 목록이 변경될 때)
+    // ⚠️ 참고용 협업 기능 - 현재 사용 안 함
     useEffect(() => {
         const checkSharedMemos = async () => {
             if (!memos || memos.length === 0) return;
 
             const sharedInfo = new Map();
             for (const memo of memos) {
-                try {
-                    const result = await checkMemoSharedStatus(memo.id);
-                    if (result.isShared && result.room) {
-                        sharedInfo.set(memo.id, { isPublic: result.room.isPublic === true });
-                    }
-                } catch (e) {
-                    // 에러 무시
+                // folderId가 'shared'인 메모는 무조건 공유 메모로 인식
+                if (memo.folderId === 'shared') {
+                    sharedInfo.set(memo.id, { isPublic: false });
                 }
+                // 기존 로직: Firestore 협업방 확인 - 비활성화
+                // else {
+                //     try {
+                //         const result = await checkMemoSharedStatus(memo.id);
+                //         if (result.isShared && result.room) {
+                //             sharedInfo.set(memo.id, { isPublic: result.room.isPublic === true });
+                //         }
+                //     } catch (e) {
+                //         // 에러 무시
+                //     }
+                // }
             }
             setSharedMemoInfo(sharedInfo);
         };
@@ -1435,18 +1450,18 @@ const MemoPage = ({
         if (!moveMemosModal?.folder || selectedMemosForMove.size === 0) return;
 
         const folderId = moveMemosModal.folder.id;
+        const memoIds = Array.from(selectedMemosForMove);
 
-        selectedMemosForMove.forEach(memoId => {
-            if (onUpdateMemoFolder) {
-                if (moveModalTab === 'outside') {
-                    // 미분류 메모 -> 폴더로 이동
-                    onUpdateMemoFolder(memoId, folderId);
-                } else {
-                    // 폴더 내 메모 -> 미분류로 이동
-                    onUpdateMemoFolder(memoId, null);
-                }
+        // 배치 업데이트 함수 사용 (여러 메모를 한 번에 처리)
+        if (onUpdateMemoFolderBatch) {
+            if (moveModalTab === 'outside') {
+                // 미분류 메모 -> 폴더로 이동
+                onUpdateMemoFolderBatch(memoIds, folderId);
+            } else {
+                // 폴더 내 메모 -> 미분류로 이동
+                onUpdateMemoFolderBatch(memoIds, null);
             }
-        });
+        }
 
         setMoveConfirmModal(null);
         closeMoveMemosModal();
@@ -1598,16 +1613,6 @@ const MemoPage = ({
                             {selectedCount}개 선택됨
                         </SelectionInfo>
                         <SelectionButtonsContainer>
-                            {/* 공유 폴더일 때만 공유해제 버튼 표시 */}
-                            {activeFolder === 'shared' && (
-                                <SelectionButton
-                                    $variant="unshare"
-                                    disabled={selectedCount === 0}
-                                    onClick={onRequestUnshareSelectedMemos}
-                                >
-                                    공유해제
-                                </SelectionButton>
-                            )}
                             <SelectionButton onClick={() => {
                                 // 전체선택/해제 로직: SecretPage와 동일
                                 const allFilteredIds = filteredAndSortedMemos.map(memo => memo.id);
@@ -1640,37 +1645,79 @@ const MemoPage = ({
                     </SelectionModeBar>
 
                     <ActionButtonsBar>
-                        <ActionButton
-                            $type="stealth"
-                            onClick={onToggleSelectedMemosStealth}
-                            disabled={selectedCount === 0}
-                        >
-                            {(() => {
-                                if (selectedCount === 0) return '스텔스 설정/해제';
-                                const selectedMemos = memos.filter(memo => selectedMemoIds.has(memo.id));
-                                const allStealth = selectedMemos.every(memo => memo.isStealth);
-                                return allStealth ? '스텔스 해제' : '스텔스 설정';
-                            })()}
-                        </ActionButton>
-                        <ActionButton
-                            $type="importance"
-                            onClick={onToggleSelectedMemosImportance}
-                            disabled={selectedCount === 0}
-                        >
-                            {(() => {
-                                if (selectedCount === 0) return '중요도 지정/해제';
-                                const selectedMemos = memos.filter(memo => selectedMemoIds.has(memo.id));
-                                const allImportant = selectedMemos.every(memo => memo.isImportant);
-                                return allImportant ? '중요도 해제' : '중요도 지정';
-                            })()}
-                        </ActionButton>
-                        <ActionButton
-                            $type="delete"
-                            onClick={onRequestDeleteSelectedMemos}
-                            disabled={selectedCount === 0}
-                        >
-                            삭제
-                        </ActionButton>
+                        {/* 공유 폴더 내부일 때 */}
+                        {activeFolder === 'shared' ? (
+                            <>
+                                <ActionButton
+                                    $type="stealth"
+                                    onClick={onRequestUnshareSelectedMemos}
+                                    disabled={selectedCount === 0}
+                                >
+                                    공유 해제
+                                </ActionButton>
+                                <ActionButton
+                                    $type="importance"
+                                    onClick={onToggleSelectedMemosImportance}
+                                    disabled={selectedCount === 0}
+                                >
+                                    {(() => {
+                                        if (selectedCount === 0) return '중요도 지정/해제';
+                                        const selectedMemos = memos.filter(memo => selectedMemoIds.has(memo.id));
+                                        const allImportant = selectedMemos.every(memo => memo.isImportant);
+                                        return allImportant ? '중요도 해제' : '중요도 지정';
+                                    })()}
+                                </ActionButton>
+                                <ActionButton
+                                    $type="delete"
+                                    onClick={onRequestDeleteSelectedMemos}
+                                    disabled={selectedCount === 0}
+                                >
+                                    삭제
+                                </ActionButton>
+                            </>
+                        ) : (
+                            /* 메인페이지 또는 일반 폴더 */
+                            <>
+                                {/* <ActionButton
+                                    $type="stealth"
+                                    onClick={onToggleSelectedMemosStealth}
+                                    disabled={selectedCount === 0}
+                                >
+                                    {(() => {
+                                        if (selectedCount === 0) return '스텔스 설정/해제';
+                                        const selectedMemos = memos.filter(memo => selectedMemoIds.has(memo.id));
+                                        const allStealth = selectedMemos.every(memo => memo.isStealth);
+                                        return allStealth ? '스텔스 해제' : '스텔스 설정';
+                                    })()}
+                                </ActionButton> */}
+                                <ActionButton
+                                    $type="share"
+                                    onClick={onRequestShareSelectedMemos}
+                                    disabled={selectedCount === 0}
+                                >
+                                    공유 폴더로
+                                </ActionButton>
+                                <ActionButton
+                                    $type="importance"
+                                    onClick={onToggleSelectedMemosImportance}
+                                    disabled={selectedCount === 0}
+                                >
+                                    {(() => {
+                                        if (selectedCount === 0) return '중요도 지정/해제';
+                                        const selectedMemos = memos.filter(memo => selectedMemoIds.has(memo.id));
+                                        const allImportant = selectedMemos.every(memo => memo.isImportant);
+                                        return allImportant ? '중요도 해제' : '중요도 지정';
+                                    })()}
+                                </ActionButton>
+                                <ActionButton
+                                    $type="delete"
+                                    onClick={onRequestDeleteSelectedMemos}
+                                    disabled={selectedCount === 0}
+                                >
+                                    삭제
+                                </ActionButton>
+                            </>
+                        )}
                     </ActionButtonsBar>
                 </>
             ) : (
@@ -1921,10 +1968,10 @@ const MemoPage = ({
                             </AddFolderCard>
                         </FolderGridContainer>
 
-                        {/* 구분선 - 미분류 메모가 있을 때만 표시 */}
+                        {/* 구분선 - 미분류 문서가 있을 때만 표시 */}
                         {filteredAndSortedMemos.length > 0 && (
                             <>
-                                <SectionDivider>미분류 메모</SectionDivider>
+                                <SectionDivider>미분류 문서</SectionDivider>
 
                                 {/* 정렬 버튼 */}
                                 <SortBar>
@@ -1964,7 +2011,8 @@ const MemoPage = ({
                         if (!memo || !memo.id) {
                             return null;
                         }
-                        const isNew = (Date.now() - memo.date) < (24 * 60 * 60 * 1000);
+                        // createdAt이 24시간 이내인 경우만 NEW 뱃지 표시
+                        const isNew = memo.createdAt && (Date.now() - memo.createdAt) < (24 * 60 * 60 * 1000);
                         const isSelected = selectedMemoIds.has(memo.id);
                         
                         return (
@@ -2076,7 +2124,7 @@ const MemoPage = ({
                     })
                 ) : (
                     <EmptyMessage>
-                        {searchQuery ? '검색 결과가 없습니다.' : '작성된 메모가 없습니다.'}
+                        {searchQuery ? '검색 결과가 없습니다.' : '작성된 문서가 없습니다.'}
                     </EmptyMessage>
                 )}
                 </MemoGridWrapper>
@@ -2142,10 +2190,11 @@ const MemoPage = ({
 
                         <div style={{ color: '#e0e0e0', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
                             <p style={{ margin: '0 0 12px 0' }}>
-                                <strong>"{deleteFolderModal.folder.name}"</strong> 폴더를 삭제하시겠습니까?
+                                <strong>'{deleteFolderModal.folder.name}'</strong> 폴더를 삭제하시겠습니까?
                             </p>
-                            <p style={{ margin: '0', color: '#4a90e2' }}>
-                                ⚠️ 폴더 내부의 메모들은 삭제되지 않고 미분류 메모로 자동 이동됩니다.
+                            <p style={{ margin: '0', color: '#4a90e2', display: 'flex', alignItems: 'flex-start', gap: '6px' }}>
+                                <span style={{ flexShrink: 0 }}>ℹ️</span>
+                                <span>폴더 내부의 문서들은 삭제되지 않고 미분류 문서로 이동됩니다.</span>
                             </p>
                         </div>
 
@@ -2166,20 +2215,15 @@ const MemoPage = ({
                 <FolderModalOverlay onClick={() => setMoveConfirmModal(null)} style={{ zIndex: 10002 }}>
                     <FolderModalBox onClick={(e) => e.stopPropagation()}>
                         <FolderModalTitle>
-                            {moveConfirmModal.action === 'move' ? '메모 이동' : '폴더에서 제거'}
+                            {moveConfirmModal.action === 'move' ? '문서 이동' : '폴더에서 제거'}
                         </FolderModalTitle>
 
                         <div style={{ color: '#e0e0e0', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
-                            <p style={{ margin: '0 0 12px 0' }}>
+                            <p style={{ margin: '0' }}>
                                 {moveConfirmModal.action === 'move'
-                                    ? `선택한 ${moveConfirmModal.count}개의 메모를 "${moveMemosModal?.folder.name}" 폴더로 이동하시겠습니까?`
-                                    : `선택한 ${moveConfirmModal.count}개의 메모를 폴더에서 제거하시겠습니까?`}
+                                    ? `선택한 ${moveConfirmModal.count}개의 문서를 "${moveMemosModal?.folder.name}" 폴더로 이동하시겠습니까?`
+                                    : `선택한 ${moveConfirmModal.count}개의 문서를 미분류 문서로 이동할까요?`}
                             </p>
-                            {moveConfirmModal.action === 'remove' && (
-                                <p style={{ margin: '0', color: '#4a90e2' }}>
-                                    ⚠️ 메모는 삭제되지 않고 미분류 메모로 이동됩니다.
-                                </p>
-                            )}
                         </div>
 
                         <FolderModalButtons>
@@ -2187,7 +2231,7 @@ const MemoPage = ({
                                 취소
                             </FolderModalButton>
                             <FolderModalButton $variant="confirm" onClick={handleConfirmMove}>
-                                {moveConfirmModal.action === 'move' ? '이동' : '제거'}
+                                이동
                             </FolderModalButton>
                         </FolderModalButtons>
                     </FolderModalBox>
@@ -2199,7 +2243,7 @@ const MemoPage = ({
                 <MemoSelectModalOverlay>
                     <MemoSelectHeader>
                         <MemoSelectTitle>
-                            {moveMemosModal.folder.icon} "{moveMemosModal.folder.name}" 메모 이동
+                            {moveMemosModal.folder.icon} "{moveMemosModal.folder.name}" 문서 이동
                         </MemoSelectTitle>
                         <MemoSelectCloseBtn onClick={closeMoveMemosModal}>×</MemoSelectCloseBtn>
                     </MemoSelectHeader>
@@ -2213,7 +2257,7 @@ const MemoPage = ({
                                 setSelectedMemosForMove(new Set());
                             }}
                         >
-                            미분류 메모
+                            미분류 문서
                         </Tab>
                         <Tab
                             $active={moveModalTab === 'inside'}
@@ -2222,7 +2266,7 @@ const MemoPage = ({
                                 setSelectedMemosForMove(new Set());
                             }}
                         >
-                            폴더 내 메모
+                            폴더 내 문서
                         </Tab>
                     </TabContainer>
 
@@ -2258,7 +2302,7 @@ const MemoPage = ({
                             if (targetMemos.length === 0) {
                                 return (
                                     <MemoSelectInfo>
-                                        {moveModalTab === 'outside' ? '미분류 메모가 없습니다.' : '폴더 내 메모가 없습니다.'}
+                                        {moveModalTab === 'outside' ? '미분류 문서가 없습니다.' : '폴더 내 문서가 없습니다.'}
                                     </MemoSelectInfo>
                                 );
                             }

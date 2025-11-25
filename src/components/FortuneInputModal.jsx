@@ -192,7 +192,9 @@ const TimeInputGroup = styled.div`
 const ButtonGroup = styled.div`
     display: flex;
     gap: 12px;
-    margin-top: 20px;
+    padding: 20px 24px;
+    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 const Button = styled.button`
@@ -1105,80 +1107,82 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                     </InfoText>
                                 )}
                             </div>
-
-                            <ButtonGroup>
-                                <Button onClick={onClose}>취소</Button>
-                                <Button $primary onClick={handleNext}>
-                                    다음
-                                </Button>
-                            </ButtonGroup>
                         </InputSection>
                     )}
 
                     {step === 'confirm' && (
-                        <>
-                            <ConfirmSection>
-                                <ConfirmTitle>운세 프로필 정보</ConfirmTitle>
+                        <ConfirmSection>
+                            <ConfirmTitle>운세 프로필 정보</ConfirmTitle>
 
-                                <ConfirmItem>
-                                    <ConfirmLabel>이름</ConfirmLabel>
-                                    <ConfirmValue>{userName}</ConfirmValue>
-                                </ConfirmItem>
+                            <ConfirmItem>
+                                <ConfirmLabel>이름</ConfirmLabel>
+                                <ConfirmValue>{userName}</ConfirmValue>
+                            </ConfirmItem>
 
+                            <ConfirmItem>
+                                <ConfirmLabel>생년월일 (양력)</ConfirmLabel>
+                                <ConfirmValue>
+                                    {birthYear}년 {birthMonth}월 {birthDay}일
+                                </ConfirmValue>
+                            </ConfirmItem>
+
+                            {lunarDate && (
                                 <ConfirmItem>
-                                    <ConfirmLabel>생년월일 (양력)</ConfirmLabel>
-                                    <ConfirmValue>
-                                        {birthYear}년 {birthMonth}월 {birthDay}일
+                                    <ConfirmLabel>음력</ConfirmLabel>
+                                    <ConfirmValue style={{ fontSize: '13px', color: '#667eea' }}>
+                                        {(() => {
+                                            // 음력 날짜 문자열에서 연도 추출 (예: "1969년 12월 17일" -> 1969)
+                                            const yearMatch = lunarDate.match(/(\d{4})년/);
+                                            const lunarYear = yearMatch ? parseInt(yearMatch[1]) : birthYear;
+                                            return `(${calculateZodiacAnimal(lunarYear)}띠)`;
+                                        })()} {lunarDate}
                                     </ConfirmValue>
                                 </ConfirmItem>
+                            )}
 
-                                {lunarDate && (
-                                    <ConfirmItem>
-                                        <ConfirmLabel>음력</ConfirmLabel>
-                                        <ConfirmValue style={{ fontSize: '13px', color: '#667eea' }}>
-                                            {(() => {
-                                                // 음력 날짜 문자열에서 연도 추출 (예: "1969년 12월 17일" -> 1969)
-                                                const yearMatch = lunarDate.match(/(\d{4})년/);
-                                                const lunarYear = yearMatch ? parseInt(yearMatch[1]) : birthYear;
-                                                return `(${calculateZodiacAnimal(lunarYear)}띠)`;
-                                            })()} {lunarDate}
-                                        </ConfirmValue>
-                                    </ConfirmItem>
-                                )}
+                            <ConfirmItem>
+                                <ConfirmLabel>성별</ConfirmLabel>
+                                <ConfirmValue>{gender}</ConfirmValue>
+                            </ConfirmItem>
 
-                                <ConfirmItem>
-                                    <ConfirmLabel>성별</ConfirmLabel>
-                                    <ConfirmValue>{gender}</ConfirmValue>
-                                </ConfirmItem>
+                            <ConfirmItem>
+                                <ConfirmLabel>출생 시간</ConfirmLabel>
+                                <ConfirmValue>
+                                    {birthHour && birthMinute
+                                        ? `${birthHour}시 ${birthMinute}분`
+                                        : '선택하지 않음'}
+                                </ConfirmValue>
+                            </ConfirmItem>
 
-                                <ConfirmItem>
-                                    <ConfirmLabel>출생 시간</ConfirmLabel>
-                                    <ConfirmValue>
-                                        {birthHour && birthMinute
-                                            ? `${birthHour}시 ${birthMinute}분`
-                                            : '선택하지 않음'}
-                                    </ConfirmValue>
-                                </ConfirmItem>
-
-                                <ConfirmItem>
-                                    <ConfirmLabel>출생 장소</ConfirmLabel>
-                                    <ConfirmValue>
-                                        {country && city
-                                            ? `${country}, ${city}`
-                                            : '선택하지 않음'}
-                                    </ConfirmValue>
-                                </ConfirmItem>
-                            </ConfirmSection>
-
-                            <ButtonGroup>
-                                <Button onClick={handleEdit}>수정하기</Button>
-                                <Button $primary onClick={handleSubmit}>
-                                    확인
-                                </Button>
-                            </ButtonGroup>
-                        </>
+                            <ConfirmItem>
+                                <ConfirmLabel>출생 장소</ConfirmLabel>
+                                <ConfirmValue>
+                                    {country && city
+                                        ? `${country}, ${city}`
+                                        : '선택하지 않음'}
+                                </ConfirmValue>
+                            </ConfirmItem>
+                        </ConfirmSection>
                     )}
                 </Content>
+
+                <ButtonGroup>
+                    {step === 'input' ? (
+                        <>
+                            <Button onClick={onClose}>취소</Button>
+                            <Button $primary onClick={handleNext}>
+                                다음
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Button onClick={handleEdit}>수정하기</Button>
+                            <Button $primary onClick={handleSubmit}>
+                                확인
+                            </Button>
+                        </>
+                    )}
+                </ButtonGroup>
             </Container>
 
             {/* 음력 경고 모달 */}

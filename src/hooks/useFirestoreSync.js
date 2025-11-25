@@ -43,6 +43,11 @@ export const useFirestoreSync = (userId, enabled = true) => {
   const [migrated, setMigrated] = useState(false);
   const migrationRef = useRef(false);
 
+  // userId 변경 시 migrationRef 초기화
+  useEffect(() => {
+    migrationRef.current = false;
+  }, [userId]);
+
   // 초기 데이터 로드
   useEffect(() => {
     if (!userId || !enabled || migrationRef.current) return;

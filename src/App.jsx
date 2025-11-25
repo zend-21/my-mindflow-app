@@ -13,7 +13,7 @@ import { backupToGoogleDrive } from './utils/googleDriveBackup';
 import { DndContext, closestCenter, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useLocalStorage } from './hooks/useLocalStorage';
+import { useFirestoreSync } from './hooks/useFirestoreSync';
 import { exportData, importData } from './utils/dataManager';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -43,7 +43,7 @@ import FortuneFlow from './components/FortuneFlow.jsx';
 import ProfilePage from './components/ProfilePage.jsx';
 import Timer from './components/Timer.jsx';
 import MacroModal from './components/MacroModal.jsx';
-import { TrashProvider } from './contexts/TrashContext';
+import { TrashProvider, useTrashContext } from './contexts/TrashContext';
 import TrashPage from './components/TrashPage.jsx';
 import AppContent from './components/AppContent.jsx';
 import SecretPage from './components/secret/SecretPage.jsx';
@@ -53,9 +53,9 @@ import ChatRoom from './components/messaging/ChatRoom.jsx';
 import AppRouter from './components/AppRouter.jsx';
 import './utils/createWorkspaceManually'; // 워크스페이스 수동 생성 유틸리티
 import { createWorkspace, checkWorkspaceExists } from './services/workspaceService'; // 자동 워크스페이스 생성
-import CollaborationRoom from './components/collaboration/CollaborationRoom.jsx'; // 협업방 컴포넌트
+import Toast from './components/Toast.jsx';
 
-// ★★★ 토스트 메시지 스타일 ★★★
+// ★★★ 스타일 컴포넌트 ★★★
 const fadeIn = keyframes`
     from { opacity: 0; }
     to { opacity: 1; }
@@ -67,11 +67,6 @@ const MainContent = styled.main`
   justify-content: center;
   align-items: center;
   height: 100vh;
-`;
-
-const slideUp = keyframes`
-    from { transform: translateY(20px); opacity: 0; }
-    to { transform: translateY(0); opacity: 1; }
 `;
 
 const PullToSyncIndicator = styled.div`
@@ -131,34 +126,6 @@ const SyncSpinner = styled.div`
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
-`;
-
-const ToastOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 12000;
-  background: rgba(0, 0, 0, 0.2);
-  animation: ${fadeIn} 0.2s ease-out;
-`;
-
-const ToastBox = styled.div`
-  background: rgba(0, 0, 0, 0.9); /* 더 어둡게 */
-  color: white;
-  padding: 24px 32px; /* 더 크게 */
-  border-radius: 12px;
-  font-size: 18px; /* 더 크게 */
-  font-weight: 600; /* 굵게 */
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4); /* 더 진한 그림자 */
-  animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
-  text-align: center;
-  min-width: 200px; /* 최소 너비 */
-  z-index: 12001; /* z-index 더 높게 */
 `;
 
 const Screen = styled.div`
@@ -363,11 +330,6 @@ function App() {
     const [restoreType, setRestoreType] = useState('phone'); // 'phone' or 'google'
     const [pendingRestoreFile, setPendingRestoreFile] = useState(null);
     const [isUnshareConfirmOpen, setIsUnshareConfirmOpen] = useState(false);
-
-    // 협업방 상태
-    const [isCollaborationRoomOpen, setIsCollaborationRoomOpen] = useState(false);
-    const [selectedRoomId, setSelectedRoomId] = useState(null);
-    const [previousTab, setPreviousTab] = useState(null); // 방 입장 전 탭 저장
 
     const [isDragging, setIsDragging] = useState(false);
     const pullStartTime = useRef(0);
@@ -595,12 +557,41 @@ function App() {
         window.location.reload();
     }, []);
 
-    const [widgets, setWidgets] = useLocalStorage('widgets_shared', ['StatsGrid', 'QuickActions', 'RecentActivity']);
-    const [memos, setMemos] = useLocalStorage('memos_shared', []);
-    const [recentActivities, setRecentActivities] = useLocalStorage('recentActivities_shared', []);
-    const [calendarSchedules, setCalendarSchedules] = useLocalStorage('calendarSchedules_shared', {});
-    const [displayCount, setDisplayCount] = useLocalStorage('displayCount_shared', 5);
-    
+    // 🔥 Firestore 동기화 훅 사용
+    const userId = localStorage.getItem('firebaseUserId');
+    const isAuthenticated = !!profile;
+
+    const {
+        loading: dataLoading,
+        memos,
+        folders,
+        trash,
+        macros,
+        calendar: calendarSchedules,
+        activities: recentActivities,
+        settings,
+        syncMemos,
+        syncFolders,
+        syncTrash,
+        syncMacros,
+        syncCalendar,
+        syncActivities,
+        syncSettings,
+        saveImmediately
+    } = useFirestoreSync(userId, isAuthenticated);
+
+    // settings에서 개별 값 추출
+    const widgets = settings.widgets;
+    const displayCount = settings.displayCount;
+
+    // displayCount 업데이트 wrapper 함수
+    const setDisplayCount = (newCount) => {
+        syncSettings({
+            ...settings,
+            displayCount: newCount
+        });
+    };
+
     const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
     const contentAreaRef = useRef(null);
     
@@ -635,34 +626,32 @@ function App() {
 
             const isEditingExisting = !!calendarSchedules[key];
 
-            setCalendarSchedules(prev => {
-                const copy = { ...prev };
+            const copy = { ...calendarSchedules };
 
-                if (!text || text.trim() === "") {
-                    // 텍스트가 비어있으면 text만 삭제하되, alarm이 있으면 엔트리 유지
-                    if (copy[key]) {
-                        if (copy[key].alarm && copy[key].alarm.registeredAlarms && copy[key].alarm.registeredAlarms.length > 0) {
-                            // 알람이 있으면 text만 빈 문자열로
-                            copy[key] = {
-                                ...copy[key],
-                                text: '',
-                                updatedAt: now
-                            };
-                        } else {
-                            // 알람도 없으면 전체 삭제
-                            delete copy[key];
-                        }
+            if (!text || text.trim() === "") {
+                // 텍스트가 비어있으면 text만 삭제하되, alarm이 있으면 엔트리 유지
+                if (copy[key]) {
+                    if (copy[key].alarm && copy[key].alarm.registeredAlarms && copy[key].alarm.registeredAlarms.length > 0) {
+                        // 알람이 있으면 text만 빈 문자열로
+                        copy[key] = {
+                            ...copy[key],
+                            text: '',
+                            updatedAt: now
+                        };
+                    } else {
+                        // 알람도 없으면 전체 삭제
+                        delete copy[key];
                     }
-                } else {
-                    copy[key] = {
-                        text,
-                        createdAt: copy[key]?.createdAt ?? now,
-                        updatedAt: now,
-                        alarm: copy[key]?.alarm, // 기존 알람 정보 보존
-                    };
                 }
-                return copy;
-            });
+            } else {
+                copy[key] = {
+                    text,
+                    createdAt: copy[key]?.createdAt ?? now,
+                    updatedAt: now,
+                    alarm: copy[key]?.alarm, // 기존 알람 정보 보존
+                };
+            }
+            syncCalendar(copy);
 
             if (!text || text.trim() === "") {
                 addActivity('스케줄 삭제', `${key}`);
@@ -711,25 +700,23 @@ function App() {
 
         const formattedDescription = `${type} - ${trimmedDescription}`;
 
-        setRecentActivities(prevActivities => {
-            const now = Date.now();
-            const newActivity = {
-                id: now, 
-                memoId: memoId,
-                type,
-                description: formattedDescription,
-                date: new Date(now).toLocaleString('ko-KR', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                })
-            };
-            const updatedActivities = [newActivity, ...prevActivities];
-            return updatedActivities.slice(0, 15);
-        });
+        const now = Date.now();
+        const newActivity = {
+            id: now,
+            memoId: memoId,
+            type,
+            description: formattedDescription,
+            date: new Date(now).toLocaleString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            })
+        };
+        const updatedActivities = [newActivity, ...recentActivities];
+        syncActivities(updatedActivities.slice(0, 15));
     };
     
     const [isNewMemoModalOpen, setIsNewMemoModalOpen] = useState(false);
@@ -754,34 +741,32 @@ function App() {
 
     // 알람 비활성화 처리 (일반 알람이 울린 후)
     const handleAlarmDismissed = (alarm) => {
-        setCalendarSchedules(prevSchedules => {
-            const updatedSchedules = { ...prevSchedules };
+        const updatedSchedules = { ...calendarSchedules };
 
-            // 알람이 속한 스케줄 찾기
-            Object.keys(updatedSchedules).forEach(dateKey => {
-                const schedule = updatedSchedules[dateKey];
-                if (schedule.alarm && schedule.alarm.registeredAlarms) {
-                    const alarmIndex = schedule.alarm.registeredAlarms.findIndex(a => a.id === alarm.id);
-                    if (alarmIndex !== -1) {
-                        // 알람 비활성화 및 비활성화 시간 기록
-                        updatedSchedules[dateKey] = {
-                            ...schedule,
-                            alarm: {
-                                ...schedule.alarm,
-                                registeredAlarms: schedule.alarm.registeredAlarms.map((a, idx) =>
-                                    idx === alarmIndex
-                                        ? { ...a, enabled: false, disabledAt: Date.now() }
-                                        : a
-                                )
-                            }
-                        };
-                        console.log(`🔕 알람 비활성화: ${alarm.title || alarm.id}`);
-                    }
+        // 알람이 속한 스케줄 찾기
+        Object.keys(updatedSchedules).forEach(dateKey => {
+            const schedule = updatedSchedules[dateKey];
+            if (schedule.alarm && schedule.alarm.registeredAlarms) {
+                const alarmIndex = schedule.alarm.registeredAlarms.findIndex(a => a.id === alarm.id);
+                if (alarmIndex !== -1) {
+                    // 알람 비활성화 및 비활성화 시간 기록
+                    updatedSchedules[dateKey] = {
+                        ...schedule,
+                        alarm: {
+                            ...schedule.alarm,
+                            registeredAlarms: schedule.alarm.registeredAlarms.map((a, idx) =>
+                                idx === alarmIndex
+                                    ? { ...a, enabled: false, disabledAt: Date.now() }
+                                    : a
+                            )
+                        }
+                    };
+                    console.log(`🔕 알람 비활성화: ${alarm.title || alarm.id}`);
                 }
-            });
-
-            return updatedSchedules;
+            }
         });
+
+        syncCalendar(updatedSchedules);
     };
 
     // 비활성화된 알람 자동 삭제 (7일 후)
@@ -792,43 +777,40 @@ function App() {
             const now = Date.now();
             let deletedCount = 0;
 
-            setCalendarSchedules(prevSchedules => {
-                const updatedSchedules = { ...prevSchedules };
+            const updatedSchedules = { ...calendarSchedules };
 
-                Object.keys(updatedSchedules).forEach(dateKey => {
-                    const schedule = updatedSchedules[dateKey];
-                    if (schedule.alarm && schedule.alarm.registeredAlarms) {
-                        const beforeCount = schedule.alarm.registeredAlarms.length;
+            Object.keys(updatedSchedules).forEach(dateKey => {
+                const schedule = updatedSchedules[dateKey];
+                if (schedule.alarm && schedule.alarm.registeredAlarms) {
+                    const beforeCount = schedule.alarm.registeredAlarms.length;
 
-                        // 기념일이 아니고 비활성화된 지 7일이 지난 알람 삭제
-                        const filteredAlarms = schedule.alarm.registeredAlarms.filter(alarm => {
-                            if (alarm.isAnniversary) return true; // 기념일 알람은 유지
-                            if (alarm.enabled !== false) return true; // 활성 알람은 유지
-                            if (!alarm.disabledAt) return true; // 비활성화 시간이 없으면 유지
+                    // 기념일이 아니고 비활성화된 지 7일이 지난 알람 삭제
+                    const filteredAlarms = schedule.alarm.registeredAlarms.filter(alarm => {
+                        if (alarm.isAnniversary) return true; // 기념일 알람은 유지
+                        if (alarm.enabled !== false) return true; // 활성 알람은 유지
+                        if (!alarm.disabledAt) return true; // 비활성화 시간이 없으면 유지
 
-                            const daysSinceDisabled = (now - alarm.disabledAt) / (1000 * 60 * 60 * 24);
-                            return daysSinceDisabled < AUTO_DELETE_DAYS;
-                        });
+                        const daysSinceDisabled = (now - alarm.disabledAt) / (1000 * 60 * 60 * 24);
+                        return daysSinceDisabled < AUTO_DELETE_DAYS;
+                    });
 
-                        if (filteredAlarms.length < beforeCount) {
-                            deletedCount += (beforeCount - filteredAlarms.length);
-                            updatedSchedules[dateKey] = {
-                                ...schedule,
-                                alarm: {
-                                    ...schedule.alarm,
-                                    registeredAlarms: filteredAlarms
-                                }
-                            };
-                        }
+                    if (filteredAlarms.length < beforeCount) {
+                        deletedCount += (beforeCount - filteredAlarms.length);
+                        updatedSchedules[dateKey] = {
+                            ...schedule,
+                            alarm: {
+                                ...schedule.alarm,
+                                registeredAlarms: filteredAlarms
+                            }
+                        };
                     }
-                });
-
-                if (deletedCount > 0) {
-                    console.log(`🗑️ 자동 삭제: ${deletedCount}개의 만료된 알람 삭제됨`);
                 }
-
-                return updatedSchedules;
             });
+
+            if (deletedCount > 0) {
+                console.log(`🗑️ 자동 삭제: ${deletedCount}개의 만료된 알람 삭제됨`);
+                syncCalendar(updatedSchedules);
+            }
         };
 
         // 앱 시작 시 즉시 실행
@@ -852,32 +834,32 @@ function App() {
 
     // 앱 시작 시 일정 데이터 정리 (text가 없으면 createdAt/updatedAt 제거)
     useEffect(() => {
-        setCalendarSchedules(prevSchedules => {
-            const updatedSchedules = { ...prevSchedules };
-            let hasChanges = false;
+        const updatedSchedules = { ...calendarSchedules };
+        let hasChanges = false;
 
-            Object.keys(updatedSchedules).forEach(dateKey => {
-                const schedule = updatedSchedules[dateKey];
+        Object.keys(updatedSchedules).forEach(dateKey => {
+            const schedule = updatedSchedules[dateKey];
 
-                // text가 없거나 빈 문자열인 경우 createdAt/updatedAt 제거
-                if (!schedule.text || schedule.text.trim() === '') {
-                    if (schedule.createdAt || schedule.updatedAt) {
-                        hasChanges = true;
-                        const { createdAt, updatedAt, ...rest } = schedule;
+            // text가 없거나 빈 문자열인 경우 createdAt/updatedAt 제거
+            if (!schedule.text || schedule.text.trim() === '') {
+                if (schedule.createdAt || schedule.updatedAt) {
+                    hasChanges = true;
+                    const { createdAt, updatedAt, ...rest } = schedule;
 
-                        // 알람이 있으면 알람만 유지
-                        if (rest.alarm && rest.alarm.registeredAlarms && rest.alarm.registeredAlarms.length > 0) {
-                            updatedSchedules[dateKey] = rest;
-                        } else {
-                            // 알람도 없으면 엔트리 전체 삭제
-                            delete updatedSchedules[dateKey];
-                        }
+                    // 알람이 있으면 알람만 유지
+                    if (rest.alarm && rest.alarm.registeredAlarms && rest.alarm.registeredAlarms.length > 0) {
+                        updatedSchedules[dateKey] = rest;
+                    } else {
+                        // 알람도 없으면 엔트리 전체 삭제
+                        delete updatedSchedules[dateKey];
                     }
                 }
-            });
-
-            return hasChanges ? updatedSchedules : prevSchedules;
+            }
         });
+
+        if (hasChanges) {
+            syncCalendar(updatedSchedules);
+        }
     }, []); // 앱 시작 시 한 번만 실행
 
     const handleOpenAlarmModal = (scheduleData) => {
@@ -895,27 +877,25 @@ function App() {
         const key = format(new Date(scheduleForAlarm.date), 'yyyy-MM-dd');
 
         // 2. calendarSchedules 상태를 업데이트합니다.
-        setCalendarSchedules(prevSchedules => {
-            const updatedSchedules = { ...prevSchedules };
-            const targetSchedule = updatedSchedules[key];
+        const updatedSchedules = { ...calendarSchedules };
+        const targetSchedule = updatedSchedules[key];
 
-            // 3. 해당 날짜의 스케줄에 'alarm' 객체를 추가하거나 업데이트합니다.
-            if (targetSchedule) {
-                // 기존 일정이 있는 경우
-                updatedSchedules[key] = {
-                    ...targetSchedule,
-                    alarm: alarmSettings
-                };
-            } else {
-                // 일정이 없는 경우 알람만 저장 (createdAt/updatedAt은 실제 일정 저장 시에만 생성)
-                updatedSchedules[key] = {
-                    text: '',  // 빈 일정
-                    alarm: alarmSettings
-                };
-            }
+        // 3. 해당 날짜의 스케줄에 'alarm' 객체를 추가하거나 업데이트합니다.
+        if (targetSchedule) {
+            // 기존 일정이 있는 경우
+            updatedSchedules[key] = {
+                ...targetSchedule,
+                alarm: alarmSettings
+            };
+        } else {
+            // 일정이 없는 경우 알람만 저장 (createdAt/updatedAt은 실제 일정 저장 시에만 생성)
+            updatedSchedules[key] = {
+                text: '',  // 빈 일정
+                alarm: alarmSettings
+            };
+        }
 
-            return updatedSchedules;
-        });
+        syncCalendar(updatedSchedules);
 
         // 4. 사용자에게 피드백을 줍니다 (모달은 닫지 않음)
         const hasAlarms = alarmSettings.registeredAlarms && alarmSettings.registeredAlarms.length > 0;
@@ -1035,11 +1015,16 @@ function App() {
                 if (importedData.version && importedData.data) {
                     // v1.0 형식 (새 형식)
                     const { data } = importedData;
-                    if (data.memos) setMemos(data.memos);
-                    if (data.calendarSchedules) setCalendarSchedules(data.calendarSchedules);
-                    if (data.recentActivities) setRecentActivities(data.recentActivities);
-                    if (data.widgets) setWidgets(data.widgets);
-                    if (data.displayCount) setDisplayCount(data.displayCount);
+                    if (data.memos) syncMemos(data.memos);
+                    if (data.calendarSchedules) syncCalendar(data.calendarSchedules);
+                    if (data.recentActivities) syncActivities(data.recentActivities);
+                    if (data.widgets || data.displayCount) {
+                        syncSettings({
+                            ...settings,
+                            ...(data.widgets && { widgets: data.widgets }),
+                            ...(data.displayCount && { displayCount: data.displayCount })
+                        });
+                    }
                     if (data.trashedItems) {
                         localStorage.setItem('trashedItems_shared', JSON.stringify(data.trashedItems));
                     }
@@ -1051,7 +1036,7 @@ function App() {
                     }
                 } else if (Array.isArray(importedData)) {
                     // 구 형식 (메모만 있는 경우)
-                    setMemos(importedData);
+                    syncMemos(importedData);
                 } else {
                     // 알 수 없는 형식
                     throw new Error('지원하지 않는 백업 파일 형식입니다.');
@@ -1084,7 +1069,7 @@ function App() {
                 isImportant: isImportant,
                 folderId: newMemoFolderId || null // 폴더 ID 저장 (null이면 미분류)
             };
-            setMemos(prevMemos => [newMemo, ...prevMemos]);
+            syncMemos([newMemo, ...memos]);
             addActivity('메모 작성', newMemoContent, newId);
             setIsNewMemoModalOpen(false);
             setNewMemoFolderId(null); // 폴더 ID 초기화
@@ -1094,16 +1079,19 @@ function App() {
 
     const handleEditMemo = (id, newContent, isImportant, folderId, previousFolderId) => {
             const now = Date.now();
-            setMemos(prevMemos =>
-                prevMemos.map(memo => {
+            syncMemos(
+                memos.map(memo => {
                     if (memo.id === id) {
+                        // 내용이 변경되었는지 확인 (공백 포함)
+                        const contentChanged = memo.content !== newContent;
+
                         return {
                             ...memo,
                             content: newContent,
-                            date: now,
+                            date: contentChanged ? now : memo.date, // 내용 변경 시에만 date 갱신
                             createdAt: memo.createdAt || now, // 기존 createdAt 유지, 없으면 현재 시간
-                            updatedAt: now,
-                            displayDate: new Date(now).toLocaleString(),
+                            updatedAt: contentChanged ? now : memo.updatedAt, // 내용 변경 시에만 updatedAt 갱신
+                            displayDate: contentChanged ? new Date(now).toLocaleString() : memo.displayDate, // 내용 변경 시에만 displayDate 갱신
                             isImportant: isImportant,
                             folderId: folderId !== undefined ? folderId : memo.folderId, // 폴더 ID 저장
                             previousFolderId: previousFolderId !== undefined ? previousFolderId : memo.previousFolderId // 이전 폴더 ID 저장
@@ -1131,9 +1119,22 @@ function App() {
                     }
                 });
                 window.dispatchEvent(event);
-                
+
+                // 휴지통에 추가
+                const trashedItem = {
+                    id: deletedMemo.id,
+                    type: 'memo',
+                    title: deletedMemo.title,
+                    content: deletedMemo.content,
+                    originalData: deletedMemo,
+                    deletedAt: Date.now(),
+                    createdAt: deletedMemo.createdAt,
+                    updatedAt: deletedMemo.updatedAt
+                };
+                syncTrash([trashedItem, ...trash]);
+
                 // 메모 목록에서 제거
-                setMemos(prevMemos => prevMemos.filter(memo => memo.id !== id));
+                syncMemos(memos.filter(memo => memo.id !== id));
                 addActivity('메모 삭제', deletedMemo.content, id);
                 quietSync(); // ✅ 추가
             }
@@ -1175,8 +1176,8 @@ function App() {
         const newImportance = !allImportant;
 
         // 메모 업데이트
-        setMemos(prevMemos =>
-            prevMemos.map(memo =>
+        syncMemos(
+            memos.map(memo =>
                 selectedMemoIds.has(memo.id)
                     ? { ...memo, isImportant: newImportance }
                     : memo
@@ -1198,8 +1199,8 @@ function App() {
         const newStealth = !allStealth;
 
         // 메모 업데이트
-        setMemos(prevMemos =>
-            prevMemos.map(memo => {
+        syncMemos(
+            memos.map(memo => {
                 if (selectedMemoIds.has(memo.id)) {
                     if (newStealth) {
                         // 스텔스 설정: 랜덤 더미 문구 할당
@@ -1227,9 +1228,28 @@ function App() {
 
     // 메모 폴더 변경
     const handleUpdateMemoFolder = (memoId, folderId, savePrevious = false) => {
-        setMemos(prevMemos =>
-            prevMemos.map(memo => {
+        syncMemos(
+            memos.map(memo => {
                 if (memo.id === memoId) {
+                    const updates = { folderId };
+                    // 공유 폴더로 이동할 때 원래 폴더 정보 저장
+                    if (savePrevious && folderId === 'shared') {
+                        updates.previousFolderId = memo.folderId || null;
+                    }
+                    return { ...memo, ...updates };
+                }
+                return memo;
+            })
+        );
+        quietSync(); // 변경사항 동기화
+    };
+
+    // 여러 메모의 폴더 한 번에 변경
+    const handleUpdateMemoFolderBatch = (memoIds, folderId, savePrevious = false) => {
+        const memoIdSet = new Set(memoIds);
+        syncMemos(
+            memos.map(memo => {
+                if (memoIdSet.has(memo.id)) {
                     const updates = { folderId };
                     // 공유 폴더로 이동할 때 원래 폴더 정보 저장
                     if (savePrevious && folderId === 'shared') {
@@ -1245,8 +1265,8 @@ function App() {
 
     // 메모 폴더 복원 (공유 해제 시)
     const handleRestoreMemoFolder = (memoId) => {
-        setMemos(prevMemos =>
-            prevMemos.map(memo => {
+        syncMemos(
+            memos.map(memo => {
                 if (memo.id === memoId) {
                     // previousFolderId가 있으면 복원, 없으면 미분류(null)로
                     return {
@@ -1261,31 +1281,25 @@ function App() {
         quietSync(); // 변경사항 동기화
     };
 
-    // 협업방 선택 핸들러 (MyWorkspace, RoomBrowser에서 호출)
-    const handleRoomSelect = (room) => {
-        console.log('방 입장:', room);
-        setPreviousTab(activeTab); // 현재 탭 저장
-        setSelectedRoomId(room.id);
-        setIsCollaborationRoomOpen(true);
-    };
-
-    // 협업방 닫기 핸들러
-    const handleCloseCollaborationRoom = () => {
-        setIsCollaborationRoomOpen(false);
-        setSelectedRoomId(null);
-        // 이전 탭으로 복귀
-        if (previousTab) {
-            setActiveTab(previousTab);
-            setPreviousTab(null);
-        }
-    };
-
     const requestDeleteSelectedMemos = () => {
         if (selectedMemoIds.size === 0) return;
         const idsToDelete = Array.from(selectedMemoIds);
         console.log("삭제 요청된 메모 ID들:", idsToDelete); // ★★★ 추가
         setMemoToDelete(idsToDelete);
         setIsDeleteModalOpen(true);
+    };
+
+    // 선택된 메모 공유 설정 요청
+    const requestShareSelectedMemos = () => {
+        if (selectedMemoIds.size === 0) return;
+
+        const selectedIds = Array.from(selectedMemoIds);
+
+        // 선택된 메모들을 공유 폴더로 이동 (배치 처리)
+        handleUpdateMemoFolderBatch(selectedIds, 'shared', true);
+
+        handleExitSelectionMode();
+        showToast(`${selectedIds.length}개의 메모가 공유 폴더로 이동되었습니다.`);
     };
 
     // 선택된 메모 공유 해제 요청
@@ -1301,10 +1315,8 @@ function App() {
         try {
             const selectedIds = Array.from(selectedMemoIds);
 
-            for (const memoId of selectedIds) {
-                // 메모 폴더 복원 (공유 폴더에서 원래 폴더로)
-                handleRestoreMemoFolder(memoId);
-            }
+            // 메모를 미분류 문서로 이동 (배치 처리)
+            handleUpdateMemoFolderBatch(selectedIds, null, false);
 
             handleExitSelectionMode();
             showToast(`${selectedIds.length}개 메모의 공유가 해제되었습니다.`);
@@ -1320,10 +1332,12 @@ function App() {
 
         if (isBulkDelete) {
             const idsToDelete = new Set(memoToDelete);
-            
+            const newTrashItems = [];
+
             // 각 메모를 휴지통으로 이동
             memos.forEach(memo => {
                 if (idsToDelete.has(memo.id)) {
+                    // 이벤트 발생
                     const event = new CustomEvent('moveToTrash', {
                         detail: {
                             id: memo.id,
@@ -1333,10 +1347,25 @@ function App() {
                         }
                     });
                     window.dispatchEvent(event);
+
+                    // 휴지통 아이템 생성
+                    newTrashItems.push({
+                        id: memo.id,
+                        type: 'memo',
+                        title: memo.title,
+                        content: memo.content,
+                        originalData: memo,
+                        deletedAt: Date.now(),
+                        createdAt: memo.createdAt,
+                        updatedAt: memo.updatedAt
+                    });
                 }
             });
-            
-            setMemos(prevMemos => prevMemos.filter(memo => !idsToDelete.has(memo.id)));
+
+            // 휴지통에 추가
+            syncTrash([...newTrashItems, ...trash]);
+
+            syncMemos(memos.filter(memo => !idsToDelete.has(memo.id)));
             message = `${idsToDelete.size}개의 메모가 삭제되었습니다.`;
             handleExitSelectionMode();
         } else {
@@ -1362,17 +1391,91 @@ function App() {
     };
 
     const deleteActivity = (activityId) => {
-        setRecentActivities(prevActivities => prevActivities.filter(activity => activity.id !== activityId));
+        syncActivities(recentActivities.filter(activity => activity.id !== activityId));
     };
 
-    const allData = [
-        { id: 'm1', title: '오늘의 할 일', content: '장보기, 운동하기', type: 'memo', isSecret: false },
-        { id: 'c1', title: '여행 계획', content: '제주도 맛집 리스트, 숙소 예약', type: 'calendar', isSecret: false },
-        { id: 'r1', title: '이번 주 리뷰', content: '프로젝트 피드백 반영', type: 'review', isSecret: false },
-        { id: 's1', title: '비밀번호 목록', content: '중요한 계정 정보', type: 'secret', isSecret: true },
-        { id: 'm2', title: 'React 공부', content: '컴포넌트와 상태 관리에 대해 복습하기', type: 'memo', isSecret: false },
-        { id: 'm3', title: '아이디어 구상', content: '새로운 앱 서비스에 대한 아이디어 스케치', type: 'memo', isSecret: false },
-    ];
+    // 검색용 전체 데이터 통합
+    const allData = React.useMemo(() => {
+        const searchData = [];
+
+        // 1. 메모 데이터 (폴더별 포함)
+        if (memos && memos.length > 0) {
+            memos.forEach(memo => {
+                // 시크릿 메모 제외
+                if (memo.isSecret) return;
+
+                const folderName = memo.folderId
+                    ? folders?.find(f => f.id === memo.folderId)?.name
+                    : null;
+
+                searchData.push({
+                    id: memo.id,
+                    title: memo.title || '제목 없음',
+                    content: memo.content || '',
+                    type: 'memo',
+                    isSecret: false,
+                    folderId: memo.folderId,
+                    folderName: folderName,
+                    createdAt: memo.createdAt,
+                    updatedAt: memo.updatedAt
+                });
+            });
+        }
+
+        // 2. 일정 데이터 (캘린더 스케줄 + 알람)
+        if (calendarSchedules) {
+            Object.entries(calendarSchedules).forEach(([dateKey, schedule]) => {
+                if (schedule.text && schedule.text.trim()) {
+                    searchData.push({
+                        id: dateKey,
+                        title: schedule.text,
+                        content: schedule.text,
+                        type: 'calendar',
+                        isSecret: false,
+                        dateKey: dateKey,
+                        createdAt: schedule.createdAt,
+                        updatedAt: schedule.updatedAt,
+                        hasAlarm: schedule.alarm?.registeredAlarms?.length > 0
+                    });
+                }
+
+                // 알람만 있는 경우도 검색 가능하도록
+                if (schedule.alarm?.registeredAlarms?.length > 0) {
+                    schedule.alarm.registeredAlarms.forEach((alarm, index) => {
+                        searchData.push({
+                            id: `${dateKey}-alarm-${index}`,
+                            title: alarm.title || '알람',
+                            content: alarm.title || '',
+                            type: 'calendar',
+                            isSecret: false,
+                            dateKey: dateKey,
+                            isAlarm: true,
+                            alarmTime: alarm.time
+                        });
+                    });
+                }
+            });
+        }
+
+        // 3. 휴지통 데이터
+        if (trash && trash.length > 0) {
+            trash.forEach(item => {
+                searchData.push({
+                    id: item.id,
+                    title: item.title || '제목 없음',
+                    content: item.content || '',
+                    type: 'trash',
+                    isSecret: false,
+                    originalType: item.type,
+                    deletedAt: item.deletedAt,
+                    createdAt: item.createdAt,
+                    updatedAt: item.updatedAt
+                });
+            });
+        }
+
+        return searchData;
+    }, [memos, calendarSchedules, trash, folders]);
 
     const handleSwitchTab = (tab) => {
         setActiveTab(tab);
@@ -1402,13 +1505,15 @@ function App() {
     const onDragEnd = (event) => {
         const { active, over } = event;
         if (active.id !== over.id) {
-            setWidgets((items) => {
-                const oldIndex = items.findIndex((item) => item === active.id);
-                const newIndex = items.findIndex((item) => item === over.id);
-                return arrayMove(items, oldIndex, newIndex);
+            const oldIndex = widgets.findIndex((item) => item === active.id);
+            const newIndex = widgets.findIndex((item) => item === over.id);
+            const newWidgets = arrayMove(widgets, oldIndex, newIndex);
+            syncSettings({
+                ...settings,
+                widgets: newWidgets
             });
         }
-        
+
         setActiveId(null);
     };
 
@@ -1569,6 +1674,17 @@ function App() {
                 name: userInfo.name,
                 picture: pictureUrl, // 수정된 pictureUrl 사용
             };
+
+            // ✅ 기존에 저장된 커스텀 닉네임 및 프로필 사진이 있으면 추가
+            const savedNickname = localStorage.getItem('userNickname');
+            const savedCustomPicture = localStorage.getItem('customProfilePicture');
+
+            if (savedNickname) {
+                profileData.nickname = savedNickname;
+            }
+            if (savedCustomPicture) {
+                profileData.customPicture = savedCustomPicture;
+            }
 
             setProfile(profileData);
             setAccessTokenState(accessToken);
@@ -1936,11 +2052,16 @@ function App() {
             const result = await loadFromGoogleDrive();
 
             if (result.success && result.data) {
-                if (result.data.memos) setMemos(result.data.memos);
-                if (result.data.calendarSchedules) setCalendarSchedules(result.data.calendarSchedules);
-                if (result.data.recentActivities) setRecentActivities(result.data.recentActivities);
-                if (result.data.displayCount) setDisplayCount(result.data.displayCount);
-                if (result.data.widgets) setWidgets(result.data.widgets);
+                if (result.data.memos) syncMemos(result.data.memos);
+                if (result.data.calendarSchedules) syncCalendar(result.data.calendarSchedules);
+                if (result.data.recentActivities) syncActivities(result.data.recentActivities);
+                if (result.data.displayCount || result.data.widgets) {
+                    syncSettings({
+                        ...settings,
+                        ...(result.data.widgets && { widgets: result.data.widgets }),
+                        ...(result.data.displayCount && { displayCount: result.data.displayCount })
+                    });
+                }
                 if (result.data.trashedItems) {
                     localStorage.setItem('trashedItems_shared', JSON.stringify(result.data.trashedItems));
                 }
@@ -1974,6 +2095,17 @@ function App() {
 
     // ✅ 로그아웃 (확장됨)
     const handleLogout = async () => {
+        // 🔥 로그아웃 전 Firestore에 즉시 저장
+        try {
+            if (userId && isAuthenticated) {
+                console.log('💾 로그아웃 전 데이터 저장 중...');
+                await saveImmediately();
+                console.log('✅ 데이터 저장 완료');
+            }
+        } catch (error) {
+            console.error('데이터 저장 오류:', error);
+        }
+
         // 🔥 Firebase Auth 로그아웃
         try {
             if (auth) {
@@ -1984,20 +2116,39 @@ function App() {
             console.error('Firebase 로그아웃 오류:', error);
         }
 
+        // 🔑 Google OAuth 토큰 revoke (선택적)
+        try {
+            if (accessToken) {
+                await fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-type': 'application/x-www-form-urlencoded'
+                    }
+                });
+                console.log('🔑 Google OAuth 토큰 revoke 완료');
+            }
+        } catch (error) {
+            console.error('Google OAuth 토큰 revoke 오류:', error);
+        }
+
+        // 상태 초기화 (새로고침 없이)
         setProfile(null);
         setAccessTokenState(null);
         localStorage.removeItem('userProfile');
         localStorage.removeItem('accessToken');
         localStorage.removeItem('lastSyncTime');
-        localStorage.removeItem('firebaseUserId'); // 🔥 협업 기능용 사용자 ID 제거
+        localStorage.removeItem('firebaseUserId');
 
         showToast("✓ 로그아웃되었습니다");
         setIsMenuOpen(false);
+        setIsLoginModalOpen(false);
 
         // 자동 동기화 중지
         if (syncIntervalRef.current) {
             clearInterval(syncIntervalRef.current);
         }
+
+        console.log('✅ 로그아웃 완료 - 상태 초기화됨');
     };
     
     useEffect(() => {
@@ -2067,11 +2218,9 @@ function App() {
             addActivity('스케줄 삭제', `${key} - ${deletedEntry.text}`);
         }
 
-        setCalendarSchedules(prev => {
-            const updated = { ...prev };
-            delete updated[key];
-            return updated;
-        });
+        const updated = { ...calendarSchedules };
+        delete updated[key];
+        syncCalendar(updated);
 
         showToast?.('✓ 스케줄이 삭제되었습니다');
         setIsCalendarConfirmOpen(false);
@@ -2193,17 +2342,17 @@ function App() {
             restoredItems.forEach(item => {
                 if (item.type === 'memo') {
                     // 메모 복원
-                    setMemos(prev => [item.originalData, ...prev]);
+                    syncMemos([item.originalData, ...memos]);
                     addActivity('메모 복원', item.content);
                     console.log('✅ 메모 복원됨:', item.originalData);
                 } else if (item.type === 'schedule') {
                     // 스케줄 복원
                     const { date, ...scheduleData } = item.originalData;
                     const key = format(new Date(date), 'yyyy-MM-dd');
-                    setCalendarSchedules(prev => ({
-                        ...prev,
+                    syncCalendar({
+                        ...calendarSchedules,
                         [key]: scheduleData
-                    }));
+                    });
                     addActivity('스케줄 복원', item.content);
                     console.log('✅ 스케줄 복원됨:', { key, scheduleData });
                 } else if (item.type === 'secret') {
@@ -2310,7 +2459,7 @@ function App() {
                                 onSelectDate={handleSelectDate}
                                 addActivity={addActivity}
                                 schedules={calendarSchedules}
-                                setSchedules={setCalendarSchedules}
+                                setSchedules={syncCalendar}
                                 showToast={showToast}
                                 onRequestDelete={requestCalendarDelete}
                                 onOpenAlarm={handleOpenAlarmModal}
@@ -2334,6 +2483,8 @@ function App() {
                                 onToggleSelectedMemosStealth={handleToggleSelectedMemosStealth}
                                 onRequestDeleteSelectedMemos={requestDeleteSelectedMemos}
                                 onUpdateMemoFolder={handleUpdateMemoFolder}
+                                onUpdateMemoFolderBatch={handleUpdateMemoFolderBatch}
+                                onRequestShareSelectedMemos={requestShareSelectedMemos}
                                 onRequestUnshareSelectedMemos={requestUnshareSelectedMemos}
                             />
                         }
@@ -2383,7 +2534,6 @@ function App() {
                             setActiveTab('secret');
                         }}
                         onRestoreMemoFolder={handleRestoreMemoFolder}
-                        onRoomSelect={handleRoomSelect}
                     />
                 </>
             </Screen>
@@ -2399,13 +2549,7 @@ function App() {
             )}
 
             {/* 모달(Modal)들은 Screen 컴포넌트 바깥에 두어 전체 화면을 덮도록 합니다. */}
-            {toastMessage && (
-                <ToastOverlay>
-                    <ToastBox>
-                        {toastMessage}
-                    </ToastBox>
-                </ToastOverlay>
-            )}
+            <Toast message={toastMessage} />
 
             {/* 복원 확인 모달 */}
             {isRestoreConfirmOpen && (
@@ -2430,8 +2574,27 @@ function App() {
                     onClose={() => setIsSearchModalOpen(false)}
                     allData={allData}
                     onSelectResult={(id, type) => {
-                        setIsSearchModalOpen(false);
-                        console.log(`선택된 항목: ID: ${id}, 유형: ${type}`);
+                        // 검색 결과를 클릭하면 해당 문서를 엽니다 (검색 모달은 유지)
+                        if (type === 'memo') {
+                            // 메모 상세 보기
+                            const memo = memos?.find(m => m.id === id);
+                            if (memo) {
+                                setCurrentMemo(memo);
+                                setIsMemoDetailModalOpen(true);
+                            }
+                        } else if (type === 'calendar') {
+                            // 일정/알람 - 캘린더 에디터 열기
+                            const item = allData.find(d => d.id === id);
+                            if (item && item.dateKey) {
+                                const date = new Date(item.dateKey);
+                                const scheduleData = calendarSchedules[item.dateKey] || {};
+                                handleOpenCalendarEditor(date, scheduleData.text || '');
+                            }
+                        } else if (type === 'trash') {
+                            // 휴지통 문서 - 휴지통 탭으로 이동하고 검색 모달 닫기
+                            setIsSearchModalOpen(false);
+                            setActiveTab('trash');
+                        }
                     }}
                 />
             )}
@@ -2502,7 +2665,7 @@ function App() {
             {isUnshareConfirmOpen && (
                 <ConfirmModal
                     title="공유 해제"
-                    message={`선택한 ${selectedMemoIds.size}개의 문서 공유를 해제 할까요?\n\n해제시 해당문서와 연계된 대화방은\n삭제되며 문서는 원래 폴더로 복원됩니다.`}
+                    message={`선택한 ${selectedMemoIds.size}개의 문서 공유를 해제할까요?\n\n공유 해제된 문서는\n미분류 문서로 이동합니다.`}
                     onConfirm={executeUnshareSelectedMemos}
                     onCancel={() => setIsUnshareConfirmOpen(false)}
                 />
@@ -2529,14 +2692,6 @@ function App() {
             {/* ⏱️ 타이머 모달 */}
             {isTimerOpen && (
                 <Timer onClose={() => setIsTimerOpen(false)} />
-            )}
-
-            {/* 🏠 협업방 모달 */}
-            {isCollaborationRoomOpen && selectedRoomId && (
-                <CollaborationRoom
-                    roomId={selectedRoomId}
-                    onClose={handleCloseCollaborationRoom}
-                />
             )}
 
             {/* 👤 프로필 페이지 모달 */}

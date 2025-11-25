@@ -1,3 +1,9 @@
+/*
+ * ⚠️ 경고: 이 파일은 현재 사용하지 않는 참고용 파일입니다.
+ * ⚠️ WARNING: This file is NOT IN USE - for reference only.
+ * ⚠️ 다른 파일과 연동하지 마세요. DO NOT integrate with other files.
+ */
+
 // 내 워크스페이스 관리 페이지 - 내가 만든 모든 방 보기 및 관리
 import { useState, useEffect, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';

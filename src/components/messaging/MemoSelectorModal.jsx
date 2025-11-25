@@ -268,7 +268,7 @@ const MemoSelectorModal = ({ onClose, onSelectMemo, showToast }) => {
       setFilteredMemos(loadedMemos);
     } catch (error) {
       console.error('메모 불러오기 실패:', error);
-      showToast?.('메모를 불러오는데 실패했습니다');
+      showToast?.('문서를 불러오는데 실패했습니다');
     } finally {
       setLoading(false);
     }
@@ -320,18 +320,18 @@ const MemoSelectorModal = ({ onClose, onSelectMemo, showToast }) => {
           {loading ? (
             <EmptyState>
               <EmptyIcon>📝</EmptyIcon>
-              <EmptyTitle>메모를 불러오는 중...</EmptyTitle>
+              <EmptyTitle>문서를 불러오는 중...</EmptyTitle>
             </EmptyState>
           ) : filteredMemos.length === 0 ? (
             <EmptyState>
               <EmptyIcon>📝</EmptyIcon>
               <EmptyTitle>
-                {searchQuery ? '검색 결과 없음' : '메모가 없습니다'}
+                {searchQuery ? '검색 결과 없음' : '문서가 없습니다'}
               </EmptyTitle>
               <EmptyDescription>
                 {searchQuery
                   ? '다른 검색어를 입력해보세요'
-                  : '메모 탭에서 메모를 작성해보세요'}
+                  : '메모 탭에서 문서를 작성해보세요'}
               </EmptyDescription>
             </EmptyState>
           ) : (

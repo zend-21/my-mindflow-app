@@ -1,35 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python download_tarot.py:*)",
-      "Bash(pip install:*)",
-      "Bash(python download_sacred_texts.py:*)",
-      "Bash(git push)",
-      "Bash(npm run dev:*)",
-      "Bash(npm run build:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(\"E:\\React test\\my-mindflow-app\\public\\images\\secret\\mask-gray.svg\")",
-      "Bash(nul)",
-      "Bash(cat:*)",
-      "Bash(findstr:*)",
-      "Bash(git checkout:*)",
-      "Bash(npm install:*)",
-      "Bash(npx cap init:*)",
-      "Bash(npm run fix-restaurants:*)",
-      "Bash(node:*)",
-      "Bash(firebase deploy:*)",
-      "Bash(npx firebase deploy --only firestore:rules)",
-      "Bash(firestore.indexes.json)",
-      "Bash(firebase firestore:indexes:*)",
-      "Bash(npx vercel --prod)",
-      "Bash(powershell:*)",
-      "Bash(netstat:*)",
-      "Bash(taskkill:*)",
-      "Bash(npx firebase deploy:*)",
-      "Bash(echo:*)",
-      "Bash(git merge:*)"
+      "Bash(dir:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []

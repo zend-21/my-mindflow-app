@@ -365,6 +365,7 @@ const SharedBadge = styled.div`
     flex-shrink: 0;
     cursor: pointer;
     transition: all 0.2s;
+    position: relative;
 
     .material-icons {
         font-size: 16px;
@@ -374,6 +375,29 @@ const SharedBadge = styled.div`
         background: ${props => props.$isPublic
             ? 'rgba(74, 144, 226, 0.3)'
             : 'rgba(239, 83, 80, 0.3)'};
+    }
+`;
+
+const UnshareButton = styled.button`
+    background: transparent;
+    border: none;
+    color: inherit;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin-left: 4px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+
+    &:hover {
+        opacity: 1;
+    }
+
+    .material-icons {
+        font-size: 16px;
     }
 `;
 
@@ -531,19 +555,20 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
             // ★★★ 추가: 모달이 닫힐 때 키보드 상태를 초기화 ★★★
             setIsKeyboardActive(false);
 
-            // 공유 상태 확인
-            const checkSharedStatus = async () => {
-                try {
-                    const result = await checkMemoSharedStatus(memo.id);
-                    setIsShared(result.isShared);
-                    setSharedRoom(result.room);
-                } catch (error) {
-                    console.error('공유 상태 확인 오류:', error);
-                    setIsShared(false);
-                    setSharedRoom(null);
-                }
-            };
-            checkSharedStatus();
+            // 공유 상태 확인 (folderId 기반)
+            setIsShared(memo.folderId === 'shared');
+
+            // 협업방 상태 확인 (참고용 기능 - 현재 비활성화)
+            // const checkSharedStatus = async () => {
+            //     try {
+            //         const result = await checkMemoSharedStatus(memo.id);
+            //         setSharedRoom(result.room);
+            //     } catch (error) {
+            //         console.error('공유 상태 확인 오류:', error);
+            //         setSharedRoom(null);
+            //     }
+            // };
+            // checkSharedStatus();
         }
     }, [isOpen, memo]);
     
@@ -590,8 +615,9 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
             onConfirm: executeSaveAndShowToast,
         });
     };
-    
-    const isPristine = editedContent === memo.content && isImportant === memo.isImportant;
+
+    // 내용만 변경되었는지 확인 (중요도는 즉시 저장되므로 체크하지 않음)
+    const isPristine = editedContent === memo.content;
 
     const handleCancelClick = () => {
         if (!isPristine) {
@@ -618,7 +644,10 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
     };
 
     const handleImportantToggle = () => {
-        setIsImportant(prev => !prev);
+        const newImportance = !isImportant;
+        setIsImportant(newImportance);
+        // 중요도 변경을 즉시 저장 (내용 변경 없이)
+        onSave(memo.id, editedContent, newImportance, selectedFolderId);
     };
 
     const handleUndo = () => {
@@ -656,14 +685,38 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
         }
     };
 
-    // 공유 버튼 클릭: 공유 폴더로 이동
+    // 공유 버튼 클릭: 확인 모달 표시
     const handleShareClick = () => {
-        // 메모를 공유 폴더로 이동
-        if (onUpdateMemoFolder) {
-            onUpdateMemoFolder(memo.id, 'shared', true); // savePrevious = true (원래 폴더 정보 저장)
-            setSelectedFolderId('shared'); // UI 업데이트
-            showToast?.('메모가 공유 폴더로 이동되었습니다');
-        }
+        setConfirmModalState({
+            isOpen: true,
+            message: '이 문서를 공유 폴더로 이동할까요?',
+            onConfirm: () => {
+                // 메모를 공유 폴더로 이동
+                if (onUpdateMemoFolder) {
+                    onUpdateMemoFolder(memo.id, 'shared', true); // savePrevious = true (원래 폴더 정보 저장)
+                    setSelectedFolderId('shared'); // UI 업데이트
+                    showToast?.('메모가 공유 폴더로 이동되었습니다');
+                }
+                closeConfirmModal();
+            }
+        });
+    };
+
+    // 공유 해제: 미분류로 이동
+    const handleUnshareClick = () => {
+        setConfirmModalState({
+            isOpen: true,
+            message: '이 문서를 미분류 문서로 이동할까요?',
+            onConfirm: () => {
+                // 메모를 미분류(null)로 이동
+                if (onUpdateMemoFolder) {
+                    onUpdateMemoFolder(memo.id, null, false); // folderId를 null로 설정
+                    setSelectedFolderId(null); // UI 업데이트
+                    showToast?.('메모가 미분류 문서로 이동되었습니다');
+                }
+                closeConfirmModal();
+            }
+        });
     };
 
     // 방 설정 완료 후 방 생성 및 협업방 열기
@@ -766,20 +819,12 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
                             })()}
                         </div>
 
-                        {/* 공유 버튼 또는 공유됨 뱃지 */}
+                        {/* 공유 버튼 또는 공유 해제 버튼 */}
                         {isShared ? (
-                            <SharedBadge
-                                $isPublic={sharedRoom?.isPublic ?? false}
-                                onClick={() => {
-                                    if (sharedRoom) {
-                                        setCurrentRoomId(sharedRoom.id);
-                                        setIsCollaborationRoomOpen(true);
-                                    }
-                                }}
-                            >
-                                <span className="material-icons">groups</span>
-                                공유됨
-                            </SharedBadge>
+                            <ShareButton onClick={handleUnshareClick}>
+                                <span className="material-icons">close</span>
+                                공유 해제
+                            </ShareButton>
                         ) : (
                             <ShareButton onClick={handleShareClick}>
                                 <span className="material-icons">share</span>

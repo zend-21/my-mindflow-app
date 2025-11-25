@@ -1,3 +1,9 @@
+/*
+ * ⚠️ 경고: 이 파일은 현재 사용하지 않는 참고용 파일입니다.
+ * ⚠️ WARNING: This file is NOT IN USE - for reference only.
+ * ⚠️ 다른 파일과 연동하지 마세요. DO NOT integrate with other files.
+ */
+
 // 방 탐색 - 방 코드 입력으로 직접 참가
 import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';

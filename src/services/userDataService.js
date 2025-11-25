@@ -1,6 +1,6 @@
 // 🔥 사용자 데이터 Firestore 동기화 서비스
-import { db } from '../firebase';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { db } from '../firebase/config';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 /**
  * 사용자 데이터 구조:
@@ -119,9 +119,20 @@ export const fetchTrashFromFirestore = async (userId) => {
  */
 export const saveTrashToFirestore = async (userId, trash) => {
   try {
+    // undefined 값 필터링
+    const cleanedTrash = trash.map(item => {
+      const cleanedItem = {};
+      Object.keys(item).forEach(key => {
+        if (item[key] !== undefined) {
+          cleanedItem[key] = item[key];
+        }
+      });
+      return cleanedItem;
+    });
+
     const docRef = doc(db, 'users', userId, 'userData', 'trash');
     await setDoc(docRef, {
-      items: trash,
+      items: cleanedTrash,
       updatedAt: serverTimestamp()
     }, { merge: true });
   } catch (error) {
@@ -190,14 +201,47 @@ export const fetchCalendarFromFirestore = async (userId) => {
   }
 };
 
+// undefined 값을 재귀적으로 제거하는 헬퍼 함수
+const removeUndefined = (obj) => {
+  if (obj === null || obj === undefined) return null;
+  if (typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefined(item)).filter(item => item !== null && item !== undefined);
+  }
+
+  const cleaned = {};
+  Object.keys(obj).forEach(key => {
+    const value = obj[key];
+    if (value !== undefined) {
+      const cleanedValue = removeUndefined(value);
+      if (cleanedValue !== null && cleanedValue !== undefined) {
+        cleaned[key] = cleanedValue;
+      }
+    }
+  });
+  return Object.keys(cleaned).length > 0 ? cleaned : null;
+};
+
 /**
  * Firestore에 캘린더 일정 데이터 저장
  */
 export const saveCalendarToFirestore = async (userId, schedules) => {
   try {
+    // undefined 값 제거하여 정리된 스케줄 생성
+    const cleanedSchedules = {};
+    Object.keys(schedules).forEach(dateKey => {
+      const schedule = schedules[dateKey];
+      const cleanedSchedule = removeUndefined(schedule);
+
+      // 빈 객체가 아닌 경우만 추가
+      if (cleanedSchedule && Object.keys(cleanedSchedule).length > 0) {
+        cleanedSchedules[dateKey] = cleanedSchedule;
+      }
+    });
+
     const docRef = doc(db, 'users', userId, 'userData', 'calendar');
     await setDoc(docRef, {
-      schedules: schedules,
+      schedules: cleanedSchedules,
       updatedAt: serverTimestamp()
     }, { merge: true });
   } catch (error) {

@@ -109,6 +109,14 @@ const MemoList = styled.div`
   flex: 1;
   overflow-y: auto;
   padding: 16px 24px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  align-content: start;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -134,9 +142,12 @@ const MemoItem = styled.div`
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   padding: 16px;
-  margin-bottom: 12px;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: fit-content;
 
   &:hover {
     background: rgba(255, 255, 255, 0.08);
@@ -145,67 +156,38 @@ const MemoItem = styled.div`
   }
 `;
 
-const MemoHeader = styled.div`
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 8px;
-`;
-
-const MemoIcon = styled.div`
-  width: 40px;
-  height: 40px;
-  background: linear-gradient(135deg, #4a90e2, #357abd);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-`;
-
-const MemoInfo = styled.div`
-  flex: 1;
-  min-width: 0;
-`;
-
 const MemoTitle = styled.h3`
   font-size: 15px;
   font-weight: 600;
   color: #ffffff;
-  margin: 0 0 4px 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const MemoFolder = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #2ed573;
-  font-weight: 500;
-`;
-
-const MemoPreview = styled.p`
-  font-size: 13px;
-  color: #888;
-  margin: 8px 0 0 0;
-  line-height: 1.5;
+  margin: 0;
+  line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+  word-break: break-all;
+`;
+
+const MemoPreview = styled.p`
+  font-size: 11px;
+  color: #888;
+  margin: 0;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 `;
 
 const MemoDate = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
+  font-size: 11px;
   color: #666;
-  margin-top: 8px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 `;
 
 const EmptyState = styled.div`
@@ -264,14 +246,27 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos })
     onClose();
   };
 
+  // 제목이 없으면 메모 첫 줄에서 10자 추출
+  const getDisplayTitle = (memo) => {
+    if (memo.title && memo.title.trim() !== '') {
+      return memo.title;
+    }
+    if (memo.content && memo.content.trim() !== '') {
+      const firstLine = memo.content.split('\n')[0].trim();
+      return firstLine.substring(0, 10) || '제목 없음';
+    }
+    return '제목 없음';
+  };
+
   const formatDate = (timestamp) => {
     if (!timestamp) return '';
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}/${month}/${day} ${hours}:${minutes}`;
   };
 
   return (
@@ -307,35 +302,23 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos })
             <EmptyState>
               <EmptyIcon>📂</EmptyIcon>
               <EmptyText>
-                {searchQuery ? '검색 결과가 없습니다' : '공유 폴더에 메모가 없습니다'}
+                {searchQuery ? '검색 결과가 없습니다' : '공유 폴더에 문서가 없습니다'}
               </EmptyText>
               <EmptyDescription>
                 {searchQuery
                   ? '다른 검색어를 입력해보세요'
-                  : '메모 페이지에서 공유 폴더에 메모를 추가하세요'}
+                  : '메모 페이지에서 공유 폴더에 문서를 추가하세요'}
               </EmptyDescription>
             </EmptyState>
           ) : (
             filteredMemos.map(memo => (
               <MemoItem key={memo.id} onClick={() => handleSelectMemo(memo)}>
-                <MemoHeader>
-                  <MemoIcon>
-                    <FileText size={20} color="#ffffff" />
-                  </MemoIcon>
-                  <MemoInfo>
-                    <MemoTitle>{memo.title || '제목 없음'}</MemoTitle>
-                    <MemoFolder>
-                      <Folder size={12} />
-                      공유
-                    </MemoFolder>
-                  </MemoInfo>
-                </MemoHeader>
+                <MemoTitle>{getDisplayTitle(memo)}</MemoTitle>
                 {memo.content && (
                   <MemoPreview>{memo.content}</MemoPreview>
                 )}
                 <MemoDate>
-                  <Calendar size={12} />
-                  {formatDate(memo.updatedAt)}
+                  {formatDate(memo.updatedAt || memo.createdAt)}
                 </MemoDate>
               </MemoItem>
             ))

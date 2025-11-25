@@ -1,3 +1,9 @@
+/*
+ * ⚠️ 경고: 이 파일은 현재 사용하지 않는 참고용 파일입니다.
+ * ⚠️ WARNING: This file is NOT IN USE - for reference only.
+ * ⚠️ 다른 파일과 연동하지 마세요. DO NOT integrate with other files.
+ */
+
 // 공유된 메모/스케줄 목록 페이지
 
 import React, { useState, useEffect } from 'react';
