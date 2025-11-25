@@ -48,11 +48,10 @@ import TrashPage from './components/TrashPage.jsx';
 import AppContent from './components/AppContent.jsx';
 import SecretPage from './components/secret/SecretPage.jsx';
 import MessagingHub from './components/messaging/MessagingHub.jsx';
+import AuthRequiredModal from './components/AuthRequiredModal.jsx';
 import AdBanner from './components/messaging/AdBanner.jsx';
 import ChatRoom from './components/messaging/ChatRoom.jsx';
 import AppRouter from './components/AppRouter.jsx';
-import './utils/createWorkspaceManually'; // 워크스페이스 수동 생성 유틸리티
-import { createWorkspace, checkWorkspaceExists } from './services/workspaceService'; // 자동 워크스페이스 생성
 import Toast from './components/Toast.jsx';
 import PhoneVerification from './components/PhoneVerification.jsx';
 import {
@@ -321,10 +320,13 @@ function App() {
     const [isLoading, setIsLoading] = useState(true);
     const [profile, setProfile] = useState(null);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+    const [loginKey, setLoginKey] = useState(0); // LoginModal 강제 리마운트용
 
     // 🔐 휴대폰 인증 관련 상태
     const [isPhoneVerifying, setIsPhoneVerifying] = useState(false);
     const [pendingAuthData, setPendingAuthData] = useState(null); // Google 로그인 후 대기 중인 데이터
+    const [isAuthRequiredModalOpen, setIsAuthRequiredModalOpen] = useState(false); // 인증 요구 모달
+    const [authRequiredFeature, setAuthRequiredFeature] = useState(''); // 어떤 기능을 위한 인증인지
 
     // ✅ 새로 추가되는 상태들
     const [accessToken, setAccessTokenState] = useState(null);
@@ -570,7 +572,10 @@ function App() {
     }, []);
 
     // 🔥 Firestore 동기화 훅 사용
-    const userId = localStorage.getItem('mindflowUserId'); // 휴대폰 번호 (Primary ID)
+    // ⚠️ 중요: 휴대폰 인증한 경우 휴대폰 번호 사용, 아니면 firebaseUserId 사용
+    const phoneId = localStorage.getItem('mindflowUserId'); // 휴대폰 번호
+    const firebaseId = localStorage.getItem('firebaseUserId'); // Firebase UID
+    const userId = phoneId || firebaseId; // 둘 중 하나 사용 (Progressive Onboarding)
     const isAuthenticated = !!profile;
 
     const {
@@ -957,13 +962,13 @@ function App() {
         setIsCalendarConfirmOpen(true);
     };
 
-    const showToast = (message) => {
+    const showToast = (message, duration = 1000) => {
         console.log('🔔 showToast 호출됨:', message);
         setToastMessage(message);
         setTimeout(() => {
             console.log('🔔 Toast 숨김');
             setToastMessage(null);
-        }, 1000); // 1초로 단축
+        }, duration);
     };
     
     const handleDataExport = async () => {
@@ -1697,14 +1702,26 @@ function App() {
                 console.log('📱 휴대폰 인증 필요');
 
                 // 구 구조 사용자 확인
-                const isLegacy = await isLegacyUser(firebaseUserId);
+                // ✅ Progressive Onboarding: 휴대폰 인증은 특정 기능 사용 시에만 요구
+                const existingPhone = await findPhoneByFirebaseUID(firebaseUserId);
 
-                if (isLegacy) {
-                    console.log('⚠️ 구 구조 사용자 감지 - 마이그레이션 필요');
-                    showToast('⚠ 계정 업그레이드가 필요합니다. 휴대폰 인증을 진행해주세요.');
+                if (existingPhone) {
+                    // 이미 휴대폰 인증을 완료한 사용자
+                    console.log('✅ 기존 휴대폰 인증 사용자:', existingPhone);
+                    localStorage.setItem('mindflowUserId', existingPhone);
+                    localStorage.setItem('isPhoneVerified', 'true');
+                } else {
+                    // 신규 사용자 또는 아직 휴대폰 인증하지 않은 사용자
+                    console.log('📱 휴대폰 미인증 사용자 - 특정 기능 사용 시 인증 필요');
+                    localStorage.setItem('isPhoneVerified', 'false');
+
+                    const isLegacy = await isLegacyUser(firebaseUserId);
+                    if (isLegacy) {
+                        console.log('⚠️ 구 구조 사용자 감지 - 채팅/협업 사용 시 인증 필요');
+                    }
                 }
 
-                // 휴대폰 인증 모달 열기
+                // 휴대폰 인증 데이터 저장 (나중에 필요할 때 사용)
                 setPendingAuthData({
                     firebaseUserId,
                     accessToken,
@@ -1712,11 +1729,91 @@ function App() {
                     pictureUrl,
                     expiresAt
                 });
-                setIsPhoneVerifying(true);
+
+                // Google 로그인만으로도 앱 사용 가능
+                await handleSimpleLogin(firebaseUserId, accessToken, userInfo, pictureUrl, expiresAt);
                 setIsLoginModalOpen(false);
             }
         } catch (error) {
             console.error('❌ 로그인 처리 중 오류:', error);
+            showToast('⚠ 로그인에 실패했습니다');
+        }
+    };
+
+    // 🔓 간단 로그인 처리 (Google 로그인만, 휴대폰 인증 없이)
+    const handleSimpleLogin = async (firebaseUserId, accessToken, userInfo, pictureUrl, expiresAt) => {
+        try {
+            console.log('🔓 Google 로그인 처리 (휴대폰 인증 없음)');
+
+            // 사용자 프로필 설정
+            const profileData = {
+                email: userInfo.email,
+                name: userInfo.name,
+                picture: pictureUrl
+            };
+
+            const savedNickname = localStorage.getItem('userNickname');
+            const savedCustomPicture = localStorage.getItem('customProfilePicture');
+
+            if (savedNickname) {
+                profileData.nickname = savedNickname;
+            }
+            if (savedCustomPicture) {
+                profileData.customPicture = savedCustomPicture;
+            }
+
+            setProfile(profileData);
+            setAccessTokenState(accessToken);
+
+            // localStorage에 로그인 정보 저장
+            localStorage.setItem('userProfile', JSON.stringify(profileData)); // ✅ 추가: 프로필 저장
+            localStorage.setItem('firebaseUserId', firebaseUserId);
+            localStorage.setItem('accessToken', accessToken);
+            localStorage.setItem('userInfo', JSON.stringify(userInfo));
+            localStorage.setItem('userPicture', pictureUrl);
+            localStorage.setItem('tokenExpiresAt', expiresAt);
+            localStorage.setItem('lastLoginTime', Date.now().toString());
+
+            // 👤 협업용 사용자 문서 생성/업데이트 (users 컬렉션)
+            try {
+                const userRef = doc(db, 'users', firebaseUserId);
+                const userDoc = await getDoc(userRef);
+
+                const userData = {
+                    displayName: userInfo.name,
+                    email: userInfo.email,
+                    photoURL: pictureUrl,
+                    phoneNumber: null, // 아직 인증 안함
+                    updatedAt: Date.now()
+                };
+
+                if (!userDoc.exists()) {
+                    await setDoc(userRef, {
+                        ...userData,
+                        createdAt: Date.now()
+                    });
+                    console.log('✅ 협업용 사용자 문서 생성 완료');
+                } else {
+                    await updateDoc(userRef, userData);
+                    console.log('✅ 협업용 사용자 정보 업데이트 완료');
+                }
+            } catch (userError) {
+                console.error('⚠️ 사용자 문서 생성/업데이트 오류:', userError);
+            }
+
+            // GAPI에 토큰 설정
+            if (isGapiReady) {
+                console.log('🔑 로그인 성공 - GAPI에 토큰 설정');
+                setAccessToken(accessToken);
+                await new Promise(resolve => setTimeout(resolve, 200));
+                console.log('✅ GAPI 토큰 설정 완료');
+            } else {
+                console.warn('⚠️ GAPI가 아직 준비되지 않음 - 토큰은 저장됨');
+            }
+
+            showToast('✓ 로그인되었습니다');
+        } catch (error) {
+            console.error('로그인 처리 중 오류:', error);
             showToast('⚠ 로그인에 실패했습니다');
         }
     };
@@ -1796,20 +1893,6 @@ function App() {
                 console.error('⚠️ 사용자 문서 생성/업데이트 오류:', userError);
             }
 
-            // 🏠 워크스페이스 자동 생성 (없으면 생성)
-            try {
-                const workspaceExists = await checkWorkspaceExists(firebaseUserId);
-                if (!workspaceExists) {
-                    console.log('🏗️ 워크스페이스가 없습니다. 자동 생성 중...');
-                    await createWorkspace(firebaseUserId, userInfo.name, userInfo.email);
-                    console.log('✅ 워크스페이스 자동 생성 완료');
-                } else {
-                    console.log('✅ 기존 워크스페이스 존재');
-                }
-            } catch (workspaceError) {
-                console.error('⚠️ 워크스페이스 생성 오류 (로그인은 계속):', workspaceError);
-            }
-
             // GAPI에 토큰 설정
             if (isGapiReady) {
                 console.log('🔑 로그인 성공 - GAPI에 토큰 설정');
@@ -1880,6 +1963,40 @@ function App() {
         setIsPhoneVerifying(false);
         setPendingAuthData(null);
         showToast('인증이 취소되었습니다');
+    };
+
+    // 🔐 휴대폰 인증 확인 함수
+    const checkPhoneVerification = () => {
+        return localStorage.getItem('isPhoneVerified') === 'true';
+    };
+
+    // 🚪 기능별 인증 게이트 (Feature-Gated Authentication)
+    const requirePhoneAuth = (featureName, callback) => {
+        const isVerified = checkPhoneVerification();
+
+        if (isVerified) {
+            // 인증 완료 → 기능 실행
+            callback();
+        } else {
+            // 미인증 → 인증 요구 모달 표시
+            setAuthRequiredFeature(featureName);
+            setIsAuthRequiredModalOpen(true);
+        }
+    };
+
+    // 인증 모달에서 "지금 인증하기" 클릭 시
+    const handleStartPhoneAuth = () => {
+        setIsAuthRequiredModalOpen(false);
+
+        // 로그인되어 있는지 확인
+        if (!profile || !pendingAuthData) {
+            // 로그인 안되어 있음 → 먼저 로그인 필요
+            showToast('⚠ 먼저 Google 로그인이 필요합니다');
+            setIsLoginModalOpen(true);
+        } else {
+            // 로그인 되어 있음 → 휴대폰 인증 시작
+            setIsPhoneVerifying(true);
+        }
     };
 
     const handleLoginError = () => {
@@ -2208,10 +2325,14 @@ function App() {
     const handleLogout = async () => {
         // 🔥 로그아웃 전 Firestore에 즉시 저장
         try {
-            if (userId && isAuthenticated) {
+            // userId(휴대폰 번호) 또는 firebaseUserId로 저장 시도
+            const firebaseUserId = localStorage.getItem('firebaseUserId');
+            if ((userId || firebaseUserId) && isAuthenticated) {
                 console.log('💾 로그아웃 전 데이터 저장 중...');
                 await saveImmediately();
                 console.log('✅ 데이터 저장 완료');
+            } else {
+                console.log('⚠️ 로그인 상태가 아니므로 저장 생략');
             }
         } catch (error) {
             console.error('데이터 저장 오류:', error);
@@ -2242,13 +2363,21 @@ function App() {
             console.error('Google OAuth 토큰 revoke 오류:', error);
         }
 
-        // 상태 초기화 (새로고침 없이)
+        // 상태 초기화
         setProfile(null);
         setAccessTokenState(null);
+
+        // localStorage 완전 정리
         localStorage.removeItem('userProfile');
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('tokenExpiresAt');
         localStorage.removeItem('lastSyncTime');
         localStorage.removeItem('firebaseUserId');
+        localStorage.removeItem('userInfo');
+        localStorage.removeItem('userPicture');
+        localStorage.removeItem('lastLoginTime');
+        localStorage.removeItem('mindflowUserId');
+        localStorage.removeItem('isPhoneVerified');
 
         showToast("✓ 로그아웃되었습니다");
         setIsMenuOpen(false);
@@ -2260,6 +2389,16 @@ function App() {
         }
 
         console.log('✅ 로그아웃 완료 - 상태 초기화됨');
+
+        // LoginModal 강제 리마운트를 위해 key 변경
+        setLoginKey(prev => prev + 1);
+
+        // Google OAuth 완전 초기화를 위해 페이지 강제 새로고침 (캐시 무시)
+        // (토스트 메시지가 보인 후 새로고침)
+        setTimeout(() => {
+            // 캐시를 무시하고 서버에서 페이지를 다시 로드
+            window.location.href = window.location.origin + window.location.pathname;
+        }, 800);
     };
     
     useEffect(() => {
@@ -2610,7 +2749,7 @@ function App() {
                                 setShowHeader={setShowHeader}
                             />
                         )}
-                        {activeTab === 'chat' && <MessagingHub showToast={showToast} memos={memos} />}
+                        {activeTab === 'chat' && <MessagingHub showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} />}
                     </ContentArea>
 
                     <FloatingButton onClick={handleOpenNewMemoFromFAB} activeTab={activeTab} />
@@ -2652,6 +2791,7 @@ function App() {
             {/* ★★★ 로그인 모달 렌더링 로직 ★★★ */}
             {isLoginModalOpen && (
                 <LoginModal
+                    key={`login-${loginKey}`}
                     onSuccess={handleLoginSuccess}
                     onError={handleLoginError}
                     onClose={() => setIsLoginModalOpen(false)}
@@ -2690,8 +2830,8 @@ function App() {
                             // 메모 상세 보기
                             const memo = memos?.find(m => m.id === id);
                             if (memo) {
-                                setCurrentMemo(memo);
-                                setIsMemoDetailModalOpen(true);
+                                setSelectedMemo(memo);
+                                setIsDetailModalOpen(true);
                             }
                         } else if (type === 'calendar') {
                             // 일정/알람 - 캘린더 에디터 열기
@@ -2702,9 +2842,9 @@ function App() {
                                 handleOpenCalendarEditor(date, scheduleData.text || '');
                             }
                         } else if (type === 'trash') {
-                            // 휴지통 문서 - 휴지통 탭으로 이동하고 검색 모달 닫기
+                            // 휴지통 문서 - 토스트 메시지만 표시
                             setIsSearchModalOpen(false);
-                            setActiveTab('trash');
+                            showToast('이 문서는 휴지통에서 확인하세요', 1000);
                         }
                     }}
                 />
@@ -2824,6 +2964,15 @@ function App() {
                     userInfo={pendingAuthData.userInfo}
                 />
             )}
+
+            {/* 🔐 휴대폰 인증 필요 알림 모달 */}
+            <AuthRequiredModal
+                isOpen={isAuthRequiredModalOpen}
+                onClose={() => setIsAuthRequiredModalOpen(false)}
+                onVerify={handleStartPhoneAuth}
+                featureName={authRequiredFeature}
+                reason="본인 확인을 위해 휴대폰 인증이 필요합니다"
+            />
 
             {/* ⏰ 알람 알림 */}
             {currentAlarm && (

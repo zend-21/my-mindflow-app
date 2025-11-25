@@ -7,7 +7,6 @@ import { useMemoFolders } from '../hooks/useMemoFolders';
 import { exportData, importData } from '../utils/dataManager';
 import Header from './Header';
 import { BsCheckCircleFill, BsCircle } from 'react-icons/bs';
-import { checkMemoSharedStatus } from '../services/collaborationRoomService';
 
 // 애니메이션 keyframes
 const fadeIn = keyframes`

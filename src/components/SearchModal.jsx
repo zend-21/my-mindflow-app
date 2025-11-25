@@ -482,7 +482,17 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
     const getLocation = (item) => {
         if (item.type === 'memo') {
             if (item.folderId) {
-                return `메모 > ${item.folderName || '폴더'}`;
+                // 폴더 이름이 있으면 표시
+                if (item.folderName) {
+                    // 공유 폴더인 경우
+                    if (item.folderId === 'shared') {
+                        return '메모 > 공유 폴더';
+                    }
+                    // 일반 폴더인 경우
+                    return `메모 > ${item.folderName} 폴더`;
+                }
+                // 폴더 이름을 찾을 수 없는 경우
+                return '메모 > 폴더';
             }
             return '메모 > 미분류';
         }

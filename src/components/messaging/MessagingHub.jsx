@@ -103,7 +103,7 @@ const Content = styled.div`
   }
 `;
 
-const MessagingHub = ({ showToast, memos }) => {
+const MessagingHub = ({ showToast, memos, requirePhoneAuth }) => {
   const [activeTab, setActiveTab] = useState('chat'); // chat, friends
 
   return (
@@ -128,8 +128,8 @@ const MessagingHub = ({ showToast, memos }) => {
       </Header>
 
       <Content>
-        {activeTab === 'chat' && <ChatList showToast={showToast} memos={memos} />}
-        {activeTab === 'friends' && <FriendList showToast={showToast} memos={memos} />}
+        {activeTab === 'chat' && <ChatList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} />}
+        {activeTab === 'friends' && <FriendList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} />}
       </Content>
     </Container>
   );

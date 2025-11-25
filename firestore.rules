@@ -252,36 +252,43 @@ service cloud.firestore {
     // 🔐 휴대폰 기반 인증 구조
     // ========================================
 
-    // MindFlow 사용자 계정 (Primary ID: 휴대폰 번호)
-    match /mindflowUsers/{phoneNumber} {
-      // 생성: 로그인한 사용자만 (본인 계정 생성 시)
+    // MindFlow 사용자 계정 (Primary ID: 휴대폰 번호 또는 Firebase UID)
+    match /mindflowUsers/{userId} {
+      // ⚠️ userId는 phoneNumber 또는 firebaseUID
+      // Progressive Onboarding: 구글 로그인만 하면 firebaseUID, 휴대폰 인증하면 phoneNumber
+
+      // 생성: 로그인한 사용자만
       allow create: if isSignedIn();
 
-      // 읽기: 본인만 또는 연결된 Firebase UID
+      // 읽기: 본인만 (userId가 firebaseUID이거나 연결된 계정)
       allow read: if isSignedIn() && (
-        // 본인의 여러 로그인 방법 중 하나와 일치
-        request.auth.uid in resource.data.keys('loginMethods').google.firebaseUID ||
-        request.auth.uid in resource.data.keys('loginMethods').kakao.firebaseUID ||
-        request.auth.uid in resource.data.keys('loginMethods').naver.firebaseUID
+        // userId가 본인의 Firebase UID인 경우 (구글 로그인만)
+        request.auth.uid == userId ||
+        // 또는 연결된 계정인 경우 (휴대폰 인증 완료)
+        (resource.data.keys().hasAll(['loginMethods']) &&
+         request.auth.uid in get(/databases/$(database)/documents/firebaseUIDToPhone/$(request.auth.uid)).data.keys())
       );
 
       // 수정: 본인만
       allow update: if isSignedIn() && (
-        request.auth.uid in resource.data.keys('loginMethods').google.firebaseUID ||
-        request.auth.uid in resource.data.keys('loginMethods').kakao.firebaseUID ||
-        request.auth.uid in resource.data.keys('loginMethods').naver.firebaseUID
+        request.auth.uid == userId ||
+        (resource.data.keys().hasAll(['loginMethods']) &&
+         request.auth.uid in get(/databases/$(database)/documents/firebaseUIDToPhone/$(request.auth.uid)).data.keys())
       );
 
       // 삭제: 본인만
       allow delete: if isSignedIn() && (
-        request.auth.uid in resource.data.keys('loginMethods').google.firebaseUID ||
-        request.auth.uid in resource.data.keys('loginMethods').kakao.firebaseUID ||
-        request.auth.uid in resource.data.keys('loginMethods').naver.firebaseUID
+        request.auth.uid == userId ||
+        (resource.data.keys().hasAll(['loginMethods']) &&
+         request.auth.uid in get(/databases/$(database)/documents/firebaseUIDToPhone/$(request.auth.uid)).data.keys())
       );
 
       // 사용자 데이터 서브컬렉션
       match /userData/{dataType} {
-        allow read, write: if isSignedIn();
+        // 본인만 읽기/쓰기 가능
+        allow read, write: if isSignedIn() && (
+          request.auth.uid == userId
+        );
       }
     }
 

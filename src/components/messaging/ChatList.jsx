@@ -298,7 +298,7 @@ const EmptyDescription = styled.div`
   line-height: 1.5;
 `;
 
-const ChatList = ({ showToast, memos }) => {
+const ChatList = ({ showToast, memos, requirePhoneAuth }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [chatRooms, setChatRooms] = useState([]);
   const [groupChats, setGroupChats] = useState([]);
@@ -369,12 +369,29 @@ const ChatList = ({ showToast, memos }) => {
   };
 
   const handleNewChat = () => {
-    // TODO: 새 대화 시작
-    showToast?.('새 대화 시작 기능 구현 예정');
+    // 🔐 휴대폰 인증 필요
+    if (requirePhoneAuth) {
+      requirePhoneAuth('새 대화 시작', () => {
+        // 인증 후 실행
+        showToast?.('새 대화 시작 기능 구현 예정');
+      });
+    } else {
+      // requirePhoneAuth가 없으면 바로 실행 (fallback)
+      showToast?.('새 대화 시작 기능 구현 예정');
+    }
   };
 
   const handleNewGroup = () => {
-    setShowCreateGroupModal(true);
+    // 🔐 휴대폰 인증 필요
+    if (requirePhoneAuth) {
+      requirePhoneAuth('그룹 채팅 생성', () => {
+        // 인증 후 실행
+        setShowCreateGroupModal(true);
+      });
+    } else {
+      // requirePhoneAuth가 없으면 바로 실행 (fallback)
+      setShowCreateGroupModal(true);
+    }
   };
 
   // 시간 포맷 함수

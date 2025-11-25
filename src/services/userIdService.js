@@ -5,23 +5,24 @@ import { db, auth } from '../firebase/config';
 
 /**
  * 고유 ID 생성 (초기 자동 생성용)
- * 형식: displayName_랜덤4자리
- * 예: hong_gildong_a3f2
- * 나중에 사용자가 원하는 ID로 변경 가능
+ * ⚠️ 중요: 이 ID는 한번 생성되면 변경 불가능합니다!
+ * 형식: 영문 소문자 + 숫자 6자리
+ * 예: a3x7y2, k9m4p1, z2b5n8
+ * 용도: 친구 검색, 친구 추가 링크 등
+ * 사용자에게 표시: "당신의 ID: a3x7y2"
  */
-export const generateUniqueId = (displayName) => {
-  let cleanName = displayName
-    .toLowerCase()
-    .replace(/\s+/g, '_')
-    .replace(/[^a-z0-9_]/g, '');
+export const generateUniqueId = () => {
+  // 영문 소문자 + 숫자만 사용 (36진수: a-z, 0-9)
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let id = '';
 
-  // 빈 문자열이거나 영문으로 시작하지 않으면 기본값 사용
-  if (!cleanName || !/^[a-z]/.test(cleanName)) {
-    cleanName = 'user';
+  // 6자리 랜덤 생성
+  for (let i = 0; i < 6; i++) {
+    const randomIndex = Math.floor(Math.random() * chars.length);
+    id += chars[randomIndex];
   }
 
-  const randomSuffix = Math.random().toString(36).substring(2, 6);
-  return `${cleanName}_${randomSuffix}`;
+  return id;
 };
 
 /**
@@ -29,26 +30,18 @@ export const generateUniqueId = (displayName) => {
  * @returns {object} { valid: boolean, message: string }
  */
 export const validateUniqueId = (uniqueId) => {
-  // 길이 체크
-  if (uniqueId.length < 3) {
-    return { valid: false, message: '3자 이상 입력해주세요' };
-  }
-  if (uniqueId.length > 20) {
-    return { valid: false, message: '20자 이하로 입력해주세요' };
+  // 길이 체크 (정확히 6자리)
+  if (uniqueId.length !== 6) {
+    return { valid: false, message: 'ID는 6자리여야 합니다' };
   }
 
-  // 문자 체크 (소문자, 숫자, 언더바만)
-  const regex = /^[a-z0-9_]+$/;
+  // 문자 체크 (영문 소문자 + 숫자만)
+  const regex = /^[a-z0-9]+$/;
   if (!regex.test(uniqueId)) {
     return {
       valid: false,
-      message: '영문 소문자, 숫자, 언더바(_)만 사용 가능합니다'
+      message: '영문 소문자와 숫자만 사용 가능합니다'
     };
-  }
-
-  // 첫 글자는 영문이어야 함
-  if (!/^[a-z]/.test(uniqueId)) {
-    return { valid: false, message: '첫 글자는 영문이어야 합니다' };
   }
 
   return { valid: true, message: '사용 가능한 ID입니다' };
@@ -66,13 +59,21 @@ export const checkUniqueIdAvailable = async (uniqueId) => {
 
 /**
  * 사용자 프로필에 고유 ID 설정
+ * ⚠️ 중요: uniqueId는 변경 불가능합니다! 이미 설정된 경우 에러를 발생시킵니다.
  */
 export const setUserUniqueId = async (uniqueId) => {
   const userId = localStorage.getItem('firebaseUserId');
   if (!userId) throw new Error('로그인이 필요합니다');
 
   const userRef = doc(db, 'users', userId);
-  await setDoc(userRef, { uniqueId, updatedAt: new Date().toISOString() }, { merge: true });
+  const userDoc = await getDoc(userRef);
+
+  // 이미 uniqueId가 설정되어 있으면 변경 불가
+  if (userDoc.exists() && userDoc.data().uniqueId) {
+    throw new Error('ID는 변경할 수 없습니다. 이미 설정된 ID: ' + userDoc.data().uniqueId);
+  }
+
+  await setDoc(userRef, { uniqueId, createdAt: new Date().toISOString() }, { merge: true });
 };
 
 /**

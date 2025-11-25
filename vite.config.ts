@@ -5,6 +5,11 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   server: {
+    // ✅ Google OAuth 팝업을 허용하기 위한 헤더 설정
+    headers: {
+      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
+      'Cross-Origin-Embedder-Policy': 'unsafe-none'
+    },
     proxy: {
       '/api/lunar': {
         target: 'https://apis.data.go.kr',

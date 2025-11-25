@@ -351,7 +351,7 @@ const AddFriendButton = styled.button`
   }
 `;
 
-const FriendList = ({ showToast, memos }) => {
+const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -450,7 +450,16 @@ const FriendList = ({ showToast, memos }) => {
   };
 
   const handleAddFriend = () => {
-    showToast?.('친구 추가 기능 구현 예정');
+    // 🔐 휴대폰 인증 필요
+    if (requirePhoneAuth) {
+      requirePhoneAuth('친구 추가', () => {
+        // 인증 후 실행
+        showToast?.('친구 추가 기능 구현 예정');
+      });
+    } else {
+      // requirePhoneAuth가 없으면 바로 실행 (fallback)
+      showToast?.('친구 추가 기능 구현 예정');
+    }
   };
 
   const handleAddTestFriends = async () => {

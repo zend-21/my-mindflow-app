@@ -4,7 +4,8 @@
       "Bash(dir:*)",
       "Bash(npm run dev:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(timeout 5 bash:*)"
     ],
     "deny": [],
     "ask": []

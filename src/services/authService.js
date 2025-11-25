@@ -55,6 +55,11 @@ export const findAccountByPhone = async (phoneNumber) => {
     }
     return null;
   } catch (error) {
+    // Permission 에러는 문서가 없는 경우이므로 null 반환 (신규 사용자)
+    if (error.code === 'permission-denied') {
+      console.log('신규 사용자 - 계정 없음:', formatted);
+      return null;
+    }
     console.error('계정 조회 실패:', error);
     throw error;
   }
@@ -75,6 +80,11 @@ export const findPhoneByFirebaseUID = async (firebaseUID) => {
     }
     return null;
   } catch (error) {
+    // Permission 에러는 문서가 없는 경우이므로 null 반환 (신규 사용자)
+    if (error.code === 'permission-denied') {
+      console.log('신규 사용자 - UID 매핑 없음:', firebaseUID);
+      return null;
+    }
     console.error('UID 매핑 조회 실패:', error);
     return null;
   }

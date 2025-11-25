@@ -144,10 +144,8 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
             onError();
         },
         scope: 'https://www.googleapis.com/auth/drive.file',
-        // Refresh Token을 받기 위한 추가 옵션
-        // 주의: flow: 'auth-code'를 사용하려면 백엔드가 필요하므로
-        // 대신 prompt: 'consent'를 사용하여 매번 동의 화면 표시
-        // 이렇게 하면 refresh_token이 응답에 포함됩니다 (첫 로그인 시)
+        flow: 'implicit', // 명시적으로 implicit flow 설정
+        ux_mode: 'popup', // 팝업 모드 강제
     });
 
     return (
