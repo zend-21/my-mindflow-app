@@ -85,14 +85,16 @@ export const findPhoneByFirebaseUID = async (firebaseUID) => {
  * @param {string} phoneNumber - 국제 형식 휴대폰 번호
  * @param {string} firebaseUID - Firebase Auth UID
  * @param {object} userInfo - Google 사용자 정보
+ * @param {object} certInfo - (선택) 본인인증 정보 (미래 확장용)
  */
-export const createMindFlowAccount = async (phoneNumber, firebaseUID, userInfo) => {
+export const createMindFlowAccount = async (phoneNumber, firebaseUID, userInfo, certInfo = null) => {
   try {
     const formatted = formatPhoneNumber(phoneNumber);
 
     // 1. mindflowUsers 컬렉션에 계정 생성
     const userRef = doc(db, 'mindflowUsers', formatted);
-    await setDoc(userRef, {
+
+    const accountData = {
       userId: formatted,
       createdAt: serverTimestamp(),
       loginMethods: {
@@ -107,7 +109,20 @@ export const createMindFlowAccount = async (phoneNumber, firebaseUID, userInfo) 
         email: userInfo.email,
         photoURL: userInfo.picture
       }
-    });
+    };
+
+    // 🔮 미래 확장: 본인인증 정보 추가 (PASS/NICE/KCB)
+    if (certInfo) {
+      accountData.verification = {
+        name: certInfo.name,
+        birthDate: certInfo.birthDate,
+        CI: certInfo.CI, // 연계정보 (중복가입 확인용)
+        verifiedAt: serverTimestamp(),
+        provider: certInfo.provider // 'PASS', 'NICE', 'KCB'
+      };
+    }
+
+    await setDoc(userRef, accountData);
 
     // 2. phoneToUser 매핑 생성
     const phoneRef = doc(db, 'phoneToUser', formatted);
@@ -248,4 +263,44 @@ export const verifyCode = async (confirmationResult, code) => {
     console.error('❌ 인증 코드 확인 실패:', error);
     throw error;
   }
+};
+
+/**
+ * 🔮 미래 확장: CI로 계정 조회 (본인인증 연동 시 사용)
+ * @param {string} CI - 연계정보 (Connecting Information)
+ * @returns {object|null} - 계정 정보 또는 null
+ */
+export const findAccountByCI = async (CI) => {
+  try {
+    // 미래 구현: CI 인덱스로 계정 검색
+    // const accountsRef = collection(db, 'mindflowUsers');
+    // const q = query(accountsRef, where('verification.CI', '==', CI));
+    // const snapshot = await getDocs(q);
+    // return snapshot.empty ? null : snapshot.docs[0].data();
+
+    console.warn('⚠️ findAccountByCI: 본인인증 미구현 (미래 기능)');
+    return null;
+  } catch (error) {
+    console.error('CI 조회 실패:', error);
+    return null;
+  }
+};
+
+/**
+ * 🔮 미래 확장: 본인인증 요청 (PASS/NICE/KCB 연동)
+ * @returns {object} - 본인인증 결과 {name, birthDate, phone, CI, provider}
+ */
+export const requestCertification = async () => {
+  // 미래 구현: PASS/NICE/KCB 본인인증 팝업
+  // 실제 구현 시 아래 형태로 반환
+  throw new Error('본인인증 서비스가 아직 연동되지 않았습니다');
+
+  // 예상 반환 형태:
+  // return {
+  //   name: '홍길동',
+  //   birthDate: '19900101',
+  //   phone: '+821012345678',
+  //   CI: '고유연계정보_암호화값',
+  //   provider: 'PASS' // 또는 'NICE', 'KCB'
+  // };
 };

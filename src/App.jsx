@@ -1837,11 +1837,24 @@ function App() {
             const existingAccount = await findAccountByPhone(phoneNumber);
 
             if (existingAccount) {
-                // 기존 계정에 Google 로그인 연결
-                console.log('✅ 기존 계정 발견 - Google 로그인 연결');
-                await linkGoogleToAccount(phoneNumber, firebaseUID, userInfo);
+                // 🔐 보안: 1 휴대폰 = 1 Google 계정 엄격 매핑
+                const existingGoogleUID = existingAccount.loginMethods?.google?.firebaseUID;
+
+                if (existingGoogleUID === firebaseUID) {
+                    // ✅ 같은 Google 계정 → 재로그인 (정상)
+                    console.log('✅ 기존 계정 재로그인');
+                } else {
+                    // ❌ 다른 Google 계정 → 차단
+                    console.warn('⚠️ 이미 다른 Google 계정에 연결된 휴대폰 번호');
+                    showToast('⚠ 이미 다른 계정에 등록된 휴대폰 번호입니다');
+
+                    // 인증 취소
+                    setIsPhoneVerifying(false);
+                    setPendingAuthData(null);
+                    return;
+                }
             } else {
-                // 새 계정 생성
+                // 🆕 새 계정 생성
                 console.log('🆕 새 계정 생성');
                 await createMindFlowAccount(phoneNumber, firebaseUID, userInfo);
             }
