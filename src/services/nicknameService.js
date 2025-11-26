@@ -5,9 +5,10 @@ import { collection, query, where, getDocs, doc, setDoc, deleteDoc, getDoc } fro
 /**
  * 닉네임 중복 체크
  * @param {string} nickname - 체크할 닉네임
+ * @param {string} excludeUserId - 제외할 사용자 ID (자기 자신 제외용)
  * @returns {Promise<boolean>} true면 사용 가능, false면 중복
  */
-export const checkNicknameAvailability = async (nickname) => {
+export const checkNicknameAvailability = async (nickname, excludeUserId = null) => {
     if (!nickname || !nickname.trim()) {
         return false;
     }
@@ -21,7 +22,17 @@ export const checkNicknameAvailability = async (nickname) => {
         const querySnapshot = await getDocs(q);
 
         // 문서가 없으면 사용 가능
-        return querySnapshot.empty;
+        if (querySnapshot.empty) {
+            return true;
+        }
+
+        // ✅ 자기 자신의 닉네임이면 사용 가능
+        if (excludeUserId) {
+            const isSelf = querySnapshot.docs.every(doc => doc.data().userId === excludeUserId);
+            return isSelf;
+        }
+
+        return false;
     } catch (error) {
         console.error('닉네임 중복 체크 오류:', error);
         throw error;
@@ -90,19 +101,25 @@ export const updateNickname = async (userId, newNickname) => {
             return true;
         }
 
-        // 새 닉네임 중복 체크
-        const isAvailable = await checkNicknameAvailability(trimmedNickname);
+        // ✅ 새 닉네임 중복 체크 (자기 자신 제외)
+        const isAvailable = await checkNicknameAvailability(trimmedNickname, userId);
         if (!isAvailable) {
             return false;
         }
 
-        // 닉네임 업데이트
-        await setDoc(nicknameDocRef, {
+        // ✅ 닉네임 업데이트 (createdAt은 기존 문서면 포함하지 않음)
+        const updateData = {
             nickname: trimmedNickname,
             userId: userId,
-            createdAt: currentNickname ? undefined : new Date(), // 기존 문서면 유지
             updatedAt: new Date()
-        }, { merge: true });
+        };
+
+        // 새 문서인 경우만 createdAt 추가
+        if (!nicknameDoc.exists()) {
+            updateData.createdAt = new Date();
+        }
+
+        await setDoc(nicknameDocRef, updateData, { merge: true });
 
         return true;
     } catch (error) {

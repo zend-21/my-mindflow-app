@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import styled from 'styled-components';
-import { useGoogleLogin } from '@react-oauth/google';
+import { useGoogleLogin, googleLogout } from '@react-oauth/google';
 import Portal from './Portal';
 
 const ModalOverlay = styled.div`
@@ -107,6 +107,23 @@ const ModalDescription = styled.p`
 function LoginModal({ onSuccess, onError, onClose, setProfile }) {
     console.log('🔧 LoginModal 렌더링');
 
+    // ✅ 모달이 열릴 때마다 Google 세션 초기화
+    useEffect(() => {
+        console.log('🔄 Google 세션 초기화 중...');
+        try {
+            // Google Identity Services 자동 선택 비활성화
+            googleLogout();
+            
+            // Google 계정 선택기 힌트 초기화
+            if (window.google?.accounts?.id) {
+                window.google.accounts.id.disableAutoSelect();
+                console.log('✅ Google disableAutoSelect 호출됨');
+            }
+        } catch (error) {
+            console.warn('⚠️ Google 세션 초기화 중 오류:', error);
+        }
+    }, []);
+
     // Refresh Token을 받기 위한 설정 추가
     const login = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
@@ -146,6 +163,8 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
         scope: 'https://www.googleapis.com/auth/drive.file',
         flow: 'implicit', // 명시적으로 implicit flow 설정
         ux_mode: 'popup', // 팝업 모드 강제
+        prompt: 'select_account', // ✅ 항상 계정 선택 창 표시 (세션 캐시 방지)
+        hint: '', // ✅ 이전 계정 힌트 제거
     });
 
     return (

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import styled, { keyframes, css } from 'styled-components';
 import { GlobalStyle } from './styles.js';
-import { GoogleLogin } from '@react-oauth/google';
+import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import { GoogleAuthProvider, signInWithCredential, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
@@ -2348,8 +2348,19 @@ function App() {
             console.error('Firebase 로그아웃 오류:', error);
         }
 
-        // 🔑 Google OAuth 토큰 revoke (선택적)
+        // 🔑 Google OAuth 토큰 revoke 및 세션 초기화
         try {
+            // 1. @react-oauth/google 라이브러리 로그아웃
+            googleLogout();
+            console.log('✅ googleLogout() 호출 완료');
+
+            // 2. Google Identity Services 자동 선택 비활성화
+            if (window.google?.accounts?.id) {
+                window.google.accounts.id.disableAutoSelect();
+                console.log('✅ disableAutoSelect() 호출 완료');
+            }
+
+            // 3. 토큰 Revoke (API 호출)
             if (accessToken) {
                 await fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, {
                     method: 'POST',
@@ -2360,7 +2371,7 @@ function App() {
                 console.log('🔑 Google OAuth 토큰 revoke 완료');
             }
         } catch (error) {
-            console.error('Google OAuth 토큰 revoke 오류:', error);
+            console.error('Google OAuth 로그아웃 오류:', error);
         }
 
         // 상태 초기화
