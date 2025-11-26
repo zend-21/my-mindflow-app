@@ -5,7 +5,7 @@ import styled, { keyframes, css } from 'styled-components';
 import { GlobalStyle } from './styles.js';
 import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
-import { GoogleAuthProvider, signInWithCredential, signOut } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithCredential, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from './firebase/config';
 import { initializeGapiClient, setAccessToken, syncToGoogleDrive, loadFromGoogleDrive, loadProfilePictureFromGoogleDrive, syncProfilePictureToGoogleDrive } from './utils/googleDriveSync';
@@ -14,6 +14,7 @@ import { DndContext, closestCenter, useSensor, useSensors, MouseSensor, TouchSen
 import { SortableContext, useSortable, arrayMove, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useFirestoreSync } from './hooks/useFirestoreSync';
+import { fetchAllUserData } from './services/userDataService';
 import { exportData, importData } from './utils/dataManager';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -322,6 +323,9 @@ function App() {
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
     const [loginKey, setLoginKey] = useState(0); // LoginModal 강제 리마운트용
 
+    // 🔥 Firebase Auth 상태
+    const [firebaseUser, setFirebaseUser] = useState(null); // Firebase Auth User 객체
+
     // 🔐 휴대폰 인증 관련 상태
     const [isPhoneVerifying, setIsPhoneVerifying] = useState(false);
     const [pendingAuthData, setPendingAuthData] = useState(null); // Google 로그인 후 대기 중인 데이터
@@ -440,6 +444,36 @@ function App() {
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
+    }, []);
+
+    // 🔥 Firebase Auth 상태 리스너
+    useEffect(() => {
+        console.log('🔥 Firebase Auth 리스너 등록');
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                console.log('✅ Firebase Auth 사용자 감지:', user.uid);
+                setFirebaseUser(user);
+
+                // localStorage에 저장 (기존 코드와의 호환성)
+                localStorage.setItem('firebaseUserId', user.uid);
+
+                // 프로필 복원 시도
+                const savedProfile = localStorage.getItem('userProfile');
+                if (savedProfile && !profile) {
+                    try {
+                        setProfile(JSON.parse(savedProfile));
+                    } catch (e) {
+                        console.error('프로필 복원 실패:', e);
+                    }
+                }
+            } else {
+                console.log('❌ Firebase Auth 로그아웃 상태');
+                setFirebaseUser(null);
+            }
+            setIsLoading(false);
+        });
+
+        return () => unsubscribe();
     }, []);
 
     useEffect(() => {
@@ -572,11 +606,12 @@ function App() {
     }, []);
 
     // 🔥 Firestore 동기화 훅 사용
-    // ⚠️ 중요: 휴대폰 인증한 경우 휴대폰 번호 사용, 아니면 firebaseUserId 사용
-    const phoneId = localStorage.getItem('mindflowUserId'); // 휴대폰 번호
-    const firebaseId = localStorage.getItem('firebaseUserId'); // Firebase UID
-    const userId = phoneId || firebaseId; // 둘 중 하나 사용 (Progressive Onboarding)
-    const isAuthenticated = !!profile;
+    // ⚠️ 중요: 휴대폰 인증한 경우 휴대폰 번호 사용, 아니면 Firebase Auth UID 사용
+    const phoneId = localStorage.getItem('mindflowUserId'); // 휴대폰 번호 (캐시)
+    const userId = phoneId || (firebaseUser?.uid); // ✅ Firebase Auth를 Source of Truth로 사용
+
+    // Firebase Auth 상태 또는 profile이 있으면 인증된 것으로 판단
+    const isAuthenticated = !!(firebaseUser || profile);
 
     const {
         loading: dataLoading,
@@ -595,7 +630,7 @@ function App() {
         syncActivities,
         syncSettings,
         saveImmediately
-    } = useFirestoreSync(userId, isAuthenticated);
+    } = useFirestoreSync(userId, isAuthenticated, firebaseUser?.uid);
 
     // settings에서 개별 값 추출
     const widgets = settings.widgets;
@@ -2056,112 +2091,69 @@ function App() {
         if (syncDebounceRef.current) {
             clearTimeout(syncDebounceRef.current);
         }
-        
-        // 3초 후 조용히 동기화
-        syncDebounceRef.current = setTimeout(async () => {
-            if (profile && accessToken && isGapiReady) {
-                console.log('🔄 조용한 동기화 시작 (3초 디바운싱)');
-                await performSync(false); // isManual = false (메시지 없음)
-            }
-        }, 3000); // 3초
+
+        // 🔥 Firestore는 이미 디바운싱 되므로 즉시 저장 (useFirestoreSync의 1초 디바운스 사용)
+        // 별도로 3초 디바운스를 추가로 걸 필요 없음
+        console.log('🔄 조용한 동기화 (Firestore 자동 디바운스)');
     };
 
     const performSync = async (isManual = false) => {
         console.log('🔧 performSync 시작 - isManual:', isManual);
 
-        if (!profile || !accessToken) {
+        // 🔥 Firestore 기반 동기화로 변경
+        if (!userId || !isAuthenticated) {
             console.log('❌ 로그인 안 됨');
             if (isManual) {
-                showToast('🔐 로그인 세션이 만료되었습니다');
-                console.log('Toast 표시: 로그인 세션이 만료되었습니다');
-                // 1.5초 후 로그인 모달 표시
-                setTimeout(() => {
-                    setIsLoginModalOpen(true);
-                }, 1500);
-            }
-            return false;
-        }
-
-        if (!isGapiReady) {
-            console.log('❌ GAPI 준비 안 됨');
-            if (isManual) {
-                showToast('⏳ Drive 연결 중...');
-                console.log('Toast 표시: Drive 연결 중');
+                showToast('🔐 로그인이 필요합니다');
+                console.log('Toast 표시: 로그인이 필요합니다');
             }
             return false;
         }
 
         try {
-            console.log('✅ 동기화 조건 충족 - 시작');
+            console.log('✅ Firestore 동기화 시작');
 
-            // 🔑 동기화 전에 GAPI에 토큰 재설정 (타이밍 이슈 방지)
-            console.log('🔑 GAPI에 토큰 재설정 중...');
-            setAccessToken(accessToken);
-            await new Promise(resolve => setTimeout(resolve, 100)); // GAPI 토큰 설정 대기
-            
             if (isManual) {
                 console.log('🎯 수동 동기화 - 스피너 표시');
                 setIsSyncing(true);
-                // 동기화 시작 토스트 제거 - 스피너만 표시
                 await new Promise(resolve => setTimeout(resolve, 300));
             }
-            
-            const dataToSync = {
-                memos,
-                calendarSchedules,
-                recentActivities,
-                displayCount,
-                widgets,
-                trashedItems: JSON.parse(localStorage.getItem('trashedItems_shared') || '[]'),
-                macroTexts: JSON.parse(localStorage.getItem('macroTexts') || '[]'),
-                memoFolders: JSON.parse(localStorage.getItem('memoFolders') || '[]'),
-                userEmail: profile.email,
-            };
 
-            console.log('📤 Google Drive에 업로드 시작...');
-            const result = await syncToGoogleDrive(dataToSync);
-            console.log('📥 업로드 결과:', result);
+            // 🔥 1. 현재 로컬 데이터를 즉시 Firestore에 저장
+            console.log('📤 로컬 데이터 → Firestore 저장 중...');
+            await saveImmediately();
 
-            if (result.success) {
-                // ✅ 성공 처리 - 이 부분이 반드시 있어야 함!
-                const now = Date.now();
-                setLastSyncTime(now);
-                localStorage.setItem('lastSyncTime', now.toString());
+            // 🔥 2. Firestore에서 최신 데이터 다시 가져오기 (다른 기기의 변경사항 반영)
+            console.log('📥 Firestore → 최신 데이터 로드 중...');
+            const freshData = await fetchAllUserData(userId);
 
-                if (isManual) {
-                    console.log('✅ 수동 동기화 - 활동 기록 추가');
-                    addActivity('동기화', 'Google Drive 동기화 완료');
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    console.log('✅ 수동 동기화 - 토스트 표시');
-                    showToast('✅ 동기화 완료!');
-                    console.log('Toast 표시: 동기화 완료');
-                }
-                return true;
-            } else {
-                console.error('❌ 동기화 실패:', result);
-                if (result.error === 'TOKEN_EXPIRED') {
-                    // ✅ 토큰 만료 - 토큰만 삭제하고 재로그인 유도
-                    console.log('🔄 토큰 만료 감지 - 토큰 삭제');
-                    localStorage.removeItem('accessToken');
-                    localStorage.removeItem('tokenExpiresAt');
-                    setAccessTokenState(null);
+            // 3. 로컬 상태 업데이트
+            if (freshData.memos) syncMemos(freshData.memos);
+            if (freshData.folders) syncFolders(freshData.folders);
+            if (freshData.trash) syncTrash(freshData.trash);
+            if (freshData.macros) syncMacros(freshData.macros);
+            if (freshData.calendar) syncCalendar(freshData.calendar);
+            if (freshData.activities) syncActivities(freshData.activities);
+            if (freshData.settings) syncSettings(freshData.settings);
 
-                    if (isManual) {
-                        showToast('🔐 로그인 세션이 만료되었습니다. 다시 로그인해주세요.');
-                        setTimeout(() => {
-                            setIsLoginModalOpen(true);
-                        }, 1500);
-                    }
-                } else {
-                    if (isManual) {
-                        showToast('❌ 동기화 실패');
-                    }
-                }
-                return false;
+            // 4. 성공 처리
+            const now = Date.now();
+            setLastSyncTime(now);
+            localStorage.setItem('lastSyncTime', now.toString());
+
+            if (isManual) {
+                console.log('✅ 수동 동기화 - 활동 기록 추가');
+                addActivity('동기화', 'Firestore 동기화 완료');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                console.log('✅ 수동 동기화 - 토스트 표시');
+                showToast('✅ 동기화 완료!');
+                console.log('Toast 표시: 동기화 완료');
             }
+            return true;
+
         } catch (error) {
-            console.error('❌ 동기화 중 오류:', error);
-            if (isManual) showToast('❌ 오류 발생');
+            console.error('❌ Firestore 동기화 중 오류:', error);
+            if (isManual) showToast('❌ 동기화 실패');
             return false;
         } finally {
             if (isManual) {
@@ -2174,46 +2166,54 @@ function App() {
     useEffect(() => {
         const handleVisibilityChange = async () => {
             console.log('🔔 Visibility 상태 변경:', document.hidden ? '숨김(백그라운드)' : '보임(포그라운드)');
-            
+
             if (document.hidden) {
-                // 앱이 백그라운드로 전환됨
-                console.log('📱 백그라운드 전환 감지 - 즉시 동기화 시작');
-                
-                // 대기 중인 디바운스 타이머 취소
-                if (syncDebounceRef.current) {
-                    clearTimeout(syncDebounceRef.current);
-                    console.log('⏸️ 디바운스 타이머 취소됨');
-                }
-                
-                // 즉시 동기화 (조용히)
-                if (profile && accessToken && isGapiReady) {
+                // 🔥 앱이 백그라운드로 전환됨 - Firestore에 즉시 저장
+                console.log('📱 백그라운드 전환 감지 - Firestore 즉시 저장');
+
+                if (userId && isAuthenticated) {
                     console.log('🔄 백그라운드 동기화 실행 중...');
-                    const success = await performSync(false); // isManual = false
-                    if (success) {
+                    try {
+                        await saveImmediately(); // Firestore에 즉시 저장
                         console.log('✅ 백그라운드 동기화 완료');
+                    } catch (error) {
+                        console.error('❌ 백그라운드 동기화 실패:', error);
                     }
                 }
             } else {
-                // 앱이 포그라운드로 복귀
-                console.log('👀 앱이 다시 활성화됨 (포그라운드)');
+                // 🔥 앱이 포그라운드로 복귀 - Firestore에서 최신 데이터 로드
+                console.log('👀 앱이 다시 활성화됨 (포그라운드) - 최신 데이터 확인');
+
+                if (userId && isAuthenticated) {
+                    try {
+                        const freshData = await fetchAllUserData(userId);
+                        if (freshData.memos) syncMemos(freshData.memos);
+                        if (freshData.folders) syncFolders(freshData.folders);
+                        if (freshData.trash) syncTrash(freshData.trash);
+                        if (freshData.calendar) syncCalendar(freshData.calendar);
+                        console.log('✅ 포그라운드 복귀 - 최신 데이터 로드 완료');
+                    } catch (error) {
+                        console.error('❌ 포그라운드 데이터 로드 실패:', error);
+                    }
+                }
             }
         };
-        
+
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        
+
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, [profile, accessToken, isGapiReady, memos, calendarSchedules, recentActivities, displayCount, widgets]);
+    }, [userId, isAuthenticated, saveImmediately, syncMemos, syncFolders, syncTrash, syncCalendar]);
 
-    // Pull-to-refresh에서 Google Drive 동기화 트리거
+    // 🔥 Pull-to-refresh에서 Firestore 동기화 트리거 (이벤트는 유지, 로직만 변경)
     useEffect(() => {
         const handleTriggerSync = async () => {
-            console.log('🔄 Pull-to-refresh에서 동기화 트리거됨');
-            if (profile && accessToken && isGapiReady) {
-                await performSync(true); // 수동 동기화로 처리 (토스트 메시지 표시)
+            console.log('🔄 Pull-to-refresh에서 Firestore 동기화 트리거됨');
+            if (userId && isAuthenticated) {
+                await performSync(true); // 수동 동기화 (토스트 메시지 표시)
             } else {
-                console.log('❌ 동기화 조건 미충족 - profile:', !!profile, 'accessToken:', !!accessToken, 'isGapiReady:', isGapiReady);
+                console.log('❌ 동기화 조건 미충족 - userId:', !!userId, 'isAuthenticated:', isAuthenticated);
             }
         };
 
@@ -2222,27 +2222,16 @@ function App() {
         return () => {
             window.removeEventListener('triggerGoogleDriveSync', handleTriggerSync);
         };
-    }, [profile, accessToken, isGapiReady, memos, calendarSchedules, recentActivities, displayCount, widgets]);
+    }, [userId, isAuthenticated, performSync]);
 
-    // ✅ 앱 종료 시 마지막 동기화 - 새로 추가
+    // 🔥 앱 종료 시 Firestore에 마지막 동기화
     useEffect(() => {
         const handleBeforeUnload = async () => {
-            if (profile && accessToken && isGapiReady) {
-                console.log('👋 앱 종료 전 마지막 동기화...');
-                
-                const dataToSync = {
-                    memos,
-                    calendarSchedules,
-                    recentActivities,
-                    displayCount,
-                    widgets,
-                    trashedItems: JSON.parse(localStorage.getItem('trashedItems_shared') || '[]'),
-                    memoFolders: JSON.parse(localStorage.getItem('memoFolders') || '[]'),
-                    userEmail: profile.email,
-                };
+            if (userId && isAuthenticated) {
+                console.log('👋 앱 종료 전 Firestore 마지막 동기화...');
 
                 try {
-                    await syncToGoogleDrive(dataToSync);
+                    await saveImmediately(); // Firestore에 즉시 저장
                     console.log('✅ 종료 전 동기화 완료');
                 } catch (error) {
                     console.error('❌ 종료 전 동기화 실패:', error);
@@ -2251,11 +2240,11 @@ function App() {
         };
 
         window.addEventListener('beforeunload', handleBeforeUnload);
-        
+
         return () => {
             window.removeEventListener('beforeunload', handleBeforeUnload);
         };
-    }, [profile, accessToken, isGapiReady, memos, calendarSchedules, recentActivities]);
+    }, [userId, isAuthenticated, saveImmediately]);
 
     // ✅ Google Drive에서 복원 - 새로 추가
     const handleRestoreFromDrive = async () => {
@@ -2389,6 +2378,27 @@ function App() {
         localStorage.removeItem('lastLoginTime');
         localStorage.removeItem('mindflowUserId');
         localStorage.removeItem('isPhoneVerified');
+
+        // sessionStorage 완전 정리 (Google OAuth 세션 포함)
+        sessionStorage.clear();
+        console.log('✅ sessionStorage 정리 완료');
+
+        // IndexedDB 정리 (Google Identity Services가 사용하는 데이터베이스)
+        try {
+            const databases = await window.indexedDB.databases();
+            databases.forEach(db => {
+                if (db.name && (
+                    db.name.includes('google') ||
+                    db.name.includes('gsi') ||
+                    db.name.includes('oauth')
+                )) {
+                    window.indexedDB.deleteDatabase(db.name);
+                    console.log(`🗑️ IndexedDB 삭제: ${db.name}`);
+                }
+            });
+        } catch (error) {
+            console.warn('IndexedDB 정리 실패 (무시 가능):', error);
+        }
 
         showToast("✓ 로그아웃되었습니다");
         setIsMenuOpen(false);
@@ -2853,9 +2863,8 @@ function App() {
                                 handleOpenCalendarEditor(date, scheduleData.text || '');
                             }
                         } else if (type === 'trash') {
-                            // 휴지통 문서 - 토스트 메시지만 표시
-                            setIsSearchModalOpen(false);
-                            showToast('이 문서는 휴지통에서 확인하세요', 1000);
+                            // 휴지통 문서 - 토스트 메시지만 표시 (검색창은 열린 상태 유지)
+                            showToast('이 문서는 휴지통에서 확인하세요', 1300);
                         }
                     }}
                 />

@@ -9,17 +9,19 @@ import {
   saveCalendarToFirestore,
   saveActivitiesToFirestore,
   saveSettingsToFirestore,
-  migrateLocalStorageToFirestore
+  migrateLocalStorageToFirestore,
+  migrateLegacyFirestoreData
 } from '../services/userDataService';
 
 /**
  * Firestore와 로컬 상태를 동기화하는 훅
  *
- * @param {string} userId - 사용자 ID
+ * @param {string} userId - 사용자 ID (phoneNumber 또는 firebaseUID)
  * @param {boolean} enabled - 동기화 활성화 여부
+ * @param {string} firebaseUID - Firebase Auth UID (구 구조 마이그레이션용)
  * @returns {object} - 동기화된 데이터와 저장 함수들
  */
-export const useFirestoreSync = (userId, enabled = true) => {
+export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -57,28 +59,75 @@ export const useFirestoreSync = (userId, enabled = true) => {
         setLoading(true);
         setError(null);
 
-        // 마이그레이션 키 확인
-        const migrationKey = `firestore_migrated_${userId}`;
-        const alreadyMigrated = localStorage.getItem(migrationKey) === 'true';
+        // 🔄 구 구조 Firestore → 신 구조 Firestore 마이그레이션
+        const legacyMigrationKey = `legacy_firestore_migrated_${userId}`;
+        const legacyAlreadyMigrated = localStorage.getItem(legacyMigrationKey) === 'true';
 
-        if (!alreadyMigrated) {
-          // 첫 로그인 시 localStorage → Firestore 마이그레이션
-          console.log('📦 첫 로그인 감지 - 데이터 마이그레이션 시작...');
-          await migrateLocalStorageToFirestore(userId);
-          localStorage.setItem(migrationKey, 'true');
-          console.log('✅ 마이그레이션 완료!');
+        if (!legacyAlreadyMigrated && firebaseUID) {
+          // 구 구조 데이터가 있으면 신 구조로 마이그레이션
+          try {
+            const migrated = await migrateLegacyFirestoreData(firebaseUID, userId);
+            if (migrated) {
+              localStorage.setItem(legacyMigrationKey, 'true');
+              console.log('✅ 구 구조 데이터 마이그레이션 완료!');
+            }
+          } catch (error) {
+            console.warn('⚠️ 구 구조 마이그레이션 건너뜀:', error);
+          }
         }
 
         // Firestore에서 데이터 로드
         const data = await fetchAllUserData(userId);
 
-        setMemos(data.memos || []);
-        setFolders(data.folders || []);
-        setTrash(data.trash || []);
-        setMacros(data.macros || []);
-        setCalendar(data.calendar || {});
-        setActivities(data.activities || []);
-        setSettings(data.settings || settings);
+        // 📦 Firestore에 데이터가 없으면 localStorage에서 마이그레이션 (첫 로그인)
+        const hasFirestoreData = data.memos?.length > 0 ||
+                                  data.folders?.length > 0 ||
+                                  data.trash?.length > 0 ||
+                                  Object.keys(data.calendar || {}).length > 0;
+
+        if (!hasFirestoreData) {
+          // Firestore가 비어있을 때만 localStorage에서 마이그레이션 시도
+          const localMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
+          const localFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
+          const hasLocalData = localMemos.length > 0 || localFolders.length > 0;
+
+          if (hasLocalData) {
+            console.log('📦 Firestore 비어있음 - localStorage 데이터 마이그레이션 시작...');
+            await migrateLocalStorageToFirestore(userId);
+            console.log('✅ localStorage 마이그레이션 완료!');
+
+            // 마이그레이션 후 다시 로드
+            const refreshedData = await fetchAllUserData(userId);
+            setMemos(refreshedData.memos || []);
+            setFolders(refreshedData.folders || []);
+            setTrash(refreshedData.trash || []);
+            setMacros(refreshedData.macros || []);
+            setCalendar(refreshedData.calendar || {});
+            setActivities(refreshedData.activities || []);
+            setSettings(refreshedData.settings || settings);
+          } else {
+            // Firestore도 비어있고 localStorage도 비어있음 (완전 신규)
+            console.log('🆕 신규 사용자 - 빈 상태로 시작');
+            setMemos(data.memos || []);
+            setFolders(data.folders || []);
+            setTrash(data.trash || []);
+            setMacros(data.macros || []);
+            setCalendar(data.calendar || {});
+            setActivities(data.activities || []);
+            setSettings(data.settings || settings);
+          }
+        } else {
+          // Firestore에 데이터가 있으면 그대로 사용
+          console.log('✅ Firestore 데이터 로드 완료');
+          setMemos(data.memos || []);
+          setFolders(data.folders || []);
+          setTrash(data.trash || []);
+          setMacros(data.macros || []);
+          setCalendar(data.calendar || {});
+          setActivities(data.activities || []);
+          setSettings(data.settings || settings);
+        }
+
 
         // localStorage에도 캐싱 (오프라인 지원)
         localStorage.setItem('memos_shared', JSON.stringify(data.memos || []));
@@ -112,7 +161,7 @@ export const useFirestoreSync = (userId, enabled = true) => {
     };
 
     loadData();
-  }, [userId, enabled]);
+  }, [userId, enabled, firebaseUID]);
 
   // 디바운스 저장 (너무 자주 저장하지 않도록)
   const saveTimeout = useRef(null);

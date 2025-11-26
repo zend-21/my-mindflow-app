@@ -1,4 +1,4 @@
-// src/components/SearchModal.jsx
+// src/components/SearchModal.jsx - Updated with individual delete buttons
 
 import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
@@ -297,6 +297,7 @@ const SuggestionItem = styled.div`
     gap: 10px;
     color: #d0d0d0;
     font-size: 14px;
+    position: relative;
 
     &:hover {
         background: rgba(255, 255, 255, 0.08);
@@ -305,6 +306,37 @@ const SuggestionItem = styled.div`
     svg {
         flex-shrink: 0;
         opacity: 0.6;
+    }
+`;
+
+const SuggestionText = styled.span`
+    flex: 1;
+`;
+
+const DeleteButton = styled.button`
+    background: none;
+    border: none;
+    color: #808080;
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s;
+    opacity: 0;
+
+    ${SuggestionItem}:hover & {
+        opacity: 1;
+    }
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #ff6b6b;
+    }
+
+    &:active {
+        transform: scale(0.9);
     }
 `;
 
@@ -366,7 +398,13 @@ const ResultMeta = styled.div`
 `;
 
 const ResultLocation = styled.span`
-    color: #4a90e2;
+    color: ${props => {
+        if (props.$type === 'memo') return '#4a90e2'; // 파란색 - 메모
+        if (props.$type === 'calendar') return '#9c27b0'; // 보라색 - 일정
+        if (props.$type === 'trash') return '#ff6b6b'; // 빨간색 - 휴지통
+        return '#4a90e2';
+    }};
+    font-weight: 500;
 `;
 
 const ResultDate = styled.span`
@@ -381,7 +419,8 @@ const NoResultText = styled.p`
 `;
 
 const STORAGE_KEY = 'mindflow_search_history';
-const MAX_HISTORY = 5;
+const MAX_HISTORY = 20; // 최대 20개 저장
+const DISPLAY_HISTORY = 5; // 화면에는 5개만 표시
 
 // 추천 검색어
 const RECOMMENDED_SEARCHES = [
@@ -399,9 +438,12 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
 
     // 검색 기록 로드
     useEffect(() => {
+        console.log('🔍 SearchModal v2.0 로드됨 - 개별 삭제 기능 활성화');
         const history = localStorage.getItem(STORAGE_KEY);
         if (history) {
-            setSearchHistory(JSON.parse(history));
+            const parsed = JSON.parse(history);
+            console.log('📋 저장된 검색 기록 개수:', parsed.length);
+            setSearchHistory(parsed);
         }
     }, []);
 
@@ -425,10 +467,17 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
     };
 
-    // 검색 기록 삭제
+    // 검색 기록 전체 삭제
     const clearHistory = () => {
         setSearchHistory([]);
         localStorage.removeItem(STORAGE_KEY);
+    };
+
+    // 검색 기록 개별 삭제
+    const deleteHistoryItem = (termToDelete) => {
+        const newHistory = searchHistory.filter(term => term !== termToDelete);
+        setSearchHistory(newHistory);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory));
     };
 
     // 검색어 하이라이팅
@@ -468,6 +517,30 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
         if (end < content.length) preview = preview + '...';
 
         return preview;
+    };
+
+    // 메모 첫 줄에서 타이틀 추출 (한글 기준 10자)
+    const extractTitle = (content) => {
+        if (!content || !content.trim()) return '제목 없음';
+
+        const firstLine = content.split('\n')[0].trim();
+        if (!firstLine) return '제목 없음';
+
+        // 한글/영문 구분하여 10자 추출
+        let charCount = 0;
+        let result = '';
+
+        for (let i = 0; i < firstLine.length; i++) {
+            const char = firstLine[i];
+            // 한글은 1자로, 영문/숫자/기호는 0.5자로 계산
+            const isKorean = /[가-힣]/.test(char);
+            charCount += isKorean ? 1 : 0.5;
+
+            if (charCount > 10) break;
+            result += char;
+        }
+
+        return result || '제목 없음';
     };
 
     // 검색 실행
@@ -601,13 +674,22 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
                                     </ClearHistoryButton>
                                 </SectionHeader>
                                 <SuggestionList>
-                                    {searchHistory.map((term, index) => (
+                                    {searchHistory.slice(0, DISPLAY_HISTORY).map((term, index) => (
                                         <SuggestionItem
                                             key={index}
-                                            onClick={() => handleSearch(term)}
                                         >
                                             <Search size={16} />
-                                            {term}
+                                            <SuggestionText onClick={() => handleSearch(term)}>
+                                                {term}
+                                            </SuggestionText>
+                                            <DeleteButton
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deleteHistoryItem(term);
+                                                }}
+                                            >
+                                                <X size={16} />
+                                            </DeleteButton>
                                         </SuggestionItem>
                                     ))}
                                 </SuggestionList>
@@ -627,7 +709,7 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
                                             onClick={() => handleSearch(term)}
                                         >
                                             <Search size={16} />
-                                            {term}
+                                            <SuggestionText>{term}</SuggestionText>
                                         </SuggestionItem>
                                     ))}
                                 </SuggestionList>
@@ -647,7 +729,7 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
                                     >
                                         <ResultTitle
                                             dangerouslySetInnerHTML={{
-                                                __html: highlightText(item.title || '제목 없음', searchTerm)
+                                                __html: highlightText(extractTitle(item.content), searchTerm)
                                             }}
                                         />
                                         <ResultPreview
@@ -656,7 +738,7 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
                                             }}
                                         />
                                         <ResultMeta>
-                                            <ResultLocation>{getLocation(item)}</ResultLocation>
+                                            <ResultLocation $type={item.type}>{getLocation(item)}</ResultLocation>
                                             {(item.updatedAt || item.createdAt) && (
                                                 <>
                                                     <span>•</span>

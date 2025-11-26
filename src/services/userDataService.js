@@ -422,3 +422,95 @@ export const migrateLocalStorageToFirestore = async (userId) => {
     throw error;
   }
 };
+
+// ========================================
+// 구 구조 Firestore → 신 구조 Firestore 마이그레이션
+// ========================================
+
+/**
+ * 구 구조 Firestore 데이터를 신 구조로 마이그레이션
+ * @param {string} firebaseUID - Firebase Auth UID
+ * @param {string} userId - 새로운 사용자 ID (phoneNumber 또는 firebaseUID)
+ */
+export const migrateLegacyFirestoreData = async (firebaseUID, userId) => {
+  try {
+    console.log('🔄 구 구조 → 신 구조 Firestore 마이그레이션 시작...');
+    console.log(`  - 원본: users/${firebaseUID}/userData/*`);
+    console.log(`  - 대상: mindflowUsers/${userId}/userData/*`);
+
+    // 구 구조에서 데이터 읽기
+    const oldMemosRef = doc(db, 'users', firebaseUID, 'userData', 'memos');
+    const oldFoldersRef = doc(db, 'users', firebaseUID, 'userData', 'folders');
+    const oldTrashRef = doc(db, 'users', firebaseUID, 'userData', 'trash');
+    const oldMacrosRef = doc(db, 'users', firebaseUID, 'userData', 'macros');
+    const oldCalendarRef = doc(db, 'users', firebaseUID, 'userData', 'calendar');
+    const oldActivitiesRef = doc(db, 'users', firebaseUID, 'userData', 'activities');
+    const oldSettingsRef = doc(db, 'users', firebaseUID, 'userData', 'settings');
+
+    const [
+      oldMemosSnap,
+      oldFoldersSnap,
+      oldTrashSnap,
+      oldMacrosSnap,
+      oldCalendarSnap,
+      oldActivitiesSnap,
+      oldSettingsSnap
+    ] = await Promise.all([
+      getDoc(oldMemosRef),
+      getDoc(oldFoldersRef),
+      getDoc(oldTrashRef),
+      getDoc(oldMacrosRef),
+      getDoc(oldCalendarRef),
+      getDoc(oldActivitiesRef),
+      getDoc(oldSettingsRef)
+    ]);
+
+    // 데이터 추출
+    const memos = oldMemosSnap.exists() ? (oldMemosSnap.data().items || []) : [];
+    const folders = oldFoldersSnap.exists() ? (oldFoldersSnap.data().items || []) : [];
+    const trash = oldTrashSnap.exists() ? (oldTrashSnap.data().items || []) : [];
+    const macros = oldMacrosSnap.exists() ? (oldMacrosSnap.data().items || []) : [];
+    const calendar = oldCalendarSnap.exists() ? (oldCalendarSnap.data().schedules || {}) : {};
+    const activities = oldActivitiesSnap.exists() ? (oldActivitiesSnap.data().items || []) : [];
+    const settings = oldSettingsSnap.exists() ? oldSettingsSnap.data() : {};
+
+    // 데이터가 하나라도 있으면 마이그레이션 진행
+    const hasData = memos.length > 0 || folders.length > 0 || trash.length > 0 ||
+                    macros.length > 0 || Object.keys(calendar).length > 0 ||
+                    activities.length > 0 || Object.keys(settings).length > 0;
+
+    if (!hasData) {
+      console.log('⚠️ 마이그레이션할 구 구조 데이터가 없습니다.');
+      return false;
+    }
+
+    // 신 구조로 저장
+    await Promise.all([
+      memos.length > 0 ? saveMemosToFirestore(userId, memos) : Promise.resolve(),
+      folders.length > 0 ? saveFoldersToFirestore(userId, folders) : Promise.resolve(),
+      trash.length > 0 ? saveTrashToFirestore(userId, trash) : Promise.resolve(),
+      macros.length > 0 ? saveMacrosToFirestore(userId, macros) : Promise.resolve(),
+      Object.keys(calendar).length > 0 ? saveCalendarToFirestore(userId, calendar) : Promise.resolve(),
+      activities.length > 0 ? saveActivitiesToFirestore(userId, activities) : Promise.resolve(),
+      Object.keys(settings).length > 0 ? saveSettingsToFirestore(userId, settings) : Promise.resolve()
+    ]);
+
+    console.log('✅ 구 구조 → 신 구조 마이그레이션 완료!');
+    console.log(`  - 메모: ${memos.length}개`);
+    console.log(`  - 폴더: ${folders.length}개`);
+    console.log(`  - 휴지통: ${trash.length}개`);
+    console.log(`  - 매크로: ${macros.length}개`);
+    console.log(`  - 캘린더: ${Object.keys(calendar).length}개 날짜`);
+    console.log(`  - 활동: ${activities.length}개`);
+
+    return true;
+  } catch (error) {
+    // Permission 에러는 데이터가 없는 경우이므로 무시
+    if (error.code === 'permission-denied') {
+      console.log('⚠️ 구 구조 데이터 없음 (신규 사용자)');
+      return false;
+    }
+    console.error('❌ 구 구조 마이그레이션 실패:', error);
+    throw error;
+  }
+};

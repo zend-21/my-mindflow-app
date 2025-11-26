@@ -13,7 +13,7 @@ export const checkNicknameAvailability = async (nickname, excludeUserId = null) 
         return false;
     }
 
-    const trimmedNickname = nickname.trim();
+    const trimmedNickname = nickname.trim(); // 대소문자 구분
 
     try {
         // nicknames 컬렉션에서 해당 닉네임 검색

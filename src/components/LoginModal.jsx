@@ -124,7 +124,7 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
         }
     }, []);
 
-    // Refresh Token을 받기 위한 설정 추가
+    // Google OAuth 로그인 설정
     const login = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
             console.log('✅ Google OAuth 성공:', tokenResponse);
@@ -161,10 +161,6 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
             onError();
         },
         scope: 'https://www.googleapis.com/auth/drive.file',
-        flow: 'implicit', // 명시적으로 implicit flow 설정
-        ux_mode: 'popup', // 팝업 모드 강제
-        prompt: 'select_account', // ✅ 항상 계정 선택 창 표시 (세션 캐시 방지)
-        hint: '', // ✅ 이전 계정 힌트 제거
     });
 
     return (
