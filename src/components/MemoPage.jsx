@@ -705,6 +705,7 @@ const FolderCard = styled.div`
     flex-direction: column;
     align-items: center;
     gap: 8px;
+    position: relative;
     ${props => props.$isShared && `
         box-shadow: 0 0 15px rgba(0, 255, 136, 0.15);
     `}
@@ -752,6 +753,39 @@ const FolderName = styled.span`
     font-weight: 500;
     text-align: center;
     word-break: break-word;
+`;
+
+// 폴더 삭제 버튼
+const FolderDeleteButton = styled.button`
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    background: rgba(150, 150, 150, 0.15);
+    border: 1.5px solid rgba(150, 150, 150, 0.4);
+    color: #aaa;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 18px;
+    font-weight: 600;
+    padding: 0;
+    z-index: 10;
+
+    &:hover {
+        background: rgba(200, 200, 200, 0.25);
+        border-color: rgba(200, 200, 200, 0.6);
+        color: #ddd;
+        transform: scale(1.1);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
 `;
 
 const FolderMemoCount = styled.span`
@@ -932,7 +966,8 @@ const FolderModalTitle = styled.h3`
     color: #e0e0e0;
     font-size: 18px;
     font-weight: 600;
-    margin: 0 0 20px 0;
+    margin: 0;
+    line-height: 1;
 `;
 
 const FolderInput = styled.input`
@@ -976,6 +1011,65 @@ const IconOption = styled.button`
         border-color: rgba(74, 144, 226, 0.5);
         background: rgba(74, 144, 226, 0.1);
     }
+`;
+
+// 폴더 잠금 토글 스위치
+const FolderLockToggleContainer = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+`;
+
+const FolderLockToggle = styled.button`
+    width: 52px;
+    height: 28px;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background: ${props => props.$locked ? '#4a90e2' : '#8a8a8a'};
+    padding: 0;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+
+    &:hover {
+        opacity: 0.9;
+    }
+
+    &:active {
+        transform: scale(0.98);
+    }
+`;
+
+const FolderLockToggleSlider = styled.div`
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: white;
+    position: absolute;
+    top: 2px;
+    left: ${props => props.$locked ? 'calc(100% - 26px)' : '2px'};
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+
+    svg {
+        width: 20px;
+        height: 20px;
+        color: ${props => props.$locked ? '#4a90e2' : '#666'};
+        transition: color 0.3s;
+    }
+`;
+
+const FolderModalTitleRow = styled.div`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 20px;
 `;
 
 const FolderModalButtons = styled.div`
@@ -1310,7 +1404,11 @@ const Tab = styled.button`
 // --- (모든 스타일 끝) ---
 
 // 아이콘 선택 옵션
-const FOLDER_ICONS = ['📁', '📂', '🗂️', '📋', '📝', '💼', '🎯', '⭐', '💡', '🔖', '📌', '🏷️', '🔒', '🔓', '💎', '🎨'];
+const FOLDER_ICONS = [
+    '📁', '📂', '🗂️', '📋', '📝', '💼', '🎯', '⭐', '💡', '🔖',
+    '📌', '🏷️', '🔒', '🔓', '💎', '🎨', '🎮', '🎵', '🎬', '📷',
+    '🏆', '🎓', '💰', '🌟', '🚀', '🔥'
+];
 
 const MemoPage = ({
     memos,
@@ -1331,7 +1429,6 @@ const MemoPage = ({
     onRequestUnshareSelectedMemos
 }) => {
     const [layoutView, setLayoutView] = useLocalStorage('memoLayoutView', 'list');
-    const [searchQuery, setSearchQuery] = React.useState('');
     const [sortOrder, setSortOrder] = React.useState('date'); // 'date' 또는 'importance'
     const [sortDirection, setSortDirection] = React.useState('desc'); // 'asc' 또는 'desc'
     const longPressTimer = useRef(null);
@@ -1357,6 +1454,7 @@ const MemoPage = ({
     const [folderModal, setFolderModal] = useState(null); // null | { mode: 'add' | 'edit', folder?: object }
     const [folderName, setFolderName] = useState('');
     const [folderIcon, setFolderIcon] = useState('📁');
+    const [folderLocked, setFolderLocked] = useState(false);
 
     // 폴더 삭제 확인 모달
     const [deleteFolderModal, setDeleteFolderModal] = useState(null); // null | { folder: object }
@@ -1427,7 +1525,7 @@ const MemoPage = ({
         if (folderModal.mode === 'add') {
             addFolder(folderName, folderIcon);
         } else if (folderModal.mode === 'edit') {
-            updateFolder(folderModal.folder.id, { name: folderName, icon: folderIcon });
+            updateFolder(folderModal.folder.id, { name: folderName, icon: folderIcon, isLocked: folderLocked });
         }
         setFolderModal(null);
     };
@@ -1459,7 +1557,11 @@ const MemoPage = ({
     const handleFolderLongPress = (folder) => {
         // 기본 폴더(전체, 공유)는 제외
         if (folder.isDefault) return;
-        setDeleteFolderModal({ folder });
+        // 폴더 수정 모달 열기
+        setFolderModal({ mode: 'edit', folder });
+        setFolderName(folder.name);
+        setFolderIcon(folder.icon);
+        setFolderLocked(folder.isLocked || false);
     };
 
     // 폴더 삭제 확인
@@ -1611,40 +1713,15 @@ const MemoPage = ({
     // 검색 및 정렬 로직
     let filteredAndSortedMemos = [];
     if (memos && Array.isArray(memos)) {
-        // 검색어가 있을 때의 처리
-        if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase();
-
-            if (activeFolder === 'all') {
-                // 메인 페이지: 모든 메모 검색 (공유 메모 제외)
-                filteredAndSortedMemos = memos.filter(memo => {
-                    return !sharedMemoInfo.has(memo.id) && memo.content?.toLowerCase().includes(query);
-                });
-            } else if (activeFolder === 'shared') {
-                // 공유 폴더: 공유된 메모만 검색
-                filteredAndSortedMemos = memos.filter(memo => {
-                    return (memo.folderId === 'shared' || sharedMemoInfo.has(memo.id)) &&
-                           memo.content?.toLowerCase().includes(query);
-                });
-            } else {
-                // 사용자 정의 폴더: 해당 폴더 내 메모만 검색
-                filteredAndSortedMemos = memos.filter(memo => {
-                    return memo.folderId === activeFolder &&
-                           !sharedMemoInfo.has(memo.id) &&
-                           memo.content?.toLowerCase().includes(query);
-                });
-            }
-        } else {
-            // 검색어가 없을 때는 기존 로직대로 폴더 필터링
-            filteredAndSortedMemos = memos.filter(memo => {
-                // "전체"일 때는 폴더에 속하지 않은 미분류 메모만 표시 (공유된 메모 제외)
-                if (activeFolder === 'all') return !memo.folderId && !sharedMemoInfo.has(memo.id);
-                // "공유"일 때는 folderId가 'shared'이거나 sharedMemoInfo에 있는 메모 표시
-                if (activeFolder === 'shared') return memo.folderId === 'shared' || sharedMemoInfo.has(memo.id);
-                // 다른 커스텀 폴더일 때는 해당 폴더 ID와 일치하고 공유되지 않은 메모만 표시
-                return memo.folderId === activeFolder && !sharedMemoInfo.has(memo.id);
-            });
-        }
+        // 폴더 필터링
+        filteredAndSortedMemos = memos.filter(memo => {
+            // "전체"일 때는 폴더에 속하지 않은 미분류 메모만 표시 (공유된 메모 제외)
+            if (activeFolder === 'all') return !memo.folderId && !sharedMemoInfo.has(memo.id);
+            // "공유"일 때는 folderId가 'shared'이거나 sharedMemoInfo에 있는 메모 표시
+            if (activeFolder === 'shared') return memo.folderId === 'shared' || sharedMemoInfo.has(memo.id);
+            // 다른 커스텀 폴더일 때는 해당 폴더 ID와 일치하고 공유되지 않은 메모만 표시
+            return memo.folderId === activeFolder && !sharedMemoInfo.has(memo.id);
+        });
 
         // 3. 정렬
         filteredAndSortedMemos = [...filteredAndSortedMemos].sort((a, b) => {
@@ -1896,24 +1973,6 @@ const MemoPage = ({
                         );
                     })()}
 
-                    <SearchBar>
-                        <SearchInput
-                            type="text"
-                            placeholder={activeFolder === 'all' ? "메모 검색..." : "폴더내 검색..."}
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            $hasValue={searchQuery.length > 0}
-                        />
-                        {searchQuery && (
-                            <ClearSearchButton
-                                onClick={() => setSearchQuery('')}
-                                title="검색어 지우기"
-                            >
-                                ×
-                            </ClearSearchButton>
-                        )}
-                    </SearchBar>
-
                     {/* 공유 폴더일 때 정렬 버튼과 안내문 */}
                     {activeFolder === 'shared' && (
                         <div style={{ marginTop: '15px' }}>
@@ -2035,6 +2094,17 @@ const MemoPage = ({
                                         onMouseLeave={() => clearTimeout(folderLongPressTimer.current)}
                                         title="길게 눌러서 이름 변경"
                                     >
+                                        {!folder.isLocked && (
+                                            <FolderDeleteButton
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setDeleteFolderModal({ folder });
+                                                }}
+                                                title="폴더 삭제"
+                                            >
+                                                ×
+                                            </FolderDeleteButton>
+                                        )}
                                         <FolderIconWrapper>{folder.icon}</FolderIconWrapper>
                                         <FolderName>{folder.name}</FolderName>
                                         {folderMemoCount > 0 ? (
@@ -2215,7 +2285,7 @@ const MemoPage = ({
                     })
                 ) : (
                     <EmptyMessage>
-                        {searchQuery ? '검색 결과가 없습니다.' : '작성된 문서가 없습니다.'}
+                        작성된 문서가 없습니다.
                     </EmptyMessage>
                 )}
                 </MemoGridWrapper>
@@ -2225,17 +2295,40 @@ const MemoPage = ({
             {folderModal && ReactDOM.createPortal(
                 <FolderModalOverlay onClick={() => setFolderModal(null)}>
                     <FolderModalBox onClick={(e) => e.stopPropagation()}>
-                        <FolderModalTitle>
-                            {folderModal.mode === 'add' ? '새 폴더 만들기' : '폴더 수정'}
-                        </FolderModalTitle>
+                        <FolderModalTitleRow>
+                            <FolderModalTitle>
+                                {folderModal.mode === 'add' ? '새 폴더 만들기' : '폴더 수정'}
+                            </FolderModalTitle>
+                            {folderModal.mode === 'edit' && (
+                                <FolderLockToggleContainer>
+                                    <FolderLockToggle
+                                        $locked={folderLocked}
+                                        onClick={() => setFolderLocked(!folderLocked)}
+                                        title={folderLocked ? '폴더 잠금 해제' : '폴더 잠금'}
+                                    >
+                                        <FolderLockToggleSlider $locked={folderLocked}>
+                                            {folderLocked ? (
+                                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z" fill="currentColor"/>
+                                                </svg>
+                                            ) : (
+                                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                    <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h2c0-1.66 1.34-3 3-3s3 1.34 3 3v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z" fill="currentColor"/>
+                                                </svg>
+                                            )}
+                                        </FolderLockToggleSlider>
+                                    </FolderLockToggle>
+                                </FolderLockToggleContainer>
+                            )}
+                        </FolderModalTitleRow>
 
                         <FolderInput
                             type="text"
-                            placeholder="폴더 이름을 입력하세요"
+                            placeholder="폴더 이름을 입력하세요 (최대 9자)"
                             value={folderName}
                             onChange={(e) => setFolderName(e.target.value)}
                             autoFocus
-                            maxLength={20}
+                            maxLength={9}
                         />
 
                         <IconPickerContainer>
@@ -2254,11 +2347,6 @@ const MemoPage = ({
                             <FolderModalButton $variant="cancel" onClick={() => setFolderModal(null)}>
                                 취소
                             </FolderModalButton>
-                            {folderModal.mode === 'edit' && (
-                                <FolderModalButton $variant="delete" onClick={handleDeleteFolderFromEdit}>
-                                    삭제
-                                </FolderModalButton>
-                            )}
                             <FolderModalButton
                                 $variant="confirm"
                                 onClick={handleSaveFolder}
