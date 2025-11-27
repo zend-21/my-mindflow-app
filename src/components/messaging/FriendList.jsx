@@ -368,7 +368,21 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
   const loadMyProfile = async () => {
     try {
       const userId = localStorage.getItem('firebaseUserId');
-      const nickname = localStorage.getItem('userNickname') || '나';
+
+      // Firestore에서 최신 닉네임 가져오기
+      let nickname = '나';
+      try {
+        const { getUserNickname } = await import('../../services/nicknameService');
+        const firestoreNickname = await getUserNickname(userId);
+        if (firestoreNickname) {
+          nickname = firestoreNickname;
+        } else {
+          nickname = localStorage.getItem('userNickname') || '나';
+        }
+      } catch (error) {
+        console.error('닉네임 로드 실패:', error);
+        nickname = localStorage.getItem('userNickname') || '나';
+      }
 
       // 본인인증 상태 확인
       const verificationStatus = await checkVerificationStatus(userId);

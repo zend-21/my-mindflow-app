@@ -1,6 +1,9 @@
 // 🔥 사용자 데이터 Firestore 동기화 서비스
 import { db } from '../firebase/config';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, collection, getDocs, writeBatch, deleteDoc } from 'firebase/firestore';
+// 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+// import { encryptArray, decryptArray, encryptCalendar, decryptCalendar } from './encryptionService';
+// import { getEncryptionKey } from './keyManagementService';
 
 /**
  * 🔐 사용자 데이터 구조 (휴대폰 기반 인증)
@@ -31,7 +34,15 @@ export const fetchMemosFromFirestore = async (userId) => {
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      return docSnap.data().items || [];
+      const encryptedMemos = docSnap.data().items || [];
+
+      // 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+      // const key = getEncryptionKey();
+      // if (key && encryptedMemos.length > 0) {
+      //   return await decryptArray(encryptedMemos, key, ['content']);
+      // }
+
+      return encryptedMemos;
     }
     return [];
   } catch (error) {
@@ -45,9 +56,17 @@ export const fetchMemosFromFirestore = async (userId) => {
  */
 export const saveMemosToFirestore = async (userId, memos) => {
   try {
+    // 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+    // const key = getEncryptionKey();
+    let dataToSave = memos;
+
+    // if (key && memos.length > 0) {
+    //   dataToSave = await encryptArray(memos, key, ['content']);
+    // }
+
     const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'memos');
     await setDoc(docRef, {
-      items: memos,
+      items: dataToSave,
       updatedAt: serverTimestamp()
     }, { merge: true });
   } catch (error) {
@@ -107,7 +126,15 @@ export const fetchTrashFromFirestore = async (userId) => {
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      return docSnap.data().items || [];
+      const encryptedTrash = docSnap.data().items || [];
+
+      // 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+      // const key = getEncryptionKey();
+      // if (key && encryptedTrash.length > 0) {
+      //   return await decryptArray(encryptedTrash, key, ['content']);
+      // }
+
+      return encryptedTrash;
     }
     return [];
   } catch (error) {
@@ -121,20 +148,38 @@ export const fetchTrashFromFirestore = async (userId) => {
  */
 export const saveTrashToFirestore = async (userId, trash) => {
   try {
-    // undefined 값 필터링
-    const cleanedTrash = trash.map(item => {
-      const cleanedItem = {};
-      Object.keys(item).forEach(key => {
-        if (item[key] !== undefined) {
-          cleanedItem[key] = item[key];
+    // Ensure trash is an array
+    const trashArray = Array.isArray(trash) ? trash : [];
+
+    // undefined 값 필터링 (재귀적으로 중첩 객체까지)
+    const removeUndefined = (obj) => {
+      if (obj === null || obj === undefined) return null;
+      if (typeof obj !== 'object') return obj;
+      if (Array.isArray(obj)) return obj.map(removeUndefined);
+
+      const cleaned = {};
+      Object.keys(obj).forEach(key => {
+        const value = obj[key];
+        if (value !== undefined) {
+          cleaned[key] = removeUndefined(value);
         }
       });
-      return cleanedItem;
-    });
+      return cleaned;
+    };
+
+    const cleanedTrash = trashArray.map(item => removeUndefined(item));
+
+    // 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+    // const key = getEncryptionKey();
+    let dataToSave = cleanedTrash;
+
+    // if (key && cleanedTrash.length > 0) {
+    //   dataToSave = await encryptArray(cleanedTrash, key, ['content']);
+    // }
 
     const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'trash');
     await setDoc(docRef, {
-      items: cleanedTrash,
+      items: dataToSave,
       updatedAt: serverTimestamp()
     }, { merge: true });
   } catch (error) {
@@ -156,7 +201,15 @@ export const fetchMacrosFromFirestore = async (userId) => {
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      return docSnap.data().items || [];
+      const encryptedMacros = docSnap.data().items || [];
+
+      // 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+      // const key = getEncryptionKey();
+      // if (key && encryptedMacros.length > 0) {
+      //   return await decryptArray(encryptedMacros, key, ['content']);
+      // }
+
+      return encryptedMacros;
     }
     return [];
   } catch (error) {
@@ -170,9 +223,17 @@ export const fetchMacrosFromFirestore = async (userId) => {
  */
 export const saveMacrosToFirestore = async (userId, macros) => {
   try {
+    // 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+    // const key = getEncryptionKey();
+    let dataToSave = macros;
+
+    // if (key && macros.length > 0) {
+    //   dataToSave = await encryptArray(macros, key, ['content']);
+    // }
+
     const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'macros');
     await setDoc(docRef, {
-      items: macros,
+      items: dataToSave,
       updatedAt: serverTimestamp()
     }, { merge: true });
   } catch (error) {
@@ -194,7 +255,15 @@ export const fetchCalendarFromFirestore = async (userId) => {
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      return docSnap.data().schedules || {};
+      const encryptedCalendar = docSnap.data().schedules || {};
+
+      // 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+      // const key = getEncryptionKey();
+      // if (key && Object.keys(encryptedCalendar).length > 0) {
+      //   return await decryptCalendar(encryptedCalendar, key);
+      // }
+
+      return encryptedCalendar;
     }
     return {};
   } catch (error) {
@@ -241,9 +310,17 @@ export const saveCalendarToFirestore = async (userId, schedules) => {
       }
     });
 
+    // 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+    // const key = getEncryptionKey();
+    let dataToSave = cleanedSchedules;
+
+    // if (key && Object.keys(cleanedSchedules).length > 0) {
+    //   dataToSave = await encryptCalendar(cleanedSchedules, key);
+    // }
+
     const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'calendar');
     await setDoc(docRef, {
-      schedules: cleanedSchedules,
+      schedules: dataToSave,
       updatedAt: serverTimestamp()
     }, { merge: true });
   } catch (error) {
@@ -265,7 +342,15 @@ export const fetchActivitiesFromFirestore = async (userId) => {
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      return docSnap.data().items || [];
+      const encryptedActivities = docSnap.data().items || [];
+
+      // 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+      // const key = getEncryptionKey();
+      // if (key && encryptedActivities.length > 0) {
+      //   return await decryptArray(encryptedActivities, key, ['content']);
+      // }
+
+      return encryptedActivities;
     }
     return [];
   } catch (error) {
@@ -279,13 +364,338 @@ export const fetchActivitiesFromFirestore = async (userId) => {
  */
 export const saveActivitiesToFirestore = async (userId, activities) => {
   try {
+    // 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+    // const key = getEncryptionKey();
+    let dataToSave = activities;
+
+    // if (key && activities.length > 0) {
+    //   dataToSave = await encryptArray(activities, key, ['content']);
+    // }
+
     const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'activities');
     await setDoc(docRef, {
-      items: activities,
+      items: dataToSave,
       updatedAt: serverTimestamp()
     }, { merge: true });
   } catch (error) {
     console.error('활동 데이터 저장 실패:', error);
+    throw error;
+  }
+};
+
+// ========================================
+// 시크릿 페이지 데이터
+// ========================================
+
+/**
+ * Firestore에서 시크릿 PIN 해시 가져오기
+ */
+export const fetchSecretPinFromFirestore = async (userId) => {
+  try {
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'secretPin');
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return docSnap.data().pinHash || null;
+    }
+    return null;
+  } catch (error) {
+    console.error('시크릿 PIN 가져오기 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * Firestore에 시크릿 PIN 해시 저장
+ */
+export const saveSecretPinToFirestore = async (userId, pinHash) => {
+  try {
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'secretPin');
+    await setDoc(docRef, {
+      pinHash,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  } catch (error) {
+    console.error('시크릿 PIN 저장 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * Firestore에서 시크릿 문서 데이터 가져오기 (암호화된 상태)
+ */
+export const fetchSecretDocsFromFirestore = async (userId) => {
+  try {
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'secretDocs');
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return docSnap.data().encryptedData || '';
+    }
+    return '';
+  } catch (error) {
+    console.error('시크릿 문서 가져오기 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * Firestore에 시크릿 문서 데이터 저장 (암호화된 상태)
+ */
+export const saveSecretDocsToFirestore = async (userId, encryptedData) => {
+  try {
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'secretDocs');
+    await setDoc(docRef, {
+      encryptedData,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  } catch (error) {
+    console.error('시크릿 문서 저장 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * Firestore에서 시크릿 설정 가져오기
+ */
+export const fetchSecretSettingsFromFirestore = async (userId) => {
+  try {
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'secretSettings');
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return docSnap.data();
+    }
+    return {
+      pinLength: 6,
+      autoLockMinutes: 5,
+      emailNotifications: false,
+      categoryNames: {
+        financial: '금융',
+        personal: '개인',
+        work: '업무',
+        diary: '일기'
+      },
+      categoryIcons: {
+        financial: 'dollar',
+        personal: 'user',
+        work: 'briefcase',
+        diary: 'book'
+      }
+    };
+  } catch (error) {
+    console.error('시크릿 설정 가져오기 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * Firestore에 시크릿 설정 저장
+ */
+export const saveSecretSettingsToFirestore = async (userId, settings) => {
+  try {
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'secretSettings');
+    await setDoc(docRef, {
+      ...settings,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  } catch (error) {
+    console.error('시크릿 설정 저장 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * Firestore에서 삭제된 시크릿 문서 ID 목록 가져오기
+ */
+export const fetchDeletedSecretDocIds = async (userId) => {
+  try {
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'secretDeletedIds');
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return docSnap.data().deletedIds || [];
+    }
+    return [];
+  } catch (error) {
+    console.error('삭제된 시크릿 문서 ID 가져오기 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * Firestore에 삭제된 시크릿 문서 ID 목록 저장
+ */
+export const saveDeletedSecretDocIds = async (userId, deletedIds) => {
+  try {
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'secretDeletedIds');
+    await setDoc(docRef, {
+      deletedIds,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  } catch (error) {
+    console.error('삭제된 시크릿 문서 ID 저장 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * Firestore에서 영구 삭제 대기 중인 시크릿 문서 ID 목록 가져오기
+ */
+export const fetchPendingCleanupIds = async (userId) => {
+  try {
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'secretPendingCleanup');
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      return docSnap.data().pendingIds || [];
+    }
+    return [];
+  } catch (error) {
+    console.error('대기 중인 정리 ID 가져오기 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * Firestore에 영구 삭제 대기 중인 시크릿 문서 ID 목록 저장
+ */
+export const savePendingCleanupIds = async (userId, pendingIds) => {
+  try {
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'secretPendingCleanup');
+    await setDoc(docRef, {
+      pendingIds,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  } catch (error) {
+    console.error('대기 중인 정리 ID 저장 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * 🚀 메타데이터만 빠르게 가져오기 (문서 개수)
+ * UI에서 "로딩 중..." 표시용
+ */
+export const fetchSecretDocsMetadata = async (userId) => {
+  try {
+    const metadataRef = doc(db, 'mindflowUsers', userId, 'secretDocs', 'metadata');
+    const metadataSnap = await getDoc(metadataRef);
+
+    if (metadataSnap.exists()) {
+      return metadataSnap.data();
+    }
+    return { count: 0, updatedAt: null };
+  } catch (error) {
+    console.error('시크릿 메타데이터 가져오기 실패:', error);
+    return { count: 0, updatedAt: null };
+  }
+};
+
+/**
+ * 🚀 개별 문서 암호화 - Firestore에서 모든 시크릿 문서 가져오기
+ * 각 문서가 개별 암호화된 상태로 저장됨 (성능 최적화)
+ */
+export const fetchIndividualSecretDocsFromFirestore = async (userId) => {
+  try {
+    const colRef = collection(db, 'mindflowUsers', userId, 'secretDocs');
+    const querySnapshot = await getDocs(colRef);
+
+    const docs = [];
+    querySnapshot.forEach((docSnap) => {
+      if (docSnap.id !== 'metadata') { // 메타데이터 문서 제외
+        docs.push({
+          id: docSnap.id,
+          encryptedData: docSnap.data().encryptedData || ''
+        });
+      }
+    });
+
+    return docs;
+  } catch (error) {
+    console.error('개별 시크릿 문서 가져오기 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * 🚀 개별 문서 암호화 - Firestore에 모든 시크릿 문서 저장
+ * 각 문서를 개별적으로 암호화하여 저장 (성능 최적화)
+ */
+export const saveIndividualSecretDocsToFirestore = async (userId, encryptedDocs) => {
+  try {
+    const batch = writeBatch(db);
+    const colRef = collection(db, 'mindflowUsers', userId, 'secretDocs');
+
+    // 각 문서를 개별 문서로 저장
+    encryptedDocs.forEach((encDoc) => {
+      const docRef = doc(colRef, encDoc.id);
+      batch.set(docRef, {
+        encryptedData: encDoc.encryptedData,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    });
+
+    // 메타데이터 저장 (문서 개수, 마지막 업데이트 시간)
+    const metadataRef = doc(colRef, 'metadata');
+    batch.set(metadataRef, {
+      count: encryptedDocs.length,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+
+    await batch.commit();
+  } catch (error) {
+    console.error('개별 시크릿 문서 저장 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * 🚀 개별 문서 암호화 - 특정 문서들을 Firestore에서 삭제
+ * 영구 삭제 시 사용
+ */
+export const deleteIndividualSecretDocsFromFirestore = async (userId, docIds) => {
+  try {
+    const batch = writeBatch(db);
+    const colRef = collection(db, 'mindflowUsers', userId, 'secretDocs');
+
+    // 각 문서 삭제
+    docIds.forEach((docId) => {
+      const docRef = doc(colRef, docId);
+      batch.delete(docRef);
+    });
+
+    await batch.commit();
+  } catch (error) {
+    console.error('개별 시크릿 문서 삭제 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * 🔄 마이그레이션: 기존 단일 blob에서 개별 문서 암호화로 전환
+ * 기존 데이터가 있으면 개별 문서로 변환하고, 기존 blob 삭제
+ */
+export const migrateToIndividualEncryption = async (userId) => {
+  try {
+    // 1. 기존 단일 blob 데이터 확인
+    const oldDocRef = doc(db, 'mindflowUsers', userId, 'userData', 'secretDocs');
+    const oldDocSnap = await getDoc(oldDocRef);
+
+    if (!oldDocSnap.exists() || !oldDocSnap.data().encryptedData) {
+      console.log('✅ 마이그레이션 불필요: 기존 데이터 없음');
+      return { migrated: false, reason: 'no-old-data' };
+    }
+
+    console.log('🔄 마이그레이션 시작: 단일 blob → 개별 문서 암호화');
+
+    // 2. 기존 데이터를 개별 문서 컬렉션으로 복사 (암호화 상태 그대로 유지)
+    // 주의: 이 단계는 PIN 입력 후 secretStorage.js에서 처리됨
+    // 여기서는 마이그레이션 상태만 표시
+
+    return { migrated: false, reason: 'needs-pin', oldData: oldDocSnap.data().encryptedData };
+  } catch (error) {
+    console.error('❌ 마이그레이션 확인 실패:', error);
     throw error;
   }
 };
@@ -514,3 +924,117 @@ export const migrateLegacyFirestoreData = async (firebaseUID, userId) => {
     throw error;
   }
 };
+
+// ========================================
+// 🔐 E2EE 마이그레이션
+// ========================================
+
+// 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+/**
+ * 기존 평문 데이터를 암호화하여 다시 저장
+ * @param {string} userId - 사용자 ID (휴대폰 번호)
+ * @returns {Promise<boolean>} 마이그레이션 성공 여부
+ */
+/*
+export const migrateToEncryption = async (userId) => {
+  try {
+    console.log('🔐 평문 → 암호화 마이그레이션 시작');
+
+    const key = getEncryptionKey();
+    if (!key) {
+      console.warn('⚠️ 암호화 키가 없습니다. 마이그레이션 건너뜀');
+      return false;
+    }
+
+    // 1. 모든 데이터 가져오기 (복호화 없이 원본 그대로)
+    const memosDoc = await getDoc(doc(db, 'mindflowUsers', userId, 'userData', 'memos'));
+    const trashDoc = await getDoc(doc(db, 'mindflowUsers', userId, 'userData', 'trash'));
+    const macrosDoc = await getDoc(doc(db, 'mindflowUsers', userId, 'userData', 'macros'));
+    const calendarDoc = await getDoc(doc(db, 'mindflowUsers', userId, 'userData', 'calendar'));
+    const activitiesDoc = await getDoc(doc(db, 'mindflowUsers', userId, 'userData', 'activities'));
+
+    let migrationCount = 0;
+
+    // 2. 메모 암호화
+    if (memosDoc.exists()) {
+      const memos = memosDoc.data().items || [];
+      if (memos.length > 0) {
+        const encryptedMemos = await encryptArray(memos, key, ['content']);
+        await setDoc(doc(db, 'mindflowUsers', userId, 'userData', 'memos'), {
+          items: encryptedMemos,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        migrationCount++;
+        console.log(`✅ 메모 ${memos.length}개 암호화 완료`);
+      }
+    }
+
+    // 3. 휴지통 암호화
+    if (trashDoc.exists()) {
+      const trash = trashDoc.data().items || [];
+      if (trash.length > 0) {
+        const encryptedTrash = await encryptArray(trash, key, ['content']);
+        await setDoc(doc(db, 'mindflowUsers', userId, 'userData', 'trash'), {
+          items: encryptedTrash,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        migrationCount++;
+        console.log(`✅ 휴지통 ${trash.length}개 암호화 완료`);
+      }
+    }
+
+    // 4. 매크로 암호화
+    if (macrosDoc.exists()) {
+      const macros = macrosDoc.data().items || [];
+      if (macros.length > 0) {
+        const encryptedMacros = await encryptArray(macros, key, ['content']);
+        await setDoc(doc(db, 'mindflowUsers', userId, 'userData', 'macros'), {
+          items: encryptedMacros,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        migrationCount++;
+        console.log(`✅ 매크로 ${macros.length}개 암호화 완료`);
+      }
+    }
+
+    // 5. 캘린더 암호화
+    if (calendarDoc.exists()) {
+      const calendar = calendarDoc.data().schedules || {};
+      if (Object.keys(calendar).length > 0) {
+        const encryptedCalendar = await encryptCalendar(calendar, key);
+        await setDoc(doc(db, 'mindflowUsers', userId, 'userData', 'calendar'), {
+          schedules: encryptedCalendar,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        migrationCount++;
+        console.log(`✅ 캘린더 일정 암호화 완료`);
+      }
+    }
+
+    // 6. 활동 암호화
+    if (activitiesDoc.exists()) {
+      const activities = activitiesDoc.data().items || [];
+      if (activities.length > 0) {
+        const encryptedActivities = await encryptArray(activities, key, ['content']);
+        await setDoc(doc(db, 'mindflowUsers', userId, 'userData', 'activities'), {
+          items: encryptedActivities,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        migrationCount++;
+        console.log(`✅ 활동 ${activities.length}개 암호화 완료`);
+      }
+    }
+
+    if (migrationCount > 0) {
+      console.log(`✅ 평문 → 암호화 마이그레이션 완료 (${migrationCount}개 항목)`);
+      return true;
+    } else {
+      console.log('⚠️ 마이그레이션할 데이터 없음');
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ 암호화 마이그레이션 실패:', error);
+    throw error;
+  }
+};
+*/

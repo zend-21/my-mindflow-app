@@ -27,9 +27,11 @@ import {
     setDocPassword,
     unlockDoc,
     getSettings,
-    saveSettings
+    saveSettings,
+    cleanupPermanentlyDeletedDocs
 } from '../../utils/secretStorage';
 import { sendTempPinEmail } from '../../utils/emailService';
+import { fetchSecretDocsMetadata } from '../../services/userDataService';
 
 const Container = styled.div`
     width: 100%;
@@ -45,8 +47,41 @@ const Container = styled.div`
 `;
 
 const InnerContent = styled.div`
-    padding: 10px 24px 20px 24px;
+    padding: 0px 24px 15px 24px;
     box-sizing: border-box;
+    margin-top: -5px;
+`;
+
+const TitleWrapper = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+`;
+
+const PageTitle = styled.div`
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+    letter-spacing: 0.3px;
+`;
+
+const AddDocButton = styled.button`
+    background-color: transparent;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #f093fb;
+    transition: transform 0.2s ease;
+    &:hover {
+        transform: rotate(90deg);
+    }
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 `;
 
 const SearchBar = styled.div`
@@ -565,19 +600,28 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
     const [filteredDocs, setFilteredDocs] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('all');
+    const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+    const [docCount, setDocCount] = useState(0);
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [editingDoc, setEditingDoc] = useState(null);
     const containerRef = useRef(null);
     const lastScrollY = useRef(0);
-    const [settings, setSettings] = useState(() => {
-        // 강제로 pinLength를 6으로 설정
-        const loadedSettings = getSettings();
-        if (loadedSettings.pinLength !== 6) {
-            const updatedSettings = { ...loadedSettings, pinLength: 6 };
-            saveSettings(updatedSettings);
-            return updatedSettings;
+    const [settings, setSettings] = useState({
+        pinLength: 6,
+        autoLockMinutes: 5,
+        emailNotifications: false,
+        categoryNames: {
+            financial: '금융',
+            personal: '개인',
+            work: '업무',
+            diary: '일기'
+        },
+        categoryIcons: {
+            financial: 'dollar',
+            personal: 'user',
+            work: 'briefcase',
+            diary: 'book'
         }
-        return loadedSettings;
     });
     const [isConfirmingPin, setIsConfirmingPin] = useState(false);
     const [firstPin, setFirstPin] = useState('');
@@ -624,6 +668,10 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
     const autoLockTimerRef = useRef(null);
     const lastActivityRef = useRef(Date.now());
 
+    // PIN 설정 여부 state
+    const [pinIsSet, setPinIsSet] = useState(false);
+    const [checkingPin, setCheckingPin] = useState(true);
+
     // 카테고리 아이콘 SVG 경로 가져오기
     const getCategoryIconPath = (category) => {
         const iconId = settings?.categoryIcons?.[category];
@@ -639,6 +687,45 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
             onClose();
         }
     }, [profile, onClose, showToast]);
+
+    // PIN 설정 여부 확인
+    useEffect(() => {
+        const checkPinStatus = async () => {
+            try {
+                setCheckingPin(true);
+                const isSet = await hasPinSet();
+                setPinIsSet(isSet);
+            } catch (error) {
+                console.error('PIN 상태 확인 실패:', error);
+                setPinIsSet(false);
+            } finally {
+                setCheckingPin(false);
+            }
+        };
+
+        checkPinStatus();
+    }, []);
+
+    // 설정 불러오기
+    useEffect(() => {
+        const loadSettings = async () => {
+            try {
+                const loadedSettings = await getSettings();
+                // 강제로 pinLength를 6으로 설정
+                if (loadedSettings.pinLength !== 6) {
+                    const updatedSettings = { ...loadedSettings, pinLength: 6 };
+                    await saveSettings(updatedSettings);
+                    setSettings(updatedSettings);
+                } else {
+                    setSettings(loadedSettings);
+                }
+            } catch (error) {
+                console.error('설정 불러오기 실패:', error);
+            }
+        };
+
+        loadSettings();
+    }, []);
 
     // 자동 잠금 타이머 설정
     useEffect(() => {
@@ -662,36 +749,6 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
             }
         };
     }, [isUnlocked, settings.autoLockMinutes]);
-
-    // 휴지통에서 비밀글 복원 이벤트 리스너
-    useEffect(() => {
-        const handleRestoreSecret = async (event) => {
-            const restoredDoc = event.detail;
-
-            if (!isUnlocked || !currentPin) {
-                console.warn('⚠️ 비밀글 복원 실패: 잠금 상태');
-                return;
-            }
-
-            try {
-                console.log('♻️ 비밀글 복원:', restoredDoc);
-
-                // 복원된 문서를 secretStorage에 추가
-                await addSecretDoc(currentPin, restoredDoc);
-
-                // 문서 목록 새로고침
-                await loadDocs(currentPin);
-
-                showToast?.('비밀글이 복원되었습니다.');
-            } catch (error) {
-                console.error('비밀글 복원 오류:', error);
-                showToast?.('비밀글 복원에 실패했습니다.');
-            }
-        };
-
-        window.addEventListener('restoreSecret', handleRestoreSecret);
-        return () => window.removeEventListener('restoreSecret', handleRestoreSecret);
-    }, [isUnlocked, currentPin]);
 
     // 사용자 활동 감지
     const handleActivity = () => {
@@ -736,6 +793,35 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
     }, [isUnlocked]);
+
+    // 🔓 언락 시 임시 저장된 Draft 복원
+    useEffect(() => {
+        if (!isUnlocked || !profile?.userId) return;
+
+        try {
+            const draftKey = `secretDocDraft_${profile.userId}`;
+            const savedDraft = localStorage.getItem(draftKey);
+
+            if (savedDraft) {
+                const draftData = JSON.parse(savedDraft);
+
+                // 24시간 이내의 Draft만 복원 (오래된 Draft는 무시)
+                const hoursSinceCreated = (Date.now() - draftData.timestamp) / (1000 * 60 * 60);
+
+                if (hoursSinceCreated < 24 && draftData.isEditorOpen) {
+                    console.log('📂 임시 저장된 문서 복원:', draftData);
+                    setEditingDoc(draftData.editingDoc);
+                    setIsEditorOpen(true);
+                } else {
+                    // 오래된 Draft는 삭제
+                    localStorage.removeItem(draftKey);
+                    console.log('🗑️ 오래된 Draft 삭제');
+                }
+            }
+        } catch (error) {
+            console.error('Draft 복원 실패:', error);
+        }
+    }, [isUnlocked, profile?.userId]);
 
     // 컴포넌트 언마운트 시 타이머 및 rAF 정리, 스크롤 복원
     useEffect(() => {
@@ -801,7 +887,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                 }
             }
 
-            if (!hasPinSet()) {
+            if (!pinIsSet) {
                 // 첫 PIN 설정 - 2번 입력 확인
                 if (pin.length !== settings.pinLength) {
                     return { success: false, message: `${settings.pinLength}자리 PIN을 입력해주세요.` };
@@ -822,6 +908,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
 
                     // PIN 일치 - 저장
                     await setPin(pin);
+                    setPinIsSet(true); // PIN 설정 상태 업데이트
                     setCurrentPin(pin);
                     setIsUnlocked(true);
                     setIsConfirmingPin(false);
@@ -897,15 +984,46 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
         }
     };
 
-    // 문서 로드
+    // 문서 로드 (메타데이터 우선 + 점진적 로딩)
     const loadDocs = async (pin) => {
         try {
+            setIsLoadingDocs(true);
+
+            // 1. 메타데이터 먼저 가져오기 (문서 개수만)
+            if (profile?.userId) {
+                const metadata = await fetchSecretDocsMetadata(profile.userId);
+                setDocCount(metadata.count || 0);
+            }
+
+            // 2. 영구 삭제 대기 문서 자동 정리 (PIN 권한으로)
+            await cleanupPermanentlyDeletedDocs(pin);
+
+            // 3. 문서 전체 로드 (백그라운드)
             const allDocs = await getAllSecretDocs(pin);
-            setDocs(allDocs);
-            setFilteredDocs(allDocs);
+
+            // 4. 점진적 렌더링: 첫 5개만 먼저 표시
+            const BATCH_SIZE = 5;
+            if (allDocs.length > BATCH_SIZE) {
+                // 첫 5개 먼저 표시
+                setDocs(allDocs.slice(0, BATCH_SIZE));
+                setFilteredDocs(allDocs.slice(0, BATCH_SIZE));
+
+                // 나머지는 다음 프레임에 추가
+                setTimeout(() => {
+                    setDocs(allDocs);
+                    setFilteredDocs(allDocs);
+                    setIsLoadingDocs(false);
+                }, 0);
+            } else {
+                // 5개 이하면 전부 표시
+                setDocs(allDocs);
+                setFilteredDocs(allDocs);
+                setIsLoadingDocs(false);
+            }
         } catch (error) {
             console.error('문서 로드 오류:', error);
             showToast?.('문서를 불러올 수 없습니다.');
+            setIsLoadingDocs(false);
         }
     };
 
@@ -1065,7 +1183,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
     };
 
     // 카테고리 이름 및 아이콘 저장
-    const handleSaveCategoryName = (newName, newIcon) => {
+    const handleSaveCategoryName = async (newName, newIcon) => {
         const updatedSettings = {
             ...settings,
             categoryNames: {
@@ -1078,7 +1196,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
             }
         };
         setSettings(updatedSettings);
-        saveSettings(updatedSettings);
+        await saveSettings(updatedSettings);
         setShowCategoryNameEdit(false);
         setEditingCategory(null);
         showToast?.('카테고리가 변경되었습니다.');
@@ -1096,6 +1214,17 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
         }
     };
 
+    // 🗑️ Draft 삭제 헬퍼 함수
+    const clearDraft = () => {
+        try {
+            const draftKey = `secretDocDraft_${profile?.userId}`;
+            localStorage.removeItem(draftKey);
+            console.log('🗑️ Draft 삭제 완료');
+        } catch (error) {
+            console.error('Draft 삭제 실패:', error);
+        }
+    };
+
     // 카테고리 변경
     const handleCategoryChange = async (docId, newCategory) => {
         try {
@@ -1108,47 +1237,88 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
         }
     };
 
-    // 문서 저장
+    // 문서 저장 (낙관적 업데이트)
     const handleSaveDoc = async (docData) => {
+        // 1. 이전 상태 백업
+        const previousDocs = [...docs];
+        const previousFilteredDocs = [...filteredDocs];
+
         try {
             if (editingDoc) {
-                // 업데이트
-                const updated = await updateSecretDoc(currentPin, editingDoc.id, docData);
+                // === 업데이트 케이스 ===
+                // 2. 낙관적 UI 업데이트 (수정)
+                const updatedDoc = { ...editingDoc, ...docData, updatedAt: new Date().toISOString() };
+                setDocs(prev => prev.map(d => d.id === editingDoc.id ? updatedDoc : d));
+                setFilteredDocs(prev => prev.map(d => d.id === editingDoc.id ? updatedDoc : d));
+                setIsEditorOpen(false);
+                setEditingDoc(null);
+                clearDraft();
+                showToast?.('문서가 수정되었습니다.');
+
+                // 3. 백그라운드에서 실제 저장
+                await updateSecretDoc(currentPin, editingDoc.id, docData);
 
                 // 개별 비밀번호 설정
                 if (docData.hasPassword && docData.password) {
-                    await setDocPassword(currentPin, updated.id, docData.password);
+                    await setDocPassword(currentPin, editingDoc.id, docData.password);
                 }
-
-                await loadDocs(currentPin);
-                showToast?.('문서가 수정되었습니다.');
             } else {
-                // 새 문서
+                // === 새 문서 케이스 ===
+                // 2. 임시 ID로 낙관적 UI 업데이트
+                const tempId = `temp_${Date.now()}`;
+                const tempDoc = {
+                    id: tempId,
+                    ...docData,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+                setDocs(prev => [tempDoc, ...prev]);
+                setFilteredDocs(prev => [tempDoc, ...prev]);
+                setIsEditorOpen(false);
+                setEditingDoc(null);
+                clearDraft();
+                showToast?.('문서가 추가되었습니다.');
+
+                // 3. 백그라운드에서 실제 저장
                 const newDoc = await addSecretDoc(currentPin, docData);
 
                 // 개별 비밀번호 설정
                 if (docData.hasPassword && docData.password) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
                     await setDocPassword(currentPin, newDoc.id, docData.password);
                 }
 
-                await loadDocs(currentPin);
-                showToast?.('문서가 추가되었습니다.');
+                // 4. 임시 문서를 실제 문서로 교체
+                setDocs(prev => prev.map(d => d.id === tempId ? newDoc : d));
+                setFilteredDocs(prev => prev.map(d => d.id === tempId ? newDoc : d));
             }
-
-            setIsEditorOpen(false);
-            setEditingDoc(null);
         } catch (error) {
+            // 5. 실패 시 롤백
             console.error('문서 저장 오류:', error);
-            showToast?.('문서 저장에 실패했습니다.');
+            setDocs(previousDocs);
+            setFilteredDocs(previousFilteredDocs);
+            showToast?.('문서 저장에 실패했습니다. 다시 시도해주세요.');
         }
     };
 
-    // 문서 삭제
+    // 문서 삭제 (낙관적 업데이트)
     const handleDeleteDoc = async (docId) => {
-        try {
-            const doc = docs.find(d => d.id === docId);
-            if (!doc) return;
+        const doc = docs.find(d => d.id === docId);
+        if (!doc) return;
 
+        // 1. 이전 상태 백업
+        const previousDocs = [...docs];
+        const previousFilteredDocs = [...filteredDocs];
+
+        // 2. 즉시 UI 업데이트 (낙관적)
+        setDocs(prev => prev.filter(d => d.id !== docId));
+        setFilteredDocs(prev => prev.filter(d => d.id !== docId));
+        setIsEditorOpen(false);
+        setEditingDoc(null);
+        clearDraft();
+
+        try {
+            // 3. 백그라운드에서 실제 삭제
             // 개별 비밀번호 제거 (휴지통으로 이동 시 리셋)
             const docWithoutPassword = {
                 ...doc,
@@ -1162,26 +1332,43 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                     id: doc.id,
                     type: 'secret',
                     content: doc.title || '제목 없음',
-                    originalData: docWithoutPassword // 비밀번호 없는 버전으로 저장
+                    originalData: docWithoutPassword
                 }
             });
             window.dispatchEvent(event);
 
             // 시크릿 스토리지에서 삭제
             await deleteSecretDoc(currentPin, docId);
-            await loadDocs(currentPin);
 
-            setIsEditorOpen(false);
-            setEditingDoc(null);
+            // 4. 성공 토스트
             showToast?.('문서가 삭제되었습니다.');
         } catch (error) {
+            // 5. 실패 시 롤백
             console.error('문서 삭제 오류:', error);
-            showToast?.('문서 삭제에 실패했습니다.');
+            setDocs(previousDocs);
+            setFilteredDocs(previousFilteredDocs);
+            showToast?.('문서 삭제에 실패했습니다. 다시 시도해주세요.');
         }
     };
 
     // 잠금
     const handleLock = () => {
+        // 🔐 작성 중인 문서가 있으면 localStorage에 임시 저장
+        if (editingDoc || isEditorOpen) {
+            try {
+                const draftKey = `secretDocDraft_${profile?.userId}`;
+                const draftData = {
+                    editingDoc,
+                    isEditorOpen,
+                    timestamp: Date.now()
+                };
+                localStorage.setItem(draftKey, JSON.stringify(draftData));
+                console.log('💾 작성 중인 문서 임시 저장:', draftData);
+            } catch (error) {
+                console.error('Draft 저장 실패:', error);
+            }
+        }
+
         setIsUnlocked(false);
         setCurrentPin('');
         setDocs([]);
@@ -1558,14 +1745,23 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                     setIsTempPinLogin(false);
                 }
 
-                showToast?.('PIN이 성공적으로 변경되었습니다.');
                 setShowPinChangeModal(false);
+
+                // 🔓 새로운 PIN으로 자동 언락 (시크릿 페이지 진입)
+                setCurrentPin(newPin);
+                setIsUnlocked(true);
+
+                // 시크릿 페이지가 열린 후 토스트 표시
+                setTimeout(() => {
+                    showToast?.('PIN이 성공적으로 변경되었습니다.');
+                }, 300);
             } else {
-                showToast?.(result.message || 'PIN 변경에 실패했습니다.');
+                // 실패 시 모달 내부에서 에러 표시하도록 result 반환
+                return result;
             }
         } catch (error) {
             console.error('PIN 변경 오류:', error);
-            showToast?.('PIN 변경 중 오류가 발생했습니다.');
+            return { success: false, message: 'PIN 변경 중 오류가 발생했습니다.' };
         }
     };
 
@@ -1624,7 +1820,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                         pinLength={settings.pinLength}
                         title={isSettingNewPin
                             ? (isConfirmingPin ? '새 PIN 확인' : '새 PIN 설정')
-                            : (hasPinSet()
+                            : (pinIsSet
                                 ? 'PIN 입력'
                                 : (isConfirmingPin ? 'PIN 확인' : 'PIN 설정'))
                         }
@@ -1632,7 +1828,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                             ? (isConfirmingPin
                                 ? '동일한 PIN을 한 번 더 입력해주세요'
                                 : '임시 PIN과 다른 새로운 PIN을 설정하세요')
-                            : (hasPinSet()
+                            : (pinIsSet
                                 ? '시크릿 페이지에 접근하려면 PIN을 입력하세요'
                                 : (isConfirmingPin
                                     ? '동일한 PIN을 한 번 더 입력해주세요'
@@ -1640,7 +1836,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                         }
                         onSubmit={handlePinSubmit}
                         onForgotPin={profile?.email && !isSettingNewPin ? handleForgotPin : null}
-                        onChangePin={hasPinSet() && !isSettingNewPin ? handleChangePinClick : null}
+                        onChangePin={pinIsSet && !isSettingNewPin ? handleChangePinClick : null}
                         isSettingNewPin={isSettingNewPin}
                     />
                 </div>
@@ -1678,6 +1874,20 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
         <>
         <Container ref={containerRef}>
             <InnerContent>
+            <TitleWrapper>
+                <PageTitle>
+                    시크릿 문서 ({isLoadingDocs && docs.length === 0 ? `${docCount}개 로딩 중...` : docs.length})
+                </PageTitle>
+                <AddDocButton
+                    onClick={() => {
+                        setEditingDoc(null);
+                        setIsEditorOpen(true);
+                    }}
+                    title="새 문서 작성"
+                >
+                    +
+                </AddDocButton>
+            </TitleWrapper>
             <SearchBar>
                 <SearchIcon>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1819,6 +2029,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                                 settings={settings}
                                 onClick={selectionMode ? () => toggleSelection(doc.id) : handleDocClick}
                                 onCategoryChange={handleCategoryChange}
+                                onDelete={handleDeleteDoc}
                                 onLongPress={() => enterSelectionMode(doc.id)}
                                 selectionMode={selectionMode}
                                 isSelected={selectedDocs.includes(doc.id)}
@@ -1838,6 +2049,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                     onClose={() => {
                         setIsEditorOpen(false);
                         setEditingDoc(null);
+                        clearDraft(); // 사용자가 직접 닫을 때도 Draft 삭제
                     }}
                     onSave={handleSaveDoc}
                     onDelete={handleDeleteDoc}

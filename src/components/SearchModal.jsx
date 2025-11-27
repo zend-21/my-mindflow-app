@@ -290,7 +290,6 @@ const SuggestionItem = styled.div`
     padding: 10px 12px;
     background: rgba(255, 255, 255, 0.03);
     border-radius: 8px;
-    cursor: pointer;
     transition: all 0.2s;
     display: flex;
     align-items: center;
@@ -311,12 +310,13 @@ const SuggestionItem = styled.div`
 
 const SuggestionText = styled.span`
     flex: 1;
+    cursor: pointer;
 `;
 
 const DeleteButton = styled.button`
     background: none;
     border: none;
-    color: #808080;
+    color: #666666;
     cursor: pointer;
     padding: 4px;
     display: flex;
@@ -324,11 +324,8 @@ const DeleteButton = styled.button`
     justify-content: center;
     border-radius: 50%;
     transition: all 0.2s;
-    opacity: 0;
-
-    ${SuggestionItem}:hover & {
-        opacity: 1;
-    }
+    opacity: 1;
+    flex-shrink: 0;
 
     &:hover {
         background: rgba(255, 255, 255, 0.1);
@@ -399,12 +396,13 @@ const ResultMeta = styled.div`
 
 const ResultLocation = styled.span`
     color: ${props => {
-        if (props.$type === 'memo') return '#4a90e2'; // 파란색 - 메모
-        if (props.$type === 'calendar') return '#9c27b0'; // 보라색 - 일정
-        if (props.$type === 'trash') return '#ff6b6b'; // 빨간색 - 휴지통
-        return '#4a90e2';
+        if (props.$type === 'memo') return '#6366f1'; // 보라색 - 메모
+        if (props.$type === 'calendar') return '#22c55e'; // 초록색 - 일정
+        if (props.$type === 'alarm') return '#f87171'; // 연한 붉은색 - 알람
+        if (props.$type === 'trash') return '#9ca3af'; // 회색 - 휴지통
+        return '#6366f1';
     }};
-    font-weight: 500;
+    font-weight: 600;
 `;
 
 const ResultDate = styled.span`
@@ -570,6 +568,7 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
             return '메모 > 미분류';
         }
         if (item.type === 'calendar') return '일정';
+        if (item.type === 'alarm') return '⏰ 알람';
         if (item.type === 'trash') return '휴지통';
         return '';
     };
@@ -582,6 +581,18 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}/${month}/${day}`;
+    };
+
+    // 알람 시간 포맷 (년월일 시:분)
+    const formatAlarmTime = (timestamp) => {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${year}년 ${month}월 ${day}일 ${hours}:${minutes}`;
     };
 
     // 검색 결과 필터링
@@ -599,8 +610,10 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
 
         if (!matchesSearchTerm) return false;
 
-        // 카테고리 필터
-        return activeFilter === 'all' || activeFilter === item.type;
+        // 카테고리 필터 (calendar 필터는 alarm도 포함)
+        if (activeFilter === 'all') return true;
+        if (activeFilter === 'calendar') return item.type === 'calendar' || item.type === 'alarm';
+        return activeFilter === item.type;
     });
 
     // 카테고리별 검색 결과 개수 계산
@@ -617,7 +630,10 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
 
             if (!matchesSearchTerm) return false;
 
-            return categoryId === 'all' || item.type === categoryId;
+            // calendar 필터는 alarm도 포함
+            if (categoryId === 'all') return true;
+            if (categoryId === 'calendar') return item.type === 'calendar' || item.type === 'alarm';
+            return item.type === categoryId;
         }).length;
     };
 
@@ -661,7 +677,7 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
 
                 <ContentSection>
                     {searchTerm.length < 2 ? (
-                        // 검색어 입력 전: 추천 검색어 또는 검색 기록
+                        // 검색어 입력 전: 검색 기록만 표시
                         searchHistory.length > 0 ? (
                             <>
                                 <SectionHeader>
@@ -694,27 +710,7 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
                                     ))}
                                 </SuggestionList>
                             </>
-                        ) : (
-                            <>
-                                <SectionHeader>
-                                    <SectionTitle>
-                                        <TrendingUp size={14} />
-                                        추천 검색어
-                                    </SectionTitle>
-                                </SectionHeader>
-                                <SuggestionList>
-                                    {RECOMMENDED_SEARCHES.map((term, index) => (
-                                        <SuggestionItem
-                                            key={index}
-                                            onClick={() => handleSearch(term)}
-                                        >
-                                            <Search size={16} />
-                                            <SuggestionText>{term}</SuggestionText>
-                                        </SuggestionItem>
-                                    ))}
-                                </SuggestionList>
-                            </>
-                        )
+                        ) : null
                     ) : (
                         // 검색 결과
                         <SearchResultList>
@@ -727,27 +723,47 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
                                             onSelectResult(item.id, item.type);
                                         }}
                                     >
-                                        <ResultTitle
-                                            dangerouslySetInnerHTML={{
-                                                __html: highlightText(extractTitle(item.content), searchTerm)
-                                            }}
-                                        />
-                                        <ResultPreview
-                                            dangerouslySetInnerHTML={{
-                                                __html: highlightText(getMatchedPreview(item.content, searchTerm), searchTerm)
-                                            }}
-                                        />
-                                        <ResultMeta>
-                                            <ResultLocation $type={item.type}>{getLocation(item)}</ResultLocation>
-                                            {(item.updatedAt || item.createdAt) && (
-                                                <>
-                                                    <span>•</span>
-                                                    <ResultDate>
-                                                        {formatDate(item.updatedAt || item.createdAt)}
-                                                    </ResultDate>
-                                                </>
-                                            )}
-                                        </ResultMeta>
+                                        {item.type === 'alarm' ? (
+                                            // 알람 타입 - 특별한 표시
+                                            <>
+                                                <ResultTitle
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: highlightText(item.title, searchTerm)
+                                                    }}
+                                                />
+                                                <ResultPreview style={{ color: '#808080' }}>
+                                                    --
+                                                </ResultPreview>
+                                                <ResultMeta>
+                                                    <ResultLocation $type={item.type}>{getLocation(item)} {formatAlarmTime(item.alarmTime)}</ResultLocation>
+                                                </ResultMeta>
+                                            </>
+                                        ) : (
+                                            // 일반 타입 - 기존 표시
+                                            <>
+                                                <ResultTitle
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: highlightText(extractTitle(item.content), searchTerm)
+                                                    }}
+                                                />
+                                                <ResultPreview
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: highlightText(getMatchedPreview(item.content, searchTerm), searchTerm)
+                                                    }}
+                                                />
+                                                <ResultMeta>
+                                                    <ResultLocation $type={item.type}>{getLocation(item)}</ResultLocation>
+                                                    {(item.updatedAt || item.createdAt) && (
+                                                        <>
+                                                            <span>•</span>
+                                                            <ResultDate>
+                                                                {formatDate(item.updatedAt || item.createdAt)}
+                                                            </ResultDate>
+                                                        </>
+                                                    )}
+                                                </ResultMeta>
+                                            </>
+                                        )}
                                     </SearchResultItem>
                                 ))
                             ) : (

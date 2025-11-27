@@ -6,12 +6,16 @@ import { useLocalStorage } from './useLocalStorage';
 /**
  * 휴지통 관리 커스텀 훅
  * @param {number} autoDeleteDays - 자동 삭제까지의 일수 (기본: 30일)
+ * @param {Array} externalTrashedItems - 외부에서 관리되는 휴지통 아이템 (Firestore 동기화용)
+ * @param {Function} externalSetTrashedItems - 외부 상태 업데이트 함수 (Firestore 동기화용)
  * @returns {Object} 휴지통 관련 상태와 함수들
  */
-export const useTrash = (autoDeleteDays = 30) => {
-    // 휴지통 아이템 저장 (로컬스토리지)
-    const [trashedItems, setTrashedItems] = useLocalStorage('trashedItems_shared', []);
-    
+export const useTrash = (autoDeleteDays = 30, externalTrashedItems = null, externalSetTrashedItems = null) => {
+    // 외부 상태가 제공되면 사용, 아니면 로컬스토리지 사용 (하위 호환성)
+    const [localTrashedItems, setLocalTrashedItems] = useLocalStorage('trashedItems_shared', []);
+    const trashedItems = externalTrashedItems !== null ? externalTrashedItems : localTrashedItems;
+    const setTrashedItems = externalSetTrashedItems !== null ? externalSetTrashedItems : setLocalTrashedItems;
+
     // 자동 삭제 기간 설정 (로컬스토리지)
     const [autoDeletePeriod, setAutoDeletePeriod] = useLocalStorage('autoDeletePeriod_shared', autoDeleteDays);
 
@@ -31,8 +35,19 @@ export const useTrash = (autoDeleteDays = 30) => {
             deletedAt: Date.now()
         };
 
-        setTrashedItems(prev => [trashedItem, ...prev]);
+        const newTrashItems = [trashedItem, ...trashedItems];
+        setTrashedItems(newTrashItems);
         console.log(`🗑️ 휴지통으로 이동: ${type} - ${id}`);
+
+        // 즉시 Firestore 저장 (디바운스 없이)
+        const userId = localStorage.getItem('firebaseUserId');
+        if (userId) {
+            import('../services/userDataService').then(({ saveTrashToFirestore }) => {
+                saveTrashToFirestore(userId, newTrashItems).catch(err => {
+                    console.error('휴지통 즉시 저장 실패:', err);
+                });
+            });
+        }
     };
 
     /**
@@ -40,22 +55,51 @@ export const useTrash = (autoDeleteDays = 30) => {
      * @param {Array<string>} ids - 복원할 아이템 ID 배열
      * @returns {Array<Object>} 복원된 아이템들의 원본 데이터
      */
-    const restoreFromTrash = (ids) => {
+    const restoreFromTrash = async (ids) => {
         const idsSet = new Set(ids);
         const itemsToRestore = trashedItems.filter(item => idsSet.has(item.id));
-        
-        // 휴지통에서 제거
-        setTrashedItems(prev => prev.filter(item => !idsSet.has(item.id)));
-        
-        // 복원 이벤트 발생 (App.jsx에서 감지하여 실제 복원 처리)
-        if (typeof window !== 'undefined') {
+
+        console.log(`♻️ 복원 시작: ${ids.length}개 아이템`, itemsToRestore);
+
+        // 시크릿 문서와 일반 문서 분리
+        const secretItems = itemsToRestore.filter(item => item.type === 'secret');
+        const normalItems = itemsToRestore.filter(item => item.type !== 'secret');
+
+        // 일반 문서는 기존 방식대로 복원 이벤트 발생
+        if (normalItems.length > 0 && typeof window !== 'undefined') {
             const event = new CustomEvent('itemsRestored', {
-                detail: itemsToRestore
+                detail: normalItems
             });
             window.dispatchEvent(event);
         }
-        
-        console.log(`♻️ 복원: ${ids.length}개 아이템`);
+
+        // 시크릿 문서는 PIN 없이 복원 (삭제 ID 목록에서만 제거)
+        if (secretItems.length > 0) {
+            try {
+                const { restoreSecretDocsWithoutPin } = await import('../utils/secretStorage');
+                const secretDocIds = secretItems.map(item => item.id);
+                await restoreSecretDocsWithoutPin(secretDocIds);
+                console.log('✅ 시크릿 문서 복원 완료 (PIN 없음):', secretItems.length, '개');
+            } catch (error) {
+                console.error('❌ 시크릿 문서 복원 실패:', error);
+            }
+        }
+
+        // 휴지통에서 복원된 아이템 제거 (시크릿, 일반 모두)
+        const newTrashItems = trashedItems.filter(item => !idsSet.has(item.id));
+        setTrashedItems(newTrashItems);
+
+        // 즉시 Firestore 저장 (디바운스 없이)
+        const userId = localStorage.getItem('firebaseUserId');
+        if (userId) {
+            import('../services/userDataService').then(({ saveTrashToFirestore }) => {
+                saveTrashToFirestore(userId, newTrashItems).catch(err => {
+                    console.error('휴지통 복원 후 저장 실패:', err);
+                });
+            });
+        }
+
+        console.log(`✅ 복원 완료: ${ids.length}개 아이템 (일반: ${normalItems.length}, 시크릿: ${secretItems.length})`);
         return itemsToRestore;
     };
 
@@ -63,10 +107,43 @@ export const useTrash = (autoDeleteDays = 30) => {
      * 휴지통에서 영구 삭제
      * @param {Array<string>} ids - 삭제할 아이템 ID 배열
      */
-    const permanentDelete = (ids) => {
+    const permanentDelete = async (ids) => {
         const idsSet = new Set(ids);
-        setTrashedItems(prev => prev.filter(item => !idsSet.has(item.id)));
-        console.log(`🔥 영구 삭제: ${ids.length}개 아이템`);
+        const itemsToDelete = trashedItems.filter(item => idsSet.has(item.id));
+
+        console.log(`🔥 영구 삭제 시작: ${ids.length}개 아이템`, itemsToDelete);
+
+        // 시크릿 문서와 일반 문서 분리
+        const secretItems = itemsToDelete.filter(item => item.type === 'secret');
+        const normalItems = itemsToDelete.filter(item => item.type !== 'secret');
+
+        // 시크릿 문서는 삭제 ID 목록에서만 제거 (실제 삭제는 다음 PIN 입력 시 자동 정리)
+        if (secretItems.length > 0) {
+            try {
+                const { permanentDeleteSecretDocWithoutPin } = await import('../utils/secretStorage');
+                const secretDocIds = secretItems.map(item => item.id);
+                await permanentDeleteSecretDocWithoutPin(secretDocIds);
+                console.log('✅ 시크릿 문서 영구 삭제 완료 (삭제 ID 목록에서 제거):', secretItems.length, '개');
+            } catch (error) {
+                console.error('❌ 시크릿 문서 영구 삭제 실패:', error);
+            }
+        }
+
+        // 휴지통에서 영구 삭제된 아이템 제거 (시크릿, 일반 모두)
+        const newTrashItems = trashedItems.filter(item => !idsSet.has(item.id));
+        setTrashedItems(newTrashItems);
+
+        // 즉시 Firestore 저장 (디바운스 없이)
+        const userId = localStorage.getItem('firebaseUserId');
+        if (userId) {
+            import('../services/userDataService').then(({ saveTrashToFirestore }) => {
+                saveTrashToFirestore(userId, newTrashItems).catch(err => {
+                    console.error('휴지통 영구 삭제 후 저장 실패:', err);
+                });
+            });
+        }
+
+        console.log(`✅ 영구 삭제 완료: ${ids.length}개 아이템 (일반: ${normalItems.length}, 시크릿: ${secretItems.length})`);
     };
 
     /**
@@ -75,6 +152,17 @@ export const useTrash = (autoDeleteDays = 30) => {
     const emptyTrash = () => {
         const count = trashedItems.length;
         setTrashedItems([]);
+
+        // 즉시 Firestore 저장 (디바운스 없이)
+        const userId = localStorage.getItem('firebaseUserId');
+        if (userId) {
+            import('../services/userDataService').then(({ saveTrashToFirestore }) => {
+                saveTrashToFirestore(userId, []).catch(err => {
+                    console.error('휴지통 비우기 후 저장 실패:', err);
+                });
+            });
+        }
+
         console.log(`🧹 휴지통 비우기: ${count}개 아이템 삭제`);
     };
 
@@ -102,6 +190,17 @@ export const useTrash = (autoDeleteDays = 30) => {
         if (updatedItems.length < beforeCount) {
             setTrashedItems(updatedItems);
             const deletedCount = beforeCount - updatedItems.length;
+
+            // 즉시 Firestore 저장 (디바운스 없이)
+            const userId = localStorage.getItem('firebaseUserId');
+            if (userId) {
+                import('../services/userDataService').then(({ saveTrashToFirestore }) => {
+                    saveTrashToFirestore(userId, updatedItems).catch(err => {
+                        console.error('자동 삭제 후 저장 실패:', err);
+                    });
+                });
+            }
+
             console.log(`🕐 자동 삭제: ${deletedCount}개 아이템 (${autoDeletePeriod}일 경과)`);
         }
     };

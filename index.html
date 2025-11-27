@@ -19,8 +19,8 @@
     </style>
     <link rel="icon" type="image/svg+xml" href="/vite.svg">
     <title>나의 비망록</title>
-    <!-- Google Identity Services (최신) -->
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <!-- Google Identity Services (최신) - onload로 안전하게 로드 -->
+    <script src="https://accounts.google.com/gsi/client" async defer onload="console.log('✅ Google Identity Services 로드 완료')" onerror="console.error('❌ Google Identity Services 로드 실패')"></script>
   </head>
   <body>
     <div id="root"></div>

@@ -513,6 +513,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
     const [initialData, setInitialData] = useState(null);
 
     const textareaRef = useRef(null);
+    const passwordSectionRef = useRef(null);
 
     // 카테고리 아이콘 SVG 경로 가져오기
     const getCategoryIconPath = (category) => {
@@ -522,13 +523,41 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
         return icon?.svg || ALL_ICONS[0]?.svg;
     };
 
+    // 🔓 Draft 복원 및 초기화
     useEffect(() => {
         // 에디터가 열릴 때마다 에러 상태 초기화
         setValidationError('');
         setPasswordError('');
         setIsInputEnabled(false);
 
-        const initialFormData = doc ? {
+        // 🔓 localStorage에서 Draft 복원 시도
+        const userId = localStorage.getItem('firebaseUserId');
+        const draftKey = `secretDocEditorDraft_${userId}`;
+        let restoredData = null;
+
+        try {
+            const savedDraft = localStorage.getItem(draftKey);
+            if (savedDraft) {
+                const draftData = JSON.parse(savedDraft);
+                // 24시간 이내의 Draft만 복원
+                const hoursSinceCreated = (Date.now() - draftData.timestamp) / (1000 * 60 * 60);
+
+                if (hoursSinceCreated < 24) {
+                    restoredData = draftData.formData;
+                    console.log('📂 Draft 복원:', restoredData);
+                    if (draftData.passwordConfirm) {
+                        setPasswordConfirm(draftData.passwordConfirm);
+                    }
+                } else {
+                    // 오래된 Draft 삭제
+                    localStorage.removeItem(draftKey);
+                }
+            }
+        } catch (error) {
+            console.error('Draft 복원 실패:', error);
+        }
+
+        const initialFormData = restoredData || (doc ? {
             title: doc.title || '',
             content: doc.content || '',
             category: doc.category || 'diary',
@@ -544,13 +573,13 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
             hasPassword: false,
             password: '',
             isImportant: false
-        };
+        });
 
         setFormData(initialFormData);
         setInitialData(initialFormData); // 원본 데이터 저장
 
         // 기존 비밀번호가 있으면 확인 필드도 동일하게 설정
-        if (doc?.hasPassword && doc.password) {
+        if (!restoredData && doc?.hasPassword && doc.password) {
             setPasswordConfirm(doc.password);
         }
 
@@ -562,12 +591,50 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
         return () => clearTimeout(timer);
     }, [doc]);
 
+    // 💾 formData 변경 시 자동 Draft 저장
+    useEffect(() => {
+        // 입력이 활성화되지 않았으면 저장하지 않음 (초기화 중)
+        if (!isInputEnabled) return;
+
+        // 내용이 비어있으면 저장하지 않음
+        if (!formData.title && !formData.content) return;
+
+        const userId = localStorage.getItem('firebaseUserId');
+        if (!userId) return;
+
+        const draftKey = `secretDocEditorDraft_${userId}`;
+        const draftData = {
+            formData,
+            passwordConfirm,
+            timestamp: Date.now()
+        };
+
+        try {
+            localStorage.setItem(draftKey, JSON.stringify(draftData));
+            console.log('💾 Draft 자동 저장');
+        } catch (error) {
+            console.error('Draft 저장 실패:', error);
+        }
+    }, [formData, passwordConfirm, isInputEnabled]);
+
     const handleChange = (field, value) => {
         setFormData(prev => ({ ...prev, [field]: value }));
 
         // 비밀번호가 변경되면 에러 초기화
         if (field === 'password') {
             setPasswordError('');
+        }
+
+        // 개별 비밀번호 체크박스를 선택하면 비밀번호 입력 필드로 스크롤
+        if (field === 'hasPassword' && value === true) {
+            setTimeout(() => {
+                if (passwordSectionRef.current) {
+                    passwordSectionRef.current.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center'
+                    });
+                }
+            }, 100);
         }
     };
 
@@ -684,6 +751,14 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
             title: finalTitle,
             preview: formData.content.substring(0, 100)
         });
+
+        // 🗑️ 저장 성공 시 Draft 삭제
+        const userId = localStorage.getItem('firebaseUserId');
+        if (userId) {
+            const draftKey = `secretDocEditorDraft_${userId}`;
+            localStorage.removeItem(draftKey);
+            console.log('🗑️ Draft 삭제 (저장 완료)');
+        }
 
         // 확인 모달 닫기
         setShowSaveConfirm(false);
@@ -826,7 +901,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                         </CheckboxGroup>
                         {formData.hasPassword && (
                             <>
-                                <PasswordInputWrapper>
+                                <PasswordInputWrapper ref={passwordSectionRef}>
                                     <PasswordInput
                                         type={showPassword ? "text" : "password"}
                                         placeholder="문서 비밀번호 (4-20자)"
@@ -965,6 +1040,13 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                             <ErrorModalButton
                                 onClick={() => {
                                     setShowDeleteConfirm(false);
+                                    // 🗑️ Draft 삭제 (문서 삭제 시)
+                                    const userId = localStorage.getItem('firebaseUserId');
+                                    if (userId) {
+                                        const draftKey = `secretDocEditorDraft_${userId}`;
+                                        localStorage.removeItem(draftKey);
+                                        console.log('🗑️ Draft 삭제 (문서 삭제)');
+                                    }
                                     onDelete(doc.id);
                                 }}
                                 style={{

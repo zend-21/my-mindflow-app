@@ -139,7 +139,17 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
         localStorage.setItem('widgets_shared', JSON.stringify(data.settings?.widgets || ['StatsGrid', 'QuickActions', 'RecentActivity']));
         localStorage.setItem('displayCount_shared', JSON.stringify(data.settings?.displayCount || 5));
 
-        if (data.settings?.nickname) localStorage.setItem('userNickname', data.settings.nickname);
+        // 닉네임은 별도 nicknames 컬렉션에서 가져오기
+        try {
+          const { getUserNickname } = await import('../services/nicknameService');
+          const nickname = await getUserNickname(userId);
+          if (nickname) {
+            localStorage.setItem('userNickname', nickname);
+          }
+        } catch (error) {
+          console.error('닉네임 동기화 실패:', error);
+        }
+
         if (data.settings?.profileImageType) localStorage.setItem('profileImageType', data.settings.profileImageType);
         if (data.settings?.selectedAvatarId) localStorage.setItem('selectedAvatarId', data.settings.selectedAvatarId);
         if (data.settings?.avatarBgColor) localStorage.setItem('avatarBgColor', data.settings.avatarBgColor);
@@ -175,7 +185,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
           console.error('Firestore 저장 실패:', err);
         });
       }
-    }, 1000); // 1초 디바운스
+    }, 300); // 300ms 디바운스 (더 빠른 저장)
   }, [userId, enabled]);
 
   // 메모 저장

@@ -21,13 +21,14 @@ export const initializeGapiClient = () => {
       return;
     }
 
-    const script = document.createElement('script');
-    script.src = 'https://apis.google.com/js/api.js';
-    script.onload = () => {
+    const existingScript = document.querySelector('script[src="https://apis.google.com/js/api.js"]');
+
+    if (existingScript && window.gapi) {
+      // 스크립트는 있지만 아직 로드 중일 수 있음
       window.gapi.load('client', async () => {
         try {
           await window.gapi.client.init({
-            apiKey: '', // 선택사항
+            apiKey: '',
             discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
           });
           gapiInited = true;
@@ -38,24 +39,59 @@ export const initializeGapiClient = () => {
           reject(error);
         }
       });
-    };
-    script.onerror = reject;
-    
-    if (!document.querySelector('script[src="https://apis.google.com/js/api.js"]')) {
+    } else if (!existingScript) {
+      // 스크립트가 없으면 새로 추가
+      const script = document.createElement('script');
+      script.src = 'https://apis.google.com/js/api.js';
+      script.onload = () => {
+        window.gapi.load('client', async () => {
+          try {
+            await window.gapi.client.init({
+              apiKey: '',
+              discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+            });
+            gapiInited = true;
+            console.log('✅ GAPI 클라이언트 초기화 완료');
+            resolve();
+          } catch (error) {
+            console.error('❌ GAPI 초기화 실패:', error);
+            reject(error);
+          }
+        });
+      };
+      script.onerror = (error) => {
+        console.error('❌ GAPI 스크립트 로드 실패:', error);
+        reject(error);
+      };
       document.body.appendChild(script);
     } else {
-      window.gapi.load('client', async () => {
-        try {
-          await window.gapi.client.init({
-            apiKey: '',
-            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+      // 스크립트는 있지만 window.gapi가 없으면 로딩 대기
+      console.log('⏳ GAPI 스크립트 로딩 대기 중...');
+      const checkGapi = setInterval(() => {
+        if (window.gapi) {
+          clearInterval(checkGapi);
+          window.gapi.load('client', async () => {
+            try {
+              await window.gapi.client.init({
+                apiKey: '',
+                discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
+              });
+              gapiInited = true;
+              console.log('✅ GAPI 클라이언트 초기화 완료');
+              resolve();
+            } catch (error) {
+              console.error('❌ GAPI 초기화 실패:', error);
+              reject(error);
+            }
           });
-          gapiInited = true;
-          resolve();
-        } catch (error) {
-          reject(error);
         }
-      });
+      }, 100);
+
+      // 10초 후 타임아웃
+      setTimeout(() => {
+        clearInterval(checkGapi);
+        reject(new Error('GAPI 로드 타임아웃'));
+      }, 10000);
     }
   });
 };

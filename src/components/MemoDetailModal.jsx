@@ -3,9 +3,10 @@
 import React, { useState, useEffect, Fragment, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
 import Portal from './Portal';
-import RoomSettingsModal from './collaboration/RoomSettingsModal';
-import CollaborationRoom from './collaboration/CollaborationRoom';
-import { createCollaborationRoom, checkMemoSharedStatus } from '../services/collaborationRoomService';
+// 🗑️ COLLABORATION REMOVED - 협업방 기능 제거됨
+// import RoomSettingsModal from './collaboration/RoomSettingsModal';
+// import CollaborationRoom from './collaboration/CollaborationRoom';
+// import { createCollaborationRoom, checkMemoSharedStatus } from '../services/collaborationRoomService';
 import { useMemoFolders } from '../hooks/useMemoFolders';
 
 /* --- (1) 기존 스타일 및 애니메이션 (모두 동일) --- */
@@ -520,11 +521,12 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
 
     // 폴더 목록 가져오기
     const { folders } = useMemoFolders();
-    const [isRoomSettingsOpen, setIsRoomSettingsOpen] = useState(false);
-    const [isCollaborationRoomOpen, setIsCollaborationRoomOpen] = useState(false);
-    const [currentRoomId, setCurrentRoomId] = useState(null);
-    const [isShared, setIsShared] = useState(false); // 공유 상태
-    const [sharedRoom, setSharedRoom] = useState(null); // 공유된 방 정보
+    // 🗑️ COLLABORATION REMOVED - 협업방 관련 state 제거됨
+    // const [isRoomSettingsOpen, setIsRoomSettingsOpen] = useState(false);
+    // const [isCollaborationRoomOpen, setIsCollaborationRoomOpen] = useState(false);
+    // const [currentRoomId, setCurrentRoomId] = useState(null);
+    const [isShared, setIsShared] = useState(false); // 공유 상태 (폴더 이동용)
+    // const [sharedRoom, setSharedRoom] = useState(null); // 공유된 방 정보
     // ★★★ 추가: 키보드 활성화 상태를 관리하는 state ★★★
     const [isKeyboardActive, setIsKeyboardActive] = useState(false);
 
@@ -558,6 +560,7 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
             // 공유 상태 확인 (folderId 기반)
             setIsShared(memo.folderId === 'shared');
 
+            // 🗑️ COLLABORATION REMOVED - 협업방 상태 확인 제거됨
             // 협업방 상태 확인 (참고용 기능 - 현재 비활성화)
             // const checkSharedStatus = async () => {
             //     try {
@@ -719,44 +722,20 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
         });
     };
 
-    // 방 설정 완료 후 방 생성 및 협업방 열기
-    const handleRoomSettingsConfirm = async (settings) => {
-        try {
-            // 협업방 생성
-            const roomId = await createCollaborationRoom(
-                memo.id,
-                settings.title, // 사용자가 입력한 제목
-                editedContent, // 현재 편집 중인 내용
-                settings.roomType, // 방 타입: 'open' (개방형) | 'restricted' (제한형)
-                settings.allowEdit // 모두 편집 가능 여부
-            );
+    // 🗑️ COLLABORATION REMOVED - 협업방 함수 제거됨
+    // const handleRoomSettingsConfirm = async (settings) => {
+    //     try {
+    //         const roomId = await createCollaborationRoom(...);
+    //         ...
+    //     } catch (error) {
+    //         console.error('협업방 생성 실패:', error);
+    //     }
+    // };
 
-            // 메모를 공유 폴더로 자동 이동 (원래 폴더 정보 저장)
-            if (onUpdateMemoFolder) {
-                onUpdateMemoFolder(memo.id, 'shared', true); // savePrevious = true
-                setSelectedFolderId('shared'); // UI 업데이트
-            }
-
-            setCurrentRoomId(roomId);
-            setIsRoomSettingsOpen(false);
-
-            // 방 생성 완료 후 협업방 화면으로 이동
-            setIsCollaborationRoomOpen(true);
-
-            setToastMessage('협업방이 생성되었습니다!');
-            setTimeout(() => setToastMessage(null), 2000);
-        } catch (error) {
-            console.error('협업방 생성 실패:', error);
-            setToastMessage(error.message || '협업방 생성에 실패했습니다.');
-            setTimeout(() => setToastMessage(null), 2000);
-        }
-    };
-
-    // 협업방 닫기
-    const handleCloseCollaborationRoom = () => {
-        setIsCollaborationRoomOpen(false);
-        setCurrentRoomId(null);
-    };
+    // const handleCloseCollaborationRoom = () => {
+    //     setIsCollaborationRoomOpen(false);
+    //     setCurrentRoomId(null);
+    // };
 
     return (
       <Portal>
@@ -897,16 +876,15 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
                 </ToastOverlay>
             )}
 
-            {/* 방 설정 모달 */}
-            <RoomSettingsModal
+            {/* 🗑️ COLLABORATION REMOVED - 협업방 UI 제거됨 */}
+            {/* <RoomSettingsModal
                 isOpen={isRoomSettingsOpen}
                 onClose={() => setIsRoomSettingsOpen(false)}
                 onConfirm={handleRoomSettingsConfirm}
                 defaultTitle={memo?.content?.substring(0, 50) || '제목 없음'}
-            />
+            /> */}
 
-            {/* 협업방 */}
-            {isCollaborationRoomOpen && currentRoomId && (
+            {/* {isCollaborationRoomOpen && currentRoomId && (
                 <CollaborationRoom
                     roomId={currentRoomId}
                     onClose={handleCloseCollaborationRoom}
@@ -915,7 +893,7 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
                         setTimeout(() => setToastMessage(null), 2000);
                     }}
                 />
-            )}
+            )} */}
         </Fragment>
       </Portal>
     );

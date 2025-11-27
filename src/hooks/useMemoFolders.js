@@ -1,8 +1,8 @@
 // 메모 폴더 관리 커스텀 훅
 import { useState, useEffect, useCallback } from 'react';
+import { fetchFoldersFromFirestore, saveFoldersToFirestore } from '../services/userDataService';
 
-const STORAGE_KEY = 'memoFolders';
-const MAX_CUSTOM_FOLDERS = 5; // 사용자 정의 폴더 최대 개수
+const MAX_CUSTOM_FOLDERS = 4; // 사용자 정의 폴더 최대 개수
 
 // 기본 폴더 (삭제 불가)
 const DEFAULT_FOLDERS = [
@@ -13,41 +13,113 @@ const DEFAULT_FOLDERS = [
 export const useMemoFolders = () => {
   const [folders, setFolders] = useState([]);
   const [activeFolder, setActiveFolder] = useState('all');
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  // 초기 로드
+  // 초기 로드 (Firestore 우선, localStorage 마이그레이션)
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // 기본 폴더가 없으면 추가
-        const hasAllFolder = parsed.some(f => f.id === 'all');
-        const hasSharedFolder = parsed.some(f => f.id === 'shared');
-
-        let merged = [...parsed];
-        if (!hasAllFolder) {
-          merged = [DEFAULT_FOLDERS[0], ...merged];
-        }
-        if (!hasSharedFolder) {
-          merged.splice(1, 0, DEFAULT_FOLDERS[1]);
-        }
-
-        setFolders(merged);
-      } catch (e) {
-        console.error('폴더 데이터 파싱 오류:', e);
+    const loadFolders = async () => {
+      const userId = localStorage.getItem('firebaseUserId');
+      if (!userId) {
+        console.log('⚠️ userId 없음, 기본 폴더만 로드');
         setFolders(DEFAULT_FOLDERS);
+        return;
       }
-    } else {
-      setFolders(DEFAULT_FOLDERS);
-    }
+
+      try {
+        console.log('📂 Firestore에서 폴더 로드 시도...');
+        // Firestore에서 폴더 데이터 가져오기
+        const firestoreFolders = await fetchFoldersFromFirestore(userId);
+        console.log('📂 Firestore 폴더:', firestoreFolders);
+
+        let loadedFolders = DEFAULT_FOLDERS;
+
+        if (firestoreFolders && firestoreFolders.length > 0) {
+          // Firestore에 데이터가 있으면 사용
+          const hasAllFolder = firestoreFolders.some(f => f.id === 'all');
+          const hasSharedFolder = firestoreFolders.some(f => f.id === 'shared');
+
+          let merged = [...firestoreFolders];
+          if (!hasAllFolder) {
+            merged = [DEFAULT_FOLDERS[0], ...merged];
+          }
+          if (!hasSharedFolder) {
+            merged.splice(1, 0, DEFAULT_FOLDERS[1]);
+          }
+
+          loadedFolders = merged;
+        } else {
+          // Firestore가 비어있으면 localStorage에서 마이그레이션
+          const localFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
+
+          if (localFolders.length > 0) {
+            console.log('📦 localStorage 폴더를 Firestore로 마이그레이션합니다...');
+
+            // 기본 폴더가 없으면 추가
+            const hasAllFolder = localFolders.some(f => f.id === 'all');
+            const hasSharedFolder = localFolders.some(f => f.id === 'shared');
+
+            let merged = [...localFolders];
+            if (!hasAllFolder) {
+              merged = [DEFAULT_FOLDERS[0], ...merged];
+            }
+            if (!hasSharedFolder) {
+              merged.splice(1, 0, DEFAULT_FOLDERS[1]);
+            }
+
+            loadedFolders = merged;
+
+            // Firestore에 저장
+            try {
+              await saveFoldersToFirestore(userId, merged);
+              console.log('✅ 폴더 마이그레이션 완료!');
+            } catch (error) {
+              console.error('폴더 마이그레이션 실패:', error);
+            }
+          }
+        }
+
+        setFolders(loadedFolders);
+      } catch (error) {
+        console.error('폴더 로드 실패:', error);
+        setFolders(DEFAULT_FOLDERS);
+      } finally {
+        setIsInitialLoad(false);
+      }
+    };
+
+    loadFolders();
   }, []);
 
-  // 저장
+  // Firestore에 저장
   useEffect(() => {
-    if (folders.length > 0) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(folders));
+    // 초기 로드 중에는 저장하지 않음
+    if (isInitialLoad) {
+      console.log('⏳ 초기 로드 중... 폴더 저장 스킵');
+      return;
     }
-  }, [folders]);
+    if (folders.length === 0) {
+      console.log('⚠️ 폴더가 없음, 저장 스킵');
+      return;
+    }
+
+    const saveFolders = async () => {
+      const userId = localStorage.getItem('firebaseUserId');
+      if (!userId) {
+        console.log('⚠️ userId 없음, 폴더 저장 불가');
+        return;
+      }
+
+      try {
+        console.log('💾 Firestore에 폴더 저장 시도:', folders.length, '개');
+        await saveFoldersToFirestore(userId, folders);
+        console.log('✅ 폴더 저장 완료:', folders.map(f => f.name));
+      } catch (error) {
+        console.error('❌ 폴더 저장 실패:', error);
+      }
+    };
+
+    saveFolders();
+  }, [folders, isInitialLoad]);
 
   // 폴더 추가 (최대 개수 제한)
   const addFolder = useCallback((name, icon = '📁') => {

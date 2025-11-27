@@ -16,24 +16,8 @@ const AppContent = ({
     // 휴지통 컨텍스트 가져오기
     const { moveToTrash, restoreFromTrash } = useTrashContext();
 
-    // 복원 이벤트 리스너
-    useEffect(() => {
-        const handleRestore = (event) => {
-            const restoredItems = event.detail;
-            
-            console.log('♻️ 복원 이벤트 수신:', restoredItems);
-            
-            // 이 부분은 App.jsx에서 처리해야 하므로
-            // 커스텀 이벤트로 다시 전파
-            const restoreEvent = new CustomEvent('restoreToApp', {
-                detail: restoredItems
-            });
-            window.dispatchEvent(restoreEvent);
-        };
-
-        window.addEventListener('itemsRestored', handleRestore);
-        return () => window.removeEventListener('itemsRestored', handleRestore);
-    }, []);
+    // 복원 이벤트는 App.jsx에서 직접 처리하므로 여기서는 제거
+    // (불필요한 이벤트 중계 제거)
 
     // 삭제 이벤트 리스너
     useEffect(() => {

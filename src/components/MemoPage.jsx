@@ -1,6 +1,7 @@
 // src/components/MemoPage.jsx
 
 import React, { useRef, useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import styled, { keyframes, css } from 'styled-components';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { useMemoFolders } from '../hooks/useMemoFolders';
@@ -333,13 +334,13 @@ const SectionTitleWrapper = styled.div`
     gap: 10px;
 `;
 const SectionTitle = styled.h2`
-    font-size: 24px;
+    font-size: 16px;
     font-weight: 500;
     color: #e0e0e0;
     margin: 0;
 `;
 const MemoCount = styled.span`
-    font-size: 18px;
+    font-size: 14px;
     font-weight: normal;
 `;
 const HeaderButtonWrapper = styled.div`
@@ -1011,6 +1012,82 @@ const FolderModalButton = styled.button`
     `}
 `;
 
+// 폴더 이동 모달
+const FolderSelectModalOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+    animation: ${fadeIn} 0.2s ease-out;
+`;
+
+const FolderSelectModalBox = styled.div`
+    background: linear-gradient(135deg, #2a2d35, #333842);
+    border-radius: 16px;
+    padding: 24px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
+`;
+
+const FolderSelectTitle = styled.h3`
+    color: #e0e0e0;
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0 0 20px 0;
+    text-align: center;
+`;
+
+const FolderOptionsContainer = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+`;
+
+const FolderOptionButton = styled.button`
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    color: #e0e0e0;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(74, 144, 226, 0.5);
+        transform: translateX(5px);
+    }
+
+    &:active {
+        transform: translateX(5px) scale(0.98);
+    }
+`;
+
+const FolderOptionIcon = styled.span`
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+`;
+
+const FolderOptionName = styled.span`
+    flex: 1;
+    font-weight: 500;
+`;
+
 // 메모 선택 모달 (폴더에 메모 추가)
 const MemoSelectModalOverlay = styled.div`
     position: fixed;
@@ -1285,14 +1362,16 @@ const MemoPage = ({
     const [deleteFolderModal, setDeleteFolderModal] = useState(null); // null | { folder: object }
     const folderLongPressTimer = useRef(null);
 
-    // 메모 이동 모달 상태
-    const [moveMemosModal, setMoveMemosModal] = useState(null); // null | { folder: object }
-    const [moveModalTab, setMoveModalTab] = useState('outside'); // 'inside' | 'outside'
-    const [selectedMemosForMove, setSelectedMemosForMove] = useState(new Set());
     const folderHeaderLongPressTimer = useRef(null);
 
-    // 메모 이동 확인 모달
-    const [moveConfirmModal, setMoveConfirmModal] = useState(null); // null | { action: 'move' | 'remove', count: number }
+    // 폴더 선택 모달 (미분류 문서를 폴더로 이동)
+    const [showMoveToFolderModal, setShowMoveToFolderModal] = useState(false);
+
+    // 폴더 이동 확인 모달
+    const [moveConfirmModal, setMoveConfirmModal] = useState(null); // null | { targetFolder: object, count: number }
+
+    // 미분류로 이동 확인 모달
+    const [moveToUncategorizedConfirm, setMoveToUncategorizedConfirm] = useState(null); // null | { count: number }
 
     // 공유 상태 확인 (메모 목록이 변경될 때)
     // ⚠️ 참고용 협업 기능 - 현재 사용 안 함
@@ -1408,68 +1487,75 @@ const MemoPage = ({
         openEditFolderModal(folder);
     };
 
-    // 메모 이동 모달 열기
-    const openMoveMemosModal = (folder) => {
-        setMoveMemosModal({ folder });
-        setMoveModalTab('outside'); // 기본값: 미분류 메모 탭
-        setSelectedMemosForMove(new Set());
-    };
-
-    // 메모 이동 모달 닫기
-    const closeMoveMemosModal = () => {
-        setMoveMemosModal(null);
-        setSelectedMemosForMove(new Set());
-    };
-
-    // 메모 선택 토글
-    const toggleMemoForMove = (memoId) => {
-        setSelectedMemosForMove(prev => {
-            const newSet = new Set(prev);
-            if (newSet.has(memoId)) {
-                newSet.delete(memoId);
-            } else {
-                newSet.add(memoId);
-            }
-            return newSet;
-        });
-    };
-
-    // 메모 이동 확인 모달 열기
-    const handleRequestMove = () => {
-        if (selectedMemosForMove.size === 0) return;
-
-        setMoveConfirmModal({
-            action: moveModalTab === 'outside' ? 'move' : 'remove',
-            count: selectedMemosForMove.size
-        });
-    };
-
-    // 메모 이동 실행
-    const handleConfirmMove = () => {
-        if (!moveMemosModal?.folder || selectedMemosForMove.size === 0) return;
-
-        const folderId = moveMemosModal.folder.id;
-        const memoIds = Array.from(selectedMemosForMove);
-
-        // 배치 업데이트 함수 사용 (여러 메모를 한 번에 처리)
-        if (onUpdateMemoFolderBatch) {
-            if (moveModalTab === 'outside') {
-                // 미분류 메모 -> 폴더로 이동
-                onUpdateMemoFolderBatch(memoIds, folderId);
-            } else {
-                // 폴더 내 메모 -> 미분류로 이동
-                onUpdateMemoFolderBatch(memoIds, null);
-            }
-        }
-
-        setMoveConfirmModal(null);
-        closeMoveMemosModal();
-    };
-
     const handleAddMemoClick = () => {
         // 폴더 안에서 메모 작성 시 해당 폴더 ID 전달 (전체/공유 폴더는 미분류로 저장)
         const targetFolderId = (activeFolder !== 'all' && activeFolder !== 'shared') ? activeFolder : null;
         onOpenNewMemo(targetFolderId);
+    };
+
+    // 폴더 선택 모달 열기 (미분류 문서를 폴더로 이동)
+    const handleOpenMoveToFolderModal = () => {
+        if (selectedCount === 0) return;
+        setShowMoveToFolderModal(true);
+    };
+
+    // 폴더 선택 모달 닫기
+    const handleCloseMoveToFolderModal = () => {
+        setShowMoveToFolderModal(false);
+    };
+
+    // 폴더 선택 시 확인 모달 열기 (폴더 선택 모달은 닫지 않음)
+    const handleSelectFolder = (folder) => {
+        setMoveConfirmModal({
+            targetFolder: folder,
+            count: selectedCount
+        });
+    };
+
+    // 폴더 이동 확인 취소 (폴더 선택 모달로 되돌아가기)
+    const handleCancelMoveConfirm = () => {
+        setMoveConfirmModal(null);
+    };
+
+    // 폴더 이동 확인
+    const handleConfirmMoveToFolder = () => {
+        if (!moveConfirmModal || !onUpdateMemoFolderBatch) return;
+
+        const selectedMemoIdsArray = Array.from(selectedMemoIds);
+        const targetFolderId = moveConfirmModal.targetFolder.id === 'shared'
+            ? null
+            : moveConfirmModal.targetFolder.id;
+
+        // 공유 폴더를 선택한 경우
+        if (moveConfirmModal.targetFolder.id === 'shared') {
+            // 공유 폴더로 이동 시 기존 공유 로직 사용
+            if (onRequestShareSelectedMemos) {
+                onRequestShareSelectedMemos();
+            }
+        } else {
+            // 사용자 정의 폴더로 이동
+            onUpdateMemoFolderBatch(selectedMemoIdsArray, targetFolderId);
+        }
+
+        // 이동 완료 후 두 모달 모두 닫기
+        setMoveConfirmModal(null);
+        setShowMoveToFolderModal(false);
+    };
+
+    // 미분류로 이동 확인 모달 열기
+    const handleRequestMoveToUncategorized = () => {
+        if (selectedCount === 0) return;
+        setMoveToUncategorizedConfirm({ count: selectedCount });
+    };
+
+    // 미분류로 이동 실행
+    const handleConfirmMoveToUncategorized = () => {
+        if (!moveToUncategorizedConfirm || !onUpdateMemoFolderBatch) return;
+
+        const selectedMemoIdsArray = Array.from(selectedMemoIds);
+        onUpdateMemoFolderBatch(selectedMemoIdsArray, null);
+
+        setMoveToUncategorizedConfirm(null);
     };
 
     const handleTouchStart = (e, memoId) => {
@@ -1689,13 +1775,24 @@ const MemoPage = ({
                                         return allStealth ? '스텔스 해제' : '스텔스 설정';
                                     })()}
                                 </ActionButton> */}
-                                <ActionButton
-                                    $type="share"
-                                    onClick={onRequestShareSelectedMemos}
-                                    disabled={selectedCount === 0}
-                                >
-                                    공유 폴더로
-                                </ActionButton>
+                                {/* 사용자 정의 폴더 내부일 때는 '미분류로 이동', 메인페이지일 때는 '폴더로 이동' */}
+                                {activeFolder !== 'all' && activeFolder !== 'shared' ? (
+                                    <ActionButton
+                                        $type="share"
+                                        onClick={handleRequestMoveToUncategorized}
+                                        disabled={selectedCount === 0}
+                                    >
+                                        미분류로 이동
+                                    </ActionButton>
+                                ) : (
+                                    <ActionButton
+                                        $type="share"
+                                        onClick={handleOpenMoveToFolderModal}
+                                        disabled={selectedCount === 0}
+                                    >
+                                        폴더로 이동
+                                    </ActionButton>
+                                )}
                                 <ActionButton
                                     $type="importance"
                                     onClick={onToggleSelectedMemosImportance}
@@ -1847,7 +1944,7 @@ const MemoPage = ({
                         </div>
                     )}
 
-                    {/* 사용자 정의 폴더일 때 정렬 버튼, 안내문, 문서 이동 버튼 */}
+                    {/* 사용자 정의 폴더일 때 정렬 버튼, 안내문 */}
                     {activeFolder !== 'all' && activeFolder !== 'shared' && (() => {
                         const currentFolder = customFolders.find(f => f.id === activeFolder);
                         if (!currentFolder) return null;
@@ -1878,18 +1975,13 @@ const MemoPage = ({
                                     하단의 목록창을 길게 누르면 다중 선택 모드가 활성화 됩니다.
                                 </GuidanceMessage>
 
-                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: '9px', marginBottom: '5px' }}>
-                                    <FolderEditButton onClick={() => openMoveMemosModal(currentFolder)}>
-                                        📋 문서 이동
-                                    </FolderEditButton>
-                                    <div style={{
-                                        width: '100%',
-                                        height: '1px',
-                                        background: 'rgba(255, 255, 255, 0.1)',
-                                        marginTop: '15px',
-                                        marginBottom: '10px'
-                                    }} />
-                                </div>
+                                <div style={{
+                                    width: '100%',
+                                    height: '1px',
+                                    background: 'rgba(255, 255, 255, 0.1)',
+                                    marginTop: '15px',
+                                    marginBottom: '10px'
+                                }} />
                             </div>
                         );
                     })()}
@@ -2130,7 +2222,7 @@ const MemoPage = ({
             </MemoList>
 
             {/* 폴더 추가/수정 모달 */}
-            {folderModal && (
+            {folderModal && ReactDOM.createPortal(
                 <FolderModalOverlay onClick={() => setFolderModal(null)}>
                     <FolderModalBox onClick={(e) => e.stopPropagation()}>
                         <FolderModalTitle>
@@ -2176,11 +2268,12 @@ const MemoPage = ({
                             </FolderModalButton>
                         </FolderModalButtons>
                     </FolderModalBox>
-                </FolderModalOverlay>
+                </FolderModalOverlay>,
+                document.getElementById('modal-root')
             )}
 
             {/* 폴더 삭제 확인 모달 */}
-            {deleteFolderModal && (
+            {deleteFolderModal && ReactDOM.createPortal(
                 <FolderModalOverlay onClick={() => setDeleteFolderModal(null)}>
                     <FolderModalBox onClick={(e) => e.stopPropagation()}>
                         <FolderModalTitle>
@@ -2206,127 +2299,92 @@ const MemoPage = ({
                             </FolderModalButton>
                         </FolderModalButtons>
                     </FolderModalBox>
-                </FolderModalOverlay>
+                </FolderModalOverlay>,
+                document.getElementById('modal-root')
             )}
 
-            {/* 메모 이동 확인 모달 */}
-            {moveConfirmModal && (
-                <FolderModalOverlay onClick={() => setMoveConfirmModal(null)} style={{ zIndex: 10002 }}>
+            {/* 폴더 선택 모달 (미분류 문서를 폴더로 이동) */}
+            {showMoveToFolderModal && ReactDOM.createPortal(
+                <FolderSelectModalOverlay onClick={handleCloseMoveToFolderModal}>
+                    <FolderSelectModalBox onClick={(e) => e.stopPropagation()}>
+                        <FolderSelectTitle>폴더 선택</FolderSelectTitle>
+                        <FolderOptionsContainer>
+                            {/* 공유 폴더 옵션 */}
+                            <FolderOptionButton onClick={() => handleSelectFolder({ id: 'shared', name: '공유 폴더' })}>
+                                <FolderOptionIcon>
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M18 16.08C17.24 16.08 16.56 16.38 16.04 16.85L8.91 12.7C8.96 12.47 9 12.24 9 12C9 11.76 8.96 11.53 8.91 11.3L15.96 7.19C16.5 7.69 17.21 8 18 8C19.66 8 21 6.66 21 5C21 3.34 19.66 2 18 2C16.34 2 15 3.34 15 5C15 5.24 15.04 5.47 15.09 5.7L8.04 9.81C7.5 9.31 6.79 9 6 9C4.34 9 3 10.34 3 12C3 13.66 4.34 15 6 15C6.79 15 7.5 14.69 8.04 14.19L15.16 18.35C15.11 18.56 15.08 18.78 15.08 19C15.08 20.61 16.39 21.92 18 21.92C19.61 21.92 20.92 20.61 20.92 19C20.92 17.39 19.61 16.08 18 16.08Z" fill="currentColor"/>
+                                    </svg>
+                                </FolderOptionIcon>
+                                <FolderOptionName>공유 폴더</FolderOptionName>
+                            </FolderOptionButton>
+
+                            {/* 사용자 정의 폴더 옵션들 */}
+                            {customFolders.map(folder => (
+                                <FolderOptionButton key={folder.id} onClick={() => handleSelectFolder(folder)}>
+                                    <FolderOptionIcon>{folder.icon}</FolderOptionIcon>
+                                    <FolderOptionName>{folder.name}</FolderOptionName>
+                                </FolderOptionButton>
+                            ))}
+                        </FolderOptionsContainer>
+                        <FolderModalButtons style={{ marginTop: '20px' }}>
+                            <FolderModalButton $variant="cancel" onClick={handleCloseMoveToFolderModal}>
+                                취소
+                            </FolderModalButton>
+                        </FolderModalButtons>
+                    </FolderSelectModalBox>
+                </FolderSelectModalOverlay>,
+                document.getElementById('modal-root')
+            )}
+
+            {/* 폴더 이동 확인 모달 */}
+            {moveConfirmModal && ReactDOM.createPortal(
+                <FolderModalOverlay onClick={handleCancelMoveConfirm} style={{ zIndex: 10002 }}>
                     <FolderModalBox onClick={(e) => e.stopPropagation()}>
-                        <FolderModalTitle>
-                            {moveConfirmModal.action === 'move' ? '문서 이동' : '폴더에서 제거'}
-                        </FolderModalTitle>
+                        <FolderModalTitle>문서 이동</FolderModalTitle>
 
                         <div style={{ color: '#e0e0e0', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
                             <p style={{ margin: '0' }}>
-                                {moveConfirmModal.action === 'move'
-                                    ? `선택한 ${moveConfirmModal.count}개의 문서를 "${moveMemosModal?.folder.name}" 폴더로 이동하시겠습니까?`
-                                    : `선택한 ${moveConfirmModal.count}개의 문서를 미분류 문서로 이동할까요?`}
+                                {moveConfirmModal.count}개의 문서를 "{moveConfirmModal.targetFolder.name}" 폴더로 이동하시겠습니까?
                             </p>
                         </div>
 
                         <FolderModalButtons>
-                            <FolderModalButton $variant="cancel" onClick={() => setMoveConfirmModal(null)}>
+                            <FolderModalButton $variant="cancel" onClick={handleCancelMoveConfirm}>
                                 취소
                             </FolderModalButton>
-                            <FolderModalButton $variant="confirm" onClick={handleConfirmMove}>
+                            <FolderModalButton $variant="confirm" onClick={handleConfirmMoveToFolder}>
                                 이동
                             </FolderModalButton>
                         </FolderModalButtons>
                     </FolderModalBox>
-                </FolderModalOverlay>
+                </FolderModalOverlay>,
+                document.getElementById('modal-root')
             )}
 
-            {/* 메모 이동 모달 */}
-            {moveMemosModal && (
-                <MemoSelectModalOverlay>
-                    <MemoSelectHeader>
-                        <MemoSelectTitle>
-                            {moveMemosModal.folder.icon} "{moveMemosModal.folder.name}" 문서 이동
-                        </MemoSelectTitle>
-                        <MemoSelectCloseBtn onClick={closeMoveMemosModal}>×</MemoSelectCloseBtn>
-                    </MemoSelectHeader>
+            {/* 미분류로 이동 확인 모달 */}
+            {moveToUncategorizedConfirm && ReactDOM.createPortal(
+                <FolderModalOverlay onClick={() => setMoveToUncategorizedConfirm(null)}>
+                    <FolderModalBox onClick={(e) => e.stopPropagation()}>
+                        <FolderModalTitle>미분류로 이동</FolderModalTitle>
 
-                    {/* 탭 */}
-                    <TabContainer>
-                        <Tab
-                            $active={moveModalTab === 'outside'}
-                            onClick={() => {
-                                setMoveModalTab('outside');
-                                setSelectedMemosForMove(new Set());
-                            }}
-                        >
-                            미분류 문서
-                        </Tab>
-                        <Tab
-                            $active={moveModalTab === 'inside'}
-                            onClick={() => {
-                                setMoveModalTab('inside');
-                                setSelectedMemosForMove(new Set());
-                            }}
-                        >
-                            폴더 내 문서
-                        </Tab>
-                    </TabContainer>
+                        <div style={{ color: '#e0e0e0', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
+                            <p style={{ margin: '0' }}>
+                                {moveToUncategorizedConfirm.count}개의 문서를 미분류 문서로 이동할까요?
+                            </p>
+                        </div>
 
-                    {/* 버튼 영역 */}
-                    <div style={{
-                        padding: '12px 20px',
-                        display: 'flex',
-                        gap: '8px',
-                        background: '#2c2f38',
-                        borderBottom: '1px solid rgba(255, 255, 255, 0.1)'
-                    }}>
-                        <MemoSelectBtn
-                            $variant="confirm"
-                            onClick={handleRequestMove}
-                            disabled={selectedMemosForMove.size === 0}
-                            style={{ flex: 1 }}
-                        >
-                            {moveModalTab === 'outside'
-                                ? `이 폴더로 이동 ${selectedMemosForMove.size > 0 ? `(${selectedMemosForMove.size}개)` : ''}`
-                                : `폴더에서 제거 ${selectedMemosForMove.size > 0 ? `(${selectedMemosForMove.size}개)` : ''}`}
-                        </MemoSelectBtn>
-                        <MemoSelectBtn $variant="cancel" onClick={closeMoveMemosModal}>
-                            닫기
-                        </MemoSelectBtn>
-                    </div>
-
-                    <MemoSelectList>
-                        {(() => {
-                            const targetMemos = moveModalTab === 'outside'
-                                ? memos?.filter(memo => !memo.folderId && !sharedMemoInfo.has(memo.id)) || []
-                                : memos?.filter(memo => memo.folderId === moveMemosModal.folder.id) || [];
-
-                            if (targetMemos.length === 0) {
-                                return (
-                                    <MemoSelectInfo>
-                                        {moveModalTab === 'outside' ? '미분류 문서가 없습니다.' : '폴더 내 문서가 없습니다.'}
-                                    </MemoSelectInfo>
-                                );
-                            }
-
-                            return targetMemos.map(memo => {
-                                const isSelected = selectedMemosForMove.has(memo.id);
-                                // 메모 이동 모달에서는 스텔스 여부와 관계없이 실제 내용 표시
-                                const displayContent = memo.content?.split('\n')[0] || '(내용 없음)';
-                                return (
-                                    <MemoSelectItem
-                                        key={memo.id}
-                                        $selected={isSelected}
-                                        onClick={() => toggleMemoForMove(memo.id)}
-                                    >
-                                        <MemoSelectItemHeader>
-                                            <MemoSelectItemText>
-                                                {displayContent}
-                                            </MemoSelectItemText>
-                                        </MemoSelectItemHeader>
-                                    </MemoSelectItem>
-                                );
-                            });
-                        })()}
-                    </MemoSelectList>
-                </MemoSelectModalOverlay>
+                        <FolderModalButtons>
+                            <FolderModalButton $variant="cancel" onClick={() => setMoveToUncategorizedConfirm(null)}>
+                                취소
+                            </FolderModalButton>
+                            <FolderModalButton $variant="confirm" onClick={handleConfirmMoveToUncategorized}>
+                                이동
+                            </FolderModalButton>
+                        </FolderModalButtons>
+                    </FolderModalBox>
+                </FolderModalOverlay>,
+                document.getElementById('modal-root')
             )}
         </MemoContainer>
     );

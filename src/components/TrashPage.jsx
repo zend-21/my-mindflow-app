@@ -50,8 +50,8 @@ const TopActionButton = styled.button`
     padding: 10px 16px;
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.2s;
     background: #333842;
@@ -1243,9 +1243,10 @@ const TrashPage = ({ showToast }) => {
                     isOpen={true}
                     message={`선택한 ${selectedIds.size}개 항목을 복원하시겠습니까?`}
                     confirmText="복원"
-                    onConfirm={() => {
-                        const restoredItems = restoreFromTrash(Array.from(selectedIds));
-                        showToast(`${restoredItems.length}개 항목이 복원되었습니다 ✅`);
+                    onConfirm={async () => {
+                        const count = selectedIds.size;
+                        await restoreFromTrash(Array.from(selectedIds));
+                        showToast(`${count}개 항목이 복원되었습니다 ✅`);
                         setSelectedIds(new Set());
                         setIsRestoreConfirmOpen(false);
                     }}
@@ -1258,9 +1259,10 @@ const TrashPage = ({ showToast }) => {
                 <ConfirmationModal
                     isOpen={true}
                     message={`선택한 ${selectedIds.size}개 항목을 영구적으로 삭제하시겠습니까?`}
-                    onConfirm={() => {
-                        permanentDelete(Array.from(selectedIds));
-                        showToast(`${selectedIds.size}개 항목이 영구 삭제되었습니다 🔥`);
+                    onConfirm={async () => {
+                        const count = selectedIds.size;
+                        await permanentDelete(Array.from(selectedIds));
+                        showToast(`${count}개 항목이 영구 삭제되었습니다 🔥`);
                         setSelectedIds(new Set());
                         setIsDeleteConfirmOpen(false);
                     }}

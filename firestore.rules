@@ -290,6 +290,14 @@ service cloud.firestore {
           request.auth.uid == userId
         );
       }
+
+      // 🚀 개별 시크릿 문서 컬렉션 (개별 문서 암호화)
+      match /secretDocs/{docId} {
+        // 본인만 읽기/쓰기 가능
+        allow read, write: if isSignedIn() && (
+          request.auth.uid == userId
+        );
+      }
     }
 
     // 휴대폰 번호 -> 사용자 ID 매핑

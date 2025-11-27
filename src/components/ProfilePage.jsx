@@ -12,8 +12,10 @@ import { avatarList } from './avatars/AvatarIcons';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import QRCode from 'qrcode';
-import { Copy } from 'lucide-react';
+import { Copy, Lock } from 'lucide-react';
 import { checkNicknameAvailability, updateNickname } from '../services/nicknameService';
+import ChangePasswordModal from './ChangePasswordModal';
+import { hasMasterPassword } from '../services/keyManagementService';
 
 // 🎨 Styled Components
 
@@ -984,6 +986,38 @@ const ChangeIdButton = styled.button`
     }
 `;
 
+const SecurityButton = styled.button`
+    width: 100%;
+    padding: 14px;
+    background: rgba(74, 144, 226, 0.1);
+    border: 1px solid rgba(74, 144, 226, 0.3);
+    border-radius: 12px;
+    color: #4a90e2;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    &:hover {
+        background: rgba(74, 144, 226, 0.2);
+        border-color: rgba(74, 144, 226, 0.5);
+        box-shadow: 0 2px 8px rgba(74, 144, 226, 0.2);
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        &:hover {
+            background: rgba(74, 144, 226, 0.1);
+            box-shadow: none;
+        }
+    }
+`;
+
 // 🎯 Main Component
 
 const BACKGROUND_COLORS = {
@@ -1030,6 +1064,10 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
     const [isQRModalOpen, setIsQRModalOpen] = useState(false);
 
+    // 비밀번호 변경 관련 상태
+    const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+    const [hasMasterPasswordSet, setHasMasterPasswordSet] = useState(false);
+
     // 운세 프로필 정보
     const fortuneProfile = getUserProfile();
 
@@ -1073,20 +1111,10 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                 return;
             }
 
-            // 닉네임 중복 체크
-            const isAvailable = await checkNicknameAvailability(newNickname);
-            if (!isAvailable) {
-                showToast?.('⚠️ 이미 사용 중인 닉네임입니다');
-                // 이전 닉네임으로 되돌리기
-                setNickname(savedNickname || '');
-                setIsEditingNickname(false);
-                return;
-            }
-
-            // Firestore에 닉네임 등록/업데이트
+            // Firestore에 닉네임 등록/업데이트 (내부에서 중복 체크 포함)
             const success = await updateNickname(userId, newNickname);
             if (!success) {
-                showToast?.('⚠️ 닉네임 저장에 실패했습니다');
+                showToast?.('⚠️ 이미 사용 중인 닉네임이거나 저장에 실패했습니다');
                 setNickname(savedNickname || '');
                 setIsEditingNickname(false);
                 return;
@@ -1097,6 +1125,19 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
 
             // nickname state 업데이트 (즉시 UI 반영)
             setNickname(newNickname);
+
+            // 🔥 mindflowUsers/.../settings에도 닉네임 동기화
+            try {
+                const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
+                const currentSettings = await fetchSettingsFromFirestore(userId);
+                await saveSettingsToFirestore(userId, {
+                    ...currentSettings,
+                    nickname: newNickname
+                });
+                console.log('✅ settings 닉네임 동기화 완료');
+            } catch (settingsError) {
+                console.error('settings 닉네임 동기화 실패:', settingsError);
+            }
 
             showToast?.('✅ 닉네임이 변경되었습니다');
 
@@ -1220,12 +1261,44 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
         }
     }, [profile]);
 
-    // 닉네임 초기화 (localStorage에서 로드)
+    // 닉네임 초기화 (Firestore 우선, localStorage는 백업)
     useEffect(() => {
-        const savedNickname = localStorage.getItem('userNickname');
-        if (savedNickname) {
-            setNickname(savedNickname);
-        }
+        const loadNickname = async () => {
+            const userId = localStorage.getItem('firebaseUserId');
+            if (!userId) return;
+
+            try {
+                // Firestore에서 최신 닉네임 가져오기
+                const { getUserNickname } = await import('../services/nicknameService');
+                const firestoreNickname = await getUserNickname(userId);
+
+                if (firestoreNickname) {
+                    setNickname(firestoreNickname);
+                    // localStorage 동기화
+                    localStorage.setItem('userNickname', firestoreNickname);
+                } else {
+                    // Firestore에 없으면 localStorage 사용
+                    const savedNickname = localStorage.getItem('userNickname');
+                    if (savedNickname) {
+                        setNickname(savedNickname);
+                    }
+                }
+            } catch (error) {
+                console.error('닉네임 로드 실패:', error);
+                // 에러 시 localStorage 폴백
+                const savedNickname = localStorage.getItem('userNickname');
+                if (savedNickname) {
+                    setNickname(savedNickname);
+                }
+            }
+        };
+
+        loadNickname();
+    }, []);
+
+    // 마스터 비밀번호 설정 여부 확인
+    useEffect(() => {
+        setHasMasterPasswordSet(hasMasterPassword());
     }, []);
 
     // 생년월일 마스킹 함수
@@ -1672,6 +1745,17 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                     </StatsGrid>
                 </Section>
 
+                {/* 보안 설정 */}
+                {hasMasterPasswordSet && (
+                    <Section>
+                        <SectionTitle>🔐 보안 설정</SectionTitle>
+                        <SecurityButton onClick={() => setIsChangePasswordModalOpen(true)}>
+                            <Lock size={18} />
+                            마스터 비밀번호 변경
+                        </SecurityButton>
+                    </Section>
+                )}
+
                 {/* 운세 정보 관리 */}
                 <Section>
                     <FortuneSection onClick={() => setIsFortuneExpanded(!isFortuneExpanded)}>
@@ -1840,6 +1924,16 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                         </QRModalButtons>
                     </QRModalContent>
                 </QRModalOverlay>
+            )}
+
+            {/* 비밀번호 변경 모달 */}
+            {isChangePasswordModalOpen && (
+                <ChangePasswordModal
+                    onClose={() => setIsChangePasswordModalOpen(false)}
+                    onSuccess={() => {
+                        showToast?.('✅ 비밀번호가 성공적으로 변경되었습니다');
+                    }}
+                />
             )}
 
         </>

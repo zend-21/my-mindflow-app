@@ -324,7 +324,108 @@ const DateText = styled.span`
     white-space: nowrap;
 `;
 
-const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionMode, isSelected, openCategoryDropdownId, setOpenCategoryDropdownId, settings }) => {
+const RightSection = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 4px;
+`;
+
+const DeleteButton = styled.button`
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #808080;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    font-size: 12px;
+    line-height: 1;
+    flex-shrink: 0;
+    padding: 0;
+    z-index: 10;
+    position: relative;
+    top: -29px;
+    right: -35px;
+
+    &:hover {
+        background: rgba(255, 107, 107, 0.2);
+        border-color: rgba(255, 107, 107, 0.4);
+        color: #ff6b6b;
+        transform: scale(1.1);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
+`;
+
+const DeleteModal = styled.div`
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    padding: 24px;
+    z-index: 20;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    width: 85%;
+    max-width: 320px;
+`;
+
+const DeleteModalText = styled.p`
+    color: #ffffff;
+    font-size: 15px;
+    margin: 0 0 20px 0;
+    text-align: center;
+    line-height: 1.5;
+`;
+
+const DeleteModalButtons = styled.div`
+    display: flex;
+    gap: 8px;
+`;
+
+const DeleteModalButton = styled.button`
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    border: none;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    ${props => props.$primary ? `
+        background: linear-gradient(135deg, #ff6b6b, #ff4444);
+        color: white;
+
+        &:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+        }
+    ` : `
+        background: rgba(255, 255, 255, 0.1);
+        color: #d0d0d0;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+    `}
+
+    &:active {
+        transform: scale(0.98);
+    }
+`;
+
+const SecretDocCard = ({ doc, onClick, onCategoryChange, onDelete, onLongPress, selectionMode, isSelected, openCategoryDropdownId, setOpenCategoryDropdownId, settings }) => {
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const longPressTimerRef = useRef(null);
     const badgeLongPressTimerRef = useRef(null);
     const isLongPressRef = useRef(false);
@@ -392,9 +493,13 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
 
         // 길게 누르기 타이머 시작
         longPressTimerRef.current = setTimeout(() => {
+            console.log('🔥 롱프레스 발생! selectionMode:', selectionMode);
             isLongPressRef.current = true;
             if (onLongPress) {
+                console.log('✅ onLongPress 호출');
                 onLongPress();
+            } else {
+                console.warn('⚠️ onLongPress 함수가 없음');
             }
         }, 500); // 0.5초
     };
@@ -561,7 +666,32 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
                 ) : (
                     <div></div>
                 )}
-                <DateText>{formatDate(doc.updatedAt || doc.createdAt)}</DateText>
+                <RightSection>
+                    {!selectionMode && (
+                        <DeleteButton
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                setShowDeleteModal(true);
+                            }}
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                            }}
+                            onMouseUp={(e) => {
+                                e.stopPropagation();
+                            }}
+                            onTouchStart={(e) => {
+                                e.stopPropagation();
+                            }}
+                            onTouchEnd={(e) => {
+                                e.stopPropagation();
+                            }}
+                        >
+                            ✕
+                        </DeleteButton>
+                    )}
+                    <DateText>{formatDate(doc.updatedAt || doc.createdAt)}</DateText>
+                </RightSection>
             </CardFooter>
 
             {showDropdown && (
@@ -600,6 +730,51 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onLongPress, selectionM
                         ))}
                     </CategoryGrid>
                 </CategoryModal>
+            )}
+
+            {showDeleteModal && (
+                <DeleteModal
+                    onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => {
+                        e.stopPropagation();
+                        clearTimeout(longPressTimerRef.current);
+                    }}
+                    onPointerUp={(e) => e.stopPropagation()}
+                >
+                    <DeleteModalText>이 문서를 정말 삭제할까요?</DeleteModalText>
+                    <DeleteModalButtons>
+                        <DeleteModalButton
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                setShowDeleteModal(false);
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onMouseUp={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onTouchEnd={(e) => e.stopPropagation()}
+                        >
+                            취소
+                        </DeleteModalButton>
+                        <DeleteModalButton
+                            $primary
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                setShowDeleteModal(false);
+                                if (onDelete) {
+                                    onDelete(doc.id);
+                                }
+                            }}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onMouseUp={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onTouchEnd={(e) => e.stopPropagation()}
+                        >
+                            삭제
+                        </DeleteModalButton>
+                    </DeleteModalButtons>
+                </DeleteModal>
             )}
         </Card>
     );

@@ -55,6 +55,10 @@ import ChatRoom from './components/messaging/ChatRoom.jsx';
 import AppRouter from './components/AppRouter.jsx';
 import Toast from './components/Toast.jsx';
 import PhoneVerification from './components/PhoneVerification.jsx';
+import MasterPasswordModal from './components/MasterPasswordModal.jsx';
+import { hasMasterPassword, setEncryptionKey, isUnlocked } from './services/keyManagementService';
+// 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+// import { migrateToEncryption } from './services/userDataService';
 import {
     findAccountByPhone,
     findPhoneByFirebaseUID,
@@ -332,6 +336,10 @@ function App() {
     const [isAuthRequiredModalOpen, setIsAuthRequiredModalOpen] = useState(false); // 인증 요구 모달
     const [authRequiredFeature, setAuthRequiredFeature] = useState(''); // 어떤 기능을 위한 인증인지
 
+    // 🔐 마스터 비밀번호 관련 상태
+    const [isMasterPasswordModalOpen, setIsMasterPasswordModalOpen] = useState(false);
+    const [masterPasswordMode, setMasterPasswordMode] = useState('setup'); // 'setup' | 'unlock'
+
     // ✅ 새로 추가되는 상태들
     const [accessToken, setAccessTokenState] = useState(null);
     const [lastSyncTime, setLastSyncTime] = useState(null);
@@ -476,6 +484,68 @@ function App() {
         return () => unsubscribe();
     }, []);
 
+    // userId와 isAuthenticated 계산
+    const phoneId = localStorage.getItem('mindflowUserId'); // 휴대폰 번호 (캐시)
+    const userId = phoneId || (firebaseUser?.uid); // ✅ Firebase Auth를 Source of Truth로 사용
+    const isAuthenticated = !!(firebaseUser || profile);
+
+    // 🔐 E2EE DISABLED - 마스터 비밀번호 자동 프롬프트 (향후 재활성화 시 사용)
+    // ⚠️ UX 이슈로 인해 비활성화: 앱 실행 시 즉시 비밀번호 요구는 사용자가 앱을 이해하기 전에 삭제하게 만듦
+    // 향후 구현 시: 민감한 데이터 접근 시점에 선택적으로 요구
+    /*
+    useEffect(() => {
+        if (!isAuthenticated || !userId) return;
+
+        // 이미 잠금 해제되어 있으면 체크하지 않음
+        if (isUnlocked()) {
+            console.log('✅ 이미 암호화 키가 메모리에 있습니다');
+            return;
+        }
+
+        // 마스터 비밀번호가 설정되어 있는지 확인
+        if (hasMasterPassword()) {
+            console.log('🔐 마스터 비밀번호가 설정되어 있습니다. 잠금 해제 필요');
+            setMasterPasswordMode('unlock');
+            setIsMasterPasswordModalOpen(true);
+        } else {
+            console.log('🆕 마스터 비밀번호가 설정되지 않았습니다. 설정 모달 표시');
+            setMasterPasswordMode('setup');
+            setIsMasterPasswordModalOpen(true);
+        }
+    }, [isAuthenticated, userId]);
+    */
+
+    // 🔐 마스터 비밀번호 모달 성공 핸들러
+    const handleMasterPasswordSuccess = async (key) => {
+        console.log('✅ 마스터 비밀번호 설정/잠금 해제 성공');
+        setEncryptionKey(key);
+        setIsMasterPasswordModalOpen(false);
+
+        // 🔐 E2EE DISABLED - 향후 재활성화 시 사용
+        // 기존 평문 데이터 자동 암호화 (최초 설정 시에만)
+        /*
+        if (userId && isAuthenticated && masterPasswordMode === 'setup') {
+            try {
+                console.log('🔐 기존 데이터 암호화 마이그레이션 시작...');
+                const migrated = await migrateToEncryption(userId);
+                if (migrated) {
+                    console.log('✅ 기존 데이터 암호화 완료');
+                } else {
+                    console.log('ℹ️ 마이그레이션할 데이터 없음 (신규 사용자 또는 이미 암호화됨)');
+                }
+            } catch (error) {
+                console.error('⚠️ 데이터 암호화 실패:', error);
+                // 실패해도 계속 진행 (사용자 경험 유지)
+            }
+        }
+        */
+
+        // 데이터 다시 로드 (암호화 키로 복호화하기 위해)
+        if (userId && isAuthenticated) {
+            saveImmediately();
+        }
+    };
+
     useEffect(() => {
         const resetIdleTimer = () => {
             setIsUserIdle(false);
@@ -607,11 +677,7 @@ function App() {
 
     // 🔥 Firestore 동기화 훅 사용
     // ⚠️ 중요: 휴대폰 인증한 경우 휴대폰 번호 사용, 아니면 Firebase Auth UID 사용
-    const phoneId = localStorage.getItem('mindflowUserId'); // 휴대폰 번호 (캐시)
-    const userId = phoneId || (firebaseUser?.uid); // ✅ Firebase Auth를 Source of Truth로 사용
-
-    // Firebase Auth 상태 또는 profile이 있으면 인증된 것으로 판단
-    const isAuthenticated = !!(firebaseUser || profile);
+    // (userId와 isAuthenticated는 위에서 이미 선언됨)
 
     const {
         loading: dataLoading,
@@ -1494,16 +1560,25 @@ function App() {
                 // 알람만 있는 경우도 검색 가능하도록
                 if (schedule.alarm?.registeredAlarms?.length > 0) {
                     schedule.alarm.registeredAlarms.forEach((alarm, index) => {
-                        searchData.push({
-                            id: `${dateKey}-alarm-${index}`,
-                            title: alarm.title || '알람',
-                            content: alarm.title || '',
-                            type: 'calendar',
-                            isSecret: false,
-                            dateKey: dateKey,
-                            isAlarm: true,
-                            alarmTime: alarm.time
-                        });
+                        // 알람 시간 파싱 (검색일 기준 1달 이내만)
+                        const now = new Date();
+                        const oneMonthLater = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+                        const alarmDateTime = new Date(alarm.calculatedTime || alarm.time);
+
+                        // 알람이 현재부터 1달 이내에 있는 경우만 검색 결과에 포함
+                        if (alarmDateTime >= now && alarmDateTime <= oneMonthLater) {
+                            searchData.push({
+                                id: `${dateKey}-alarm-${index}`,
+                                title: alarm.title || alarm.anniversaryName || '알람',
+                                content: '', // 알람은 내용이 없음
+                                type: 'alarm',
+                                isSecret: false,
+                                dateKey: dateKey,
+                                isAlarm: true,
+                                alarmTime: alarm.calculatedTime || alarm.time,
+                                alarmData: alarm
+                            });
+                        }
                     });
                 }
             });
@@ -1597,56 +1672,81 @@ function App() {
 
     // ✅ 앱 시작 시 저장된 정보 복원 (기존 useEffect를 확장)
     useEffect(() => {
-        const savedProfile = localStorage.getItem('userProfile');
-        const savedToken = localStorage.getItem('accessToken');
-        const savedTokenExpiresAt = localStorage.getItem('tokenExpiresAt');
-        const savedNickname = localStorage.getItem('userNickname');
-        const savedCustomPicture = localStorage.getItem('customProfilePicture');
+        const loadProfileData = async () => {
+            const savedProfile = localStorage.getItem('userProfile');
+            const savedToken = localStorage.getItem('accessToken');
+            const savedTokenExpiresAt = localStorage.getItem('tokenExpiresAt');
+            const savedCustomPicture = localStorage.getItem('customProfilePicture');
+            const userId = localStorage.getItem('firebaseUserId');
 
-        if (savedProfile) {
-            // 프로필은 항상 복원 (로그인 상태 유지)
-            const profileData = JSON.parse(savedProfile);
+            if (savedProfile) {
+                // 프로필은 항상 복원 (로그인 상태 유지)
+                const profileData = JSON.parse(savedProfile);
 
-            // 저장된 닉네임이 있으면 profile에 추가
-            if (savedNickname) {
-                profileData.nickname = savedNickname;
-            }
-            // 저장된 커스텀 프로필 사진이 있으면 추가
-            if (savedCustomPicture) {
-                profileData.customPicture = savedCustomPicture;
-            }
-
-            setProfile(profileData);
-
-            // 토큰 검증 및 설정
-            if (savedToken && savedTokenExpiresAt) {
-                const expiresAt = parseInt(savedTokenExpiresAt, 10);
-                const now = Date.now();
-
-                // 토큰이 만료되었는지 확인 (5분 여유를 둠)
-                if (now >= expiresAt - 5 * 60 * 1000) {
-                    console.log('⚠️ 저장된 토큰이 만료되었습니다. 동기화 시 재인증이 필요합니다.');
-                    // 만료된 토큰만 삭제 (프로필은 유지)
-                    localStorage.removeItem('accessToken');
-                    localStorage.removeItem('tokenExpiresAt');
-                    setAccessTokenState(null);
-                } else {
-                    // 토큰이 유효함
-                    console.log('✅ 유효한 토큰으로 복원됨');
-                    setAccessTokenState(savedToken);
-
-                    // GAPI가 준비되면 토큰 설정
-                    if (isGapiReady) {
-                        setAccessToken(savedToken);
+                // Firestore에서 최신 닉네임 가져오기
+                if (userId) {
+                    try {
+                        const { getUserNickname } = await import('./services/nicknameService');
+                        const firestoreNickname = await getUserNickname(userId);
+                        if (firestoreNickname) {
+                            profileData.nickname = firestoreNickname;
+                            localStorage.setItem('userNickname', firestoreNickname); // localStorage 동기화
+                        } else {
+                            // Firestore에 없으면 localStorage 사용
+                            const savedNickname = localStorage.getItem('userNickname');
+                            if (savedNickname) {
+                                profileData.nickname = savedNickname;
+                            }
+                        }
+                    } catch (error) {
+                        console.error('닉네임 로드 실패:', error);
+                        // 에러 시 localStorage 폴백
+                        const savedNickname = localStorage.getItem('userNickname');
+                        if (savedNickname) {
+                            profileData.nickname = savedNickname;
+                        }
                     }
                 }
-            } else {
-                console.log('⚠️ 토큰이 없습니다. 동기화 시 재인증이 필요합니다.');
-                setAccessTokenState(null);
-            }
-        }
 
-        setIsLoading(false);
+                // 저장된 커스텀 프로필 사진이 있으면 추가
+                if (savedCustomPicture) {
+                    profileData.customPicture = savedCustomPicture;
+                }
+
+                setProfile(profileData);
+
+                // 토큰 검증 및 설정
+                if (savedToken && savedTokenExpiresAt) {
+                    const expiresAt = parseInt(savedTokenExpiresAt, 10);
+                    const now = Date.now();
+
+                    // 토큰이 만료되었는지 확인 (5분 여유를 둠)
+                    if (now >= expiresAt - 5 * 60 * 1000) {
+                        console.log('⚠️ 저장된 토큰이 만료되었습니다. 동기화 시 재인증이 필요합니다.');
+                        // 만료된 토큰만 삭제 (프로필은 유지)
+                        localStorage.removeItem('accessToken');
+                        localStorage.removeItem('tokenExpiresAt');
+                        setAccessTokenState(null);
+                    } else {
+                        // 토큰이 유효함
+                        console.log('✅ 유효한 토큰으로 복원됨');
+                        setAccessTokenState(savedToken);
+
+                        // GAPI가 준비되면 토큰 설정
+                        if (isGapiReady) {
+                            setAccessToken(savedToken);
+                        }
+                    }
+                } else {
+                    console.log('⚠️ 토큰이 없습니다. 동기화 시 재인증이 필요합니다.');
+                    setAccessTokenState(null);
+                }
+            }
+
+            setIsLoading(false);
+        };
+
+        loadProfileData();
     }, [isGapiReady]);
 
     // ✅ 닉네임 변경 이벤트 리스너
@@ -2608,40 +2708,47 @@ function App() {
         const handleRestore = (event) => {
             const restoredItems = event.detail;
 
-            console.log('♻️ 복원 이벤트 수신:', restoredItems);
+            console.log('♻️ [App.jsx] 복원 이벤트 수신:', restoredItems);
 
             restoredItems.forEach(item => {
                 if (item.type === 'memo') {
-                    // 메모 복원
-                    syncMemos([item.originalData, ...memos]);
+                    // 메모 복원 - 기존 메모에 추가
+                    syncMemos(prevMemos => {
+                        console.log('📊 현재 메모 수:', prevMemos.length);
+                        console.log('➕ 복원할 메모:', item.originalData);
+                        const newMemos = [item.originalData, ...prevMemos];
+                        console.log('✅ 복원 후 메모 수:', newMemos.length);
+                        return newMemos;
+                    });
                     addActivity('메모 복원', item.content);
                     console.log('✅ 메모 복원됨:', item.originalData);
                 } else if (item.type === 'schedule') {
                     // 스케줄 복원
                     const { date, ...scheduleData } = item.originalData;
                     const key = format(new Date(date), 'yyyy-MM-dd');
-                    syncCalendar({
-                        ...calendarSchedules,
+                    syncCalendar(prevSchedules => ({
+                        ...prevSchedules,
                         [key]: scheduleData
-                    });
+                    }));
                     addActivity('스케줄 복원', item.content);
                     console.log('✅ 스케줄 복원됨:', { key, scheduleData });
                 } else if (item.type === 'secret') {
-                    // 비밀글 복원 - SecretPage에 이벤트 전달
-                    const restoreSecretEvent = new CustomEvent('restoreSecret', {
-                        detail: item.originalData
-                    });
-                    window.dispatchEvent(restoreSecretEvent);
+                    // 비밀글 복원 - SecretPage에서 itemsRestored 이벤트로 처리됨
+                    // 여기서는 activity만 추가
                     addActivity('비밀글 복원', item.content);
-                    console.log('✅ 비밀글 복원 이벤트 발송:', item.originalData);
+                    console.log('✅ 비밀글 복원 (SecretPage에서 처리됨):', item.originalData);
                 }
             });
 
             quietSync();
         };
 
-        window.addEventListener('restoreToApp', handleRestore);
-        return () => window.removeEventListener('restoreToApp', handleRestore);
+        console.log('👂 [App.jsx] itemsRestored 이벤트 리스너 등록');
+        window.addEventListener('itemsRestored', handleRestore);
+        return () => {
+            console.log('🔇 [App.jsx] itemsRestored 이벤트 리스너 제거');
+            window.removeEventListener('itemsRestored', handleRestore);
+        };
     }, []);
 
     if (isLoading) {
@@ -2656,7 +2763,7 @@ function App() {
 
     return (
         <AppRouter>
-            <TrashProvider autoDeleteDays={30}>
+            <TrashProvider autoDeleteDays={30} trashedItems={trash} setTrashedItems={syncTrash}>
                 <AppContent>
                     <GlobalStyle />
                 <Screen>
@@ -2820,6 +2927,15 @@ function App() {
                 />
             )}
 
+            {/* 🔐 마스터 비밀번호 모달 */}
+            {isMasterPasswordModalOpen && (
+                <MasterPasswordModal
+                    mode={masterPasswordMode}
+                    onSuccess={handleMasterPasswordSuccess}
+                    onCancel={null} // 취소 불가 (반드시 설정/입력 필요)
+                />
+            )}
+
             {/* 모달(Modal)들은 Screen 컴포넌트 바깥에 두어 전체 화면을 덮도록 합니다. */}
             <Toast message={toastMessage} />
 
@@ -2854,7 +2970,7 @@ function App() {
                                 setSelectedMemo(memo);
                                 setIsDetailModalOpen(true);
                             }
-                        } else if (type === 'calendar') {
+                        } else if (type === 'calendar' || type === 'alarm') {
                             // 일정/알람 - 캘린더 에디터 열기
                             const item = allData.find(d => d.id === id);
                             if (item && item.dateKey) {

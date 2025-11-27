@@ -51,12 +51,25 @@ export const sendMessage = async (roomId, message, type = 'text') => {
     throw new Error('유효하지 않은 메시지 타입입니다.');
   }
 
-  // 프로필 이미지 정보 가져오기
+  // 프로필 이미지 정보 가져오기 (Firestore 우선)
   const profileImageType = localStorage.getItem('profileImageType') || 'avatar';
   const selectedAvatarId = localStorage.getItem('selectedAvatarId') || null;
   const avatarBgColor = localStorage.getItem('avatarBgColor') || 'none';
   const customPicture = localStorage.getItem('customProfilePicture') || null;
-  const userNickname = localStorage.getItem('userNickname') || null;
+
+  // Firestore에서 최신 닉네임 가져오기
+  let userNickname = null;
+  try {
+    const { getUserNickname } = await import('./nicknameService');
+    userNickname = await getUserNickname(userId);
+    if (!userNickname) {
+      // Firestore에 없으면 localStorage에서 가져오기
+      userNickname = localStorage.getItem('userNickname') || null;
+    }
+  } catch (error) {
+    console.error('닉네임 로드 실패:', error);
+    userNickname = localStorage.getItem('userNickname') || null;
+  }
 
   const messageData = {
     roomId,
@@ -77,12 +90,13 @@ export const sendMessage = async (roomId, message, type = 'text') => {
 
   await addDoc(collection(db, 'chatMessages'), messageData);
 
-  // 방의 마지막 메시지 시간 업데이트
-  const roomRef = doc(db, 'collaborationRooms', roomId);
-  await updateDoc(roomRef, {
-    lastMessageAt: new Date().toISOString(),
-    messageCount: await getMessageCount(roomId) + 1
-  });
+  // 🗑️ COLLABORATION ROOMS REMOVED - 협업방 기능 제거됨
+  // 방의 마지막 메시지 시간 업데이트 로직 제거
+  // const roomRef = doc(db, 'collaborationRooms', roomId);
+  // await updateDoc(roomRef, {
+  //   lastMessageAt: new Date().toISOString(),
+  //   messageCount: await getMessageCount(roomId) + 1
+  // });
 
   return true;
 };

@@ -100,9 +100,15 @@ const Label = styled.label`
     margin-bottom: 8px;
 `;
 
+const InputWrapper = styled.div`
+    position: relative;
+    width: 100%;
+`;
+
 const Input = styled.input`
     width: 100%;
     padding: 12px 16px;
+    padding-right: ${props => props.$hasValue ? '40px' : '16px'};
     border-radius: 8px;
     border: 1px solid ${props => props.$error ? 'rgba(255, 107, 107, 0.5)' : 'rgba(255, 255, 255, 0.15)'};
     background: rgba(255, 255, 255, 0.05);
@@ -130,6 +136,36 @@ const Input = styled.input`
     &::-webkit-inner-spin-button {
         -webkit-appearance: none;
         margin: 0;
+    }
+`;
+
+const ClearButton = styled.button`
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: #ffffff;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    opacity: ${props => props.$visible ? '1' : '0'};
+    pointer-events: ${props => props.$visible ? 'auto' : 'none'};
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.3);
+        transform: translateY(-50%) scale(1.1);
+    }
+
+    &:active {
+        transform: translateY(-50%) scale(0.95);
     }
 `;
 
@@ -225,7 +261,7 @@ const PinChangeModal = ({ onClose, onConfirm, pinLength = 6, forcedMode = false 
     const [confirmPin, setConfirmPin] = useState('');
     const [errors, setErrors] = useState({});
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         const newErrors = {};
 
         // 유효성 검사
@@ -258,7 +294,13 @@ const PinChangeModal = ({ onClose, onConfirm, pinLength = 6, forcedMode = false 
         setErrors(newErrors);
 
         if (Object.keys(newErrors).length === 0) {
-            onConfirm({ currentPin, newPin });
+            // onConfirm이 Promise를 반환할 수 있으므로 await
+            const result = await onConfirm({ currentPin, newPin });
+
+            // 서버 측 에러 처리 (예: 기존 PIN이 틀림)
+            if (result && !result.success) {
+                setErrors({ currentPin: result.message });
+            }
         }
     };
 
@@ -290,62 +332,101 @@ const PinChangeModal = ({ onClose, onConfirm, pinLength = 6, forcedMode = false 
 
                         <FormGroup>
                             <Label>기존 PIN 번호 입력</Label>
-                            <Input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                maxLength={pinLength}
-                                value={currentPin}
-                                onChange={(e) => {
-                                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, pinLength);
-                                    setCurrentPin(value);
-                                    setErrors(prev => ({ ...prev, currentPin: '' }));
-                                }}
-                                onKeyPress={handleKeyPress}
-                                placeholder={`기존 PIN (${pinLength}자리)`}
-                                $error={errors.currentPin}
-                            />
+                            <InputWrapper>
+                                <Input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    maxLength={pinLength}
+                                    value={currentPin}
+                                    $hasValue={currentPin.length > 0}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/[^0-9]/g, '').slice(0, pinLength);
+                                        setCurrentPin(value);
+                                        setErrors(prev => ({ ...prev, currentPin: '' }));
+                                    }}
+                                    onKeyPress={handleKeyPress}
+                                    placeholder={`기존 PIN (${pinLength}자리)`}
+                                    $error={errors.currentPin}
+                                />
+                                <ClearButton
+                                    type="button"
+                                    $visible={currentPin.length > 0}
+                                    onClick={() => {
+                                        setCurrentPin('');
+                                        setErrors(prev => ({ ...prev, currentPin: '' }));
+                                    }}
+                                >
+                                    ×
+                                </ClearButton>
+                            </InputWrapper>
                             {errors.currentPin && <ErrorText>{errors.currentPin}</ErrorText>}
                         </FormGroup>
 
                         <FormGroup>
                             <Label>새 PIN 번호 입력</Label>
-                            <Input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                maxLength={pinLength}
-                                value={newPin}
-                                onChange={(e) => {
-                                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, pinLength);
-                                    setNewPin(value);
-                                    setErrors(prev => ({ ...prev, newPin: '' }));
-                                }}
-                                onKeyPress={handleKeyPress}
-                                placeholder={`새 PIN (${pinLength}자리)`}
-                                $error={errors.newPin}
-                            />
+                            <InputWrapper>
+                                <Input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    maxLength={pinLength}
+                                    value={newPin}
+                                    $hasValue={newPin.length > 0}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/[^0-9]/g, '').slice(0, pinLength);
+                                        setNewPin(value);
+                                        setErrors(prev => ({ ...prev, newPin: '' }));
+                                    }}
+                                    onKeyPress={handleKeyPress}
+                                    placeholder={`새 PIN (${pinLength}자리)`}
+                                    $error={errors.newPin}
+                                />
+                                <ClearButton
+                                    type="button"
+                                    $visible={newPin.length > 0}
+                                    onClick={() => {
+                                        setNewPin('');
+                                        setErrors(prev => ({ ...prev, newPin: '' }));
+                                    }}
+                                >
+                                    ×
+                                </ClearButton>
+                            </InputWrapper>
                             {errors.newPin && <ErrorText>{errors.newPin}</ErrorText>}
                             {!errors.newPin && <HelperText>숫자 {pinLength}자리를 입력해주세요</HelperText>}
                         </FormGroup>
 
                         <FormGroup>
                             <Label>새 PIN 번호 입력 (확인용)</Label>
-                            <Input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                maxLength={pinLength}
-                                value={confirmPin}
-                                onChange={(e) => {
-                                    const value = e.target.value.replace(/[^0-9]/g, '').slice(0, pinLength);
-                                    setConfirmPin(value);
-                                    setErrors(prev => ({ ...prev, confirmPin: '' }));
-                                }}
-                                onKeyPress={handleKeyPress}
-                                placeholder={`새 PIN 재입력 (${pinLength}자리)`}
-                                $error={errors.confirmPin}
-                            />
+                            <InputWrapper>
+                                <Input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    maxLength={pinLength}
+                                    value={confirmPin}
+                                    $hasValue={confirmPin.length > 0}
+                                    onChange={(e) => {
+                                        const value = e.target.value.replace(/[^0-9]/g, '').slice(0, pinLength);
+                                        setConfirmPin(value);
+                                        setErrors(prev => ({ ...prev, confirmPin: '' }));
+                                    }}
+                                    onKeyPress={handleKeyPress}
+                                    placeholder={`새 PIN 재입력 (${pinLength}자리)`}
+                                    $error={errors.confirmPin}
+                                />
+                                <ClearButton
+                                    type="button"
+                                    $visible={confirmPin.length > 0}
+                                    onClick={() => {
+                                        setConfirmPin('');
+                                        setErrors(prev => ({ ...prev, confirmPin: '' }));
+                                    }}
+                                >
+                                    ×
+                                </ClearButton>
+                            </InputWrapper>
                             {errors.confirmPin && <ErrorText>{errors.confirmPin}</ErrorText>}
                         </FormGroup>
                     </Body>
