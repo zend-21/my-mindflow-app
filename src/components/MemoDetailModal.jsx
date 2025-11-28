@@ -982,11 +982,14 @@ const MemoDetailModal = ({
         const now = Date.now();
         const DOUBLE_TAP_DELAY = 300;
 
-        if (now - lastTap < DOUBLE_TAP_DELAY) {
+        if (lastTap && (now - lastTap < DOUBLE_TAP_DELAY)) {
             // 더블탭 감지됨
             setIsEditMode(true);
+            setLastTap(0); // 다음 더블탭을 위해 리셋
+        } else {
+            // 첫 번째 탭 또는 시간 초과
+            setLastTap(now);
         }
-        setLastTap(now);
     };
 
     // 스와이프 이벤트 핸들러 (읽기 모드에서만 작동)
