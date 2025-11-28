@@ -1276,9 +1276,6 @@ const MemoDetailModal = ({
                             {/* 읽기 모드 컨텐츠 */}
                             <ReadModeContainer
                                 $isImportant={isImportant}
-                                onTouchStart={handleTouchStart}
-                                onTouchMove={handleTouchMove}
-                                onTouchEnd={handleTouchEnd}
                             >
                                 {editedContent}
                             </ReadModeContainer>
