@@ -1678,7 +1678,12 @@ const MemoPage = ({
             onToggleMemoSelection(memo.id);
         } else {
             // 선택 모드가 아닌 경우, 상세 보기로 이동
-            onOpenDetailMemo(memo);
+            onOpenDetailMemo(memo, {
+                activeFolder,
+                sortOrder,
+                sortDirection,
+                sharedMemoInfo
+            });
         }
         // 클릭 이벤트 후 longPressTimer를 항상 초기화
         clearTimeout(longPressTimer.current);
@@ -2184,7 +2189,12 @@ const MemoPage = ({
                                     if(isSelectionMode) {
                                         onToggleMemoSelection(memo.id);
                                     } else {
-                                        onOpenDetailMemo(memo);
+                                        onOpenDetailMemo(memo, {
+                                            activeFolder,
+                                            sortOrder,
+                                            sortDirection,
+                                            sharedMemoInfo
+                                        });
                                     }
                                 }}
                                 onTouchStart={(e) => {
