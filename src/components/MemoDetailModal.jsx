@@ -977,13 +977,20 @@ const MemoDetailModal = ({
         }
     };
 
-    // ✨ 더블탭으로 편집 모드 전환
-    const handleDoubleTap = () => {
+    // ✨ 더블클릭/더블탭으로 편집 모드 전환
+    const handleDoubleTap = (e) => {
         const now = Date.now();
         const DOUBLE_TAP_DELAY = 300;
 
+        // 텍스트 선택이 발생한 경우 무시 (복사를 위한 텍스트 선택 허용)
+        if (window.getSelection && window.getSelection().toString().length > 0) {
+            setLastTap(0);
+            return;
+        }
+
         if (lastTap && (now - lastTap < DOUBLE_TAP_DELAY)) {
             // 더블탭 감지됨
+            e.preventDefault(); // 기본 동작 방지
             setIsEditMode(true);
             setLastTap(0); // 다음 더블탭을 위해 리셋
         } else {
@@ -1276,6 +1283,7 @@ const MemoDetailModal = ({
                             {/* 읽기 모드 컨텐츠 */}
                             <ReadModeContainer
                                 $isImportant={isImportant}
+                                onClick={handleDoubleTap}
                             >
                                 {editedContent}
                             </ReadModeContainer>
