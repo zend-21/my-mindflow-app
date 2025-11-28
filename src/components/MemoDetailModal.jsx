@@ -53,6 +53,49 @@ const Overlay = styled.div`
     align-items: center;
     z-index: 10000;
     animation: ${fadeIn} 0.3s ease-out;
+    overflow: hidden;
+`;
+
+// 다음/이전 메모 미리보기 (배경에 흐릿하게 표시)
+const PreviewMemoCard = styled.div`
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%) translateX(${props => props.$offset}px);
+    width: 95vw;
+    max-width: 800px;
+    height: 97vh;
+    background: ${props => props.$isImportant ? 'linear-gradient(135deg, #3d2a2e, #4a2d32)' : 'linear-gradient(135deg, #2a2d35, #333842)'};
+    border-radius: 16px;
+    padding: 24px;
+    opacity: 0.3;
+    filter: blur(2px);
+    pointer-events: none;
+    z-index: -1;
+
+    @media (min-width: 768px) {
+        max-width: 420px;
+        border-radius: 20px;
+    }
+
+    @media (min-width: 1200px) {
+        max-width: 480px;
+    }
+
+    @media (min-width: 1900px) {
+        max-width: 530px;
+    }
+`;
+
+const PreviewContent = styled.div`
+    color: #e0e0e0;
+    font-size: 14px;
+    line-height: 1.6;
+    opacity: 0.7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 15;
+    -webkit-box-orient: vertical;
 `;
 
 const ModalContent = styled.div`
@@ -716,10 +759,11 @@ const MemoDetailModal = ({
         if (canNavigatePrev()) {
             const prevMemo = memos[currentIndex - 1];
             setSlideDirection('right'); // 오른쪽으로 슬라이드
+            // 애니메이션이 완전히 끝난 후(250ms) 내용 변경
             setTimeout(() => {
                 onNavigate && onNavigate(prevMemo);
                 setSlideDirection(null);
-            }, 150);
+            }, 250);
         }
     };
 
@@ -728,10 +772,11 @@ const MemoDetailModal = ({
         if (canNavigateNext()) {
             const nextMemo = memos[currentIndex + 1];
             setSlideDirection('left'); // 왼쪽으로 슬라이드
+            // 애니메이션이 완전히 끝난 후(250ms) 내용 변경
             setTimeout(() => {
                 onNavigate && onNavigate(nextMemo);
                 setSlideDirection(null);
-            }, 150);
+            }, 250);
         }
     };
 
@@ -901,10 +946,48 @@ const MemoDetailModal = ({
     //     setCurrentRoomId(null);
     // };
 
+    // 다음/이전 메모 가져오기
+    const getPrevMemo = () => {
+        const currentIndex = getCurrentMemoIndex();
+        return currentIndex > 0 ? memos[currentIndex - 1] : null;
+    };
+
+    const getNextMemo = () => {
+        const currentIndex = getCurrentMemoIndex();
+        return currentIndex < memos.length - 1 && currentIndex !== -1 ? memos[currentIndex + 1] : null;
+    };
+
+    const prevMemo = getPrevMemo();
+    const nextMemo = getNextMemo();
+
     return (
       <Portal>
         <Fragment>
             <Overlay>
+                {/* 이전 메모 미리보기 (오른쪽에서 대기, 스와이프 시 함께 이동) */}
+                {prevMemo && swipeOffset > 0 && (
+                    <PreviewMemoCard
+                        $offset={swipeOffset - window.innerWidth}
+                        $isImportant={prevMemo.isImportant}
+                    >
+                        <PreviewContent>
+                            {prevMemo.text}
+                        </PreviewContent>
+                    </PreviewMemoCard>
+                )}
+
+                {/* 다음 메모 미리보기 (왼쪽에서 대기, 스와이프 시 함께 이동) */}
+                {nextMemo && swipeOffset < 0 && (
+                    <PreviewMemoCard
+                        $offset={swipeOffset + window.innerWidth}
+                        $isImportant={nextMemo.isImportant}
+                    >
+                        <PreviewContent>
+                            {nextMemo.text}
+                        </PreviewContent>
+                    </PreviewMemoCard>
+                )}
+
                 <ModalContent
                     ref={modalContentRef}
                     $isImportant={isImportant}
