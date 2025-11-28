@@ -708,6 +708,10 @@ const ReadModeContainer = styled.div`
     white-space: pre-wrap;
     word-wrap: break-word;
     position: relative;
+    user-select: text;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
 
     /* 다크 노트북 질감 효과 */
     box-shadow: ${props => props.$isImportant
