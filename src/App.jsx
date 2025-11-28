@@ -1105,29 +1105,36 @@ function App() {
 
     const handleEditMemo = (id, newContent, isImportant, folderId, previousFolderId) => {
             const now = Date.now();
-            syncMemos(
-                memos.map(memo => {
-                    if (memo.id === id) {
-                        // 내용이 변경되었는지 확인 (공백 포함)
-                        const contentChanged = memo.content !== newContent;
+            const updatedMemos = memos.map(memo => {
+                if (memo.id === id) {
+                    // 내용이 변경되었는지 확인 (공백 포함)
+                    const contentChanged = memo.content !== newContent;
 
-                        return {
-                            ...memo,
-                            content: newContent,
-                            date: contentChanged ? now : memo.date, // 내용 변경 시에만 date 갱신
-                            createdAt: memo.createdAt || now, // 기존 createdAt 유지, 없으면 현재 시간
-                            updatedAt: contentChanged ? now : memo.updatedAt, // 내용 변경 시에만 updatedAt 갱신
-                            displayDate: contentChanged ? new Date(now).toLocaleString() : memo.displayDate, // 내용 변경 시에만 displayDate 갱신
-                            isImportant: isImportant,
-                            folderId: folderId !== undefined ? folderId : memo.folderId, // 폴더 ID 저장
-                            previousFolderId: previousFolderId !== undefined ? previousFolderId : memo.previousFolderId // 이전 폴더 ID 저장
-                        };
+                    const updatedMemo = {
+                        ...memo,
+                        content: newContent,
+                        date: contentChanged ? now : memo.date, // 내용 변경 시에만 date 갱신
+                        createdAt: memo.createdAt || now, // 기존 createdAt 유지, 없으면 현재 시간
+                        updatedAt: contentChanged ? now : memo.updatedAt, // 내용 변경 시에만 updatedAt 갱신
+                        displayDate: contentChanged ? new Date(now).toLocaleString() : memo.displayDate, // 내용 변경 시에만 displayDate 갱신
+                        isImportant: isImportant,
+                        folderId: folderId !== undefined ? folderId : memo.folderId, // 폴더 ID 저장
+                        previousFolderId: previousFolderId !== undefined ? previousFolderId : memo.previousFolderId // 이전 폴더 ID 저장
+                    };
+
+                    // ✨ 선택된 메모 업데이트 (읽기 모드에서 변경사항 반영)
+                    if (selectedMemo && selectedMemo.id === id) {
+                        setSelectedMemo(updatedMemo);
                     }
-                    return memo;
-                })
-            );
+
+                    return updatedMemo;
+                }
+                return memo;
+            });
+
+            syncMemos(updatedMemos);
             addActivity('메모 수정', newContent, id);
-            setIsDetailModalOpen(false);
+            // setIsDetailModalOpen(false); // ✨ 읽기 모드로 전환되므로 모달은 열린 채로 유지
             showToast("✓ 메모가 수정되었습니다");
             quietSync(); // ✅ 추가
         };

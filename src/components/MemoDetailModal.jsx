@@ -584,6 +584,174 @@ const FolderSelect = styled.select`
 `;
 /* --- 스타일 추가 완료 --- */
 
+// ✨ 읽기 모드 스타일
+const ReadModeHeader = styled.div`
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 0;
+    gap: 8px;
+`;
+
+const ReadModeLeftButtons = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 6px;
+`;
+
+const ReadModeRightButtons = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 6px;
+`;
+
+const ReadModeButton = styled.button`
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: rgba(74, 144, 226, 0.15);
+    border: 1px solid rgba(74, 144, 226, 0.3);
+    color: #4a90e2;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 13px;
+    white-space: nowrap;
+
+    &:hover {
+        background: rgba(74, 144, 226, 0.25);
+        border-color: rgba(74, 144, 226, 0.5);
+    }
+
+    &:active {
+        transform: scale(0.95);
+    }
+
+    .material-icons {
+        font-size: 16px;
+    }
+`;
+
+const CloseButton = styled(ReadModeButton)`
+    background: rgba(158, 158, 158, 0.15);
+    border-color: rgba(158, 158, 158, 0.3);
+    color: #9e9e9e;
+
+    &:hover {
+        background: rgba(158, 158, 158, 0.25);
+        border-color: rgba(158, 158, 158, 0.5);
+    }
+`;
+
+const ImportantButton = styled(ReadModeButton)`
+    background: ${props => props.$isImportant ? 'rgba(239, 83, 80, 0.2)' : 'rgba(74, 144, 226, 0.15)'};
+    border-color: ${props => props.$isImportant ? 'rgba(239, 83, 80, 0.4)' : 'rgba(74, 144, 226, 0.3)'};
+    color: ${props => props.$isImportant ? '#ef5350' : '#4a90e2'};
+
+    &:hover {
+        background: ${props => props.$isImportant ? 'rgba(239, 83, 80, 0.3)' : 'rgba(74, 144, 226, 0.25)'};
+        border-color: ${props => props.$isImportant ? 'rgba(239, 83, 80, 0.5)' : 'rgba(74, 144, 226, 0.5)'};
+    }
+`;
+
+const ShareBadge = styled.div`
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: rgba(94, 190, 38, 0.15);
+    border: 1px solid rgba(94, 190, 38, 0.3);
+    color: #5ebe26;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: default;
+
+    .material-icons {
+        font-size: 16px;
+    }
+`;
+
+const ImportantBadge = styled.div`
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: ${props => props.$isImportant ? 'rgba(239, 83, 80, 0.2)' : 'rgba(74, 144, 226, 0.15)'};
+    border: 1px solid ${props => props.$isImportant ? 'rgba(239, 83, 80, 0.4)' : 'rgba(74, 144, 226, 0.3)'};
+    color: ${props => props.$isImportant ? '#ef5350' : '#4a90e2'};
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: default;
+
+    .material-icons {
+        font-size: 16px;
+    }
+`;
+
+const ReadModeContainer = styled.div`
+    flex: 1;
+    overflow-y: auto;
+    padding: ${props => props.$isImportant ? '40px 32px 40px 48px' : '40px 32px 40px 48px'};
+    background: ${props => props.$isImportant
+        ? 'linear-gradient(135deg, #2a1f23 0%, #3d2a2e 50%, #4a2d32 100%)'
+        : 'linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 50%, #1e1e1e 100%)'};
+    border-radius: 12px;
+    margin: 0;
+    color: ${props => props.$isImportant ? '#f5f5f5' : '#d0d0d0'};
+    line-height: 1.9;
+    font-size: 17px;
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    position: relative;
+
+    /* 다크 노트북 질감 효과 */
+    box-shadow: ${props => props.$isImportant
+        ? 'inset 0 0 60px rgba(0, 0, 0, 0.4), inset 0 2px 8px rgba(0, 0, 0, 0.3)'
+        : 'inset 0 0 60px rgba(0, 0, 0, 0.5), inset 0 2px 8px rgba(0, 0, 0, 0.4)'};
+
+    /* 노트북 왼쪽 여백선 */
+    &::before {
+        content: '';
+        position: absolute;
+        left: 32px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: ${props => props.$isImportant
+            ? 'rgba(239, 83, 80, 0.4)'
+            : 'rgba(74, 144, 226, 0.4)'};
+    }
+
+    /* 다크 노트 라인 효과 */
+    background-image: ${props => props.$isImportant
+        ? 'repeating-linear-gradient(transparent, transparent 31px, rgba(239, 83, 80, 0.08) 31px, rgba(239, 83, 80, 0.08) 32px)'
+        : 'repeating-linear-gradient(transparent, transparent 31px, rgba(255, 255, 255, 0.05) 31px, rgba(255, 255, 255, 0.05) 32px)'};
+
+    /* 스크롤바 스타일링 */
+    &::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: ${props => props.$isImportant ? 'rgba(239, 83, 80, 0.4)' : 'rgba(74, 144, 226, 0.4)'};
+        border-radius: 4px;
+
+        &:hover {
+            background: ${props => props.$isImportant ? 'rgba(239, 83, 80, 0.6)' : 'rgba(74, 144, 226, 0.6)'};
+        }
+    }
+`;
+
 
 const MemoDetailModal = ({
     isOpen,
@@ -602,6 +770,15 @@ const MemoDetailModal = ({
     const [history, setHistory] = useState([]);
     const [historyIndex, setHistoryIndex] = useState(0);
     const [selectedFolderId, setSelectedFolderId] = useState(null); // 폴더 선택
+
+    // ✨ 읽기/편집 모드 상태
+    const [isEditMode, setIsEditMode] = useState(false);
+
+    // ✨ 더블탭 감지 상태
+    const [lastTap, setLastTap] = useState(0);
+
+    // ✨ 원본 중요도 상태 (취소 시 복원용)
+    const [originalIsImportant, setOriginalIsImportant] = useState(false);
 
     // 스와이프 상태
     const [touchStart, setTouchStart] = useState(null);
@@ -633,8 +810,10 @@ const MemoDetailModal = ({
 
     useEffect(() => {
         if (isOpen && memo) {
+            // 모달이 처음 열리거나 다른 메모로 변경될 때만 초기화
             setEditedContent(memo.content);
             setIsImportant(memo.isImportant);
+            setOriginalIsImportant(memo.isImportant); // 원본 중요도 저장
             setSelectedFolderId(memo.folderId || null); // 폴더 ID 초기화
             const initialHistory = [memo.content];
             setHistory(initialHistory);
@@ -642,6 +821,12 @@ const MemoDetailModal = ({
 
             closeConfirmModal();
             setToastMessage(null);
+
+            // ✨ 읽기 모드로 초기화 (편집 모드가 아닐 때만)
+            if (!isEditMode) {
+                setIsEditMode(false);
+            }
+            setLastTap(0);
 
             if (textareaRef.current) {
                 textareaRef.current.blur();
@@ -696,10 +881,11 @@ const MemoDetailModal = ({
 
     const executeSaveAndShowToast = () => {
         onSave(memo.id, editedContent, isImportant, selectedFolderId);
+        setOriginalIsImportant(isImportant); // 저장 후 원본 중요도 업데이트
         setToastMessage("메모를 수정했습니다.");
         setTimeout(() => {
             setToastMessage(null);
-            onCancel();
+            setIsEditMode(false); // 읽기 모드로 전환
         }, 1000);
     };
 
@@ -711,18 +897,29 @@ const MemoDetailModal = ({
         });
     };
 
-    // 내용만 변경되었는지 확인 (중요도는 즉시 저장되므로 체크하지 않음)
-    const isPristine = editedContent === memo.content;
+    // 내용 또는 중요도가 변경되었는지 확인
+    const isPristine = editedContent === memo.content && isImportant === originalIsImportant;
 
     const handleCancelClick = () => {
+        // 읽기 모드에서는 바로 닫기
+        if (!isEditMode) {
+            onCancel();
+            return;
+        }
+
+        // 편집 모드에서는 읽기 모드로 전환
         if (!isPristine) {
             setConfirmModalState({
                 isOpen: true,
-                message: "변경사항을 저장하지 않고 닫으시겠습니까?",
-                onConfirm: () => onCancel(),
+                message: "변경사항을 저장하지 않고 읽기 모드로 돌아가시겠습니까?",
+                onConfirm: () => {
+                    setEditedContent(memo.content); // 원래 내용으로 복원
+                    setIsImportant(originalIsImportant); // 원래 중요도로 복원
+                    setIsEditMode(false);
+                },
             });
         } else {
-            onCancel();
+            setIsEditMode(false);
         }
     };
     
@@ -780,8 +977,23 @@ const MemoDetailModal = ({
         }
     };
 
-    // 스와이프 이벤트 핸들러
+    // ✨ 더블탭으로 편집 모드 전환
+    const handleDoubleTap = () => {
+        const now = Date.now();
+        const DOUBLE_TAP_DELAY = 300;
+
+        if (now - lastTap < DOUBLE_TAP_DELAY) {
+            // 더블탭 감지됨
+            setIsEditMode(true);
+        }
+        setLastTap(now);
+    };
+
+    // 스와이프 이벤트 핸들러 (읽기 모드에서만 작동)
     const handleTouchStart = (e) => {
+        // ✨ 편집 모드에서는 스와이프 비활성화
+        if (isEditMode) return;
+
         setTouchEnd(null);
         setTouchStart(e.targetTouches[0].clientX);
         // 초기에는 스와이프로 간주하지 않음 (탭일 수도 있으므로)
@@ -789,6 +1001,8 @@ const MemoDetailModal = ({
     };
 
     const handleTouchMove = (e) => {
+        // ✨ 편집 모드에서는 스와이프 비활성화
+        if (isEditMode) return;
         if (!touchStart) return;
 
         const currentTouch = e.targetTouches[0].clientX;
@@ -796,14 +1010,9 @@ const MemoDetailModal = ({
 
         // 좌우로 10px 이상 움직였을 때만 스와이프로 간주
         if (Math.abs(diff) > 10) {
-            // 스와이프 시작 (입력 영역에서도 드래그하면 스와이프 모드)
+            // 스와이프 시작
             if (!isSwiping) {
                 setIsSwiping(true);
-
-                // 입력 영역에서 스와이프 시작하면 포커스 해제
-                if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
-                    e.target.blur();
-                }
             }
 
             // 이전 메모가 없으면 오른쪽 스와이프 제한
@@ -824,6 +1033,9 @@ const MemoDetailModal = ({
     };
 
     const handleTouchEnd = () => {
+        // ✨ 편집 모드에서는 스와이프 비활성화
+        if (isEditMode) return;
+
         if (!touchStart) {
             setIsSwiping(false);
             setSwipeOffset(0);
@@ -832,6 +1044,9 @@ const MemoDetailModal = ({
 
         // 스와이프가 아니라 단순 탭이었다면 (10px 미만 이동)
         if (!isSwiping || !touchEnd || Math.abs(touchStart - touchEnd) < 10) {
+            // ✨ 읽기 모드에서 탭 감지 → 더블탭 체크
+            handleDoubleTap();
+
             setIsSwiping(false);
             setSwipeOffset(0);
             setTouchStart(null);
@@ -858,8 +1073,7 @@ const MemoDetailModal = ({
     const handleImportantToggle = () => {
         const newImportance = !isImportant;
         setIsImportant(newImportance);
-        // 중요도 변경을 즉시 저장 (내용 변경 없이)
-        onSave(memo.id, editedContent, newImportance, selectedFolderId);
+        // 중요도 변경은 저장 버튼을 눌러야 저장됨 (편집창은 유지)
     };
 
     const handleUndo = () => {
@@ -998,9 +1212,74 @@ const MemoDetailModal = ({
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
                 >
-                    
-                    {/* 1. 새로운 상단 그리드 */}
-                    <TopGridContainer>
+                    {/* ✨ 읽기 모드 */}
+                    {!isEditMode ? (
+                        <>
+                            {/* 읽기 모드 헤더 - 모든 버튼을 한 줄로 */}
+                            <ReadModeHeader>
+                                <ReadModeLeftButtons>
+                                    <CloseButton onClick={handleCancelClick}>
+                                        <span className="material-icons">close</span>
+                                    </CloseButton>
+                                    {isImportant && (
+                                        <ImportantBadge $isImportant={isImportant}>
+                                            <span className="material-icons">star</span>
+                                        </ImportantBadge>
+                                    )}
+                                    {isShared && (
+                                        <ShareBadge>
+                                            <span className="material-icons">share</span>
+                                        </ShareBadge>
+                                    )}
+                                </ReadModeLeftButtons>
+                                <ReadModeRightButtons>
+                                    <ReadModeButton onClick={() => setIsEditMode(true)}>
+                                        <span className="material-icons">edit</span>
+                                    </ReadModeButton>
+                                </ReadModeRightButtons>
+                            </ReadModeHeader>
+
+                            {/* 날짜 정보 */}
+                            <DateText>
+                                {memo.createdAt && (
+                                    <>
+                                        최초 등록일: {new Date(memo.createdAt).toLocaleString('ko-KR', {
+                                            year: 'numeric',
+                                            month: '2-digit',
+                                            day: '2-digit',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            second: '2-digit',
+                                            hour12: false
+                                        }).replace(/\. /g, '. ').replace(/\.$/, '')}
+                                        {memo.updatedAt && memo.updatedAt !== memo.createdAt && ' / '}
+                                    </>
+                                )}
+                                {memo.updatedAt && memo.createdAt && memo.updatedAt !== memo.createdAt && (
+                                    <>
+                                        최종 수정일: {new Date(memo.updatedAt).toLocaleString('ko-KR', {
+                                            year: 'numeric',
+                                            month: '2-digit',
+                                            day: '2-digit',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            second: '2-digit',
+                                            hour12: false
+                                        }).replace(/\. /g, '. ').replace(/\.$/, '')}
+                                    </>
+                                )}
+                            </DateText>
+
+                            {/* 읽기 모드 컨텐츠 */}
+                            <ReadModeContainer $isImportant={isImportant}>
+                                {editedContent}
+                            </ReadModeContainer>
+                        </>
+                    ) : (
+                        <>
+                            {/* ✨ 편집 모드 - 기존 UI */}
+                            {/* 1. 새로운 상단 그리드 */}
+                            <TopGridContainer>
                         {/* 좌측: 되돌리기/다시실행 */}
                         <GridAreaLeft>
                             <HistoryButton onClick={handleUndo} disabled={historyIndex === 0}>
@@ -1105,8 +1384,10 @@ const MemoDetailModal = ({
                         onChange={handleContentChange}
                         onFocus={handleTextareaFocus}
                         onBlur={handleTextareaBlur}
-                        onDoubleClick={handleDoubleClick} 
+                        onDoubleClick={handleDoubleClick}
                     />
+                        </>
+                    )}
                 </ModalContent>
             </Overlay>
 
