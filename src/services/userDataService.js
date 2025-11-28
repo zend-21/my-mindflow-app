@@ -750,28 +750,54 @@ export const saveSettingsToFirestore = async (userId, settings) => {
 // ========================================
 
 /**
- * 모든 사용자 데이터를 Firestore에서 가져오기
+ * 모든 사용자 데이터를 Firestore에서 가져오기 (타임스탬프 포함)
  */
 export const fetchAllUserData = async (userId) => {
   try {
-    const [memos, folders, trash, macros, calendar, activities, settings] = await Promise.all([
-      fetchMemosFromFirestore(userId),
-      fetchFoldersFromFirestore(userId),
-      fetchTrashFromFirestore(userId),
-      fetchMacrosFromFirestore(userId),
-      fetchCalendarFromFirestore(userId),
-      fetchActivitiesFromFirestore(userId),
-      fetchSettingsFromFirestore(userId)
+    // 데이터와 타임스탬프를 함께 가져오기
+    const [
+      memosDoc,
+      foldersDoc,
+      trashDoc,
+      macrosDoc,
+      calendarDoc,
+      activitiesDoc,
+      settingsDoc
+    ] = await Promise.all([
+      getDoc(doc(db, 'mindflowUsers', userId, 'userData', 'memos')),
+      getDoc(doc(db, 'mindflowUsers', userId, 'userData', 'folders')),
+      getDoc(doc(db, 'mindflowUsers', userId, 'userData', 'trash')),
+      getDoc(doc(db, 'mindflowUsers', userId, 'userData', 'macros')),
+      getDoc(doc(db, 'mindflowUsers', userId, 'userData', 'calendar')),
+      getDoc(doc(db, 'mindflowUsers', userId, 'userData', 'activities')),
+      getDoc(doc(db, 'mindflowUsers', userId, 'userData', 'settings'))
     ]);
 
     return {
-      memos,
-      folders,
-      trash,
-      macros,
-      calendar,
-      activities,
-      settings
+      memos: memosDoc.exists() ? (memosDoc.data().items || []) : [],
+      folders: foldersDoc.exists() ? (foldersDoc.data().items || []) : [],
+      trash: trashDoc.exists() ? (trashDoc.data().items || []) : [],
+      macros: macrosDoc.exists() ? (macrosDoc.data().items || []) : [],
+      calendar: calendarDoc.exists() ? (calendarDoc.data().schedules || {}) : {},
+      activities: activitiesDoc.exists() ? (activitiesDoc.data().items || []) : [],
+      settings: settingsDoc.exists() ? settingsDoc.data() : {
+        widgets: ['StatsGrid', 'QuickActions', 'RecentActivity'],
+        displayCount: 5,
+        nickname: null,
+        profileImageType: 'avatar',
+        selectedAvatarId: null,
+        avatarBgColor: 'none'
+      },
+      // 타임스탬프 정보 추가
+      timestamps: {
+        memos: memosDoc.exists() ? memosDoc.data().updatedAt : null,
+        folders: foldersDoc.exists() ? foldersDoc.data().updatedAt : null,
+        trash: trashDoc.exists() ? trashDoc.data().updatedAt : null,
+        macros: macrosDoc.exists() ? macrosDoc.data().updatedAt : null,
+        calendar: calendarDoc.exists() ? calendarDoc.data().updatedAt : null,
+        activities: activitiesDoc.exists() ? activitiesDoc.data().updatedAt : null,
+        settings: settingsDoc.exists() ? settingsDoc.data().updatedAt : null
+      }
     };
   } catch (error) {
     console.error('전체 데이터 가져오기 실패:', error);

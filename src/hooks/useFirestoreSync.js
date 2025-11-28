@@ -12,6 +12,14 @@ import {
   migrateLocalStorageToFirestore,
   migrateLegacyFirestoreData
 } from '../services/userDataService';
+import {
+  decideSyncStrategy,
+  getSyncConflictSummary,
+  generateConflictMessage,
+  isFirstLogin,
+  updateAllLocalSyncTimestamps,
+  setLocalSyncTimestamp
+} from '../services/syncMetadataService';
 
 /**
  * Firestore와 로컬 상태를 동기화하는 훅
@@ -76,7 +84,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
           }
         }
 
-        // Firestore에서 데이터 로드
+        // Firestore에서 데이터 로드 (타임스탬프 포함)
         const data = await fetchAllUserData(userId);
 
         // 📦 Firestore에 데이터가 없으면 localStorage에서 마이그레이션 (첫 로그인)
@@ -105,6 +113,9 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
             setCalendar(refreshedData.calendar || {});
             setActivities(refreshedData.activities || []);
             setSettings(refreshedData.settings || settings);
+
+            // 타임스탬프 저장
+            updateAllLocalSyncTimestamps(userId);
           } else {
             // Firestore도 비어있고 localStorage도 비어있음 (완전 신규)
             console.log('🆕 신규 사용자 - 빈 상태로 시작');
@@ -115,17 +126,90 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
             setCalendar(data.calendar || {});
             setActivities(data.activities || []);
             setSettings(data.settings || settings);
+
+            // 타임스탬프 저장
+            updateAllLocalSyncTimestamps(userId);
           }
         } else {
-          // Firestore에 데이터가 있으면 그대로 사용
-          console.log('✅ Firestore 데이터 로드 완료');
-          setMemos(data.memos || []);
-          setFolders(data.folders || []);
-          setTrash(data.trash || []);
-          setMacros(data.macros || []);
-          setCalendar(data.calendar || {});
-          setActivities(data.activities || []);
-          setSettings(data.settings || settings);
+          // 🔍 Firestore에 데이터가 있음 - 타임스탬프 기반 스마트 동기화
+          console.log('🔍 타임스탬프 기반 동기화 전략 결정 중...');
+
+          // 동기화 전략 결정
+          const strategy = decideSyncStrategy(data.timestamps, userId);
+          const conflictSummary = getSyncConflictSummary(strategy);
+
+          console.log('📊 동기화 전략:', strategy);
+          console.log('📊 충돌 요약:', conflictSummary);
+
+          if (conflictSummary.needsUserConfirmation) {
+            // ⚠️ 사용자 확인 필요
+            const message = generateConflictMessage(conflictSummary);
+            console.warn('⚠️ 동기화 충돌 감지:\n' + message);
+
+            const userChoice = window.confirm(
+              `${message}\n\n` +
+              '서버 데이터로 복원하시겠습니까?\n\n' +
+              '✅ 예 = 서버 데이터 사용 (안전)\n' +
+              '❌ 아니오 = 이 기기 데이터 유지 (주의: 서버 덮어쓰기)'
+            );
+
+            if (userChoice) {
+              // 서버 데이터 사용
+              console.log('✅ 사용자 선택: 서버 데이터 복원');
+              setMemos(data.memos || []);
+              setFolders(data.folders || []);
+              setTrash(data.trash || []);
+              setMacros(data.macros || []);
+              setCalendar(data.calendar || {});
+              setActivities(data.activities || []);
+              setSettings(data.settings || settings);
+
+              // 타임스탬프 업데이트
+              updateAllLocalSyncTimestamps(userId);
+            } else {
+              // 로컬 데이터 유지 (서버에 덮어쓰기)
+              console.log('⚠️ 사용자 선택: 로컬 데이터 유지 (서버 덮어쓰기)');
+              const localMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
+              const localFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
+              const localTrash = JSON.parse(localStorage.getItem('trashedItems_shared') || '[]');
+              const localMacros = JSON.parse(localStorage.getItem('macroTexts') || '[]');
+              const localCalendar = JSON.parse(localStorage.getItem('calendarSchedules_shared') || '{}');
+              const localActivities = JSON.parse(localStorage.getItem('recentActivities_shared') || '[]');
+
+              setMemos(localMemos);
+              setFolders(localFolders);
+              setTrash(localTrash);
+              setMacros(localMacros);
+              setCalendar(localCalendar);
+              setActivities(localActivities);
+
+              // 즉시 서버에 저장
+              await Promise.all([
+                saveMemosToFirestore(userId, localMemos),
+                saveFoldersToFirestore(userId, localFolders),
+                saveTrashToFirestore(userId, localTrash),
+                saveMacrosToFirestore(userId, localMacros),
+                saveCalendarToFirestore(userId, localCalendar),
+                saveActivitiesToFirestore(userId, localActivities)
+              ]);
+
+              // 타임스탬프 업데이트
+              updateAllLocalSyncTimestamps(userId);
+            }
+          } else {
+            // ✅ 충돌 없음 - 서버 데이터 사용
+            console.log('✅ 충돌 없음 - 서버 데이터 로드');
+            setMemos(data.memos || []);
+            setFolders(data.folders || []);
+            setTrash(data.trash || []);
+            setMacros(data.macros || []);
+            setCalendar(data.calendar || {});
+            setActivities(data.activities || []);
+            setSettings(data.settings || settings);
+
+            // 타임스탬프 업데이트
+            updateAllLocalSyncTimestamps(userId);
+          }
         }
 
 
@@ -192,43 +276,49 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
   const syncMemos = useCallback((newMemos) => {
     setMemos(newMemos);
     localStorage.setItem('memos_shared', JSON.stringify(newMemos));
+    setLocalSyncTimestamp(userId, 'memos');
     debouncedSave(saveMemosToFirestore, newMemos);
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 폴더 저장
   const syncFolders = useCallback((newFolders) => {
     setFolders(newFolders);
     localStorage.setItem('memoFolders', JSON.stringify(newFolders));
+    setLocalSyncTimestamp(userId, 'folders');
     debouncedSave(saveFoldersToFirestore, newFolders);
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 휴지통 저장
   const syncTrash = useCallback((newTrash) => {
     setTrash(newTrash);
     localStorage.setItem('trashedItems_shared', JSON.stringify(newTrash));
+    setLocalSyncTimestamp(userId, 'trash');
     debouncedSave(saveTrashToFirestore, newTrash);
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 매크로 저장
   const syncMacros = useCallback((newMacros) => {
     setMacros(newMacros);
     localStorage.setItem('macroTexts', JSON.stringify(newMacros));
+    setLocalSyncTimestamp(userId, 'macros');
     debouncedSave(saveMacrosToFirestore, newMacros);
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 캘린더 저장
   const syncCalendar = useCallback((newCalendar) => {
     setCalendar(newCalendar);
     localStorage.setItem('calendarSchedules_shared', JSON.stringify(newCalendar));
+    setLocalSyncTimestamp(userId, 'calendar');
     debouncedSave(saveCalendarToFirestore, newCalendar);
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 활동 저장
   const syncActivities = useCallback((newActivities) => {
     setActivities(newActivities);
     localStorage.setItem('recentActivities_shared', JSON.stringify(newActivities));
+    setLocalSyncTimestamp(userId, 'activities');
     debouncedSave(saveActivitiesToFirestore, newActivities);
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 설정 저장
   const syncSettings = useCallback((newSettings) => {
@@ -241,8 +331,9 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     if (newSettings.selectedAvatarId) localStorage.setItem('selectedAvatarId', newSettings.selectedAvatarId);
     if (newSettings.avatarBgColor) localStorage.setItem('avatarBgColor', newSettings.avatarBgColor);
 
+    setLocalSyncTimestamp(userId, 'settings');
     debouncedSave(saveSettingsToFirestore, newSettings);
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 즉시 저장 (디바운스 없이)
   const saveImmediately = useCallback(async () => {
@@ -258,6 +349,10 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
         saveActivitiesToFirestore(userId, activities),
         saveSettingsToFirestore(userId, settings)
       ]);
+
+      // 모든 타임스탬프 업데이트
+      updateAllLocalSyncTimestamps(userId);
+
       console.log('✅ 모든 데이터 즉시 저장 완료');
     } catch (err) {
       console.error('❌ 즉시 저장 실패:', err);

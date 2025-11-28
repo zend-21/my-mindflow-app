@@ -560,7 +560,24 @@ const SideMenu = ({
                                 </MenuItem>
                             </MenuGroup>
 
-                            {/* ☁️ 그룹 3: 동기화 - 제거됨 (자동 동기화로 대체) */}
+                            {/* ☁️ 그룹 3: 서버 복원 */}
+                            <MenuGroup>
+                                <MenuItem onClick={() => {
+                                    if (onRestoreFromDrive) {
+                                        const confirm = window.confirm(
+                                            '서버에 저장된 데이터로 복원하시겠습니까?\n\n' +
+                                            '현재 기기의 모든 데이터가 서버 데이터로 덮어씌워집니다.\n' +
+                                            '(이미 자동 동기화 중이지만, 수동으로 복원이 필요한 경우에만 사용하세요)'
+                                        );
+                                        if (confirm) {
+                                            onClose();
+                                            onRestoreFromDrive();
+                                        }
+                                    }
+                                }}>
+                                    <span className="icon">☁️</span> 서버에서 복원
+                                </MenuItem>
+                            </MenuGroup>
 
                             {/* ⚙️ 그룹 4: 설정/관리 */}
                             <MenuGroup>
