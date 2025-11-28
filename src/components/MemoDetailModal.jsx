@@ -1283,7 +1283,13 @@ const MemoDetailModal = ({
                             {/* 읽기 모드 컨텐츠 */}
                             <ReadModeContainer
                                 $isImportant={isImportant}
-                                onClick={handleDoubleTap}
+                                onDoubleClick={() => {
+                                    // 텍스트 선택이 발생한 경우 무시
+                                    if (window.getSelection && window.getSelection().toString().length > 0) {
+                                        return;
+                                    }
+                                    setIsEditMode(true);
+                                }}
                             >
                                 {editedContent}
                             </ReadModeContainer>
