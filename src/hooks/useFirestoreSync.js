@@ -618,6 +618,71 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     }
   }, [userId, enabled, memos, folders, trash, macros, calendar, activities, settings]);
 
+  // ========================================
+  // 🔄 하위 호환성 래퍼 함수 (기존 배열 기반 코드 지원)
+  // ========================================
+
+  // 메모 배열 동기화 (하위 호환)
+  const syncMemos = useCallback((newMemos) => {
+    setMemos(newMemos);
+    localStorage.setItem('memos_shared', JSON.stringify(newMemos));
+
+    // 각 메모를 개별 저장 (실시간 리스너가 자동으로 반영)
+    newMemos.forEach(memo => {
+      debouncedSave(saveMemoToFirestore, memo);
+    });
+  }, [debouncedSave]);
+
+  // 폴더 배열 동기화 (하위 호환)
+  const syncFolders = useCallback((newFolders) => {
+    setFolders(newFolders);
+    localStorage.setItem('memoFolders', JSON.stringify(newFolders));
+
+    newFolders.forEach(folder => {
+      debouncedSave(saveFolderToFirestore, folder);
+    });
+  }, [debouncedSave]);
+
+  // 휴지통 배열 동기화 (하위 호환)
+  const syncTrash = useCallback((newTrash) => {
+    setTrash(newTrash);
+    localStorage.setItem('trashedItems_shared', JSON.stringify(newTrash));
+
+    newTrash.forEach(item => {
+      debouncedSave(saveTrashItemToFirestore, item);
+    });
+  }, [debouncedSave]);
+
+  // 매크로 배열 동기화 (하위 호환)
+  const syncMacros = useCallback((newMacros) => {
+    setMacros(newMacros);
+    localStorage.setItem('macroTexts', JSON.stringify(newMacros));
+
+    newMacros.forEach(macro => {
+      debouncedSave(saveMacroToFirestore, macro);
+    });
+  }, [debouncedSave]);
+
+  // 캘린더 객체 동기화 (하위 호환)
+  const syncCalendar = useCallback((newCalendar) => {
+    setCalendar(newCalendar);
+    localStorage.setItem('calendarSchedules_shared', JSON.stringify(newCalendar));
+
+    Object.entries(newCalendar).forEach(([dateKey, schedule]) => {
+      debouncedSave(saveCalendarDateToFirestore, dateKey, schedule);
+    });
+  }, [debouncedSave]);
+
+  // 활동 배열 동기화 (하위 호환)
+  const syncActivities = useCallback((newActivities) => {
+    setActivities(newActivities);
+    localStorage.setItem('recentActivities_shared', JSON.stringify(newActivities));
+
+    newActivities.forEach(activity => {
+      debouncedSave(saveActivityToFirestore, activity);
+    });
+  }, [debouncedSave]);
+
   return {
     // 상태
     loading,
@@ -633,7 +698,16 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     activities,
     settings,
 
-    // 개별 항목 동기화 함수 (산업 표준 방식)
+    // 🔄 하위 호환 함수 (배열 기반 - 기존 코드 지원)
+    syncMemos,
+    syncFolders,
+    syncTrash,
+    syncMacros,
+    syncCalendar,
+    syncActivities,
+    syncSettings,
+
+    // 개별 항목 동기화 함수 (산업 표준 방식 - 권장)
     syncMemo,
     deleteMemo,
     syncFolder,
@@ -646,7 +720,6 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     deleteCalendarDate,
     syncActivity,
     deleteActivity,
-    syncSettings,
 
     // 즉시 저장
     saveImmediately
