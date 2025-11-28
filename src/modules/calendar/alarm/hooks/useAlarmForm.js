@@ -1,7 +1,9 @@
 // src/modules/calendar/alarm/hooks/useAlarmForm.js
 // 알람 등록 폼 상태 및 로직 관리
+// ✨ 미리 알림, 반복 간격, 반복 횟수 추가
 
 import { useState, useEffect } from 'react';
+import { ALARM_REPEAT_CONFIG, ADVANCE_NOTICE_CONFIG } from '../constants/alarmConstants';
 
 export const useAlarmForm = () => {
   // 기본 알람 정보
@@ -33,6 +35,11 @@ export const useAlarmForm = () => {
   const [showIndividualOptions, setShowIndividualOptions] = useState(false);
   const [showRepeatedAnniversaries, setShowRepeatedAnniversaries] = useState(false);
 
+  // ✨ 새로 추가: 미리 알림, 반복 간격, 반복 횟수
+  const [advanceNotice, setAdvanceNotice] = useState(ADVANCE_NOTICE_CONFIG.defaultValue); // 기본: 없음
+  const [repeatInterval, setRepeatInterval] = useState(ALARM_REPEAT_CONFIG.defaultInterval); // 기본: 1분
+  const [repeatCount, setRepeatCount] = useState(ALARM_REPEAT_CONFIG.defaultCount); // 기본: 3회
+
   // Update eventTime when hour or minute inputs change
   useEffect(() => {
     if (hourInput && minuteInput) {
@@ -59,6 +66,10 @@ export const useAlarmForm = () => {
     setHourInput('');
     setMinuteInput('');
     setShowIndividualOptions(false);
+    // ✨ 새 필드 초기화
+    setAdvanceNotice(ADVANCE_NOTICE_CONFIG.defaultValue);
+    setRepeatInterval(ALARM_REPEAT_CONFIG.defaultInterval);
+    setRepeatCount(ALARM_REPEAT_CONFIG.defaultCount);
   };
 
   // 기념일 관련 상태만 초기화
@@ -123,6 +134,14 @@ export const useAlarmForm = () => {
     setShowOptions,
     setShowIndividualOptions,
     setShowRepeatedAnniversaries,
+
+    // ✨ 새로 추가된 상태
+    advanceNotice,
+    repeatInterval,
+    repeatCount,
+    setAdvanceNotice,
+    setRepeatInterval,
+    setRepeatCount,
 
     // 유틸리티 함수
     resetForm,

@@ -20,6 +20,26 @@ const slideUp = keyframes`
     to { transform: translateY(0); opacity: 1; }
 `;
 
+const slideInFromLeft = keyframes`
+    from { transform: translateX(-100%); opacity: 0.5; }
+    to { transform: translateX(0); opacity: 1; }
+`;
+
+const slideInFromRight = keyframes`
+    from { transform: translateX(100%); opacity: 0.5; }
+    to { transform: translateX(0); opacity: 1; }
+`;
+
+const slideOutToLeft = keyframes`
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(-100%); opacity: 0.5; }
+`;
+
+const slideOutToRight = keyframes`
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0.5; }
+`;
+
 const Overlay = styled.div`
     position: fixed;
     top: 0;
@@ -42,12 +62,22 @@ const ModalContent = styled.div`
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
-    animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
     position: relative;
     width: 95vw;
     height: 97vh;
-    max-width: 800px;    
-    
+    max-width: 800px;
+
+    /* 스와이프 오프셋 적용 */
+    transform: translateX(${props => props.$swipeOffset || 0}px);
+    transition: ${props => props.$isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)'};
+
+    /* 슬라이드 애니메이션 */
+    animation: ${props => {
+        if (props.$slideDirection === 'left') return slideOutToLeft;
+        if (props.$slideDirection === 'right') return slideOutToRight;
+        return slideUp;
+    }} ${props => props.$slideDirection ? '0.25s' : '0.3s'} cubic-bezier(0.2, 0, 0, 1);
+
     /* 가로 모드일 때 padding-bottom을 줄여 공간 확보 */
     @media (orientation: landscape) {
         padding-bottom: 10px;
@@ -512,12 +542,30 @@ const FolderSelect = styled.select`
 /* --- 스타일 추가 완료 --- */
 
 
-const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, onUpdateMemoFolder, showToast }) => {
+const MemoDetailModal = ({
+    isOpen,
+    memo,
+    memos = [], // 전체 메모 목록 (스와이프 네비게이션용)
+    onSave,
+    onDelete,
+    onClose,
+    onCancel,
+    onUpdateMemoFolder,
+    showToast,
+    onNavigate, // 다른 메모로 이동 시 호출되는 콜백
+}) => {
     const [editedContent, setEditedContent] = useState('');
     const [isImportant, setIsImportant] = useState(false);
     const [history, setHistory] = useState([]);
     const [historyIndex, setHistoryIndex] = useState(0);
     const [selectedFolderId, setSelectedFolderId] = useState(null); // 폴더 선택
+
+    // 스와이프 상태
+    const [touchStart, setTouchStart] = useState(null);
+    const [touchEnd, setTouchEnd] = useState(null);
+    const [swipeOffset, setSwipeOffset] = useState(0);
+    const [isSwiping, setIsSwiping] = useState(false);
+    const [slideDirection, setSlideDirection] = useState(null); // 'left' | 'right' | null
 
     // 폴더 목록 가져오기
     const { folders } = useMemoFolders();
@@ -538,6 +586,7 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
 
     const [toastMessage, setToastMessage] = useState(null);
     const textareaRef = useRef(null);
+    const modalContentRef = useRef(null);
 
     useEffect(() => {
         if (isOpen && memo) {
@@ -646,6 +695,121 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
         closeConfirmModal();
     };
 
+    // 스와이프 네비게이션 로직
+    const getCurrentMemoIndex = () => {
+        if (!memo || memos.length === 0) return -1;
+        return memos.findIndex(m => m.id === memo.id);
+    };
+
+    const canNavigatePrev = () => {
+        const currentIndex = getCurrentMemoIndex();
+        return currentIndex > 0;
+    };
+
+    const canNavigateNext = () => {
+        const currentIndex = getCurrentMemoIndex();
+        return currentIndex < memos.length - 1 && currentIndex !== -1;
+    };
+
+    const navigateToPrevMemo = () => {
+        const currentIndex = getCurrentMemoIndex();
+        if (canNavigatePrev()) {
+            const prevMemo = memos[currentIndex - 1];
+            setSlideDirection('right'); // 오른쪽으로 슬라이드
+            setTimeout(() => {
+                onNavigate && onNavigate(prevMemo);
+                setSlideDirection(null);
+            }, 150);
+        }
+    };
+
+    const navigateToNextMemo = () => {
+        const currentIndex = getCurrentMemoIndex();
+        if (canNavigateNext()) {
+            const nextMemo = memos[currentIndex + 1];
+            setSlideDirection('left'); // 왼쪽으로 슬라이드
+            setTimeout(() => {
+                onNavigate && onNavigate(nextMemo);
+                setSlideDirection(null);
+            }, 150);
+        }
+    };
+
+    // 스와이프 이벤트 핸들러
+    const handleTouchStart = (e) => {
+        setTouchEnd(null);
+        setTouchStart(e.targetTouches[0].clientX);
+        // 초기에는 스와이프로 간주하지 않음 (탭일 수도 있으므로)
+        setIsSwiping(false);
+    };
+
+    const handleTouchMove = (e) => {
+        if (!touchStart) return;
+
+        const currentTouch = e.targetTouches[0].clientX;
+        const diff = currentTouch - touchStart;
+
+        // 좌우로 10px 이상 움직였을 때만 스와이프로 간주
+        if (Math.abs(diff) > 10) {
+            // 스와이프 시작 (입력 영역에서도 드래그하면 스와이프 모드)
+            if (!isSwiping) {
+                setIsSwiping(true);
+
+                // 입력 영역에서 스와이프 시작하면 포커스 해제
+                if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') {
+                    e.target.blur();
+                }
+            }
+
+            // 이전 메모가 없으면 오른쪽 스와이프 제한
+            if (diff > 0 && !canNavigatePrev()) {
+                setSwipeOffset(Math.min(diff * 0.2, 50)); // 최대 50px까지만
+            }
+            // 다음 메모가 없으면 왼쪽 스와이프 제한
+            else if (diff < 0 && !canNavigateNext()) {
+                setSwipeOffset(Math.max(diff * 0.2, -50)); // 최대 -50px까지만
+            }
+            // 정상적인 스와이프
+            else {
+                setSwipeOffset(diff);
+            }
+        }
+
+        setTouchEnd(currentTouch);
+    };
+
+    const handleTouchEnd = () => {
+        if (!touchStart) {
+            setIsSwiping(false);
+            setSwipeOffset(0);
+            return;
+        }
+
+        // 스와이프가 아니라 단순 탭이었다면 (10px 미만 이동)
+        if (!isSwiping || !touchEnd || Math.abs(touchStart - touchEnd) < 10) {
+            setIsSwiping(false);
+            setSwipeOffset(0);
+            setTouchStart(null);
+            setTouchEnd(null);
+            return;
+        }
+
+        const distance = touchStart - touchEnd;
+        const isLeftSwipe = distance > 50;
+        const isRightSwipe = distance < -50;
+
+        if (isLeftSwipe && canNavigateNext()) {
+            navigateToNextMemo();
+        } else if (isRightSwipe && canNavigatePrev()) {
+            navigateToPrevMemo();
+        }
+
+        setIsSwiping(false);
+        setSwipeOffset(0);
+        setTouchStart(null);
+        setTouchEnd(null);
+    };
+
     const handleImportantToggle = () => {
         const newImportance = !isImportant;
         setIsImportant(newImportance);
@@ -741,7 +905,16 @@ const MemoDetailModal = ({ isOpen, memo, onSave, onDelete, onClose, onCancel, on
       <Portal>
         <Fragment>
             <Overlay>
-                <ModalContent $isImportant={isImportant}>
+                <ModalContent
+                    ref={modalContentRef}
+                    $isImportant={isImportant}
+                    $swipeOffset={swipeOffset}
+                    $isSwiping={isSwiping}
+                    $slideDirection={slideDirection}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                >
                     
                     {/* 1. 새로운 상단 그리드 */}
                     <TopGridContainer>

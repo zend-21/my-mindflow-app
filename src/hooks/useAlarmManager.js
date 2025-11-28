@@ -1,20 +1,13 @@
 // src/hooks/useAlarmManager.js
+// ✨ 토스트 기반 알람 매니저 (미리 알림 + 정시 알림 모두 트리거)
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { format, addDays, addWeeks, addMonths, addYears, isSameMinute, startOfMinute } from 'date-fns';
+import { ALARM_REPEAT_CONFIG } from '../modules/calendar/alarm/constants/alarmConstants';
 
 const useAlarmManager = (schedules) => {
-  const [currentAlarm, setCurrentAlarm] = useState(null);
-  const [snoozedAlarms, setSnoozedAlarms] = useState(() => {
-    // localStorage에서 스누즈된 알람 복원
-    const saved = localStorage.getItem('snoozedAlarms');
-    return saved ? JSON.parse(saved) : {};
-  });
-
-  // 스누즈 정보를 localStorage에 저장
-  useEffect(() => {
-    localStorage.setItem('snoozedAlarms', JSON.stringify(snoozedAlarms));
-  }, [snoozedAlarms]);
+  const [toastAlarms, setToastAlarms] = useState([]); // 활성 토스트 알람 큐
+  const repeatTimersRef = useRef({}); // 반복 타이머 관리
 
   // 기념일 알람의 다음 발생 시간 계산
   const calculateNextAnniversaryTime = useCallback((alarm, baseDate) => {
@@ -80,6 +73,65 @@ const useAlarmManager = (schedules) => {
     return nextDate;
   }, []);
 
+  // 알람 트리거 (반복 포함)
+  const triggerAlarm = useCallback((alarm, scheduleData, isAdvance = false) => {
+    const repeatInterval = alarm.repeatInterval || ALARM_REPEAT_CONFIG.defaultInterval;
+    const repeatCount = alarm.repeatCount || ALARM_REPEAT_CONFIG.defaultCount;
+    const alarmId = `${alarm.id}_${isAdvance ? 'advance' : 'ontime'}_${Date.now()}`;
+
+    // 첫 번째 토스트 표시
+    const alarmData = {
+      id: alarmId,
+      title: isAdvance ? `[미리 알림] ${alarm.title}` : alarm.title,
+      content: alarm.content || scheduleData.text,
+      soundFile: alarm.soundFile,
+      volume: alarm.volume,
+      currentRepeat: 1,
+      totalRepeats: repeatCount
+    };
+
+    setToastAlarms(prev => [...prev, alarmData]);
+
+    // 반복 처리
+    if (repeatCount > 1) {
+      let currentRepeat = 1;
+      const timerId = setInterval(() => {
+        currentRepeat++;
+
+        if (currentRepeat <= repeatCount) {
+          // 다음 반복 토스트 표시
+          const nextAlarmData = {
+            ...alarmData,
+            id: `${alarmId}_${currentRepeat}`,
+            currentRepeat,
+          };
+          setToastAlarms(prev => [...prev, nextAlarmData]);
+        } else {
+          // 모든 반복 완료
+          clearInterval(timerId);
+          delete repeatTimersRef.current[alarmId];
+        }
+      }, repeatInterval * 1000);
+
+      repeatTimersRef.current[alarmId] = timerId;
+    }
+  }, []);
+
+  // 토스트 알람 닫기 (남은 반복 모두 취소)
+  const dismissToast = useCallback((alarmId) => {
+    // 해당 알람의 모든 반복 타이머 제거
+    const baseId = alarmId.split('_').slice(0, -1).join('_');
+    Object.keys(repeatTimersRef.current).forEach(timerId => {
+      if (timerId.startsWith(baseId)) {
+        clearInterval(repeatTimersRef.current[timerId]);
+        delete repeatTimersRef.current[timerId];
+      }
+    });
+
+    // 토스트 제거
+    setToastAlarms(prev => prev.filter(alarm => !alarm.id.startsWith(baseId)));
+  }, []);
+
   // 알람 체크 함수
   const checkAlarms = useCallback(() => {
     const now = startOfMinute(new Date());
@@ -92,55 +144,45 @@ const useAlarmManager = (schedules) => {
         // enabled가 false면 무시
         if (!alarm.enabled) return;
 
-        // 스누즈된 알람 확인
-        const snoozeInfo = snoozedAlarms[alarm.id];
-        if (snoozeInfo) {
-          const snoozeTime = new Date(snoozeInfo.snoozeUntil);
-          if (isSameMinute(now, snoozeTime)) {
-            // 스누즈 시간 도달 - 알람 트리거
-            setCurrentAlarm({
-              ...alarm,
-              scheduleData: {
-                date: schedule.date || snoozeInfo.originalDate,
-                text: alarm.title
-              },
-              snoozeCount: snoozeInfo.count || 0
-            });
-            // 스누즈 정보 삭제
-            setSnoozedAlarms((prev) => {
-              const updated = { ...prev };
-              delete updated[alarm.id];
-              return updated;
-            });
-          }
-          return; // 스누즈 중이면 일반 체크는 건너뛰기
-        }
+        let onTimeAlarm;
 
-        // 일반 알람 시간 체크
-        let alarmTime;
-
+        // 정시 알람 시간 계산
         if (alarm.isAnniversary) {
           // 기념일 알람 - 다음 발생 시간 계산
-          alarmTime = calculateNextAnniversaryTime(alarm);
+          onTimeAlarm = calculateNextAnniversaryTime(alarm);
         } else {
           // 일반 알람 - calculatedTime 사용
-          alarmTime = new Date(alarm.calculatedTime);
+          onTimeAlarm = new Date(alarm.calculatedTime);
         }
 
-        if (alarmTime && isSameMinute(now, alarmTime)) {
-          // 알람 시간 도달 - 트리거
-          setCurrentAlarm({
-            ...alarm,
-            scheduleData: {
-              date: schedule.date || alarmTime,
+        if (!onTimeAlarm) return;
+
+        // 미리 알림 체크 (advanceNotice가 설정된 경우)
+        const advanceNotice = alarm.advanceNotice || 0;
+        if (advanceNotice > 0) {
+          const advanceTime = new Date(onTimeAlarm);
+          advanceTime.setMinutes(advanceTime.getMinutes() - advanceNotice);
+
+          if (isSameMinute(now, advanceTime)) {
+            // 미리 알림 트리거
+            triggerAlarm(alarm, {
+              date: schedule.date || onTimeAlarm,
               text: alarm.title
-            },
-            snoozeCount: 0
-          });
+            }, true);
+          }
+        }
+
+        // 정시 알람 체크
+        if (isSameMinute(now, onTimeAlarm)) {
+          // 정시 알람 트리거
+          triggerAlarm(alarm, {
+            date: schedule.date || onTimeAlarm,
+            text: alarm.title
+          }, false);
         }
       });
     });
-  }, [schedules, snoozedAlarms, calculateNextAnniversaryTime]);
+  }, [schedules, calculateNextAnniversaryTime, triggerAlarm]);
 
   // 매 분마다 알람 체크
   useEffect(() => {
@@ -163,43 +205,16 @@ const useAlarmManager = (schedules) => {
       return () => clearInterval(interval);
     }, msUntilNextMinute);
 
-    return () => clearTimeout(initialTimer);
+    return () => {
+      clearTimeout(initialTimer);
+      // 모든 반복 타이머 정리
+      Object.values(repeatTimersRef.current).forEach(timerId => clearInterval(timerId));
+    };
   }, [checkAlarms]);
 
-  // 알람 닫기
-  const dismissAlarm = useCallback((onAlarmDismissed) => {
-    if (currentAlarm && !currentAlarm.isAnniversary) {
-      // 일반 알람(기념일 아님)은 비활성화 처리
-      if (onAlarmDismissed) {
-        onAlarmDismissed(currentAlarm);
-      }
-    }
-    setCurrentAlarm(null);
-  }, [currentAlarm]);
-
-  // 스누즈 처리
-  const snoozeAlarm = useCallback((minutes) => {
-    if (!currentAlarm) return;
-
-    const snoozeUntil = new Date();
-    snoozeUntil.setMinutes(snoozeUntil.getMinutes() + minutes);
-
-    setSnoozedAlarms((prev) => ({
-      ...prev,
-      [currentAlarm.id]: {
-        snoozeUntil: snoozeUntil.toISOString(),
-        count: (currentAlarm.snoozeCount || 0) + 1,
-        originalDate: currentAlarm.scheduleData.date
-      }
-    }));
-
-    setCurrentAlarm(null);
-  }, [currentAlarm]);
-
   return {
-    currentAlarm,
-    dismissAlarm,
-    snoozeAlarm
+    toastAlarms,
+    dismissToast
   };
 };
 

@@ -1,6 +1,7 @@
 // src/utils/fortuneLogic.js
 
 // 🌟 사주팔자 기반 운세 계산 로직
+// ✨ 개선: 오행 상생상극, 월령, 24절기 반영
 
 import { getTarotData, getHoroscopeData, getLuckyElementsData } from './fortuneData';
 import { getRandomFortune, getCombinedFortune } from './fortuneSelector';
@@ -131,6 +132,203 @@ const getStemElement = (stem) => {
         '계': 'Water'  // 癸 - 음수
     };
     return elementMap[stem] || 'Wood';
+};
+
+/**
+ * 지지로부터 오행 계산
+ * @param {string} branch - 지지 (자, 축, 인, 묘, 진, 사, 오, 미, 신, 유, 술, 해)
+ * @returns {string} 오행 (Wood, Fire, Earth, Metal, Water)
+ */
+const getBranchElement = (branch) => {
+    const elementMap = {
+        '인': 'Wood', '묘': 'Wood',  // 寅卯 - 목
+        '사': 'Fire', '오': 'Fire',  // 巳午 - 화
+        '신': 'Metal', '유': 'Metal', // 申酉 - 금
+        '해': 'Water', '자': 'Water', // 亥子 - 수
+        '진': 'Earth', '술': 'Earth', '축': 'Earth', '미': 'Earth' // 辰戌丑未 - 토
+    };
+    return elementMap[branch] || 'Earth';
+};
+
+/**
+ * ✨ 오행 상생상극(相生相剋) 계산
+ * 상생(相生): 木生火, 火生土, 土生金, 金生水, 水生木
+ * 상극(相剋): 木剋土, 土剋水, 水剋火, 火剋金, 金剋木
+ *
+ * @param {string} userElement - 사용자 오행
+ * @param {string} todayElement - 오늘의 오행
+ * @returns {number} 상호작용 점수 (-20 ~ +20)
+ */
+const calculateElementInteraction = (userElement, todayElement) => {
+    // 상생 관계 (생해주는 관계: +15)
+    const generating = {
+        'Wood': 'Fire',   // 木生火
+        'Fire': 'Earth',  // 火生土
+        'Earth': 'Metal', // 土生金
+        'Metal': 'Water', // 金生水
+        'Water': 'Wood'   // 水生木
+    };
+
+    // 상극 관계 (극하는 관계: -15)
+    const controlling = {
+        'Wood': 'Earth',  // 木剋土
+        'Earth': 'Water', // 土剋水
+        'Water': 'Fire',  // 水剋火
+        'Fire': 'Metal',  // 火剋金
+        'Metal': 'Wood'   // 金剋木
+    };
+
+    // 같은 오행 (비화: +10)
+    if (userElement === todayElement) {
+        return 10;
+    }
+
+    // 내가 상대를 생해주는 경우 (설기: +15)
+    if (generating[userElement] === todayElement) {
+        return 15;
+    }
+
+    // 상대가 나를 생해주는 경우 (인수: +20) - 가장 좋음
+    if (generating[todayElement] === userElement) {
+        return 20;
+    }
+
+    // 내가 상대를 극하는 경우 (재성: +5) - 약간 좋음
+    if (controlling[userElement] === todayElement) {
+        return 5;
+    }
+
+    // 상대가 나를 극하는 경우 (관살: -15) - 좋지 않음
+    if (controlling[todayElement] === userElement) {
+        return -15;
+    }
+
+    // 그 외 (간접 관계: 0)
+    return 0;
+};
+
+/**
+ * ✨ 24절기 계산
+ * @param {Date} date - 날짜
+ * @returns {Object} { name: string, index: number, seasonEnergy: number }
+ */
+const calculateSolarTerm = (date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+
+    // 24절기 (간략화된 고정 날짜 - 실제로는 매년 1-2일씩 차이남)
+    const solarTerms = [
+        { name: '소한', month: 1, day: 6, season: 'Winter', energy: 2 },
+        { name: '대한', month: 1, day: 20, season: 'Winter', energy: 1 },
+        { name: '입춘', month: 2, day: 4, season: 'Spring', energy: 10 },
+        { name: '우수', month: 2, day: 19, season: 'Spring', energy: 11 },
+        { name: '경칩', month: 3, day: 6, season: 'Spring', energy: 12 },
+        { name: '춘분', month: 3, day: 21, season: 'Spring', energy: 13 },
+        { name: '청명', month: 4, day: 5, season: 'Spring', energy: 14 },
+        { name: '곡우', month: 4, day: 20, season: 'Spring', energy: 15 },
+        { name: '입하', month: 5, day: 6, season: 'Summer', energy: 20 },
+        { name: '소만', month: 5, day: 21, season: 'Summer', energy: 21 },
+        { name: '망종', month: 6, day: 6, season: 'Summer', energy: 22 },
+        { name: '하지', month: 6, day: 21, season: 'Summer', energy: 23 },
+        { name: '소서', month: 7, day: 7, season: 'Summer', energy: 24 },
+        { name: '대서', month: 7, day: 23, season: 'Summer', energy: 25 },
+        { name: '입추', month: 8, day: 8, season: 'Autumn', energy: 30 },
+        { name: '처서', month: 8, day: 23, season: 'Autumn', energy: 31 },
+        { name: '백로', month: 9, day: 8, season: 'Autumn', energy: 32 },
+        { name: '추분', month: 9, day: 23, season: 'Autumn', energy: 33 },
+        { name: '한로', month: 10, day: 8, season: 'Autumn', energy: 34 },
+        { name: '상강', month: 10, day: 23, season: 'Autumn', energy: 35 },
+        { name: '입동', month: 11, day: 8, season: 'Winter', energy: 40 },
+        { name: '소설', month: 11, day: 22, season: 'Winter', energy: 41 },
+        { name: '대설', month: 12, day: 7, season: 'Winter', energy: 42 },
+        { name: '동지', month: 12, day: 22, season: 'Winter', energy: 43 }
+    ];
+
+    // 현재 날짜에 가장 가까운 이전 절기 찾기
+    let currentTerm = solarTerms[0];
+    for (let i = 0; i < solarTerms.length; i++) {
+        const term = solarTerms[i];
+        if (month > term.month || (month === term.month && day >= term.day)) {
+            currentTerm = term;
+        } else {
+            break;
+        }
+    }
+
+    return {
+        name: currentTerm.name,
+        index: solarTerms.indexOf(currentTerm),
+        season: currentTerm.season,
+        energy: currentTerm.energy
+    };
+};
+
+/**
+ * ✨ 월령(月令) 오행 계산
+ * 월령은 사주에서 매우 중요한 요소로, 계절의 기운을 나타냄
+ * @param {number} month - 월 (1-12)
+ * @returns {string} 월령 오행
+ */
+const getMonthElement = (month) => {
+    // 음력 기준이지만 양력으로 간략화
+    const monthElements = {
+        1: 'Water',  // 인월(寅月) - 입춘 이후, 목의 시작이지만 수 기운 잔존
+        2: 'Wood',   // 묘월(卯月) - 춘분 전후, 목 왕성
+        3: 'Wood',   // 진월(辰月) - 청명 전후, 목에서 토로 전환
+        4: 'Wood',   // 사월(巳月) - 입하 전후, 목에서 화로 전환
+        5: 'Fire',   // 오월(午月) - 하지 전후, 화 왕성
+        6: 'Fire',   // 미월(未月) - 소서 전후, 화에서 토로 전환
+        7: 'Fire',   // 신월(申月) - 입추 전후, 화에서 금으로 전환
+        8: 'Metal',  // 유월(酉月) - 추분 전후, 금 왕성
+        9: 'Metal',  // 술월(戌月) - 한로 전후, 금에서 토로 전환
+        10: 'Metal', // 해월(亥月) - 입동 전후, 금에서 수로 전환
+        11: 'Water', // 자월(子月) - 동지 전후, 수 왕성
+        12: 'Water'  // 축월(丑月) - 대한 전후, 수에서 토로 전환
+    };
+    return monthElements[month] || 'Earth';
+};
+
+/**
+ * ✨ 간이 천체력 계산 (별자리 운세용)
+ * 실제 천체 위치는 아니지만 근사치로 변화를 줌
+ * @param {Date} date - 날짜
+ * @returns {Object} { sunPosition, moonPhase, planetaryEnergy }
+ */
+const calculatePlanetaryInfluence = (date) => {
+    const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000);
+
+    // 태양의 황도 위치 (0-360도)
+    const sunPosition = (dayOfYear * 360 / 365) % 360;
+
+    // 달의 위상 (0-1, 0=신월, 0.5=보름)
+    const moonPhase = (dayOfYear % 29.5) / 29.5;
+
+    // 수성 역행 근사 (실제로는 1년에 3-4번, 여기서는 간략화)
+    const mercuryRetrograde = Math.sin(dayOfYear * Math.PI / 88) < -0.8 ? 1 : 0;
+
+    // 목성의 길조 (1년 주기의 특정 시기)
+    const jupiterBlessing = Math.cos(dayOfYear * Math.PI * 2 / 365) > 0.7 ? 1 : 0;
+
+    // 토성의 시련 (1년 주기의 특정 시기)
+    const saturnChallenge = Math.sin(dayOfYear * Math.PI * 2 / 365) < -0.7 ? 1 : 0;
+
+    // 종합 행성 에너지 (-10 ~ +10)
+    const planetaryEnergy = Math.floor(
+        (moonPhase - 0.5) * 10 +  // 달: 보름달(+5) ~ 그믐달(-5)
+        jupiterBlessing * 5 -      // 목성 길조 +5
+        saturnChallenge * 5 -      // 토성 시련 -5
+        mercuryRetrograde * 3      // 수성 역행 -3
+    );
+
+    return {
+        sunPosition,
+        moonPhase,
+        planetaryEnergy,
+        mercuryRetrograde: mercuryRetrograde === 1,
+        jupiterBlessing: jupiterBlessing === 1,
+        saturnChallenge: saturnChallenge === 1
+    };
 };
 
 /**
@@ -341,21 +539,28 @@ const calculateTimeEnergy = (date) => {
 };
 
 /**
- * 정/역방향 결정
+ * ✨ 개선된 정/역방향 결정 (더 고른 분포)
  * @param {Object} userData - 사용자 정보
  * @param {Date} date - 현재 시각
  * @returns {boolean} true면 역방향
  */
 const calculateReversed = (userData, date) => {
-    const { birthDay } = userData;
+    const { birthYear, birthMonth, birthDay } = userData;
     const currentDay = date.getDate();
     const hour = date.getHours();
+    const minute = date.getMinutes();
 
-    // 복합 요소로 정/역 결정
-    const reverseScore = (birthDay * 3 + currentDay * 2 + hour) % 10;
+    // 사용자 고유 시드 (생년월일 전체 사용)
+    const userSeed = birthYear * 10000 + birthMonth * 100 + birthDay;
 
-    // 40% 확률로 역방향 (실제 타로 통계)
-    return reverseScore < 4;
+    // 시간 시드 (시간 + 분으로 더 세밀하게)
+    const timeSeed = hour * 60 + minute;
+
+    // 복잡한 해시로 고른 분포 생성
+    const reversedHash = (userSeed * 17 + currentDay * 23 + timeSeed * 7 + hour * 11) % 100;
+
+    // 40% 확률로 역방향 (실제 타로 통계 반영)
+    return reversedHash < 40;
 };
 
 /**
@@ -464,7 +669,7 @@ const selectLuckyElement = (userData, luckyData) => {
 };
 
 /**
- * 별자리 운세 선택 (신문 스타일: 날짜 기반)
+ * ✨ 개선된 별자리 운세 선택 (천체력 반영)
  * @param {string} zodiacSign - 별자리 이름
  * @param {Date} date - 날짜
  * @returns {Promise<Object>} { keyword: string, content: string }
@@ -503,10 +708,18 @@ const selectHoroscopeFortune = async (zodiacSign, date) => {
         };
     }
 
-    // 오늘 날짜로 인덱스 결정 (같은 날은 같은 운세, 200개 순환)
+    // ✨ 천체력 반영
     const dayOfYear = Math.floor((date - new Date(date.getFullYear(), 0, 0)) / 86400000);
-    const index = dayOfYear % zodiacFortunes.length;
-    const selectedFortune = zodiacFortunes[index];
+    const planetary = calculatePlanetaryInfluence(date);
+
+    // 태양 위치와 달의 위상을 반영하여 인덱스 계산
+    const sunInfluence = Math.floor(planetary.sunPosition / 10); // 0-36
+    const moonInfluence = Math.floor(planetary.moonPhase * 10);  // 0-10
+    const energyInfluence = Math.abs(planetary.planetaryEnergy); // 0-10
+
+    // 복합적인 인덱스 계산 (천체 운행을 고려)
+    const complexIndex = (dayOfYear + sunInfluence + moonInfluence + energyInfluence) % zodiacFortunes.length;
+    const selectedFortune = zodiacFortunes[complexIndex];
 
     return {
         keyword: selectedFortune.Keyword || '운세',
@@ -568,33 +781,83 @@ const mapScoreToKeyword = (score, category) => {
 };
 
 /**
- * 사주 계산 결과로 점수 산출 (0~100)
+ * ✨ 개선된 사주 점수 계산 (0~100)
+ * 오행 상생상극, 월령, 절기를 모두 반영
+ *
  * @param {string} userDayStem - 사용자 일간
- * @param {Object} todayPillar - 오늘 일진
+ * @param {Object} todayPillar - 오늘 일진 { stem, branch, index }
  * @param {number} categoryIndex - 카테고리 인덱스 (각 카테고리마다 다른 점수)
  * @returns {number} 0~100 점수
  */
 const calculateCategoryScore = (userDayStem, todayPillar, categoryIndex) => {
-    const userStemIndex = HEAVENLY_STEMS.indexOf(userDayStem);
     const today = new Date();
+    const userStemIndex = HEAVENLY_STEMS.indexOf(userDayStem);
 
-    // 날짜를 시드로 사용하여 매일 다른 점수
+    // 1️⃣ 오행 상생상극 점수 (-20 ~ +20)
+    const userElement = getStemElement(userDayStem);
+    const todayElement = getStemElement(todayPillar.stem);
+    const todayBranchElement = getBranchElement(todayPillar.branch);
+
+    // 천간 오행 상호작용 (가중치 60%)
+    const stemInteraction = calculateElementInteraction(userElement, todayElement);
+    // 지지 오행 상호작용 (가중치 40%)
+    const branchInteraction = calculateElementInteraction(userElement, todayBranchElement);
+
+    const elementScore = stemInteraction * 0.6 + branchInteraction * 0.4; // -20 ~ +20
+
+    // 2️⃣ 월령(계절) 보너스 (-10 ~ +10)
+    const monthElement = getMonthElement(today.getMonth() + 1);
+    const monthBonus = calculateElementInteraction(userElement, monthElement) * 0.5; // -10 ~ +10
+
+    // 3️⃣ 절기 에너지 (0 ~ 43)
+    const solarTerm = calculateSolarTerm(today);
+    const termEnergy = solarTerm.energy; // 0 ~ 43
+
+    // 4️⃣ 날짜 기반 변동성 (매일 다른 결과 보장)
     const dateSeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
 
-    // 여러 요소를 조합하여 더 다양한 점수 생성
-    const factor1 = (userStemIndex * 13 + todayPillar.index * 17) % 101;
-    const factor2 = (dateSeed * 7 + categoryIndex * 23) % 101;
-    const factor3 = (userStemIndex + todayPillar.index + categoryIndex) % 101;
+    // 복잡한 해시 함수로 날짜별 변화 생성
+    const complexHash = ((dateSeed * 31 + userStemIndex * 97 + todayPillar.index * 67 + categoryIndex * 43) ^ termEnergy) >>> 0;
+    const dailyVariation = (complexHash % 41) - 20; // -20 ~ +20
 
-    // 세 가지 요소를 가중평균 (더 넓은 분포)
-    const baseScore = Math.floor((factor1 * 0.4 + factor2 * 0.35 + factor3 * 0.25));
+    // 5️⃣ 카테고리별 가중치 조정
+    const categoryWeights = {
+        0: { element: 1.0, month: 0.8, term: 0.5, daily: 1.0 },  // Main
+        1: { element: 0.9, month: 0.6, term: 0.4, daily: 1.1 },  // Money
+        2: { element: 1.1, month: 0.7, term: 0.6, daily: 0.9 },  // Health
+        3: { element: 1.0, month: 0.9, term: 0.7, daily: 1.0 },  // Love
+        4: { element: 0.8, month: 0.5, term: 0.3, daily: 0.8 }   // Advice
+    };
 
-    // 0~100 범위 보장
-    return Math.max(0, Math.min(100, baseScore));
+    const weights = categoryWeights[categoryIndex] || categoryWeights[0];
+
+    // 6️⃣ 최종 점수 계산 (0 ~ 100)
+    const rawScore = 50 + // 기본 50점
+        elementScore * weights.element +     // 오행 상생상극: -20 ~ +20
+        monthBonus * weights.month +         // 월령 보너스: -10 ~ +10
+        termEnergy * weights.term +          // 절기 에너지: 0 ~ 43
+        dailyVariation * weights.daily;      // 일일 변동: -20 ~ +20
+
+    // 0~100 범위로 클램핑
+    const finalScore = Math.max(0, Math.min(100, Math.floor(rawScore)));
+
+    // 디버깅용 로그 (개발 시에만 출력)
+    if (typeof console !== 'undefined' && false) { // false로 설정하여 운영 시 비활성화
+        console.log(`[점수 계산] 카테고리 ${categoryIndex}:`, {
+            오행점수: elementScore.toFixed(1),
+            월령보너스: monthBonus.toFixed(1),
+            절기: solarTerm.name,
+            절기에너지: termEnergy,
+            일일변동: dailyVariation,
+            최종점수: finalScore
+        });
+    }
+
+    return finalScore;
 };
 
 /**
- * 오행 기반 행운 요소 선택
+ * ✨ 개선된 오행 기반 행운 요소 선택 (절기 반영)
  * @param {string} dayStem - 일간 (천간)
  * @param {Date} today - 오늘 날짜
  * @param {Object} todayPillar - 오늘의 일진 { stem, branch, index }
@@ -615,17 +878,21 @@ const selectLuckyElements = async (dayStem, today, todayPillar, userData) => {
             };
         }
 
-        // ✨ 개선: 사용자 일간 + 오늘 일진의 오행을 조합
+        // ✨ 개선: 사용자 일간 + 오늘 일진 + 절기의 오행을 조합
         const userElement = getStemElement(dayStem);
         const todayElement = getStemElement(todayPillar.stem);
+        const solarTerm = calculateSolarTerm(today);
 
         // 오행 배열
         const elements = ['Wood', 'Fire', 'Earth', 'Metal', 'Water'];
         const userElementIndex = elements.indexOf(userElement);
         const todayElementIndex = elements.indexOf(todayElement);
 
-        // 두 오행의 조합으로 최종 오행 결정 (날짜마다 달라짐)
-        const combinedElementIndex = (userElementIndex + todayElementIndex) % elements.length;
+        // ✨ 절기 에너지를 오행 선택에 반영
+        const termBonus = solarTerm.index % 5; // 0-4, 24절기를 5개 오행에 매핑
+
+        // 세 요소의 조합으로 최종 오행 결정 (절기 추가로 더욱 다양해짐)
+        const combinedElementIndex = (userElementIndex + todayElementIndex + termBonus) % elements.length;
         const finalElement = elements[combinedElementIndex];
 
         const elementData = luckyElementsData[finalElement];
@@ -641,14 +908,15 @@ const selectLuckyElements = async (dayStem, today, todayPillar, userData) => {
             };
         }
 
-        // ✨ 시드 생성: 오늘 일진 index 추가하여 매일 다른 결과
+        // ✨ 시드 생성: 절기 index도 추가하여 더욱 다양한 결과
         const dateString = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}`;
         const birthString = `${userData.birthYear}-${userData.birthMonth}-${userData.birthDay}`;
         const birthTimeString = (userData.birthHour !== undefined && userData.birthMinute !== undefined)
             ? `-${userData.birthHour}-${userData.birthMinute}`
             : '';
-        const todayPillarString = `-${todayPillar.index}`; // 오늘 일진 추가
-        const combinedString = dateString + birthString + birthTimeString + todayPillarString;
+        const todayPillarString = `-${todayPillar.index}`; // 오늘 일진
+        const termString = `-${solarTerm.index}`; // 절기 추가
+        const combinedString = dateString + birthString + birthTimeString + todayPillarString + termString;
         const seed = combinedString.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
 
         const random = (max, offset = 0) => {

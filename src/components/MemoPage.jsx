@@ -2324,11 +2324,11 @@ const MemoPage = ({
 
                         <FolderInput
                             type="text"
-                            placeholder="폴더 이름을 입력하세요 (최대 9자)"
+                            placeholder="폴더 이름을 입력하세요 (최대 8자)"
                             value={folderName}
                             onChange={(e) => setFolderName(e.target.value)}
                             autoFocus
-                            maxLength={9}
+                            maxLength={8}
                         />
 
                         <IconPickerContainer>

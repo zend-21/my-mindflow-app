@@ -37,7 +37,7 @@ import ConfirmModal from './components/ConfirmModal.jsx';
 import Calendar from './modules/calendar/Calendar.jsx';
 import CalendarEditorModal from './modules/calendar/CalendarEditorModal.jsx';
 import AlarmModal from './modules/calendar/AlarmModal.jsx';
-import AlarmNotification from './modules/calendar/AlarmNotification.jsx';
+import AlarmToast from './modules/calendar/AlarmToast.jsx';
 import DateSelectorModal from './modules/calendar/DateSelectorModal.jsx';
 import LoginModal from './components/LoginModal.jsx';
 import FortuneFlow from './components/FortuneFlow.jsx';
@@ -855,100 +855,7 @@ function App() {
     const [isDateSelectorOpen, setIsDateSelectorOpen] = useState(false);
 
     // 알람 매니저 훅 사용
-    const { currentAlarm, dismissAlarm, snoozeAlarm } = useAlarmManager(calendarSchedules);
-
-    // 알람 비활성화 처리 (일반 알람이 울린 후)
-    const handleAlarmDismissed = (alarm) => {
-        const updatedSchedules = { ...calendarSchedules };
-
-        // 알람이 속한 스케줄 찾기
-        Object.keys(updatedSchedules).forEach(dateKey => {
-            const schedule = updatedSchedules[dateKey];
-            if (schedule.alarm && schedule.alarm.registeredAlarms) {
-                const alarmIndex = schedule.alarm.registeredAlarms.findIndex(a => a.id === alarm.id);
-                if (alarmIndex !== -1) {
-                    // 알람 비활성화 및 비활성화 시간 기록
-                    updatedSchedules[dateKey] = {
-                        ...schedule,
-                        alarm: {
-                            ...schedule.alarm,
-                            registeredAlarms: schedule.alarm.registeredAlarms.map((a, idx) =>
-                                idx === alarmIndex
-                                    ? { ...a, enabled: false, disabledAt: Date.now() }
-                                    : a
-                            )
-                        }
-                    };
-                    console.log(`🔕 알람 비활성화: ${alarm.title || alarm.id}`);
-                }
-            }
-        });
-
-        syncCalendar(updatedSchedules);
-    };
-
-    // 비활성화된 알람 자동 삭제 (7일 후)
-    useEffect(() => {
-        const AUTO_DELETE_DAYS = 7;
-
-        const deleteExpiredAlarms = () => {
-            const now = Date.now();
-            let deletedCount = 0;
-
-            const updatedSchedules = { ...calendarSchedules };
-
-            Object.keys(updatedSchedules).forEach(dateKey => {
-                const schedule = updatedSchedules[dateKey];
-                if (schedule.alarm && schedule.alarm.registeredAlarms) {
-                    const beforeCount = schedule.alarm.registeredAlarms.length;
-
-                    // 기념일이 아니고 비활성화된 지 7일이 지난 알람 삭제
-                    const filteredAlarms = schedule.alarm.registeredAlarms.filter(alarm => {
-                        if (alarm.isAnniversary) return true; // 기념일 알람은 유지
-                        if (alarm.enabled !== false) return true; // 활성 알람은 유지
-                        if (!alarm.disabledAt) return true; // 비활성화 시간이 없으면 유지
-
-                        const daysSinceDisabled = (now - alarm.disabledAt) / (1000 * 60 * 60 * 24);
-                        return daysSinceDisabled < AUTO_DELETE_DAYS;
-                    });
-
-                    if (filteredAlarms.length < beforeCount) {
-                        deletedCount += (beforeCount - filteredAlarms.length);
-                        updatedSchedules[dateKey] = {
-                            ...schedule,
-                            alarm: {
-                                ...schedule.alarm,
-                                registeredAlarms: filteredAlarms
-                            }
-                        };
-                    }
-                }
-            });
-
-            if (deletedCount > 0) {
-                console.log(`🗑️ 자동 삭제: ${deletedCount}개의 만료된 알람 삭제됨`);
-                syncCalendar(updatedSchedules);
-            }
-        };
-
-        // 앱 시작 시 즉시 실행
-        deleteExpiredAlarms();
-
-        // 매일 자정에 실행
-        const now = new Date();
-        const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-        const msUntilMidnight = tomorrow - now;
-
-        const midnightTimer = setTimeout(() => {
-            deleteExpiredAlarms();
-
-            // 이후 24시간마다 실행
-            const dailyInterval = setInterval(deleteExpiredAlarms, 24 * 60 * 60 * 1000);
-            return () => clearInterval(dailyInterval);
-        }, msUntilMidnight);
-
-        return () => clearTimeout(midnightTimer);
-    }, []);
+    const { toastAlarms, dismissToast } = useAlarmManager(calendarSchedules);
 
     // 앱 시작 시 일정 데이터 정리 (text가 없으면 createdAt/updatedAt 제거)
     useEffect(() => {
@@ -3015,10 +2922,12 @@ function App() {
             <MemoDetailModal
                 isOpen={isDetailModalOpen}
                 memo={selectedMemo}
+                memos={memos}
                 onSave={handleEditMemo}
                 onCancel={() => setIsDetailModalOpen(false)}
                 onUpdateMemoFolder={handleUpdateMemoFolder}
                 showToast={showToast}
+                onNavigate={(nextMemo) => setSelectedMemo(nextMemo)}
             />
             
             {isDeleteModalOpen && (
@@ -3110,17 +3019,15 @@ function App() {
                 reason="본인 확인을 위해 휴대폰 인증이 필요합니다"
             />
 
-            {/* ⏰ 알람 알림 */}
-            {currentAlarm && (
-                <AlarmNotification
+            {/* ⏰ 알람 토스트 알림 */}
+            {toastAlarms.map((alarm) => (
+                <AlarmToast
+                    key={alarm.id}
                     isVisible={true}
-                    scheduleData={currentAlarm.scheduleData}
-                    onDismiss={() => dismissAlarm(handleAlarmDismissed)}
-                    onSnooze={snoozeAlarm}
-                    currentSnoozeCount={currentAlarm.snoozeCount || 0}
-                    maxSnoozeCount={3}
+                    alarmData={alarm}
+                    onClose={() => dismissToast(alarm.id)}
                 />
-            )}
+            ))}
 
             </AppContent>
         </TrashProvider>

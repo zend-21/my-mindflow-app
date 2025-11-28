@@ -1,9 +1,10 @@
 // src/modules/calendar/alarm/components/AlarmOptionsSection.jsx
 // 기본 알람 옵션 섹션 (접을 수 있음)
+// ✨ 미리 알림, 반복 간격, 반복 횟수 추가
 
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { ALARM_COLORS } from '../';
+import { ALARM_COLORS, ALARM_REPEAT_CONFIG, ADVANCE_NOTICE_CONFIG } from '../';
 
 const Section = styled.div`
   background: white;
@@ -185,6 +186,13 @@ export const AlarmOptionsSection = ({
   onVolumeChange,
   notificationType,
   onNotificationTypeChange,
+  // ✨ 새로 추가된 props
+  advanceNotice = 0,
+  onAdvanceNoticeChange,
+  repeatInterval = 60,
+  onRepeatIntervalChange,
+  repeatCount = 3,
+  onRepeatCountChange,
   onResetDefaults,
 }) => {
   const [collapsed, setCollapsed] = useState(true);
@@ -275,6 +283,57 @@ export const AlarmOptionsSection = ({
               />
               소리+진동
             </RadioLabel>
+          </RadioGroup>
+        </OptionRow>
+
+        {/* ✨ 미리 알림 */}
+        <OptionRow>
+          <OptionLabel>미리 알림</OptionLabel>
+          <Select
+            value={advanceNotice}
+            onChange={(e) => onAdvanceNoticeChange && onAdvanceNoticeChange(parseInt(e.target.value, 10))}
+          >
+            {Object.entries(ADVANCE_NOTICE_CONFIG.options).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </Select>
+        </OptionRow>
+
+        {/* ✨ 반복 간격 */}
+        <OptionRow>
+          <OptionLabel>반복 간격</OptionLabel>
+          <RadioGroup>
+            {Object.entries(ALARM_REPEAT_CONFIG.intervals).map(([value, label]) => (
+              <RadioLabel key={value}>
+                <input
+                  type="radio"
+                  name="repeatInterval"
+                  value={value}
+                  checked={repeatInterval === parseInt(value, 10)}
+                  onChange={(e) => onRepeatIntervalChange && onRepeatIntervalChange(parseInt(e.target.value, 10))}
+                />
+                {label}
+              </RadioLabel>
+            ))}
+          </RadioGroup>
+        </OptionRow>
+
+        {/* ✨ 반복 횟수 */}
+        <OptionRow>
+          <OptionLabel>반복 횟수</OptionLabel>
+          <RadioGroup>
+            {Object.entries(ALARM_REPEAT_CONFIG.counts).map(([value, label]) => (
+              <RadioLabel key={value}>
+                <input
+                  type="radio"
+                  name="repeatCount"
+                  value={value}
+                  checked={repeatCount === parseInt(value, 10)}
+                  onChange={(e) => onRepeatCountChange && onRepeatCountChange(parseInt(e.target.value, 10))}
+                />
+                {label}
+              </RadioLabel>
+            ))}
           </RadioGroup>
         </OptionRow>
 

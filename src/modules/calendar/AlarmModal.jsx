@@ -11,6 +11,8 @@ import { saveAudioFile, loadAudioFile } from '../../utils/audioStorage';
 // alarm 모듈에서 필요한 것만 import
 import {
   ALARM_COLORS,
+  ALARM_REPEAT_CONFIG,
+  ADVANCE_NOTICE_CONFIG,
   fadeIn,
   slideUp,
   BellIcon,
@@ -39,6 +41,8 @@ import { ValidationModal, DeleteConfirmModal, EditConfirmModal } from './alarm/c
 import { AlarmEditModal } from './alarm/components/AlarmEditModal';
 // 기념일 반복 유틸 함수
 import { getRepeatedAnniversaries } from './utils/anniversaryHelpers';
+// 알람 토스트 (미리보기용)
+import AlarmToast from './AlarmToast';
 
 // ==================== STYLED COMPONENTS ====================
 const Overlay = styled.div`
@@ -287,6 +291,33 @@ const Button = styled.button`
   `}
 `;
 
+const PreviewButton = styled.button`
+  width: 100%;
+  padding: 12px 16px;
+  margin-top: 16px;
+  border-radius: 8px;
+  border: 1px solid ${ALARM_COLORS.primary};
+  background: rgba(74, 144, 226, 0.1);
+  color: ${ALARM_COLORS.primary};
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  &:hover {
+    background: rgba(74, 144, 226, 0.2);
+    border-color: #0056b3;
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+`;
+
 // ==================== COMPONENT ====================
 const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   if (!isOpen) return null;
@@ -330,8 +361,13 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
   const [customSoundName, setCustomSoundName] = useState('');
   const [volume, setVolume] = useState(80);
   const [notificationType, setNotificationType] = useState('sound');
-  const [snoozeEnabled, setSnoozeEnabled] = useState(false);
-  const [snoozeMinutes, setSnoozeMinutes] = useState(0);
+  const [advanceNotice, setAdvanceNotice] = useState(ADVANCE_NOTICE_CONFIG.defaultValue);
+  const [repeatInterval, setRepeatInterval] = useState(ALARM_REPEAT_CONFIG.defaultInterval);
+  const [repeatCount, setRepeatCount] = useState(ALARM_REPEAT_CONFIG.defaultCount);
+
+  // 미리보기 상태
+  const [previewToasts, setPreviewToasts] = useState([]);
+  const previewTimersRef = useRef([]);
 
   // Refs
   const optionsButtonRef = useRef(null);
@@ -478,6 +514,102 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       setAlarmTitle(value);
     }
   };
+
+  // 알람 미리보기 시뮬레이션
+  const handlePreview = () => {
+    // 기존 미리보기 타이머 모두 제거
+    previewTimersRef.current.forEach(timer => clearTimeout(timer));
+    previewTimersRef.current = [];
+    setPreviewToasts([]);
+
+    // 미리보기 알람 데이터
+    const previewData = {
+      title: alarmTitle || '알람 미리보기',
+      content: '설정된 알람이 이렇게 울립니다',
+      soundFile,
+      volume,
+      notificationType,
+    };
+
+    // 첫 번째 토스트 즉시 표시
+    const firstToastId = `preview_${Date.now()}`;
+    setPreviewToasts([{
+      id: firstToastId,
+      ...previewData,
+      currentRepeat: 1,
+      totalRepeats: repeatCount
+    }]);
+
+    // 반복 처리
+    if (repeatCount > 1) {
+      for (let i = 2; i <= repeatCount; i++) {
+        const timer = setTimeout(() => {
+          const toastId = `preview_${Date.now()}_${i}`;
+          setPreviewToasts(prev => [...prev, {
+            id: toastId,
+            ...previewData,
+            currentRepeat: i,
+            totalRepeats: repeatCount
+          }]);
+        }, (i - 1) * repeatInterval * 1000);
+
+        previewTimersRef.current.push(timer);
+      }
+    }
+
+    // 미리 알림 시뮬레이션 (advanceNotice가 있을 경우)
+    if (advanceNotice > 0) {
+      // 미리 알림 메시지는 5초 후에 표시 (실제로는 시간차가 있지만 미리보기에서는 짧게)
+      const advanceTimer = setTimeout(() => {
+        const advanceToastId = `preview_advance_${Date.now()}`;
+        setPreviewToasts(prev => [...prev, {
+          id: advanceToastId,
+          title: `[미리 알림] ${alarmTitle || '알람 미리보기'}`,
+          content: `${ADVANCE_NOTICE_CONFIG.options[advanceNotice]} 알림입니다`,
+          soundFile,
+          volume,
+          notificationType,
+          currentRepeat: 1,
+          totalRepeats: repeatCount
+        }]);
+
+        // 미리 알림도 반복 처리
+        if (repeatCount > 1) {
+          for (let i = 2; i <= repeatCount; i++) {
+            const advRepeatTimer = setTimeout(() => {
+              const toastId = `preview_advance_${Date.now()}_${i}`;
+              setPreviewToasts(prev => [...prev, {
+                id: toastId,
+                title: `[미리 알림] ${alarmTitle || '알람 미리보기'}`,
+                content: `${ADVANCE_NOTICE_CONFIG.options[advanceNotice]} 알림입니다`,
+                soundFile,
+                volume,
+                notificationType,
+                currentRepeat: i,
+                totalRepeats: repeatCount
+              }]);
+            }, (i - 1) * repeatInterval * 1000);
+
+            previewTimersRef.current.push(advRepeatTimer);
+          }
+        }
+      }, 5000); // 5초 후 미리 알림 표시
+
+      previewTimersRef.current.push(advanceTimer);
+    }
+  };
+
+  // 미리보기 토스트 닫기
+  const handleDismissPreview = (toastId) => {
+    setPreviewToasts(prev => prev.filter(t => t.id !== toastId));
+  };
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      previewTimersRef.current.forEach(timer => clearTimeout(timer));
+    };
+  }, []);
 
   // 토글 핸들러
   const handleToggleAlarm = (id) => {
@@ -651,6 +783,13 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
       anniversaryRepeat: isAnniversary ? anniversaryRepeat : undefined,
       anniversaryTiming: isAnniversary ? anniversaryTiming : undefined,
       anniversaryDaysBefore: isAnniversary && anniversaryTiming === 'before' ? parseInt(anniversaryDaysBefore, 10) : undefined,
+      // 알람 옵션
+      soundFile,
+      volume,
+      notificationType,
+      advanceNotice,
+      repeatInterval,
+      repeatCount,
     };
 
     console.log('새 알람:', newAlarm);
@@ -1420,6 +1559,93 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                     </RadioGroup>
                   </Section>
                 )}
+
+                {/* Advance Notice */}
+                {showOptions && (
+                  <Section>
+                    <SectionTitle>
+                      <ClockIcon />
+                      미리 알림
+                    </SectionTitle>
+                    <select
+                      value={advanceNotice}
+                      onChange={(e) => setAdvanceNotice(parseInt(e.target.value, 10))}
+                      style={{
+                        padding: '10px',
+                        borderRadius: '6px',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        background: '#1f2229',
+                        color: '#e0e0e0',
+                        fontSize: '14px',
+                      }}
+                    >
+                      {Object.entries(ADVANCE_NOTICE_CONFIG.options).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </Section>
+                )}
+
+                {/* Repeat Interval */}
+                {showOptions && (
+                  <Section>
+                    <SectionTitle>
+                      <BellIcon />
+                      반복 간격
+                    </SectionTitle>
+                    <RadioGroup>
+                      {Object.entries(ALARM_REPEAT_CONFIG.intervals).map(([value, label]) => (
+                        <RadioOption key={value} $checked={repeatInterval === parseInt(value, 10)}>
+                          <input
+                            type="radio"
+                            name="repeatInterval"
+                            value={value}
+                            checked={repeatInterval === parseInt(value, 10)}
+                            onChange={(e) => setRepeatInterval(parseInt(e.target.value, 10))}
+                          />
+                          <span>{label}</span>
+                        </RadioOption>
+                      ))}
+                    </RadioGroup>
+                  </Section>
+                )}
+
+                {/* Repeat Count */}
+                {showOptions && (
+                  <Section>
+                    <SectionTitle>
+                      <AlertIcon />
+                      반복 횟수
+                    </SectionTitle>
+                    <RadioGroup>
+                      {Object.entries(ALARM_REPEAT_CONFIG.counts).map(([value, label]) => (
+                        <RadioOption key={value} $checked={repeatCount === parseInt(value, 10)}>
+                          <input
+                            type="radio"
+                            name="repeatCount"
+                            value={value}
+                            checked={repeatCount === parseInt(value, 10)}
+                            onChange={(e) => setRepeatCount(parseInt(e.target.value, 10))}
+                          />
+                          <span>{label}</span>
+                        </RadioOption>
+                      ))}
+                    </RadioGroup>
+                  </Section>
+                )}
+
+                {/* Preview Button */}
+                {showOptions && (
+                  <PreviewButton onClick={handlePreview}>
+                    <BellIcon />
+                    알람 미리보기
+                    {advanceNotice > 0 && (
+                      <span style={{ fontSize: '12px', opacity: 0.8 }}>
+                        (정시 + {ADVANCE_NOTICE_CONFIG.options[advanceNotice]})
+                      </span>
+                    )}
+                  </PreviewButton>
+                )}
               </>
             )}
           </FormArea>
@@ -1475,6 +1701,16 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
           setAlarmToEdit(null);
         }}
       />
+
+      {/* 미리보기 토스트 알림 */}
+      {previewToasts.map((toast) => (
+        <AlarmToast
+          key={toast.id}
+          isVisible={true}
+          alarmData={toast}
+          onClose={() => handleDismissPreview(toast.id)}
+        />
+      ))}
     </Portal>
   );
 };

@@ -81,10 +81,32 @@ export const ALARM_TIMING = {
   before: 'before',    // N일 전
 };
 
-// 스누즈 설정
-export const SNOOZE_CONFIG = {
-  maxCount: 3,                          // 최대 스누즈 횟수
-  intervals: [10, 5, 2],                // 스마트 스누즈 간격 (분)
+// ✨ 알람 반복 설정 (스누즈 제거, 토스트 알림)
+export const ALARM_REPEAT_CONFIG = {
+  intervals: {
+    30: '30초 간격',
+    60: '1분 간격'
+  },
+  counts: {
+    1: '1회',
+    3: '3회'
+  },
+  defaultInterval: 60,                  // 기본: 1분 간격
+  defaultCount: 3,                      // 기본: 3회
+  toastDuration: 3000,                  // 토스트 표시 시간: 3초
+};
+
+// 미리 알림 설정
+export const ADVANCE_NOTICE_CONFIG = {
+  options: {
+    0: '없음',
+    10: '10분 전',
+    30: '30분 전',
+    60: '1시간 전',
+    180: '3시간 전',
+    1440: '1일 전'
+  },
+  defaultValue: 0,                      // 기본: 없음
 };
 
 // 알림 타입
