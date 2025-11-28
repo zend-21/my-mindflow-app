@@ -608,9 +608,10 @@ export const migrateArrayToIndividualDocs = async (userId) => {
       const memos = memosSnap.data().items;
       memos.forEach(memo => {
         if (memo.id) {
-          const docRef = doc(db, 'mindflowUsers', userId, 'memos', memo.id);
+          const docRef = doc(db, 'mindflowUsers', userId, 'memos', String(memo.id));
           batch.set(docRef, {
             ...memo,
+            id: String(memo.id), // ID도 문자열로 저장
             updatedAt: serverTimestamp()
           });
         }
@@ -623,9 +624,10 @@ export const migrateArrayToIndividualDocs = async (userId) => {
       const folders = foldersSnap.data().items;
       folders.forEach(folder => {
         if (folder.id) {
-          const docRef = doc(db, 'mindflowUsers', userId, 'folders', folder.id);
+          const docRef = doc(db, 'mindflowUsers', userId, 'folders', String(folder.id));
           batch.set(docRef, {
             ...folder,
+            id: String(folder.id),
             updatedAt: serverTimestamp()
           });
         }
@@ -646,9 +648,10 @@ export const migrateArrayToIndividualDocs = async (userId) => {
             }
           });
 
-          const docRef = doc(db, 'mindflowUsers', userId, 'trash', item.id);
+          const docRef = doc(db, 'mindflowUsers', userId, 'trash', String(item.id));
           batch.set(docRef, {
             ...cleanItem,
+            id: String(item.id),
             updatedAt: serverTimestamp()
           });
         }
@@ -661,9 +664,10 @@ export const migrateArrayToIndividualDocs = async (userId) => {
       const macros = macrosSnap.data().items;
       macros.forEach(macro => {
         if (macro.id) {
-          const docRef = doc(db, 'mindflowUsers', userId, 'macros', macro.id);
+          const docRef = doc(db, 'mindflowUsers', userId, 'macros', String(macro.id));
           batch.set(docRef, {
             ...macro,
+            id: String(macro.id),
             updatedAt: serverTimestamp()
           });
         }
@@ -684,7 +688,7 @@ export const migrateArrayToIndividualDocs = async (userId) => {
         });
 
         if (Object.keys(cleanSchedule).length > 0) {
-          const docRef = doc(db, 'mindflowUsers', userId, 'calendar', dateKey);
+          const docRef = doc(db, 'mindflowUsers', userId, 'calendar', String(dateKey));
           batch.set(docRef, {
             schedule: cleanSchedule,
             updatedAt: serverTimestamp()
@@ -699,9 +703,10 @@ export const migrateArrayToIndividualDocs = async (userId) => {
       const activities = activitiesSnap.data().items;
       activities.forEach(activity => {
         if (activity.id) {
-          const docRef = doc(db, 'mindflowUsers', userId, 'activities', activity.id);
+          const docRef = doc(db, 'mindflowUsers', userId, 'activities', String(activity.id));
           batch.set(docRef, {
             ...activity,
+            id: String(activity.id),
             updatedAt: serverTimestamp()
           });
         }
