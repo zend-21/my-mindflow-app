@@ -81,35 +81,6 @@ const MainContent = styled.main`
   height: 100vh;
 `;
 
-const PullToSyncIndicator = styled.div`
-  position: fixed;
-  top: 75px; /* 5px 위로 이동 */
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #818181ff;
-  font-size: 14px;
-  animation: ${fadeIn} 0.3s ease-out;
-  z-index: 5000;
-`;
-
-const PullGuideMessage = styled.div`
-  position: fixed;
-  top: 75px; /* 5px 아래로 이동 (70px → 75px) */
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(102, 126, 234, 0.9);
-  color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 500;
-  z-index: 5000;
-  animation: ${fadeIn} 0.2s ease-out;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-`;
 const SyncingIndicator = styled.div`
     position: fixed;
     top: 50%;
@@ -211,9 +182,7 @@ const ContentArea = styled.div`
     padding-top: ${props => props.$showHeader ? '90px' : '20px'};
     overflow-y: auto;
     position: relative;
-    transition: padding-top 0.3s ease${props => props.$isDragging ? '' : ', transform 0.3s ease'};
-    transform: translateY(${props => props.$pullDistance}px);
-    will-change: transform;
+    transition: padding-top 0.3s ease;
     overscroll-behavior: none;
     touch-action: pan-y;
     background: ${props => props.$isSecretTab ? 'linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%)' : '#1a1a1a'};
@@ -357,83 +326,6 @@ function App() {
     const [pendingRestoreFile, setPendingRestoreFile] = useState(null);
     const [isUnshareConfirmOpen, setIsUnshareConfirmOpen] = useState(false);
 
-    const [isDragging, setIsDragging] = useState(false);
-    const pullStartTime = useRef(0);
-    const [pullDistance, setPullDistance] = useState(0);
-    const pullStartY = useRef(0);
-    const WIDGET_ACTIVATION_DELAY = 500; // 위젯: 0.5초 제자리 누름
-    const MIN_PULL_DISTANCE = 110;       // 동기화: 100px 이상 드래그
-    const PULL_THRESHOLD = 110;          // 임계값: 100px (가이드 메시지도 동일)
-    const MIN_TOUCH_DURATION = 300;      // 최소 터치 시간: 0.3초 (빠른 스와이프 방지)
-
-    const handlePullStart = (clientY) => {
-        // 스크롤이 정확히 최상단일 때만 (더 엄격하게)
-        if (contentAreaRef.current && contentAreaRef.current.scrollTop > 0) {
-            return;
-        }
-
-        // 모달이 열려있으면 pull-to-refresh 비활성화
-        const hasModalOpen = document.querySelector('.rich-text-editor-overlay') ||
-                            document.querySelector('.search-modal-overlay') ||
-                            document.querySelector('.modal-overlay');
-        if (hasModalOpen) {
-            return;
-        }
-
-        pullStartY.current = clientY;
-        pullStartTime.current = Date.now();
-        setIsDragging(true);
-        console.log('⏱️ Pull 시작');
-    };
-
-    const handlePullMove = (clientY) => {
-        if (!isDragging) return;
-
-        const currentY = clientY;
-        const distance = currentY - pullStartY.current;
-
-        // 스크롤 체크 제거 - 손을 떼기 전까지는 절대 취소하지 않음
-
-        // 아래로 당김 (30px 데드존 초과)
-        if (distance > 30) {
-            setPullDistance((distance - 30) * 0.4);
-        }
-        // 데드존 안쪽 (0~30px)
-        else if (distance > 0) {
-            setPullDistance(0);
-        }
-        // 위로 올릴 때: 손가락을 따라 음수로 이동 (부드럽게 복귀)
-        else {
-            setPullDistance(distance * 0.3); // 음수 값 허용, 저항감 추가
-        }
-    };
-
-    const handlePullEnd = async () => {
-        setIsDragging(false);
-
-        const touchDuration = Date.now() - pullStartTime.current;
-
-        console.log('🔵 handlePullEnd 호출됨');
-        console.log('📏 pullDistance:', pullDistance);
-        console.log('📏 PULL_THRESHOLD:', PULL_THRESHOLD);
-        console.log('⏱️ touchDuration:', touchDuration);
-
-        const shouldSync = pullDistance > PULL_THRESHOLD && touchDuration >= MIN_TOUCH_DURATION;
-        console.log('❓ shouldSync:', shouldSync);
-
-        setPullDistance(0);
-
-        if (shouldSync) {
-            console.log('✅ 수동 동기화 시작!');
-            await handleSync();
-        } else {
-            if (touchDuration < MIN_TOUCH_DURATION) {
-                console.log('❌ 터치 시간 부족 - 동기화 안 함 (빠른 스와이프)');
-            } else {
-                console.log('❌ 거리 부족 - 동기화 안 함');
-            }
-        }
-    };
 
     // ✅ 추가: 앱 활성 상태 (포커스 여부)
     const [isAppActive, setIsAppActive] = useState(true); 
@@ -1566,7 +1458,6 @@ function App() {
     const [showHeader, setShowHeader] = useState(true);
     const lastScrollY = useRef(0);
     const scrollDirection = useRef('down');
-    const [isSyncing, setIsSyncing] = useState(false);
     const [activeId, setActiveId] = useState(null);
 
     const mouseSensor = useSensor(MouseSensor, { activationConstraint: { distance: 8 } });
@@ -2221,23 +2112,6 @@ function App() {
         };
     }, [userId, isAuthenticated, saveImmediately, syncMemos, syncFolders, syncTrash, syncCalendar]);
 
-    // 🔥 Pull-to-refresh에서 Firestore 동기화 트리거 (이벤트는 유지, 로직만 변경)
-    useEffect(() => {
-        const handleTriggerSync = async () => {
-            console.log('🔄 Pull-to-refresh에서 Firestore 동기화 트리거됨');
-            if (userId && isAuthenticated) {
-                await performSync(true); // 수동 동기화 (토스트 메시지 표시)
-            } else {
-                console.log('❌ 동기화 조건 미충족 - userId:', !!userId, 'isAuthenticated:', isAuthenticated);
-            }
-        };
-
-        window.addEventListener('triggerGoogleDriveSync', handleTriggerSync);
-
-        return () => {
-            window.removeEventListener('triggerGoogleDriveSync', handleTriggerSync);
-        };
-    }, [userId, isAuthenticated, performSync]);
 
     // 🔥 앱 종료 시 Firestore에 마지막 동기화
     useEffect(() => {
@@ -2514,66 +2388,6 @@ function App() {
         quietSync();
     };
     
-    const handleTouchStart = (e) => {
-        // SecretPage에서는 Pull-to-refresh 비활성화
-        if (activeTab === 'secret') return;
-        handlePullStart(e.touches[0].clientY);
-    };
-
-    const handleTouchMove = (e) => {
-        // SecretPage에서는 Pull-to-refresh 비활성화
-        if (activeTab === 'secret') return;
-
-        if (isDragging && contentAreaRef.current?.scrollTop === 0) {
-            // 스크롤 최상단에서 드래그 중일 때만 기본 동작 방지
-            e.preventDefault();
-        }
-        handlePullMove(e.touches[0].clientY);
-    };
-
-    const handleTouchEnd = async () => {
-        // SecretPage에서는 Pull-to-refresh 비활성화
-        if (activeTab === 'secret') return;
-        await handlePullEnd();
-    };
-
-    const handleTouchCancel = async () => {
-        // SecretPage에서는 Pull-to-refresh 비활성화
-        if (activeTab === 'secret') return;
-        // 터치가 취소되어도 handlePullEnd 호출 (드래그 종료)
-        await handlePullEnd();
-    };
-
-    // 마우스 이벤트 핸들러 (PC 지원)
-    const handleMouseDown = (e) => {
-        // SecretPage에서는 Pull-to-refresh 비활성화
-        if (activeTab === 'secret') return;
-        handlePullStart(e.clientY);
-    };
-
-    const handleMouseMove = (e) => {
-        // SecretPage에서는 Pull-to-refresh 비활성화
-        if (activeTab === 'secret') return;
-        if (isDragging) {
-            handlePullMove(e.clientY);
-        }
-    };
-
-    const handleMouseUp = async () => {
-        // SecretPage에서는 Pull-to-refresh 비활성화
-        if (activeTab === 'secret') return;
-        if (isDragging) {
-            await handlePullEnd();
-        }
-    };
-
-    const handleMouseLeave = async () => {
-        // SecretPage에서는 Pull-to-refresh 비활성화
-        if (activeTab === 'secret') return;
-        if (isDragging) {
-            await handlePullEnd();
-        }
-    };
     
     useEffect(() => {
         if (contentAreaRef.current) {
@@ -2758,38 +2572,10 @@ function App() {
                         onProfileClick={handleProfileClick}
                     />
 
-                    {/* 풀 가이드 메시지: 100px 이상 당겼을 때 표시 */}
-                    {!isSyncing && pullDistance >= 110 && (
-                        <PullGuideMessage>
-                            ↓ 손을 떼면 동기화가 시작됩니다
-                        </PullGuideMessage>
-                    )}
-
-                    {/* 동기화 중 표시 (ContentArea 밖으로 이동) */}
-                    {isSyncing && (
-                        <PullToSyncIndicator>
-                            <SyncSpinner />
-                            동기화 중...
-                        </PullToSyncIndicator>
-                    )}
-
                     <ContentArea
                         ref={contentAreaRef}
-                        $pullDistance={pullDistance}
                         $showHeader={showHeader}
-                        $isDragging={isDragging}
                         $isSecretTab={activeTab === 'secret'}
-                        // 터치 이벤트 (모바일) - 시크릿 페이지에서는 완전히 비활성화
-                        {...(activeTab !== 'secret' && {
-                            onTouchStart: handleTouchStart,
-                            onTouchMove: handleTouchMove,
-                            onTouchEnd: handleTouchEnd,
-                            onTouchCancel: handleTouchCancel,
-                            onMouseDown: handleMouseDown,
-                            onMouseMove: handleMouseMove,
-                            onMouseUp: handleMouseUp,
-                            onMouseLeave: handleMouseLeave
-                        })}
                     >
                         {activeTab === 'home' && (
                             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>

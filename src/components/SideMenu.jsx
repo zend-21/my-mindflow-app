@@ -560,17 +560,7 @@ const SideMenu = ({
                                 </MenuItem>
                             </MenuGroup>
 
-                            {/* ☁️ 그룹 3: 동기화 (로그인 사용자 전용) */}
-                            {profile && (
-                                <MenuGroup>
-                                    <MenuItem onClick={onSync}>
-                                        <span className="icon">☁️</span> 동기화 (폰→구글)
-                                    </MenuItem>
-                                    <MenuItem onClick={onRestoreFromDrive}>
-                                        <span className="icon">📥</span> 동기화 (구글→폰)
-                                    </MenuItem>
-                                </MenuGroup>
-                            )}
+                            {/* ☁️ 그룹 3: 동기화 - 제거됨 (자동 동기화로 대체) */}
 
                             {/* ⚙️ 그룹 4: 설정/관리 */}
                             <MenuGroup>

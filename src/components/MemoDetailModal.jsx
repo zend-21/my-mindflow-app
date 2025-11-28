@@ -584,6 +584,36 @@ const FolderSelect = styled.select`
 `;
 /* --- 스타일 추가 완료 --- */
 
+// ========================================
+// ✨ 읽기/편집 모드 분리 구현 (메모 상세보기)
+// ========================================
+//
+// 📌 주요 기능:
+// 1. 읽기 모드 (기본): 다크 테마의 책/노트 스타일 UI
+//    - 더블클릭으로 편집 모드 전환
+//    - 텍스트 선택 및 복사 가능 (user-select: text)
+//    - 스와이프로 메모 간 이동 가능
+//    - 상단 버튼: 닫기, 중요도 뱃지, 공유 뱃지, 편집 버튼
+//
+// 2. 편집 모드: 기존 편집 UI 유지
+//    - 중요도 토글은 상태만 변경 (저장 버튼 눌러야 실제 저장)
+//    - 취소 시 내용과 중요도 모두 원본으로 복원
+//    - 저장 시 읽기 모드로 전환 (모달은 열린 채로 유지)
+//    - 스와이프 비활성화
+//
+// 3. 상태 관리:
+//    - isEditMode: 읽기/편집 모드 전환
+//    - originalIsImportant: 취소 시 복원용 원본 중요도
+//    - isPristine: 내용 또는 중요도 변경 여부 체크
+//
+// 4. 이벤트 처리:
+//    - onDoubleClick: 본문 더블클릭으로 편집 모드 전환
+//    - 텍스트 선택 시 더블클릭 무시 (복사 기능 유지)
+//    - 편집 모드에서 스와이프 비활성화
+//
+// 📝 TODO: 스케줄 문서, 시크릿 문서에도 동일하게 적용 예정
+// ========================================
+
 // ✨ 읽기 모드 스타일
 const ReadModeHeader = styled.div`
     display: flex;
@@ -695,7 +725,7 @@ const ImportantBadge = styled.div`
 const ReadModeContainer = styled.div`
     flex: 1;
     overflow-y: auto;
-    padding: ${props => props.$isImportant ? '40px 32px 40px 48px' : '40px 32px 40px 48px'};
+    padding: ${props => props.$isImportant ? '35px 32px 40px 32px' : '35px 32px 40px 32px'};
     background: ${props => props.$isImportant
         ? 'linear-gradient(135deg, #2a1f23 0%, #3d2a2e 50%, #4a2d32 100%)'
         : 'linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 50%, #1e1e1e 100%)'};
@@ -718,23 +748,10 @@ const ReadModeContainer = styled.div`
         ? 'inset 0 0 60px rgba(0, 0, 0, 0.4), inset 0 2px 8px rgba(0, 0, 0, 0.3)'
         : 'inset 0 0 60px rgba(0, 0, 0, 0.5), inset 0 2px 8px rgba(0, 0, 0, 0.4)'};
 
-    /* 노트북 왼쪽 여백선 */
-    &::before {
-        content: '';
-        position: absolute;
-        left: 32px;
-        top: 0;
-        bottom: 0;
-        width: 2px;
-        background: ${props => props.$isImportant
-            ? 'rgba(239, 83, 80, 0.4)'
-            : 'rgba(74, 144, 226, 0.4)'};
-    }
-
-    /* 다크 노트 라인 효과 */
+    /* 다크 노트 라인 효과 - 텍스트 라인과 정확히 맞춤 (17px * 1.9 = 32.3px) */
     background-image: ${props => props.$isImportant
-        ? 'repeating-linear-gradient(transparent, transparent 31px, rgba(239, 83, 80, 0.08) 31px, rgba(239, 83, 80, 0.08) 32px)'
-        : 'repeating-linear-gradient(transparent, transparent 31px, rgba(255, 255, 255, 0.05) 31px, rgba(255, 255, 255, 0.05) 32px)'};
+        ? 'repeating-linear-gradient(transparent, transparent calc(17px * 1.9 - 1px), rgba(239, 83, 80, 0.08) calc(17px * 1.9 - 1px), rgba(239, 83, 80, 0.08) calc(17px * 1.9))'
+        : 'repeating-linear-gradient(transparent, transparent calc(17px * 1.9 - 1px), rgba(255, 255, 255, 0.05) calc(17px * 1.9 - 1px), rgba(255, 255, 255, 0.05) calc(17px * 1.9))'};
 
     /* 스크롤바 스타일링 */
     &::-webkit-scrollbar {
