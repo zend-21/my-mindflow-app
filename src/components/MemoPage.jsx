@@ -1426,7 +1426,8 @@ const MemoPage = ({
     onUpdateMemoFolder,
     onUpdateMemoFolderBatch,
     onRequestShareSelectedMemos,
-    onRequestUnshareSelectedMemos
+    onRequestUnshareSelectedMemos,
+    folderSyncContext
 }) => {
     const [layoutView, setLayoutView] = useLocalStorage('memoLayoutView', 'list');
     const [sortOrder, setSortOrder] = React.useState('date'); // 'date' 또는 'importance'
@@ -1445,7 +1446,7 @@ const MemoPage = ({
         deleteFolder,
         canAddFolder,
         maxFolders
-    } = useMemoFolders();
+    } = useMemoFolders(folderSyncContext);
 
     // 공유된 메모 정보 (Map: memoId -> { isPublic: boolean })
     const [sharedMemoInfo, setSharedMemoInfo] = useState(new Map());

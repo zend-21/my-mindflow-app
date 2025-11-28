@@ -785,6 +785,7 @@ const MemoDetailModal = ({
     onUpdateMemoFolder,
     showToast,
     onNavigate, // 다른 메모로 이동 시 호출되는 콜백
+    folderSyncContext // 폴더 동기화 컨텍스트
 }) => {
     const [editedContent, setEditedContent] = useState('');
     const [isImportant, setIsImportant] = useState(false);
@@ -809,7 +810,7 @@ const MemoDetailModal = ({
     const [slideDirection, setSlideDirection] = useState(null); // 'left' | 'right' | null
 
     // 폴더 목록 가져오기
-    const { folders } = useMemoFolders();
+    const { folders } = useMemoFolders(folderSyncContext);
     // 🗑️ COLLABORATION REMOVED - 협업방 관련 state 제거됨
     // const [isRoomSettingsOpen, setIsRoomSettingsOpen] = useState(false);
     // const [isCollaborationRoomOpen, setIsCollaborationRoomOpen] = useState(false);

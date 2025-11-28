@@ -1214,3 +1214,115 @@ export const migrateToIndividualEncryption = async (userId) => {
     throw error;
   }
 };
+
+// ========================================
+// 🔄 Backwards Compatibility: Array-based functions for legacy hooks
+// ========================================
+
+/**
+ * Save all memos as individual documents (backwards compatible)
+ * @param {string} userId - User ID
+ * @param {Array} memos - Array of memo objects
+ */
+export const saveMemosToFirestore = async (userId, memos) => {
+  if (!Array.isArray(memos) || memos.length === 0) return;
+
+  const batch = writeBatch(db);
+  memos.forEach(memo => {
+    if (memo.id) {
+      const docRef = doc(db, 'mindflowUsers', userId, 'memos', memo.id);
+      batch.set(docRef, { ...memo, updatedAt: serverTimestamp() });
+    }
+  });
+  await batch.commit();
+};
+
+/**
+ * Save all folders as individual documents (backwards compatible)
+ * @param {string} userId - User ID
+ * @param {Array} folders - Array of folder objects
+ */
+export const saveFoldersToFirestore = async (userId, folders) => {
+  if (!Array.isArray(folders) || folders.length === 0) return;
+
+  const batch = writeBatch(db);
+  folders.forEach(folder => {
+    if (folder.id) {
+      const docRef = doc(db, 'mindflowUsers', userId, 'folders', folder.id);
+      batch.set(docRef, { ...folder, updatedAt: serverTimestamp() });
+    }
+  });
+  await batch.commit();
+};
+
+/**
+ * Save all trash items as individual documents (backwards compatible)
+ * @param {string} userId - User ID
+ * @param {Array} trash - Array of trash objects
+ */
+export const saveTrashToFirestore = async (userId, trash) => {
+  if (!Array.isArray(trash) || trash.length === 0) return;
+
+  const batch = writeBatch(db);
+  trash.forEach(item => {
+    if (item.id) {
+      const docRef = doc(db, 'mindflowUsers', userId, 'trash', item.id);
+      batch.set(docRef, { ...item, updatedAt: serverTimestamp() });
+    }
+  });
+  await batch.commit();
+};
+
+/**
+ * Save all macros as individual documents (backwards compatible)
+ * @param {string} userId - User ID
+ * @param {Array} macros - Array of macro objects
+ */
+export const saveMacrosToFirestore = async (userId, macros) => {
+  if (!Array.isArray(macros) || macros.length === 0) return;
+
+  const batch = writeBatch(db);
+  macros.forEach(macro => {
+    if (macro.id) {
+      const docRef = doc(db, 'mindflowUsers', userId, 'macros', macro.id);
+      batch.set(docRef, { ...macro, updatedAt: serverTimestamp() });
+    }
+  });
+  await batch.commit();
+};
+
+/**
+ * Save all calendar events as individual documents (backwards compatible)
+ * @param {string} userId - User ID
+ * @param {Array} calendar - Array of calendar event objects
+ */
+export const saveCalendarToFirestore = async (userId, calendar) => {
+  if (!Array.isArray(calendar) || calendar.length === 0) return;
+
+  const batch = writeBatch(db);
+  calendar.forEach(event => {
+    if (event.id) {
+      const docRef = doc(db, 'mindflowUsers', userId, 'calendar', event.id);
+      batch.set(docRef, { ...event, updatedAt: serverTimestamp() });
+    }
+  });
+  await batch.commit();
+};
+
+/**
+ * Save all activities as individual documents (backwards compatible)
+ * @param {string} userId - User ID
+ * @param {Array} activities - Array of activity objects
+ */
+export const saveActivitiesToFirestore = async (userId, activities) => {
+  if (!Array.isArray(activities) || activities.length === 0) return;
+
+  const batch = writeBatch(db);
+  activities.forEach(activity => {
+    if (activity.id) {
+      const docRef = doc(db, 'mindflowUsers', userId, 'activities', activity.id);
+      batch.set(docRef, { ...activity, updatedAt: serverTimestamp() });
+    }
+  });
+  await batch.commit();
+};

@@ -587,7 +587,10 @@ function App() {
         syncCalendar,
         syncActivities,
         syncSettings,
-        saveImmediately
+        saveImmediately,
+        // 개별 항목 동기화 함수
+        syncFolder,
+        deleteFolder
     } = useFirestoreSync(userId, isAuthenticated, firebaseUser?.uid);
 
     // settings에서 개별 값 추출
@@ -2626,6 +2629,7 @@ function App() {
                                 onRequestDeleteSelectedMemos={requestDeleteSelectedMemos}
                                 onUpdateMemoFolder={handleUpdateMemoFolder}
                                 onUpdateMemoFolderBatch={handleUpdateMemoFolderBatch}
+                                folderSyncContext={{ folders, syncFolder, deleteFolder }}
                                 onRequestShareSelectedMemos={requestShareSelectedMemos}
                                 onRequestUnshareSelectedMemos={requestUnshareSelectedMemos}
                             />
@@ -2785,6 +2789,7 @@ function App() {
                 onUpdateMemoFolder={handleUpdateMemoFolder}
                 showToast={showToast}
                 onNavigate={(nextMemo) => setSelectedMemo(nextMemo)}
+                folderSyncContext={{ folders, syncFolder, deleteFolder }}
             />
             
             {isDeleteModalOpen && (
