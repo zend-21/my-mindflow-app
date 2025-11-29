@@ -51,7 +51,7 @@ const TopActionButton = styled.button`
     border-radius: 10px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 400;
     cursor: pointer;
     transition: all 0.2s;
     background: #333842;
@@ -1078,7 +1078,7 @@ const TrashPage = ({ showToast }) => {
                         $isAllSelected={selectedIds.size === filteredAndSortedItems.length && filteredAndSortedItems.length > 0}
                         onClick={handleSelectAll}
                     >
-                        {selectedIds.size === filteredAndSortedItems.length && filteredAndSortedItems.length > 0 ? '전체 해제' : '전체 선택'}
+                        {selectedIds.size === filteredAndSortedItems.length && filteredAndSortedItems.length > 0 ? '전체해제' : '전체선택'}
                     </TopActionButton>
                     <TopActionButton
                         $variant="restore"
@@ -1100,7 +1100,7 @@ const TrashPage = ({ showToast }) => {
                         }}
                         disabled={selectedIds.size === 0}
                     >
-                        영구 삭제{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+                        영구삭제{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
                     </TopActionButton>
                 </ActionButtonRow>
             </Header>

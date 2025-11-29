@@ -20,7 +20,9 @@
       "Bash(timeout:*)",
       "Bash(npm run build:*)",
       "Bash(git checkout:*)",
-      "Bash(del \"src\\services\\syncMetadataService.js\")"
+      "Bash(del \"src\\services\\syncMetadataService.js\")",
+      "Bash(firebase deploy:*)",
+      "Bash(firebase firestore:rules:list:*)"
     ],
     "deny": [],
     "ask": []

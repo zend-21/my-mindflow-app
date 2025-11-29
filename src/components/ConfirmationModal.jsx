@@ -42,7 +42,7 @@ const ModalContent = styled.div`
 const ModalMessage = styled.p`
     font-size: 16px;
     color: #e0e0e0;
-    text-align: center;
+    text-align: left;
     margin-bottom: 24px;
     line-height: 1.5;
     word-break: keep-all;
@@ -108,11 +108,25 @@ const ConfirmationModal = ({ isOpen, message, onConfirm, onCancel, confirmText =
         onCancel();
     };
 
+    // \n을 실제 줄바꿈으로 변환
+    const messageLines = message.split('\n');
+
     return (
       <Portal>
         <Overlay onClick={handleCancelClick}>
             <ModalContent onClick={e => e.stopPropagation()}>
-                <ModalMessage>{message}</ModalMessage>
+                <ModalMessage>
+                    {messageLines.map((line, index) => (
+                        <React.Fragment key={index}>
+                            {line.startsWith('(') ? (
+                                <span style={{ color: '#d4a373' }}>{line}</span>
+                            ) : (
+                                line
+                            )}
+                            {index < messageLines.length - 1 && <br />}
+                        </React.Fragment>
+                    ))}
+                </ModalMessage>
                 <ButtonContainer>
                     <CancelButton onClick={handleCancelClick}>취소</CancelButton>
                     <ConfirmButton onClick={handleConfirmClick}>{confirmText}</ConfirmButton>

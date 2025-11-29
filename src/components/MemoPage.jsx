@@ -560,14 +560,14 @@ const ToastBox = styled.div`
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
   animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
 `;
-// 중요도 뱃지 - 형광 골드/오렌지
+// 중요도 뱃지 - 붉은 계열 (MemoDetailModal과 통일)
 const ImportantIndicator = styled.span`
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: rgba(255, 215, 0, 0.2);
-    border: 1px solid rgba(255, 215, 0, 0.3);
-    color: #ffd700;
+    background: rgba(239, 83, 80, 0.2);
+    border: 1px solid rgba(239, 83, 80, 0.4);
+    color: #ef5350;
     font-size: 14px;
     font-weight: bold;
     display: flex;
@@ -1325,9 +1325,9 @@ const MemoFolderBadge = styled.span`
 `;
 
 const MemoSharedBadge = styled.span`
-    background: rgba(255, 107, 107, 0.2);
-    border: 1px solid rgba(255, 107, 107, 0.3);
-    color: #ff6b6b;
+    background: rgba(94, 190, 38, 0.15);
+    border: 1px solid rgba(94, 190, 38, 0.3);
+    color: #5ebe26;
     font-size: 10px;
     padding: 2px 6px;
     border-radius: 8px;
@@ -1427,7 +1427,8 @@ const MemoPage = ({
     onUpdateMemoFolderBatch,
     onRequestShareSelectedMemos,
     onRequestUnshareSelectedMemos,
-    folderSyncContext
+    folderSyncContext,
+    onActiveFolderChange // 활성 폴더 변경 콜백 추가
 }) => {
     const [layoutView, setLayoutView] = useLocalStorage('memoLayoutView', 'list');
     const [sortOrder, setSortOrder] = React.useState('date'); // 'date' 또는 'importance'
@@ -1471,6 +1472,13 @@ const MemoPage = ({
 
     // 미분류로 이동 확인 모달
     const [moveToUncategorizedConfirm, setMoveToUncategorizedConfirm] = useState(null); // null | { count: number }
+
+    // 활성 폴더 변경 시 App.jsx로 알림
+    useEffect(() => {
+        if (onActiveFolderChange) {
+            onActiveFolderChange(activeFolder);
+        }
+    }, [activeFolder, onActiveFolderChange]);
 
     // 공유 상태 확인 (메모 목록이 변경될 때)
     // ⚠️ 참고용 협업 기능 - 현재 사용 안 함
@@ -1591,8 +1599,8 @@ const MemoPage = ({
     };
 
     const handleAddMemoClick = () => {
-        // 폴더 안에서 메모 작성 시 해당 폴더 ID 전달 (전체/공유 폴더는 미분류로 저장)
-        const targetFolderId = (activeFolder !== 'all' && activeFolder !== 'shared') ? activeFolder : null;
+        // 폴더 안에서 메모 작성 시 해당 폴더 ID 전달 (전체 폴더만 미분류로 저장)
+        const targetFolderId = activeFolder !== 'all' ? activeFolder : null;
         onOpenNewMemo(targetFolderId);
     };
 

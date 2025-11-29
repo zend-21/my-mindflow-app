@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { avatarList } from './avatars/AvatarIcons';
 import SecurityDocViewer from './SecurityDocViewer';
+import ConfirmationModal from './ConfirmationModal';
 import { db } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -336,6 +337,7 @@ const SideMenu = ({
     const [wsCode, setWsCode] = useState(null); // WS 코드 (친구 코드)
     // 협업 관련 상태
     const [isSecurityDocViewerOpen, setIsSecurityDocViewerOpen] = useState(false);
+    const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false); // 서버 복원 확인 모달
 
     const handleError = () => { // 에러 발생 시 상태 변경
         setImageError(true);
@@ -558,28 +560,16 @@ const SideMenu = ({
                                         ref={fileInputRef}
                                     />
                                 </MenuItem>
-                            </MenuGroup>
-
-                            {/* ☁️ 그룹 3: 서버 복원 */}
-                            <MenuGroup>
                                 <MenuItem onClick={() => {
                                     if (onRestoreFromDrive) {
-                                        const confirm = window.confirm(
-                                            '서버에 저장된 데이터로 복원하시겠습니까?\n\n' +
-                                            '현재 기기의 모든 데이터가 서버 데이터로 덮어씌워집니다.\n' +
-                                            '(이미 자동 동기화 중이지만, 수동으로 복원이 필요한 경우에만 사용하세요)'
-                                        );
-                                        if (confirm) {
-                                            onClose();
-                                            onRestoreFromDrive();
-                                        }
+                                        setIsRestoreConfirmOpen(true);
                                     }
                                 }}>
                                     <span className="icon">☁️</span> 서버에서 복원
                                 </MenuItem>
                             </MenuGroup>
 
-                            {/* ⚙️ 그룹 4: 설정/관리 */}
+                            {/* ⚙️ 그룹 3: 설정/관리 */}
                             <MenuGroup>
                                 <MenuItem>
                                     <span className="icon">⚙️</span> 설정
@@ -612,6 +602,21 @@ const SideMenu = ({
             {isSecurityDocViewerOpen && (
                 <SecurityDocViewer
                     onClose={() => setIsSecurityDocViewerOpen(false)}
+                />
+            )}
+
+            {/* 서버 복원 확인 모달 */}
+            {isRestoreConfirmOpen && (
+                <ConfirmationModal
+                    isOpen={true}
+                    message={`서버에 저장된 데이터로 복원하시겠습니까?\n\n현재 기기의 모든 데이터가 서버 데이터로 덮어씌워집니다.\n(이미 자동 동기화 중이므로, 수동으로 복원이 필요한 경우에만 사용하세요)`}
+                    confirmText="복원"
+                    onConfirm={() => {
+                        setIsRestoreConfirmOpen(false);
+                        onClose();
+                        onRestoreFromDrive();
+                    }}
+                    onCancel={() => setIsRestoreConfirmOpen(false)}
                 />
             )}
         </>

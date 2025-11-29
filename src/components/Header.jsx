@@ -154,7 +154,7 @@ const BACKGROUND_COLORS = {
 };
 
 // Header 컴포넌트
-const Header = ({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, onProfileClick }) => {
+const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, onProfileClick }) => {
     const [imageError, setImageError] = useState(false);
     const [greeting, setGreeting] = useState('');
     const [profileImageType, setProfileImageType] = useState('avatar');
@@ -326,6 +326,14 @@ const Header = ({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, o
             </RightContainer>
         </HeaderWrapper>
     );
-};
+}, (prevProps, nextProps) => {
+    // profile, isHidden 값이 변경되지 않으면 리렌더링 방지
+    return (
+        prevProps.isHidden === nextProps.isHidden &&
+        prevProps.profile?.name === nextProps.profile?.name &&
+        prevProps.profile?.nickname === nextProps.profile?.nickname &&
+        prevProps.profile?.picture === nextProps.profile?.picture
+    );
+});
 
 export default Header;

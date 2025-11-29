@@ -34,19 +34,24 @@ if (firebaseConfig.apiKey && firebaseConfig.projectId) {
     auth = getAuth(app);
 
     // Analytics 초기화 (브라우저 환경에서만)
-    if (typeof window !== 'undefined') {
-      analytics = getAnalytics(app);
+    // ⚠️ 임시로 비활성화 - API 키 검증 후 재활성화 필요
+    // if (typeof window !== 'undefined') {
+    //   try {
+    //     analytics = getAnalytics(app);
 
-      // 개발 환경에서 Debug Mode 활성화 (DebugView에서 실시간 확인 가능)
-      if (import.meta.env.DEV) {
-        window['ga-disable-' + firebaseConfig.measurementId] = false;
-        console.log('🐛 Firebase Analytics Debug Mode 활성화');
-      }
+    //     // 개발 환경에서 Debug Mode 활성화 (DebugView에서 실시간 확인 가능)
+    //     if (import.meta.env.DEV) {
+    //       window['ga-disable-' + firebaseConfig.measurementId] = false;
+    //       console.log('🐛 Firebase Analytics Debug Mode 활성화');
+    //     }
 
-      console.log('✅ Firebase Analytics 초기화 완료');
-    }
+    //     console.log('✅ Firebase Analytics 초기화 완료');
+    //   } catch (error) {
+    //     console.warn('⚠️ Firebase Analytics 초기화 실패 (무시됨):', error);
+    //   }
+    // }
 
-    console.log('✅ Firebase 초기화 완료');
+    console.log('✅ Firebase 초기화 완료 (Analytics 비활성화됨)');
   } catch (error) {
     console.error('❌ Firebase 초기화 실패:', error);
   }

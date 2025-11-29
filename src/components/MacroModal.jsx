@@ -23,20 +23,21 @@ const Overlay = styled.div`
 const ModalContent = styled.div`
     background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
     border-radius: 20px;
-    padding: 32px 24px;
     max-width: 600px;
     width: 100%;
-    max-height: 80vh;
-    overflow-y: auto;
+    height: 85vh;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.15);
+    display: flex;
+    flex-direction: column;
 `;
 
 const Header = styled.div`
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    padding: 32px 24px 24px 24px;
+    flex-shrink: 0;
 `;
 
 const Title = styled.h2`
@@ -70,11 +71,20 @@ const CloseButton = styled.button`
     }
 `;
 
+const ScrollContainer = styled.div`
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 24px;
+    min-height: 0;
+`;
+
 const Description = styled.p`
     color: #b0b0b0;
     font-size: 14px;
-    margin: 0 0 24px 0;
+    margin: 0 0 16px 0;
     line-height: 1.5;
+    padding: 0 24px;
+    flex-shrink: 0;
 `;
 
 const MacroList = styled.div`
@@ -146,17 +156,13 @@ const CopyButton = styled.button`
     background: ${props => props.$copied ? 'rgba(46, 213, 115, 0.2)' : 'rgba(96, 165, 250, 0.2)'};
     border: 1px solid ${props => props.$copied ? 'rgba(46, 213, 115, 0.5)' : 'rgba(96, 165, 250, 0.5)'};
     color: ${props => props.$copied ? '#2ed573' : '#60a5fa'};
-    padding: 8px 12px;
+    padding: 8px;
     border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 4px;
-    transition: all 0.2s;
-    min-width: 70px;
     justify-content: center;
+    transition: all 0.2s;
     flex-shrink: 0;
 
     &:hover {
@@ -301,6 +307,35 @@ const AlertButton = styled.button`
     }
 `;
 
+const ToastMessage = styled.div`
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(60, 60, 60, 0.95);
+    color: white;
+    padding: 14px 50px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    z-index: 10001;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: fadeInCenter 0.3s ease-out;
+    min-width: 300px;
+    text-align: center;
+
+    @keyframes fadeInCenter {
+        from {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.9);
+        }
+        to {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+    }
+`;
+
 const STORAGE_KEY = 'macroTexts';
 const MAX_LENGTH = 100;
 
@@ -311,6 +346,7 @@ const MacroModal = ({ onClose }) => {
     const [editText, setEditText] = useState('');
     const [showAlert, setShowAlert] = useState(false);
     const [alertMessage, setAlertMessage] = useState('');
+    const [showToast, setShowToast] = useState(false);
 
     useEffect(() => {
         // localStorage에서 매크로 불러오기
@@ -363,7 +399,11 @@ const MacroModal = ({ onClose }) => {
         try {
             await navigator.clipboard.writeText(text);
             setCopiedIndex(index);
-            setTimeout(() => setCopiedIndex(null), 2000);
+            setShowToast(true);
+            setTimeout(() => {
+                setCopiedIndex(null);
+                setShowToast(false);
+            }, 2000);
         } catch (error) {
             console.error('Failed to copy:', error);
             alert('복사에 실패했습니다.');
@@ -413,46 +453,47 @@ const MacroModal = ({ onClose }) => {
                         자주 사용하는 텍스트를 저장하고 빠르게 복사하세요.
                     </Description>
 
-                    <MacroList>
-                        {macros.map((macro, index) => (
-                            <MacroItem key={index}>
-                                <MacroIndex>{index + 1}</MacroIndex>
-                                <MacroInputGroup>
-                                    <MacroInput
-                                        type="text"
-                                        value={macro}
-                                        onChange={(e) => handleMacroChange(index, e.target.value)}
-                                        placeholder={`매크로 ${index + 1} (예: URL, 아이디, 인사말 등)`}
-                                    />
-                                    <CopyButton
-                                        onClick={() => handleCopy(index)}
-                                        disabled={!macro.trim()}
-                                        $copied={copiedIndex === index}
-                                    >
-                                        {copiedIndex === index ? (
-                                            <>
-                                                <FiCheck size={14} />
-                                                복사됨
-                                            </>
-                                        ) : (
-                                            <>
-                                                <FiCopy size={14} />
-                                                복사
-                                            </>
-                                        )}
-                                    </CopyButton>
-                                    <EditButton
-                                        onClick={() => handleOpenEdit(index)}
-                                        title="편집"
-                                    >
-                                        <FiEdit2 size={16} />
-                                    </EditButton>
-                                </MacroInputGroup>
-                            </MacroItem>
-                        ))}
-                    </MacroList>
+                    <ScrollContainer>
+                        <MacroList>
+                            {macros.map((macro, index) => (
+                                <MacroItem key={index}>
+                                    <MacroIndex>{index + 1}</MacroIndex>
+                                    <MacroInputGroup>
+                                        <MacroInput
+                                            type="text"
+                                            value={macro}
+                                            onChange={(e) => handleMacroChange(index, e.target.value)}
+                                            placeholder={`매크로 ${index + 1} (예: URL, 아이디, 인사말 등)`}
+                                        />
+                                        <CopyButton
+                                            onClick={() => handleCopy(index)}
+                                            disabled={!macro.trim()}
+                                            $copied={copiedIndex === index}
+                                            title="복사"
+                                        >
+                                            {copiedIndex === index ? (
+                                                <FiCheck size={16} />
+                                            ) : (
+                                                <FiCopy size={16} />
+                                            )}
+                                        </CopyButton>
+                                        <EditButton
+                                            onClick={() => handleOpenEdit(index)}
+                                            title="편집"
+                                        >
+                                            <FiEdit2 size={16} />
+                                        </EditButton>
+                                    </MacroInputGroup>
+                                </MacroItem>
+                            ))}
+                        </MacroList>
+                    </ScrollContainer>
                 </ModalContent>
             </Overlay>
+
+            {showToast && (
+                <ToastMessage>매크로가 복사되었습니다.</ToastMessage>
+            )}
 
             {/* 편집 모달 */}
             {editingIndex !== null && (

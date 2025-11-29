@@ -1000,7 +1000,7 @@ const MemoDetailModal = ({
     };
 
     // ✨ 더블클릭/더블탭으로 편집 모드 전환
-    const handleDoubleTap = (e) => {
+    const handleDoubleTap = () => {
         const now = Date.now();
         const DOUBLE_TAP_DELAY = 300;
 
@@ -1012,7 +1012,6 @@ const MemoDetailModal = ({
 
         if (lastTap && (now - lastTap < DOUBLE_TAP_DELAY)) {
             // 더블탭 감지됨
-            e.preventDefault(); // 기본 동작 방지
             setIsEditMode(true);
             setLastTap(0); // 다음 더블탭을 위해 리셋
         } else {

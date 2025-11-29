@@ -15,6 +15,34 @@ import {
 } from 'firebase/firestore';
 
 /**
+ * Firestore Timestamp 객체를 JavaScript 숫자(밀리초)로 변환하는 헬퍼 함수
+ * 백그라운드에서 포그라운드로 돌아올 때 타임스탬프가 Timestamp 객체로 변환되어
+ * Invalid Date가 발생하는 문제를 방지합니다.
+ */
+const convertTimestampsToMillis = (data) => {
+  if (!data) return data;
+
+  const converted = { ...data };
+
+  // createdAt 변환
+  if (converted.createdAt && typeof converted.createdAt.toMillis === 'function') {
+    converted.createdAt = converted.createdAt.toMillis();
+  }
+
+  // updatedAt 변환
+  if (converted.updatedAt && typeof converted.updatedAt.toMillis === 'function') {
+    converted.updatedAt = converted.updatedAt.toMillis();
+  }
+
+  // date 필드 변환 (메모에서 사용)
+  if (converted.date && typeof converted.date.toMillis === 'function') {
+    converted.date = converted.date.toMillis();
+  }
+
+  return converted;
+};
+
+/**
  * 🔐 사용자 데이터 구조 (개별 문서 저장 - 산업 표준 방식)
  * mindflowUsers/{userId}/memos/{memoId}
  * mindflowUsers/{userId}/folders/{folderId}
@@ -45,9 +73,10 @@ export const fetchMemosFromFirestore = async (userId) => {
 
     const memos = [];
     snapshot.forEach((docSnap) => {
+      const data = convertTimestampsToMillis(docSnap.data());
       memos.push({
         id: docSnap.id,
-        ...docSnap.data()
+        ...data
       });
     });
 
@@ -64,10 +93,14 @@ export const fetchMemosFromFirestore = async (userId) => {
 export const saveMemoToFirestore = async (userId, memo) => {
   try {
     const docRef = doc(db, 'mindflowUsers', userId, 'memos', memo.id);
-    await setDoc(docRef, {
-      ...memo,
-      updatedAt: serverTimestamp()
-    });
+
+    // 새로 생성된 메모(updatedAt이 없음)는 updatedAt을 추가하지 않음
+    // 수정된 메모(updatedAt이 이미 있음)만 updatedAt을 업데이트
+    const dataToSave = memo.updatedAt
+      ? { ...memo, updatedAt: serverTimestamp() }
+      : { ...memo };
+
+    await setDoc(docRef, dataToSave);
   } catch (error) {
     console.error('메모 저장 실패:', error);
     throw error;
@@ -94,7 +127,12 @@ export const setupMemosListener = (userId, callback) => {
   const colRef = collection(db, 'mindflowUsers', userId, 'memos');
   return onSnapshot(colRef, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
-      const data = { id: change.doc.id, ...change.doc.data() };
+      const rawData = change.doc.data();
+      const data = {
+        id: change.doc.id,
+        ...convertTimestampsToMillis(rawData)
+      };
+
       callback(change.type, data);
     });
   }, (error) => {
@@ -116,9 +154,10 @@ export const fetchFoldersFromFirestore = async (userId) => {
 
     const folders = [];
     snapshot.forEach((docSnap) => {
+      const data = convertTimestampsToMillis(docSnap.data());
       folders.push({
         id: docSnap.id,
-        ...docSnap.data()
+        ...data
       });
     });
 
@@ -165,7 +204,11 @@ export const setupFoldersListener = (userId, callback) => {
   const colRef = collection(db, 'mindflowUsers', userId, 'folders');
   return onSnapshot(colRef, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
-      const data = { id: change.doc.id, ...change.doc.data() };
+      const rawData = change.doc.data();
+      const data = {
+        id: change.doc.id,
+        ...convertTimestampsToMillis(rawData)
+      };
       callback(change.type, data);
     });
   }, (error) => {
@@ -187,9 +230,10 @@ export const fetchTrashFromFirestore = async (userId) => {
 
     const trash = [];
     snapshot.forEach((docSnap) => {
+      const data = convertTimestampsToMillis(docSnap.data());
       trash.push({
         id: docSnap.id,
-        ...docSnap.data()
+        ...data
       });
     });
 
@@ -245,7 +289,11 @@ export const setupTrashListener = (userId, callback) => {
   const colRef = collection(db, 'mindflowUsers', userId, 'trash');
   return onSnapshot(colRef, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
-      const data = { id: change.doc.id, ...change.doc.data() };
+      const rawData = change.doc.data();
+      const data = {
+        id: change.doc.id,
+        ...convertTimestampsToMillis(rawData)
+      };
       callback(change.type, data);
     });
   }, (error) => {
@@ -267,9 +315,10 @@ export const fetchMacrosFromFirestore = async (userId) => {
 
     const macros = [];
     snapshot.forEach((docSnap) => {
+      const data = convertTimestampsToMillis(docSnap.data());
       macros.push({
         id: docSnap.id,
-        ...docSnap.data()
+        ...data
       });
     });
 
@@ -316,7 +365,11 @@ export const setupMacrosListener = (userId, callback) => {
   const colRef = collection(db, 'mindflowUsers', userId, 'macros');
   return onSnapshot(colRef, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
-      const data = { id: change.doc.id, ...change.doc.data() };
+      const rawData = change.doc.data();
+      const data = {
+        id: change.doc.id,
+        ...convertTimestampsToMillis(rawData)
+      };
       callback(change.type, data);
     });
   }, (error) => {
@@ -338,7 +391,8 @@ export const fetchCalendarFromFirestore = async (userId) => {
 
     const calendar = {};
     snapshot.forEach((docSnap) => {
-      calendar[docSnap.id] = docSnap.data().schedule || {};
+      const data = convertTimestampsToMillis(docSnap.data());
+      calendar[docSnap.id] = data.schedule || {};
     });
 
     return calendar;
@@ -400,7 +454,9 @@ export const setupCalendarListener = (userId, callback) => {
   return onSnapshot(colRef, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
       const dateKey = change.doc.id;
-      const schedule = change.doc.data().schedule || {};
+      const rawData = change.doc.data();
+      const convertedData = convertTimestampsToMillis(rawData);
+      const schedule = convertedData.schedule || {};
       callback(change.type, dateKey, schedule);
     });
   }, (error) => {
@@ -422,9 +478,10 @@ export const fetchActivitiesFromFirestore = async (userId) => {
 
     const activities = [];
     snapshot.forEach((docSnap) => {
+      const data = convertTimestampsToMillis(docSnap.data());
       activities.push({
         id: docSnap.id,
-        ...docSnap.data()
+        ...data
       });
     });
 
@@ -471,7 +528,11 @@ export const setupActivitiesListener = (userId, callback) => {
   const colRef = collection(db, 'mindflowUsers', userId, 'activities');
   return onSnapshot(colRef, (snapshot) => {
     snapshot.docChanges().forEach((change) => {
-      const data = { id: change.doc.id, ...change.doc.data() };
+      const rawData = change.doc.data();
+      const data = {
+        id: change.doc.id,
+        ...convertTimestampsToMillis(rawData)
+      };
       callback(change.type, data);
     });
   }, (error) => {
@@ -492,7 +553,8 @@ export const fetchSettingsFromFirestore = async (userId) => {
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      return docSnap.data();
+      const data = convertTimestampsToMillis(docSnap.data());
+      return data;
     }
     return {
       widgets: ['StatsGrid', 'QuickActions', 'RecentActivity'],
@@ -531,7 +593,9 @@ export const setupSettingsListener = (userId, callback) => {
   const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
   return onSnapshot(docRef, (snapshot) => {
     if (snapshot.exists()) {
-      callback(snapshot.data());
+      const rawData = snapshot.data();
+      const convertedData = convertTimestampsToMillis(rawData);
+      callback(convertedData);
     }
   }, (error) => {
     console.error('설정 리스너 에러:', error);
@@ -1236,7 +1300,12 @@ export const saveMemosToFirestore = async (userId, memos) => {
   memos.forEach(memo => {
     if (memo.id) {
       const docRef = doc(db, 'mindflowUsers', userId, 'memos', memo.id);
-      batch.set(docRef, { ...memo, updatedAt: serverTimestamp() });
+      // 새로 생성된 메모(updatedAt이 없음)는 updatedAt을 추가하지 않음
+      // 수정된 메모(updatedAt이 이미 있음)만 updatedAt을 업데이트
+      const dataToSave = memo.updatedAt
+        ? { ...memo, updatedAt: serverTimestamp() }
+        : { ...memo };
+      batch.set(docRef, dataToSave);
     }
   });
   await batch.commit();

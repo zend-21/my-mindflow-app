@@ -283,12 +283,42 @@ service cloud.firestore {
          request.auth.uid in get(/databases/$(database)/documents/firebaseUIDToPhone/$(request.auth.uid)).data.keys())
       );
 
-      // 사용자 데이터 서브컬렉션
+      // 사용자 데이터 서브컬렉션 (기존 배열 구조 - 하위 호환)
       match /userData/{dataType} {
         // 본인만 읽기/쓰기 가능
         allow read, write: if isSignedIn() && (
           request.auth.uid == userId
         );
+      }
+
+      // 🚀 개별 메모 컬렉션 (새 구조)
+      match /memos/{memoId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // 🚀 개별 폴더 컬렉션 (새 구조)
+      match /folders/{folderId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // 🚀 개별 휴지통 컬렉션 (새 구조)
+      match /trash/{trashId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // 🚀 개별 매크로 컬렉션 (새 구조)
+      match /macros/{macroId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // 🚀 개별 캘린더 컬렉션 (새 구조)
+      match /calendar/{dateKey} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // 🚀 개별 활동 컬렉션 (새 구조)
+      match /activities/{activityId} {
+        allow read, write: if isSignedIn() && request.auth.uid == userId;
       }
 
       // 🚀 개별 시크릿 문서 컬렉션 (개별 문서 암호화)

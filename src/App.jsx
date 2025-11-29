@@ -589,8 +589,12 @@ function App() {
         syncSettings,
         saveImmediately,
         // 개별 항목 동기화 함수
+        syncMemo,
+        deleteMemo,
         syncFolder,
-        deleteFolder
+        deleteFolder,
+        syncTrashItem,
+        deleteTrashItem
     } = useFirestoreSync(userId, isAuthenticated, firebaseUser?.uid);
 
     // settings에서 개별 값 추출
@@ -715,7 +719,7 @@ function App() {
 
         const now = Date.now();
         const newActivity = {
-            id: now,
+            id: String(now), // Firestore doc ID는 문자열이어야 함
             memoId: memoId,
             type,
             description: formattedDescription,
@@ -985,53 +989,49 @@ function App() {
                 content: newMemoContent,
                 date: now,
                 createdAt: now,
-                updatedAt: now,
+                // updatedAt은 설정하지 않음 - 새로 생성된 메모는 수정된 적이 없음
                 displayDate: new Date(now).toLocaleString(),
                 isImportant: isImportant,
                 folderId: newMemoFolderId || null // 폴더 ID 저장 (null이면 미분류)
             };
-            syncMemos([newMemo, ...memos]);
+
+            // ✅ 개별 문서 방식으로 저장 (산업 표준)
+            syncMemo(newMemo);
             addActivity('메모 작성', newMemoContent, newId);
             setIsNewMemoModalOpen(false);
             setNewMemoFolderId(null); // 폴더 ID 초기화
             showToast("✓ 메모가 저장되었습니다");
-            quietSync(); // ✅ 추가
         };
 
     const handleEditMemo = (id, newContent, isImportant, folderId, previousFolderId) => {
             const now = Date.now();
-            const updatedMemos = memos.map(memo => {
-                if (memo.id === id) {
-                    // 내용이 변경되었는지 확인 (공백 포함)
-                    const contentChanged = memo.content !== newContent;
+            const targetMemo = memos.find(memo => memo.id === id);
+            if (!targetMemo) return;
 
-                    const updatedMemo = {
-                        ...memo,
-                        content: newContent,
-                        date: contentChanged ? now : memo.date, // 내용 변경 시에만 date 갱신
-                        createdAt: memo.createdAt || now, // 기존 createdAt 유지, 없으면 현재 시간
-                        updatedAt: contentChanged ? now : memo.updatedAt, // 내용 변경 시에만 updatedAt 갱신
-                        displayDate: contentChanged ? new Date(now).toLocaleString() : memo.displayDate, // 내용 변경 시에만 displayDate 갱신
-                        isImportant: isImportant,
-                        folderId: folderId !== undefined ? folderId : memo.folderId, // 폴더 ID 저장
-                        previousFolderId: previousFolderId !== undefined ? previousFolderId : memo.previousFolderId // 이전 폴더 ID 저장
-                    };
+            // 내용이 변경되었는지 확인 (공백 포함)
+            const contentChanged = targetMemo.content !== newContent;
 
-                    // ✨ 선택된 메모 업데이트 (읽기 모드에서 변경사항 반영)
-                    if (selectedMemo && selectedMemo.id === id) {
-                        setSelectedMemo(updatedMemo);
-                    }
+            const updatedMemo = {
+                ...targetMemo,
+                content: newContent,
+                date: contentChanged ? now : targetMemo.date, // 내용 변경 시에만 date 갱신
+                createdAt: targetMemo.createdAt || now, // 기존 createdAt 유지, 없으면 현재 시간
+                updatedAt: contentChanged ? now : targetMemo.updatedAt, // 내용 변경 시에만 updatedAt 갱신
+                displayDate: contentChanged ? new Date(now).toLocaleString() : targetMemo.displayDate, // 내용 변경 시에만 displayDate 갱신
+                isImportant: isImportant,
+                folderId: folderId !== undefined ? folderId : targetMemo.folderId, // 폴더 ID 저장
+                previousFolderId: previousFolderId !== undefined ? previousFolderId : targetMemo.previousFolderId // 이전 폴더 ID 저장
+            };
 
-                    return updatedMemo;
-                }
-                return memo;
-            });
+            // ✨ 선택된 메모 업데이트 (읽기 모드에서 변경사항 반영)
+            if (selectedMemo && selectedMemo.id === id) {
+                setSelectedMemo(updatedMemo);
+            }
 
-            syncMemos(updatedMemos);
+            // ✅ 개별 문서 방식으로 저장 (산업 표준)
+            syncMemo(updatedMemo);
             addActivity('메모 수정', newContent, id);
-            // setIsDetailModalOpen(false); // ✨ 읽기 모드로 전환되므로 모달은 열린 채로 유지
             showToast("✓ 메모가 수정되었습니다");
-            quietSync(); // ✅ 추가
         };
 
     const handleDeleteMemo = (id) => {
@@ -1059,12 +1059,11 @@ function App() {
                     createdAt: deletedMemo.createdAt,
                     updatedAt: deletedMemo.updatedAt
                 };
-                syncTrash([trashedItem, ...trash]);
+                syncTrashItem(trashedItem);
 
-                // 메모 목록에서 제거
-                syncMemos(memos.filter(memo => memo.id !== id));
+                // ✅ Firestore에서 메모 삭제
+                deleteMemo(id);
                 addActivity('메모 삭제', deletedMemo.content, id);
-                quietSync(); // ✅ 추가
             }
             return deletedMemo; 
         };
@@ -1260,9 +1259,8 @@ function App() {
 
         if (isBulkDelete) {
             const idsToDelete = new Set(memoToDelete);
-            const newTrashItems = [];
 
-            // 각 메모를 휴지통으로 이동
+            // 각 메모를 휴지통으로 이동 및 삭제
             memos.forEach(memo => {
                 if (idsToDelete.has(memo.id)) {
                     // 이벤트 발생
@@ -1276,8 +1274,8 @@ function App() {
                     });
                     window.dispatchEvent(event);
 
-                    // 휴지통 아이템 생성
-                    newTrashItems.push({
+                    // 휴지통 아이템 생성 및 저장
+                    const trashedItem = {
                         id: memo.id,
                         type: 'memo',
                         title: memo.title,
@@ -1286,14 +1284,14 @@ function App() {
                         deletedAt: Date.now(),
                         createdAt: memo.createdAt,
                         updatedAt: memo.updatedAt
-                    });
+                    };
+                    syncTrashItem(trashedItem);
+
+                    // ✅ Firestore에서 메모 삭제
+                    deleteMemo(memo.id);
                 }
             });
 
-            // 휴지통에 추가
-            syncTrash([...newTrashItems, ...trash]);
-
-            syncMemos(memos.filter(memo => !idsToDelete.has(memo.id)));
             message = `${idsToDelete.size}개의 메모가 삭제되었습니다.`;
             handleExitSelectionMode();
         } else {
@@ -2403,6 +2401,8 @@ function App() {
     
     // 새 메모 작성 시 저장할 폴더 ID
     const [newMemoFolderId, setNewMemoFolderId] = useState(null);
+    // 현재 활성화된 폴더 ID (MemoPage의 activeFolder 추적용)
+    const [currentActiveFolder, setCurrentActiveFolder] = useState('all');
 
     const handleOpenNewMemoFromPage = (folderId = null) => {
         setMemoOpenSource('page');
@@ -2410,10 +2410,18 @@ function App() {
         setIsNewMemoModalOpen(true);
     };
 
+    // FAB도 페이지 + 버튼과 동일하게 처리
     const handleOpenNewMemoFromFAB = () => {
         setMemoOpenSource('fab');
-        setNewMemoFolderId(null); // FAB에서 열 때는 미분류로 저장
+        // 현재 활성 폴더를 사용 ('all'이면 null로 저장)
+        const targetFolderId = currentActiveFolder === 'all' ? null : currentActiveFolder;
+        setNewMemoFolderId(targetFolderId);
         setIsNewMemoModalOpen(true);
+    };
+
+    // MemoPage의 활성 폴더 변경 추적
+    const handleActiveFolderChange = (folderId) => {
+        setCurrentActiveFolder(folderId);
     };
 
     const handleOpenDetailMemo = (memo, context = null) => {
@@ -2632,6 +2640,7 @@ function App() {
                                 folderSyncContext={{ folders, syncFolder, deleteFolder }}
                                 onRequestShareSelectedMemos={requestShareSelectedMemos}
                                 onRequestUnshareSelectedMemos={requestUnshareSelectedMemos}
+                                onActiveFolderChange={handleActiveFolderChange}
                             />
                         }
                         {activeTab === 'todo' && <div>할 일 페이지</div>}

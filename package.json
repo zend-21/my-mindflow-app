@@ -12,7 +12,8 @@
     "android:run": "npm run build && npx cap sync && npx cap run android",
     "sync": "npx cap sync",
     "set-admin": "node src/scripts/setAdminRank.js",
-    "fix-restaurants": "node scripts/fix-restaurant-stats.js"
+    "fix-restaurants": "node scripts/fix-restaurant-stats.js",
+    "fix-updated-at": "node fix-updated-at.js"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",
