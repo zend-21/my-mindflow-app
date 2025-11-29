@@ -1533,6 +1533,10 @@ const MemoPage = ({
 
         if (folderModal.mode === 'add') {
             addFolder(folderName, folderIcon);
+            // 폴더 생성 시 다중 선택 모드 해제
+            if (isSelectionMode) {
+                onExitSelectionMode();
+            }
         } else if (folderModal.mode === 'edit') {
             updateFolder(folderModal.folder.id, { name: folderName, icon: folderIcon, isLocked: folderLocked });
         }
@@ -1544,6 +1548,10 @@ const MemoPage = ({
         if (folderModal?.folder) {
             deleteFolder(folderModal.folder.id);
             setFolderModal(null);
+            // 폴더 삭제 시 다중 선택 모드 해제
+            if (isSelectionMode) {
+                onExitSelectionMode();
+            }
         }
     };
 
@@ -1591,6 +1599,10 @@ const MemoPage = ({
         // 폴더 삭제
         deleteFolder(folderId);
         setDeleteFolderModal(null);
+        // 폴더 삭제 시 다중 선택 모드 해제
+        if (isSelectionMode) {
+            onExitSelectionMode();
+        }
     };
 
     // 폴더 헤더 길게 누르기 (폴더 수정 모달 열기)
@@ -2069,7 +2081,12 @@ const MemoPage = ({
                             {/* 공유 폴더 - 항상 맨 앞에 표시 (형광 그린 스타일) */}
                             <FolderCard
                                 $isShared
-                                onClick={() => setActiveFolder('shared')}
+                                onClick={() => {
+                                    if (isSelectionMode) {
+                                        onExitSelectionMode();
+                                    }
+                                    setActiveFolder('shared');
+                                }}
                                 title="공유된 메모 보기"
                             >
                                 <SharedFolderIcon>
@@ -2091,7 +2108,12 @@ const MemoPage = ({
                                 return (
                                     <FolderCard
                                         key={folder.id}
-                                        onClick={() => setActiveFolder(folder.id)}
+                                        onClick={() => {
+                                            if (isSelectionMode) {
+                                                onExitSelectionMode();
+                                            }
+                                            setActiveFolder(folder.id);
+                                        }}
                                         onTouchStart={() => {
                                             folderLongPressTimer.current = setTimeout(() => {
                                                 handleFolderLongPress(folder);
