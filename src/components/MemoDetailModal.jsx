@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Fragment, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
 import Portal from './Portal';
+import RichTextEditor from './RichTextEditor';
 // 🗑️ COLLABORATION REMOVED - 협업방 기능 제거됨
 // import RoomSettingsModal from './collaboration/RoomSettingsModal';
 // import CollaborationRoom from './collaboration/CollaborationRoom';
@@ -878,8 +879,9 @@ const MemoDetailModal = ({
         return null;
     }
 
-    const handleContentChange = (e) => {
-        const newContent = e.target.value;
+    const handleContentChange = (html) => {
+        // RichTextEditor에서 HTML 문자열을 직접 받음
+        const newContent = html;
         setEditedContent(newContent);
 
         // 히스토리 중간에서 수정한 경우, 이후 히스토리 삭제
@@ -1301,7 +1303,7 @@ const MemoDetailModal = ({
                                 )}
                             </DateText>
 
-                            {/* 읽기 모드 컨텐츠 */}
+                            {/* 읽기 모드 컨텐츠 - HTML 렌더링 */}
                             <ReadModeContainer
                                 $isImportant={isImportant}
                                 onDoubleClick={() => {
@@ -1329,9 +1331,8 @@ const MemoDetailModal = ({
                                         setLastTap(now);
                                     }
                                 }}
-                            >
-                                {editedContent}
-                            </ReadModeContainer>
+                                dangerouslySetInnerHTML={{ __html: editedContent }}
+                            />
                         </>
                     ) : (
                         <>
@@ -1436,13 +1437,10 @@ const MemoDetailModal = ({
                         )}
                     </DateText>
 
-                    <ModalTextarea
-                        ref={textareaRef}
-                        value={editedContent}
+                    <RichTextEditor
+                        content={editedContent}
                         onChange={handleContentChange}
-                        onFocus={handleTextareaFocus}
-                        onBlur={handleTextareaBlur}
-                        onDoubleClick={handleDoubleClick}
+                        placeholder="메모 내용을 입력하세요..."
                     />
                         </>
                     )}
