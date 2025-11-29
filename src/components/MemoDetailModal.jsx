@@ -1311,6 +1311,24 @@ const MemoDetailModal = ({
                                     }
                                     setIsEditMode(true);
                                 }}
+                                onTouchEnd={(e) => {
+                                    // 텍스트 선택이 발생한 경우 무시
+                                    if (window.getSelection && window.getSelection().toString().length > 0) {
+                                        return;
+                                    }
+
+                                    const now = Date.now();
+                                    const DOUBLE_TAP_DELAY = 300; // 300ms 이내에 두 번 탭하면 더블탭으로 인식
+
+                                    if (now - lastTap < DOUBLE_TAP_DELAY) {
+                                        // 더블탭 감지됨 - 편집 모드로 전환
+                                        e.preventDefault();
+                                        setIsEditMode(true);
+                                        setLastTap(0); // 리셋
+                                    } else {
+                                        setLastTap(now);
+                                    }
+                                }}
                             >
                                 {editedContent}
                             </ReadModeContainer>
