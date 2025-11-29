@@ -4,6 +4,7 @@ import styled, { keyframes } from "styled-components";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import Portal from '../../components/Portal';
+import RichTextEditor from '../../components/RichTextEditor';
 
 /* 애니메이션 */
 const fadeIn = keyframes`
@@ -255,36 +256,16 @@ const HideKeyboardButton = styled.button`
   }
 `;
 
-/* 본문 입력창 */
-const Textarea = styled.textarea`
+/* Rich Text Editor 래퍼 */
+const EditorWrapper = styled.div`
   flex: 1;
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 10px;
-  padding: 12px;
-  font-size: 15px;
-  line-height: 1.5;
-  resize: none;
-  outline: none;
   background: #333842;
-  color: #e0e0e0;  /* 실제 입력한 글씨는 밝게 */
-
-  /* 안내문구(placeholder)는 연하게 */
-  &::placeholder {
-    color: #808080;   /* 연한 회색 */
-    opacity: 1;    /* 브라우저마다 흐림 방지 */
-  }
-
-  /* 🔽 브라우저 호환용 */
-  &::-webkit-input-placeholder {
-    color: #808080;
-  }
-  &:-ms-input-placeholder {
-    color: #808080;
-  }
-  &::-ms-input-placeholder {
-    color: #808080;
-  }
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 `;
 
 /* 토스트 */
@@ -315,7 +296,7 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
   const [originalText, setOriginalText] = useState(data?.text ?? "");
   const [isKeyboardActive, setIsKeyboardActive] = useState(false);
   const [toast, setToast] = useState(null);
-  const textareaRef = useRef(null);
+  const editorRef = useRef(null);
   const lastTapRef = useRef(0);
   const isPristine = text === originalText;
   const isEditingExisting = !!(originalText && originalText.trim().length > 0);
@@ -324,6 +305,24 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
   const [isClosing, setIsClosing] = useState(false);
+
+  const handleTextChange = (html) => {
+    setText(html);
+
+    // 현재까지의 히스토리만 유지 (Redo 스택은 버림)
+    let newHistory = history.slice(0, historyIndex + 1);
+
+    // 항상 새 값을 push (같은 값이라도 기록 유지)
+    newHistory.push(html);
+
+    // 최대 500개까지만 유지
+    if (newHistory.length > 500) {
+      newHistory.shift();
+    }
+
+    setHistory(newHistory);
+    setHistoryIndex(newHistory.length - 1);
+  };
 
   const handleUndo = () => {
     if (historyIndex > 0) {
@@ -346,11 +345,13 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
 
   useEffect(() => {
     if (isOpen) {
-      setText(data?.text ?? "");
-      setOriginalText(data?.text ?? "");
+      const initialText = data?.text ?? "";
+      setText(initialText);
+      setOriginalText(initialText);
+      setHistory([initialText]);
+      setHistoryIndex(0);
       setToast(null);
       setIsKeyboardActive(false);
-      setTimeout(() => textareaRef.current?.blur(), 0);
     }
   }, [isOpen, data]);
 
@@ -434,7 +435,10 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
   };
 
   const handleHideKeyboard = () => {
-    textareaRef.current?.blur();
+    // RichTextEditor에서는 포커스 관리가 자동으로 처리됨
+    if (document.activeElement) {
+      document.activeElement.blur();
+    }
   };
 
   const [confirmModalState, setConfirmModalState] = useState({
@@ -529,32 +533,13 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
           )}
 
           {/* 본문 입력 */}
-          <Textarea
-            ref={textareaRef}
-            value={text}
-            onChange={(e) => {
-              const newText = e.target.value;
-              setText(newText);
-
-              // 현재까지의 히스토리만 유지 (Redo 스택은 버림)
-              let newHistory = history.slice(0, historyIndex + 1);
-
-              // 항상 새 값을 push (같은 값이라도 기록 유지)
-              newHistory.push(newText);
-
-              // 최대 10개까지만 유지
-              if (newHistory.length > 500) {
-                newHistory.shift();
-              }
-
-              setHistory(newHistory);
-              setHistoryIndex(newHistory.length - 1);
-            }}
-            onFocus={() => setIsKeyboardActive(true)}
-            onBlur={() => setIsKeyboardActive(false)}
-            onDoubleClick={handleDoubleClick}
-            placeholder={`스케줄을 입력하세요...\n\n입력창을 두 번 탭하여 등록(수정)하거나 창을 닫을 수 있습니다.`}
-          />
+          <EditorWrapper onDoubleClick={handleDoubleClick}>
+            <RichTextEditor
+              content={text}
+              onChange={handleTextChange}
+              placeholder="스케줄을 입력하세요..."
+            />
+          </EditorWrapper>
         </ModalContent>
       </Overlay>
 

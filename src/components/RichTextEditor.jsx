@@ -1,6 +1,6 @@
 // src/components/RichTextEditor.jsx
 
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
@@ -246,8 +246,87 @@ const HiddenFileInput = styled.input`
   display: none;
 `;
 
+const LinkModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10001;
+`;
+
+const LinkModalContent = styled.div`
+  background: #2a2d35;
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+`;
+
+const LinkModalTitle = styled.h3`
+  margin: 0 0 16px 0;
+  color: #e0e0e0;
+  font-size: 18px;
+`;
+
+const LinkInput = styled.input`
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: #333842;
+  color: #e0e0e0;
+  font-size: 14px;
+  margin-bottom: 16px;
+
+  &:focus {
+    outline: none;
+    border-color: #667eea;
+  }
+
+  &::placeholder {
+    color: #808080;
+  }
+`;
+
+const LinkModalButtons = styled.div`
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+`;
+
+const LinkModalButton = styled.button`
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  ${props => props.$primary ? `
+    background: #667eea;
+    color: white;
+    &:hover {
+      background: #5568d3;
+    }
+  ` : `
+    background: rgba(255, 255, 255, 0.1);
+    color: #e0e0e0;
+    &:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+  `}
+`;
+
 const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하세요...' }) => {
   const fileInputRef = useRef(null);
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
 
   const editor = useEditor({
     extensions: [
@@ -316,12 +395,21 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
 
   const handleLinkAdd = useCallback(() => {
     if (!editor) return;
-
-    const url = prompt('링크 URL을 입력하세요:');
-    if (url) {
-      editor.chain().focus().setLink({ href: url }).run();
-    }
+    setShowLinkModal(true);
   }, [editor]);
+
+  const handleLinkSave = useCallback(() => {
+    if (!editor || !linkUrl.trim()) return;
+
+    editor.chain().focus().setLink({ href: linkUrl }).run();
+    setShowLinkModal(false);
+    setLinkUrl('');
+  }, [editor, linkUrl]);
+
+  const handleLinkCancel = useCallback(() => {
+    setShowLinkModal(false);
+    setLinkUrl('');
+  }, []);
 
   if (!editor) {
     return null;
@@ -458,6 +546,32 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
         accept="image/*"
         onChange={handleImageUpload}
       />
+
+      {showLinkModal && (
+        <LinkModalOverlay onClick={handleLinkCancel}>
+          <LinkModalContent onClick={(e) => e.stopPropagation()}>
+            <LinkModalTitle>링크 추가</LinkModalTitle>
+            <LinkInput
+              type="url"
+              placeholder="https://example.com"
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleLinkSave();
+                }
+              }}
+              autoFocus
+            />
+            <LinkModalButtons>
+              <LinkModalButton onClick={handleLinkCancel}>취소</LinkModalButton>
+              <LinkModalButton $primary onClick={handleLinkSave}>
+                추가
+              </LinkModalButton>
+            </LinkModalButtons>
+          </LinkModalContent>
+        </LinkModalOverlay>
+      )}
     </EditorWrapper>
   );
 };

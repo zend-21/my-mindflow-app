@@ -1,9 +1,10 @@
 // src/components/NewMemoModal.jsx
 
 // ★ React.Fragment를 사용하기 위해 useState 옆에 Fragment (혹은 React)를 import합니다.
-import React, { useState, Fragment, useRef } from 'react'; 
+import React, { useState, Fragment, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
 import Portal from './Portal';
+import RichTextEditor from './RichTextEditor';
 
 /* --- (1) 기존 스타일 및 애니메이션 (변경 없음) --- */
 const fadeIn = keyframes`
@@ -458,15 +459,10 @@ const NewMemoModal = ({ isOpen, onSave, onCancel, openSource }) => {
                         · 입력창을 두 번 탭하여 저장하거나 닫을 수 있습니다.
                     </DoubleTapGuide>
 
-                    <ModalTextarea
-                        ref={textareaRef}
+                    <RichTextEditor
+                        content={newMemoContent}
+                        onChange={setNewMemoContent}
                         placeholder={placeholderText}
-                        value={newMemoContent}
-                        onChange={(e) => setNewMemoContent(e.target.value)}
-                        onFocus={handleTextareaFocus}
-                        onTouchStart={handleDoubleTapSave}
-                        onBlur={handleTextareaBlur}
-                        onDoubleClick={handleDoubleClick}
                     />
                     
                 </ModalContent>
