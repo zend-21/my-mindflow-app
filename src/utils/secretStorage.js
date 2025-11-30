@@ -749,15 +749,15 @@ export const setDocPassword = async (pin, docId, password) => {
     const encryptedContent = await encrypt(doc.content, password);
     const hashedPassword = await hashPassword(password);
 
-    console.log('💾 암호화된 문서 저장 중...');
-    await updateSecretDoc(pin, docId, {
+    console.log('💾 암호화된 문서 저장 중...', { hashedPassword });
+    const updatedDoc = await updateSecretDoc(pin, docId, {
         content: encryptedContent,
         preview: preview,  // ← 원본 content 기반의 preview 보존
         hasPassword: true,
         passwordHash: hashedPassword,
         isContentEncrypted: true
     });
-    console.log('✅ 개별 비밀번호 설정 완료:', docId);
+    console.log('✅ 개별 비밀번호 설정 완료:', { docId, passwordHash: updatedDoc.passwordHash });
 };
 
 /**
@@ -771,15 +771,20 @@ export const unlockDoc = async (pin, docId, password) => {
     const docs = await getAllSecretDocs(pin);
     const doc = docs.find(d => d.id === docId);
 
+    console.log('🔓 unlockDoc 시작:', { docId, hasDoc: !!doc });
+
     if (!doc) {
         return { success: false, message: '문서를 찾을 수 없습니다.' };
     }
+
+    console.log('🔑 문서 정보:', { hasPassword: doc.hasPassword, passwordHash: doc.passwordHash?.substring(0, 20) + '...' });
 
     if (!doc.hasPassword) {
         return { success: true, content: doc.content };
     }
 
     try {
+        console.log('🔐 비밀번호 검증 중:', { password, storedHash: doc.passwordHash });
         const isValid = await verifyPassword(password, doc.passwordHash);
         if (!isValid) {
             return { success: false, message: '비밀번호가 올바르지 않습니다.' };
