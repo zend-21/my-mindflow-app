@@ -280,19 +280,76 @@ const ActiveDot = styled.div`
     top: -11px;
 `;
 
-const Preview = styled.p`
+const Preview = styled.div`
     font-size: 14px;
     color: #b0b0b0;
     margin: 0 0 12px 0;
     line-height: 1.5;
     overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
     position: relative;
     z-index: 1;
-    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 60px; /* 약 2줄 높이로 제한 */
+
+    /* HTML 콘텐츠 스타일링 */
+    h1, h2, h3, h4, h5, h6 {
+        margin: 0;
+        color: #d0d0d0;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    p {
+        margin: 0;
+        color: #b0b0b0;
+    }
+
+    img, video {
+        max-width: 100%;
+        max-height: 60px;
+        height: auto;
+        display: block;
+        border-radius: 4px;
+        margin: 4px 0;
+        object-fit: cover;
+    }
+
+    ul, ol {
+        margin: 0;
+        padding-left: 20px;
+        color: #b0b0b0;
+    }
+
+    table {
+        border-collapse: collapse;
+        font-size: 13px;
+        color: #b0b0b0;
+    }
+
+    th, td {
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 4px 8px;
+    }
+
+    a {
+        color: #4a90e2;
+        text-decoration: none;
+    }
+
+    code {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-size: 13px;
+        color: #b0b0b0;
+    }
+
+    blockquote {
+        margin: 0;
+        padding-left: 12px;
+        border-left: 3px solid rgba(255, 255, 255, 0.2);
+        color: #999;
+    }
 `;
 
 const CardFooter = styled.div`
@@ -653,7 +710,7 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onDelete, onLongPress, 
                 )}
             </CardHeader>
 
-            <Preview>{doc.preview || doc.content || '내용 없음'}</Preview>
+            <Preview dangerouslySetInnerHTML={{ __html: doc.preview || doc.content || '내용 없음' }} />
 
             <CardFooter>
                 {doc.tags && doc.tags.length > 0 ? (

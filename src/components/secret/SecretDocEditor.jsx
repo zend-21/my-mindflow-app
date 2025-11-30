@@ -147,9 +147,11 @@ const Input = styled.input`
     }
 `;
 
-const TextArea = styled.textarea`
+// ✨ HTML 서식 지원을 위한 contentEditable div
+const ContentEditor = styled.div`
     width: 100%;
     min-height: 200px;
+    max-height: 400px;
     padding: 12px;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -157,8 +159,10 @@ const TextArea = styled.textarea`
     color: #ffffff;
     font-size: 14px;
     font-family: inherit;
-    resize: vertical;
     transition: all 0.2s;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
 
     &:focus {
         outline: none;
@@ -167,10 +171,128 @@ const TextArea = styled.textarea`
         box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
     }
 
-    &::placeholder {
+    /* HTML 서식 지원 - 기본 스타일 */
+    h1, h2, h3, h4, h5, h6 {
+        margin: 0.8em 0 0.4em 0;
+        color: #ffffff;
+    }
+
+    p {
+        margin: 0.5em 0;
+    }
+
+    ul, ol {
+        margin: 0.5em 0;
+        padding-left: 1.5em;
+    }
+
+    li {
+        margin: 0.3em 0;
+    }
+
+    a {
+        color: #4a90e2;
+        text-decoration: underline;
+    }
+
+    blockquote {
+        border-left: 3px solid rgba(74, 144, 226, 0.5);
+        padding-left: 1em;
+        margin: 1em 0;
+        color: #b0b0b0;
+    }
+
+    code {
+        background: rgba(255, 255, 255, 0.1);
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.9em;
+    }
+
+    pre {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 1em;
+        border-radius: 8px;
+        overflow-x: auto;
+        margin: 1em 0;
+    }
+
+    pre code {
+        background: none;
+        padding: 0;
+    }
+
+    img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 8px;
+        margin: 0.5em 0;
+    }
+
+    iframe {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        aspect-ratio: 16 / 9;
+        border-radius: 8px;
+        margin: 1em 0;
+    }
+
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 1em 0;
+    }
+
+    th, td {
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 8px;
+        text-align: left;
+    }
+
+    th {
+        background: rgba(255, 255, 255, 0.1);
+        font-weight: 600;
+    }
+
+    strong, b {
+        font-weight: 600;
+        color: #ffffff;
+    }
+
+    em, i {
+        font-style: italic;
+    }
+
+    /* 스크롤바 스타일링 */
+    &::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(240, 147, 251, 0.4);
+        border-radius: 4px;
+
+        &:hover {
+            background: rgba(240, 147, 251, 0.6);
+        }
+    }
+
+    /* 빈 상태 플레이스홀더 */
+    &[data-placeholder]:empty:before {
+        content: attr(data-placeholder);
         color: #808080;
+        pointer-events: none;
     }
 `;
+
+// 기존 TextArea는 제거하고 ContentEditor 사용
 
 const Select = styled.select`
     width: 100%;
@@ -514,6 +636,7 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
 
     const textareaRef = useRef(null);
     const passwordSectionRef = useRef(null);
+    const contentEditorRef = useRef(null);
 
     // 카테고리 아이콘 SVG 경로 가져오기
     const getCategoryIconPath = (category) => {
@@ -590,6 +713,16 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
 
         return () => clearTimeout(timer);
     }, [doc]);
+
+    // ✨ contentEditor 초기값 설정 (커서 위치 유지)
+    useEffect(() => {
+        if (contentEditorRef.current) {
+            // 편집 중이 아닐 때만 업데이트 (포커스가 없을 때)
+            if (document.activeElement !== contentEditorRef.current) {
+                contentEditorRef.current.innerHTML = formData.content || '';
+            }
+        }
+    }, [formData.content]);
 
     // 💾 formData 변경 시 자동 Draft 저장
     useEffect(() => {
@@ -805,13 +938,14 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                 <label htmlFor="isImportant" style={{ cursor: 'pointer' }}>중요</label>
                             </ImportanceCheckbox>
                         </LabelRow>
-                        <TextArea
-                            ref={textareaRef}
-                            placeholder="내용을 입력하세요"
-                            value={formData.content}
-                            onChange={(e) => handleChange('content', e.target.value)}
-                            autoFocus={false}
+                        <ContentEditor
+                            ref={contentEditorRef}
+                            contentEditable={isInputEnabled}
+                            data-placeholder="내용을 입력하세요"
+                            onInput={(e) => handleChange('content', e.currentTarget.innerHTML)}
+                            onBlur={(e) => handleChange('content', e.currentTarget.innerHTML)}
                             style={{ pointerEvents: isInputEnabled ? 'auto' : 'none' }}
+                            suppressContentEditableWarning
                         />
                     </FormGroup>
 

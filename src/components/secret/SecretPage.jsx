@@ -7,6 +7,7 @@ import styled from 'styled-components';
 import PinInput from './PinInput';
 import SecretDocCard from './SecretDocCard';
 import SecretDocEditor from './SecretDocEditor';
+import SecretDocViewer from './SecretDocViewer';
 import PasswordInputPage from './PasswordInputPage';
 import PinChangeModal from './PinChangeModal';
 import EmailConfirmModal from './EmailConfirmModal';
@@ -604,6 +605,8 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
     const [docCount, setDocCount] = useState(0);
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [editingDoc, setEditingDoc] = useState(null);
+    const [isViewerOpen, setIsViewerOpen] = useState(false);
+    const [viewingDoc, setViewingDoc] = useState(null);
     const containerRef = useRef(null);
     const lastScrollY = useRef(0);
     const [settings, setSettings] = useState({
@@ -1103,25 +1106,25 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
         setFilteredDocs(sorted);
     }, [docs, searchQuery, selectedCategory, sortBy, sortOrder]);
 
-    // 문서 클릭
+    // 문서 클릭 - 읽기 모드 먼저 열기
     const handleDocClick = async (doc) => {
         if (doc.hasPassword) {
             setPendingDoc(doc);
             setShowPasswordInputPage(true);
         } else {
-            setEditingDoc(doc);
-            setIsEditorOpen(true);
+            setViewingDoc(doc);
+            setIsViewerOpen(true);
         }
     };
 
-    // 비밀번호 페이지 제출
+    // 비밀번호 페이지 제출 - 읽기 모드로 열기
     const handlePasswordSubmit = async (password) => {
         if (!pendingDoc) return false;
 
         const result = await unlockDoc(currentPin, pendingDoc.id, password);
         if (result.success) {
-            setEditingDoc({ ...pendingDoc, content: result.content });
-            setIsEditorOpen(true);
+            setViewingDoc({ ...pendingDoc, content: result.content });
+            setIsViewerOpen(true);
             setShowPasswordInputPage(false);
             setPendingDoc(null);
             return true;
@@ -1137,6 +1140,24 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
         setPendingDoc(null);
     };
 
+    // 읽기 모드에서 편집 버튼 클릭
+    const handleViewerEdit = () => {
+        setEditingDoc(viewingDoc);
+        setIsEditorOpen(true);
+        // isViewerOpen과 viewingDoc은 유지 - 편집창 위에 레이어됨
+    };
+
+    // 읽기 모드 닫기
+    const handleViewerClose = () => {
+        setIsViewerOpen(false);
+        setViewingDoc(null);
+    };
+
+    // 읽기 모드 네비게이션 (스와이프)
+    const handleViewerNavigate = (newDoc) => {
+        setViewingDoc(newDoc);
+    };
+
     // 비밀번호 복구 (PIN 재입력)
     const handleForgotPassword = () => {
         setShowPasswordInputPage(false);
@@ -1147,13 +1168,13 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
     const handlePinRecovery = async (pin) => {
         const isValid = await verifyPin(pin);
         if (isValid && pendingDoc) {
-            // PIN이 맞으면 문서를 복호화하여 바로 열기
+            // PIN이 맞으면 문서를 복호화하여 읽기 모드로 열기
             setShowPinRecovery(false);
 
             const result = await unlockDoc(currentPin, pendingDoc.id, pendingDoc.password);
             if (result.success) {
-                setEditingDoc({ ...pendingDoc, content: result.content });
-                setIsEditorOpen(true);
+                setViewingDoc({ ...pendingDoc, content: result.content });
+                setIsViewerOpen(true);
                 setPendingDoc(null);
             } else {
                 showToast?.('문서를 열 수 없습니다.');
@@ -1250,6 +1271,11 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                 const updatedDoc = { ...editingDoc, ...docData, updatedAt: new Date().toISOString() };
                 setDocs(prev => prev.map(d => d.id === editingDoc.id ? updatedDoc : d));
                 setFilteredDocs(prev => prev.map(d => d.id === editingDoc.id ? updatedDoc : d));
+
+                // ✅ viewingDoc 즉시 업데이트 (편집 모드 닫기 전)
+                setViewingDoc(updatedDoc);
+
+                // 편집 모드 닫기
                 setIsEditorOpen(false);
                 setEditingDoc(null);
                 clearDraft();
@@ -1261,6 +1287,17 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                 // 개별 비밀번호 설정
                 if (docData.hasPassword && docData.password) {
                     await setDocPassword(currentPin, editingDoc.id, docData.password);
+
+                    // ✅ 비밀번호 설정 후 업데이트된 문서 다시 로드
+                    const allDocs = await getAllSecretDocs(currentPin);
+                    setDocs(allDocs);
+                    setFilteredDocs(allDocs);
+
+                    // 업데이트된 문서 찾기
+                    const freshDoc = allDocs.find(d => d.id === editingDoc.id);
+                    if (freshDoc) {
+                        setViewingDoc(freshDoc);
+                    }
                 }
             } else {
                 // === 새 문서 케이스 ===
@@ -1286,11 +1323,16 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                 if (docData.hasPassword && docData.password) {
                     await new Promise(resolve => setTimeout(resolve, 100));
                     await setDocPassword(currentPin, newDoc.id, docData.password);
-                }
 
-                // 4. 임시 문서를 실제 문서로 교체
-                setDocs(prev => prev.map(d => d.id === tempId ? newDoc : d));
-                setFilteredDocs(prev => prev.map(d => d.id === tempId ? newDoc : d));
+                    // ✅ 비밀번호 설정 후 업데이트된 문서 다시 로드
+                    const allDocs = await getAllSecretDocs(currentPin);
+                    setDocs(allDocs);
+                    setFilteredDocs(allDocs);
+                } else {
+                    // 4. 임시 문서를 실제 문서로 교체 (비밀번호 없는 경우만)
+                    setDocs(prev => prev.map(d => d.id === tempId ? newDoc : d));
+                    setFilteredDocs(prev => prev.map(d => d.id === tempId ? newDoc : d));
+                }
             }
         } catch (error) {
             // 5. 실패 시 롤백
@@ -1315,6 +1357,8 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
         setFilteredDocs(prev => prev.filter(d => d.id !== docId));
         setIsEditorOpen(false);
         setEditingDoc(null);
+        setIsViewerOpen(false);
+        setViewingDoc(null);
         clearDraft();
 
         try {
@@ -2041,6 +2085,18 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                 )}
             </InnerContent>
 
+            {isViewerOpen && viewingDoc && !isEditorOpen && (
+                <SecretDocViewer
+                    doc={viewingDoc}
+                    docs={filteredDocs}
+                    selectedCategory={selectedCategory}
+                    settings={settings}
+                    onClose={handleViewerClose}
+                    onEdit={handleViewerEdit}
+                    onNavigate={handleViewerNavigate}
+                />
+            )}
+
             {isEditorOpen && (
                 <SecretDocEditor
                     doc={editingDoc}
@@ -2050,6 +2106,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                         setIsEditorOpen(false);
                         setEditingDoc(null);
                         clearDraft(); // 사용자가 직접 닫을 때도 Draft 삭제
+                        // isViewerOpen은 그대로 유지 - 이미 true이면 읽기 모드가 바로 보임
                     }}
                     onSave={handleSaveDoc}
                     onDelete={handleDeleteDoc}
@@ -2240,7 +2297,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
             )}
         </Container>
 
-        {!isEditorOpen && !showPasswordInputPage && createPortal(
+        {!isEditorOpen && !showPasswordInputPage && !isViewerOpen && createPortal(
             <AddButton
                 ref={addButtonRef}
                 role="button"

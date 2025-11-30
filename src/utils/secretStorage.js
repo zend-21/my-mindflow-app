@@ -740,6 +740,10 @@ export const setDocPassword = async (pin, docId, password) => {
         throw new Error('문서를 찾을 수 없습니다.');
     }
 
+    // 문서 내용 암호화 전에 preview 생성 (원본 content 기반)
+    console.log('📝 Preview 생성 중...');
+    const preview = doc.content ? doc.content.substring(0, 100) : '';
+
     // 문서 내용 암호화
     console.log('🔒 문서 내용 암호화 중...');
     const encryptedContent = await encrypt(doc.content, password);
@@ -748,6 +752,7 @@ export const setDocPassword = async (pin, docId, password) => {
     console.log('💾 암호화된 문서 저장 중...');
     await updateSecretDoc(pin, docId, {
         content: encryptedContent,
+        preview: preview,  // ← 원본 content 기반의 preview 보존
         hasPassword: true,
         passwordHash: hashedPassword,
         isContentEncrypted: true
@@ -801,8 +806,12 @@ export const removeDocPassword = async (pin, docId, password) => {
         return { success: false, message: result.message };
     }
 
+    // 복호화된 content 기반으로 preview 생성
+    const preview = result.content ? result.content.substring(0, 100) : '';
+
     await updateSecretDoc(pin, docId, {
         content: result.content,
+        preview: preview,  // ← 복호화된 content 기반의 preview 업데이트
         hasPassword: false,
         passwordHash: null,
         isContentEncrypted: false
