@@ -21,6 +21,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 // 환경변수로 스토리지 제공자 선택 (기본값: firebase)
+// Vercel 배포 환경에서도 VITE_STORAGE_PROVIDER 환경변수 적용됨
 const STORAGE_PROVIDER = import.meta.env.VITE_STORAGE_PROVIDER || 'firebase';
 
 /**
