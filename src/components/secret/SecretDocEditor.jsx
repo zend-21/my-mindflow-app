@@ -653,31 +653,34 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
         setPasswordError('');
         setIsInputEnabled(false);
 
-        // 🔓 localStorage에서 Draft 복원 시도
+        // 🔓 localStorage에서 Draft 복원 시도 (새 문서 작성 시에만)
         const userId = localStorage.getItem('firebaseUserId');
         const draftKey = `secretDocEditorDraft_${userId}`;
         let restoredData = null;
 
-        try {
-            const savedDraft = localStorage.getItem(draftKey);
-            if (savedDraft) {
-                const draftData = JSON.parse(savedDraft);
-                // 24시간 이내의 Draft만 복원
-                const hoursSinceCreated = (Date.now() - draftData.timestamp) / (1000 * 60 * 60);
+        // ✅ 기존 문서를 편집하는 경우 Draft 복원 건너뛰기
+        if (!doc) {
+            try {
+                const savedDraft = localStorage.getItem(draftKey);
+                if (savedDraft) {
+                    const draftData = JSON.parse(savedDraft);
+                    // 24시간 이내의 Draft만 복원
+                    const hoursSinceCreated = (Date.now() - draftData.timestamp) / (1000 * 60 * 60);
 
-                if (hoursSinceCreated < 24) {
-                    restoredData = draftData.formData;
-                    console.log('📂 Draft 복원:', restoredData);
-                    if (draftData.passwordConfirm) {
-                        setPasswordConfirm(draftData.passwordConfirm);
+                    if (hoursSinceCreated < 24) {
+                        restoredData = draftData.formData;
+                        console.log('📂 Draft 복원:', restoredData);
+                        if (draftData.passwordConfirm) {
+                            setPasswordConfirm(draftData.passwordConfirm);
+                        }
+                    } else {
+                        // 오래된 Draft 삭제
+                        localStorage.removeItem(draftKey);
                     }
-                } else {
-                    // 오래된 Draft 삭제
-                    localStorage.removeItem(draftKey);
                 }
+            } catch (error) {
+                console.error('Draft 복원 실패:', error);
             }
-        } catch (error) {
-            console.error('Draft 복원 실패:', error);
         }
 
         const initialFormData = restoredData || (doc ? {
@@ -696,6 +699,11 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
             hasPassword: false,
             password: '',
             isImportant: false
+        });
+
+        console.log('🔵 SecretDocEditor 초기화:', {
+            전달받은doc: doc ? { id: doc.id, title: doc.title } : null,
+            초기formData: { title: initialFormData.title }
         });
 
         setFormData(initialFormData);
