@@ -24,6 +24,10 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client
 // Vercel 배포 환경에서도 VITE_STORAGE_PROVIDER 환경변수 적용됨
 const STORAGE_PROVIDER = import.meta.env.VITE_STORAGE_PROVIDER || 'firebase';
 
+// 디버깅: 실제 사용되는 스토리지 제공자 확인
+console.log('🔧 Storage Provider:', STORAGE_PROVIDER);
+console.log('🔧 VITE_STORAGE_PROVIDER env:', import.meta.env.VITE_STORAGE_PROVIDER);
+
 /**
  * 이미지 파일을 스토리지에 업로드
  * @param {File|Blob} file - 업로드할 파일 또는 Blob
