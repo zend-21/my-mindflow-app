@@ -16,6 +16,16 @@ const slideUp = keyframes`
     to { transform: translateY(0); opacity: 1; }
 `;
 
+const slideOutToLeft = keyframes`
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(-100%); opacity: 0.5; }
+`;
+
+const slideOutToRight = keyframes`
+    from { transform: translateX(0); opacity: 1; }
+    to { transform: translateX(100%); opacity: 0.5; }
+`;
+
 const Overlay = styled.div`
     position: fixed;
     top: 0;
@@ -42,11 +52,17 @@ const ModalContent = styled.div`
     width: 95vw;
     height: 97vh;
     max-width: 800px;
-    animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
 
-    /* 스와이프 offset 적용 */
+    /* 스와이프 오프셋 적용 */
     transform: translateX(${props => props.$swipeOffset || 0}px);
     transition: ${props => props.$isSwiping ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0, 1)'};
+
+    /* 슬라이드 애니메이션 */
+    animation: ${props => {
+        if (props.$slideDirection === 'left') return slideOutToLeft;
+        if (props.$slideDirection === 'right') return slideOutToRight;
+        return slideUp;
+    }} ${props => props.$slideDirection ? '0.25s' : '0.3s'} cubic-bezier(0.2, 0, 0, 1);
 
     @media (min-width: 768px) {
         max-width: 420px;
@@ -407,6 +423,7 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
     const [touchEnd, setTouchEnd] = useState(null);
     const [swipeOffset, setSwipeOffset] = useState(0);
     const [isSwiping, setIsSwiping] = useState(false);
+    const [slideDirection, setSlideDirection] = useState(null);
 
     // 더블 탭 관련 state
     const [lastTap, setLastTap] = useState(0);
@@ -459,6 +476,41 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
         }
     };
 
+    // 네비게이션 가능 여부 체크
+    const canNavigatePrev = () => {
+        const currentIndex = getCurrentIndex();
+        return currentIndex > 0;
+    };
+
+    const canNavigateNext = () => {
+        const filteredDocs = getFilteredDocs();
+        const currentIndex = getCurrentIndex();
+        return currentIndex < filteredDocs.length - 1 && currentIndex !== -1;
+    };
+
+    // 이전/다음 문서로 이동 (애니메이션 포함)
+    const navigateToPrevDoc = () => {
+        if (canNavigatePrev()) {
+            const prevDoc = getAdjacentDoc('prev');
+            setSlideDirection('right'); // 오른쪽으로 슬라이드
+            setTimeout(() => {
+                onNavigate && onNavigate(prevDoc);
+                setSlideDirection(null);
+            }, 250);
+        }
+    };
+
+    const navigateToNextDoc = () => {
+        if (canNavigateNext()) {
+            const nextDoc = getAdjacentDoc('next');
+            setSlideDirection('left'); // 왼쪽으로 슬라이드
+            setTimeout(() => {
+                onNavigate && onNavigate(nextDoc);
+                setSlideDirection(null);
+            }, 250);
+        }
+    };
+
     // 스와이프 핸들러
     const handleTouchStart = (e) => {
         setTouchEnd(null);
@@ -480,11 +532,11 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
             }
 
             // 이전 문서가 없으면 오른쪽 스와이프 제한
-            if (diff > 0 && !getAdjacentDoc('prev')) {
+            if (diff > 0 && !canNavigatePrev()) {
                 setSwipeOffset(Math.min(diff * 0.2, 50)); // 최대 50px까지만
             }
             // 다음 문서가 없으면 왼쪽 스와이프 제한
-            else if (diff < 0 && !getAdjacentDoc('next')) {
+            else if (diff < 0 && !canNavigateNext()) {
                 setSwipeOffset(Math.max(diff * 0.2, -50)); // 최대 -50px까지만
             }
             // 정상적인 스와이프
@@ -516,23 +568,15 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
         const isLeftSwipe = distance > 50;
         const isRightSwipe = distance < -50;
 
-        if (isLeftSwipe) {
-            // 왼쪽 스와이프 - 다음 문서
-            const nextDoc = getAdjacentDoc('next');
-            if (nextDoc && onNavigate) {
-                onNavigate(nextDoc);
-            }
-        } else if (isRightSwipe) {
-            // 오른쪽 스와이프 - 이전 문서
-            const prevDoc = getAdjacentDoc('prev');
-            if (prevDoc && onNavigate) {
-                onNavigate(prevDoc);
-            }
+        if (isLeftSwipe && canNavigateNext()) {
+            navigateToNextDoc();
+        } else if (isRightSwipe && canNavigatePrev()) {
+            navigateToPrevDoc();
         }
 
         // 리셋
-        setSwipeOffset(0);
         setIsSwiping(false);
+        setSwipeOffset(0);
         setTouchStart(null);
         setTouchEnd(null);
     };
@@ -556,15 +600,9 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (e.key === 'ArrowLeft') {
-                const prevDoc = getAdjacentDoc('prev');
-                if (prevDoc && onNavigate) {
-                    onNavigate(prevDoc);
-                }
+                navigateToPrevDoc();
             } else if (e.key === 'ArrowRight') {
-                const nextDoc = getAdjacentDoc('next');
-                if (nextDoc && onNavigate) {
-                    onNavigate(nextDoc);
-                }
+                navigateToNextDoc();
             }
         };
 
@@ -581,6 +619,7 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
                 onTouchEnd={handleTouchEnd}
                 $swipeOffset={swipeOffset}
                 $isSwiping={isSwiping}
+                $slideDirection={slideDirection}
             >
                 <Header>
                     <LeftButtons>
