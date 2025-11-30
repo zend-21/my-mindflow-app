@@ -468,13 +468,14 @@ const MemoHeader = styled.div`
         overflow: hidden;
     `}
 `;
-const MemoText = styled.p`
+const MemoText = styled.div`
     font-size: 16px;
     color: #e0e0e0;
     margin: 0;
     white-space: pre-wrap;
     word-break: break-word;
     padding-right: 2px;
+    box-sizing: border-box;
 
     /* 리스트 뷰일 때 - 2줄 제한 */
     ${props => props.$layoutView === 'list' && `
@@ -486,15 +487,55 @@ const MemoText = styled.p`
         padding-top: 5px;
     `}
 
-    /* 그리드 뷰일 때 - 6줄 제한 */
+    /* 그리드 뷰일 때 - HTML 렌더링 */
     ${props => props.$layoutView === 'grid' && `
-        display: -webkit-box;
-        -webkit-line-clamp: 6;
-        -webkit-box-orient: vertical;
         overflow: hidden;
-        text-overflow: ellipsis;
+        max-height: 120px;
         flex-grow: 0;
         padding-top: 12px;
+        line-height: 1.5;
+
+        /* 이미지 스타일 - 썸네일처럼 작게 */
+        img {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            border-radius: 4px;
+            margin: 0.3em 0;
+            box-sizing: border-box;
+        }
+
+        /* YouTube 영상 스타일 - 썸네일처럼 작게 */
+        iframe {
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            aspect-ratio: 16 / 9 !important;
+            border-radius: 4px;
+            margin: 0.3em 0;
+            box-sizing: border-box;
+        }
+
+        /* 기타 스타일 */
+        h1, h2, h3 {
+            font-size: 1em;
+            margin: 0.2em 0;
+        }
+
+        ul, ol {
+            margin: 0.2em 0;
+            padding-left: 1.2em;
+        }
+
+        p {
+            margin: 0.2em 0;
+        }
+
+        blockquote {
+            margin: 0.2em 0;
+            padding-left: 0.5em;
+            border-left: 2px solid rgba(255, 255, 255, 0.3);
+        }
     `}
 `;
 const DateText = styled.span`
@@ -1436,6 +1477,14 @@ const MemoPage = ({
     const longPressTimer = useRef(null);
     const PRESS_DURATION = 500;
 
+    // HTML에서 순수 텍스트만 추출하는 함수
+    const stripHtmlTags = (html) => {
+        if (!html) return '';
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        return div.textContent || div.innerText || '';
+    };
+
     // 폴더 관련 상태
     const {
         folders,
@@ -2291,8 +2340,17 @@ const MemoPage = ({
                                     )}
                                 </BadgeContainer>
                                 <MemoHeader $layoutView={layoutView}>
-                                    <MemoText $layoutView={layoutView}>
-                                        {memo.isStealth ? (memo.stealthPhrase || '비공개 메모') : (memo.content || '')}
+                                    <MemoText
+                                        $layoutView={layoutView}
+                                        {...(layoutView === 'grid' && !memo.isStealth
+                                            ? { dangerouslySetInnerHTML: { __html: memo.content || '' } }
+                                            : {}
+                                        )}
+                                    >
+                                        {layoutView === 'list' || memo.isStealth
+                                            ? (memo.isStealth ? (memo.stealthPhrase || '비공개 메모') : stripHtmlTags(memo.content || ''))
+                                            : null
+                                        }
                                     </MemoText>
                                     <DeleteButton onClick={(e) => handleDeleteClick(e, memo.id)} $isSelectionMode={isSelectionMode}>
                                         &times;

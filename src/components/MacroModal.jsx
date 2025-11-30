@@ -339,8 +339,9 @@ const ToastMessage = styled.div`
 const STORAGE_KEY = 'macroTexts';
 const MAX_LENGTH = 100;
 
-const MacroModal = ({ onClose }) => {
+const MacroModal = ({ onClose, onSave }) => {
     const [macros, setMacros] = useState(Array(7).fill(''));
+    const [initialMacros, setInitialMacros] = useState(Array(7).fill('')); // 초기값 저장
     const [copiedIndex, setCopiedIndex] = useState(null);
     const [editingIndex, setEditingIndex] = useState(null);
     const [editText, setEditText] = useState('');
@@ -360,14 +361,17 @@ const MacroModal = ({ onClose }) => {
                         // 10개에서 7개로: 앞의 7개만 유지
                         const migrated = parsed.slice(0, 7);
                         setMacros(migrated);
+                        setInitialMacros(migrated); // 초기값도 저장
                         localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
                     } else if (parsed.length === 5) {
                         // 5개에서 7개로: 2개 빈 슬롯 추가
                         const migrated = [...parsed, '', ''];
                         setMacros(migrated);
+                        setInitialMacros(migrated); // 초기값도 저장
                         localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
                     } else if (parsed.length === 7) {
                         setMacros(parsed);
+                        setInitialMacros(parsed); // 초기값도 저장
                     }
                 }
             } catch (error) {
@@ -446,7 +450,27 @@ const MacroModal = ({ onClose }) => {
                 <ModalContent onClick={(e) => e.stopPropagation()}>
                     <Header>
                         <Title>매크로</Title>
-                        <CloseButton onClick={onClose}>&times;</CloseButton>
+                        <CloseButton onClick={() => {
+                            // 변경사항 확인 (7개 배열 비교)
+                            const hasChanged = macros.some((macro, index) => macro !== initialMacros[index]);
+
+                            console.log('🚪 매크로 모달 닫기');
+                            console.log('   초기값:', initialMacros);
+                            console.log('   현재값:', macros);
+                            console.log('   변경됨:', hasChanged);
+
+                            // 변경된 경우만 Firestore에 저장
+                            if (hasChanged && onSave) {
+                                console.log('💾 변경사항 있음 - Firestore 저장');
+                                onSave(macros);
+                            } else if (!hasChanged) {
+                                console.log('✅ 변경사항 없음 - Firestore 저장 건너뜀');
+                            } else if (!onSave) {
+                                console.warn('⚠️ onSave 함수가 없습니다!');
+                            }
+
+                            onClose();
+                        }}>&times;</CloseButton>
                     </Header>
 
                     <Description>

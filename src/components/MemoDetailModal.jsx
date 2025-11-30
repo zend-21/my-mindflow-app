@@ -743,6 +743,7 @@ const ReadModeContainer = styled.div`
     -webkit-user-select: text;
     -moz-user-select: text;
     -ms-user-select: text;
+    box-sizing: border-box;
 
     /* 다크 노트북 질감 효과 */
     box-shadow: ${props => props.$isImportant
@@ -771,6 +772,32 @@ const ReadModeContainer = styled.div`
         &:hover {
             background: ${props => props.$isImportant ? 'rgba(239, 83, 80, 0.6)' : 'rgba(74, 144, 226, 0.6)'};
         }
+    }
+
+    /* 이미지 스타일 - 작은 이미지는 원본 크기 유지, 큰 이미지만 100% */
+    img {
+        max-width: 100% !important;
+        height: auto !important;
+        border-radius: 8px;
+        margin: 0.5em 0;
+        cursor: pointer;
+        box-sizing: border-box;
+        display: block;
+        /* 기본은 원본 크기 유지 (작은 이미지가 깨지지 않도록) */
+        width: auto !important;
+        /* 이미지가 컨테이너보다 큰 경우에만 축소 */
+        object-fit: contain;
+    }
+
+    /* YouTube 영상 스타일 - 화면에 맞춤 */
+    iframe {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: auto !important;
+        aspect-ratio: 16 / 9 !important;
+        border-radius: 8px;
+        margin: 1em 0;
+        box-sizing: border-box;
     }
 `;
 
@@ -1109,6 +1136,36 @@ const MemoDetailModal = ({
         // 중요도 변경은 저장 버튼을 눌러야 저장됨 (편집창은 유지)
     };
 
+    // HTML 형식으로 클립보드에 복사
+    const handleCopyContent = async () => {
+        try {
+            // Clipboard API를 사용하여 HTML과 텍스트 모두 복사
+            const htmlContent = editedContent;
+            const textContent = editedContent.replace(/<[^>]*>/g, ''); // HTML 태그 제거한 순수 텍스트
+
+            const clipboardItem = new ClipboardItem({
+                'text/html': new Blob([htmlContent], { type: 'text/html' }),
+                'text/plain': new Blob([textContent], { type: 'text/plain' })
+            });
+
+            await navigator.clipboard.write([clipboardItem]);
+            setToastMessage('📋 복사되었습니다');
+            setTimeout(() => setToastMessage(null), 2000);
+        } catch (error) {
+            console.error('복사 실패:', error);
+            // 폴백: 텍스트만 복사
+            try {
+                const textContent = editedContent.replace(/<[^>]*>/g, '');
+                await navigator.clipboard.writeText(textContent);
+                setToastMessage('📋 텍스트가 복사되었습니다');
+                setTimeout(() => setToastMessage(null), 2000);
+            } catch (fallbackError) {
+                setToastMessage('❌ 복사 실패');
+                setTimeout(() => setToastMessage(null), 2000);
+            }
+        }
+    };
+
     const handleUndo = () => {
         if (historyIndex > 0) {
             const newIndex = historyIndex - 1;
@@ -1266,6 +1323,9 @@ const MemoDetailModal = ({
                                     )}
                                 </ReadModeLeftButtons>
                                 <ReadModeRightButtons>
+                                    <ReadModeButton onClick={handleCopyContent}>
+                                        <span className="material-icons">content_copy</span>
+                                    </ReadModeButton>
                                     <ReadModeButton onClick={() => setIsEditMode(true)}>
                                         <span className="material-icons">edit</span>
                                     </ReadModeButton>
@@ -1339,14 +1399,8 @@ const MemoDetailModal = ({
                             {/* ✨ 편집 모드 - 기존 UI */}
                             {/* 1. 새로운 상단 그리드 */}
                             <TopGridContainer>
-                        {/* 좌측: 되돌리기/다시실행 */}
+                        {/* 좌측: 빈 공간 */}
                         <GridAreaLeft>
-                            <HistoryButton onClick={handleUndo} disabled={historyIndex === 0}>
-                                <span className="material-icons">undo</span>
-                            </HistoryButton>
-                            <HistoryButton onClick={handleRedo} disabled={historyIndex === history.length - 1}>
-                                <span className="material-icons">redo</span>
-                            </HistoryButton>
                         </GridAreaLeft>
 
                         {/* 중앙: 취소/수정 버튼 */}
@@ -1358,7 +1412,7 @@ const MemoDetailModal = ({
                                 수정
                             </SaveButton>
                         </GridAreaCenter>
-                        
+
                         {/* 우측: 자판 숨김 버튼 */}
                         <GridAreaRight>
                             {isKeyboardActive && (
@@ -1441,6 +1495,8 @@ const MemoDetailModal = ({
                         content={editedContent}
                         onChange={handleContentChange}
                         placeholder="메모 내용을 입력하세요..."
+                        onFocus={handleTextareaFocus}
+                        onBlur={handleTextareaBlur}
                     />
                         </>
                     )}

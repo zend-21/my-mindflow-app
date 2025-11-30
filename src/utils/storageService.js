@@ -18,6 +18,7 @@
 
 import { storage } from '../firebase/config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
 // 환경변수로 스토리지 제공자 선택 (기본값: firebase)
 const STORAGE_PROVIDER = import.meta.env.VITE_STORAGE_PROVIDER || 'firebase';
@@ -42,10 +43,11 @@ export const uploadImage = async (file, folder = 'images') => {
  */
 const uploadToFirebase = async (file, folder) => {
   try {
-    // 파일명 생성: 타임스탬프_원본파일명
+    // 파일명 생성: 타임스탬프_UUID.확장자
     const timestamp = Date.now();
-    const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const fileName = `${timestamp}_${sanitizedFileName}`;
+    const extension = file.name.split('.').pop();
+    const randomId = Math.random().toString(36).substring(2, 15);
+    const fileName = `${timestamp}_${randomId}.${extension}`;
 
     // Storage 레퍼런스 생성
     const storageRef = ref(storage, `${folder}/${fileName}`);
@@ -69,39 +71,44 @@ const uploadToFirebase = async (file, folder) => {
 /**
  * Cloudflare R2에 업로드
  * @private
- *
- * 500명 돌파 시 구현 예정
- * 필요한 환경변수:
- *   - VITE_R2_ACCOUNT_ID
- *   - VITE_R2_ACCESS_KEY_ID
- *   - VITE_R2_SECRET_ACCESS_KEY
- *   - VITE_R2_BUCKET_NAME
- *   - VITE_R2_PUBLIC_URL
  */
 const uploadToR2 = async (file, folder) => {
   try {
-    // S3 SDK를 사용한 R2 업로드 (나중에 구현)
-    // 현재는 간단한 fetch API 예시
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('folder', folder);
-
-    const response = await fetch(`${import.meta.env.VITE_R2_PUBLIC_URL}/upload`, {
-      method: 'POST',
-      headers: {
-        'X-Custom-Auth-Key': import.meta.env.VITE_R2_ACCESS_KEY_ID,
+    // S3 Client 설정
+    const s3Client = new S3Client({
+      region: 'auto',
+      endpoint: import.meta.env.VITE_R2_ENDPOINT,
+      credentials: {
+        accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID,
+        secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY,
       },
-      body: formData,
     });
 
-    if (!response.ok) {
-      throw new Error('R2 업로드 실패');
-    }
+    // 파일명 생성: 타임스탬프_UUID.확장자
+    const timestamp = Date.now();
+    const extension = file.name.split('.').pop();
+    const randomId = Math.random().toString(36).substring(2, 15);
+    const fileName = `${timestamp}_${randomId}.${extension}`;
+    const key = `${folder}/${fileName}`;
 
-    const { url } = await response.json();
-    console.log('✅ Cloudflare R2 업로드 성공:', url);
-    return url;
+    // 파일을 ArrayBuffer로 변환
+    const arrayBuffer = await file.arrayBuffer();
+
+    // R2에 업로드
+    const command = new PutObjectCommand({
+      Bucket: import.meta.env.VITE_R2_BUCKET_NAME,
+      Key: key,
+      Body: new Uint8Array(arrayBuffer),
+      ContentType: file.type,
+    });
+
+    await s3Client.send(command);
+
+    // 공개 URL 생성 (R2 Public Development URL 형식)
+    const publicUrl = `${import.meta.env.VITE_R2_PUBLIC_URL}/${key}`;
+
+    console.log('✅ Cloudflare R2 업로드 성공:', publicUrl);
+    return publicUrl;
   } catch (error) {
     console.error('❌ Cloudflare R2 업로드 실패:', error);
     throw new Error(`이미지 업로드 실패: ${error.message}`);
@@ -142,10 +149,33 @@ const deleteFromFirebase = async (url) => {
  */
 const deleteFromR2 = async (url) => {
   try {
-    // R2 삭제 로직 (나중에 구현)
+    // S3 Client 설정
+    const s3Client = new S3Client({
+      region: 'auto',
+      endpoint: import.meta.env.VITE_R2_ENDPOINT,
+      credentials: {
+        accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID,
+        secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY,
+      },
+    });
+
+    // URL에서 Key 추출
+    // 예: https://pub-xxxxx.r2.dev/images/file.jpg -> images/file.jpg
+    const urlParts = url.split('/');
+    // Public URL의 경우 도메인 이후의 모든 부분이 key
+    const key = urlParts.slice(3).join('/');
+
+    // R2에서 삭제
+    const command = new DeleteObjectCommand({
+      Bucket: import.meta.env.VITE_R2_BUCKET_NAME,
+      Key: key,
+    });
+
+    await s3Client.send(command);
     console.log('✅ Cloudflare R2 삭제 성공');
   } catch (error) {
     console.error('❌ Cloudflare R2 삭제 실패:', error);
+    // 삭제 실패는 치명적이지 않으므로 에러를 던지지 않음
   }
 };
 

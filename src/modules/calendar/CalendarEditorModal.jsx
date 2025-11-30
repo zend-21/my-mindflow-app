@@ -105,7 +105,8 @@ const ModalContent = styled.div`
   flex-direction: column;
   padding: 14px;
   box-shadow: 0 10px 30px rgba(0,0,0,0.4);
-  animation: ${slideUp} 0.22s ease-out;   
+  animation: ${slideUp} 0.22s ease-out;
+  overflow: hidden;  /* 모달 자체는 스크롤 안됨 */   
     
     /* 가로 모드일 때 padding-bottom을 줄여 공간 확보 */
     @media (orientation: landscape) {
@@ -136,6 +137,7 @@ const Header = styled.div`
   flex-direction: column;
   gap: 12px;
   margin-bottom: 16px;
+  flex-shrink: 0;  /* 헤더 고정 */
 `;
 
 /* 첫 줄 (날짜 텍스트) */
@@ -152,6 +154,7 @@ const ButtonRow = styled.div`
   grid-template-columns: 30% 40% 30%;
   align-items: center;
   width: 100%;
+  flex-shrink: 0;  /* 버튼 행 고정 */
 `;
 
 /* 왼쪽: 되돌리기/다시실행 */
@@ -266,6 +269,7 @@ const EditorWrapper = styled.div`
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 `;
 
 /* 토스트 */
@@ -289,6 +293,7 @@ const SmallNote = styled.div`
     /* 헤더와 입력창 사이의 간격을 위해 추가 */
     margin-bottom: 12px;
     line-height: 1.5;
+    flex-shrink: 0;  /* SmallNote 고정 */
 `;
 
 const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
@@ -300,43 +305,25 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
   const lastTapRef = useRef(0);
   const isPristine = text === originalText;
   const isEditingExisting = !!(originalText && originalText.trim().length > 0);
-  const [history, setHistory] = useState([data?.text ?? ""]);
-  const [historyIndex, setHistoryIndex] = useState(0);
-  const canUndo = historyIndex > 0;
-  const canRedo = historyIndex < history.length - 1;
   const [isClosing, setIsClosing] = useState(false);
+
+  // TipTap editor의 undo/redo 상태
+  const canUndo = editorRef.current?.can().undo() ?? false;
+  const canRedo = editorRef.current?.can().redo() ?? false;
 
   const handleTextChange = (html) => {
     setText(html);
-
-    // 현재까지의 히스토리만 유지 (Redo 스택은 버림)
-    let newHistory = history.slice(0, historyIndex + 1);
-
-    // 항상 새 값을 push (같은 값이라도 기록 유지)
-    newHistory.push(html);
-
-    // 최대 500개까지만 유지
-    if (newHistory.length > 500) {
-      newHistory.shift();
-    }
-
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
   };
 
   const handleUndo = () => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1;
-      setHistoryIndex(newIndex);
-      setText(history[newIndex]);
+    if (editorRef.current?.can().undo()) {
+      editorRef.current.chain().focus().undo().run();
     }
   };
 
   const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1;
-      setHistoryIndex(newIndex);
-      setText(history[newIndex]);
+    if (editorRef.current?.can().redo()) {
+      editorRef.current.chain().focus().redo().run();
     }
   };
 
@@ -348,8 +335,6 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
       const initialText = data?.text ?? "";
       setText(initialText);
       setOriginalText(initialText);
-      setHistory([initialText]);
-      setHistoryIndex(0);
       setToast(null);
       setIsKeyboardActive(false);
     }
@@ -441,6 +426,14 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
     }
   };
 
+  const handleFocus = () => {
+    setIsKeyboardActive(true);
+  };
+
+  const handleBlur = () => {
+    setIsKeyboardActive(false);
+  };
+
   const [confirmModalState, setConfirmModalState] = useState({
     isOpen: false,
     message: '',
@@ -488,14 +481,8 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
 
             {/* 등록 버튼 + 자판 숨김 */}
             <ButtonRow>
-              {/* 왼쪽: 되돌리기/다시실행 */}
+              {/* 왼쪽: 빈 공간 */}
               <LeftWrapper>
-                <HistoryButton onClick={handleUndo} disabled={!canUndo}>
-                  <span className="material-icons">undo</span>
-                </HistoryButton>
-                <HistoryButton onClick={handleRedo} disabled={!canRedo}>
-                  <span className="material-icons">redo</span>
-                </HistoryButton>
               </LeftWrapper>
 
               {/* 중앙: 취소/등록 */}
@@ -538,6 +525,9 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
               content={text}
               onChange={handleTextChange}
               placeholder="스케줄을 입력하세요..."
+              editorRef={editorRef}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
             />
           </EditorWrapper>
         </ModalContent>

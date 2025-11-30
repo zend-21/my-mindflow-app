@@ -100,7 +100,12 @@ export const saveMemoToFirestore = async (userId, memo) => {
       ? { ...memo, updatedAt: serverTimestamp() }
       : { ...memo };
 
-    await setDoc(docRef, dataToSave);
+    // ⚠️ Firestore는 undefined를 허용하지 않으므로 null로 변환
+    const sanitizedData = Object.fromEntries(
+      Object.entries(dataToSave).map(([key, value]) => [key, value === undefined ? null : value])
+    );
+
+    await setDoc(docRef, sanitizedData);
   } catch (error) {
     console.error('메모 저장 실패:', error);
     throw error;
@@ -310,19 +315,18 @@ export const setupTrashListener = (userId, callback) => {
  */
 export const fetchMacrosFromFirestore = async (userId) => {
   try {
-    const colRef = collection(db, 'mindflowUsers', userId, 'macros');
-    const snapshot = await getDocs(colRef);
+    const userDocRef = doc(db, 'mindflowUsers', userId);
+    const docSnap = await getDoc(userDocRef);
 
-    const macros = [];
-    snapshot.forEach((docSnap) => {
-      const data = convertTimestampsToMillis(docSnap.data());
-      macros.push({
-        id: docSnap.id,
-        ...data
-      });
-    });
+    if (!docSnap.exists()) {
+      return [];
+    }
 
-    return macros;
+    const data = docSnap.data();
+    const macros = data?.macros?.items || [];
+
+    // 배열 형태로 반환 (문자열 배열)
+    return Array.isArray(macros) ? macros : [];
   } catch (error) {
     console.error('매크로 데이터 가져오기 실패:', error);
     throw error;
@@ -330,52 +334,29 @@ export const fetchMacrosFromFirestore = async (userId) => {
 };
 
 /**
- * Firestore에 단일 매크로 저장
+ * Firestore에 매크로 배열 저장 (사용자 문서의 macros 필드)
  */
-export const saveMacroToFirestore = async (userId, macro) => {
+export const saveMacroToFirestore = async (userId, macrosArray) => {
   try {
-    const docRef = doc(db, 'mindflowUsers', userId, 'macros', macro.id);
-    await setDoc(docRef, {
-      ...macro,
-      updatedAt: serverTimestamp()
-    });
+    console.log('🔥 saveMacroToFirestore 호출:', { userId, macrosArray });
+    const userDocRef = doc(db, 'mindflowUsers', userId);
+    await setDoc(userDocRef, {
+      macros: {
+        items: macrosArray,
+        updatedAt: serverTimestamp()
+      }
+    }, { merge: true });
+    console.log('✅ Firestore 매크로 저장 완료');
   } catch (error) {
-    console.error('매크로 저장 실패:', error);
+    console.error('❌ 매크로 저장 실패:', error);
     throw error;
   }
 };
 
 /**
- * Firestore에서 단일 매크로 삭제
+ * 매크로는 사용자 문서의 단일 필드로 관리되므로 개별 삭제/리스너 불필요
+ * fetchAllUserData에서 macros 필드를 함께 가져옴
  */
-export const deleteMacroFromFirestore = async (userId, macroId) => {
-  try {
-    const docRef = doc(db, 'mindflowUsers', userId, 'macros', macroId);
-    await deleteDoc(docRef);
-  } catch (error) {
-    console.error('매크로 삭제 실패:', error);
-    throw error;
-  }
-};
-
-/**
- * 매크로 실시간 리스너 설정
- */
-export const setupMacrosListener = (userId, callback) => {
-  const colRef = collection(db, 'mindflowUsers', userId, 'macros');
-  return onSnapshot(colRef, (snapshot) => {
-    snapshot.docChanges().forEach((change) => {
-      const rawData = change.doc.data();
-      const data = {
-        id: change.doc.id,
-        ...convertTimestampsToMillis(rawData)
-      };
-      callback(change.type, data);
-    });
-  }, (error) => {
-    console.error('매크로 리스너 에러:', error);
-  });
-};
 
 // ========================================
 // 캘린더 일정 (날짜별 문서)

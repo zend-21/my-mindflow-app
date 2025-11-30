@@ -19,6 +19,11 @@ const NavContainer = styled.nav`
     background: rgba(31, 34, 41, 0.95);
     backdrop-filter: blur(10px);
     border-top: 1px solid rgba(255, 255, 255, 0.05);
+
+    @media (min-width: 768px) { max-width: 480px; }
+    @media (min-width: 1024px) { max-width: 530px; }
+    @media (min-width: 1440px) { max-width: 580px; }
+    @media (min-width: 1900px) { max-width: 680px; }
 `;
 
 const NavItem = styled.div`

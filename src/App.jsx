@@ -1141,7 +1141,7 @@ function App() {
                         return {
                             ...memo,
                             isStealth: false,
-                            stealthPhrase: undefined
+                            stealthPhrase: null // Firestore는 undefined를 허용하지 않음
                         };
                     }
                 }
@@ -1199,7 +1199,7 @@ function App() {
                     return {
                         ...memo,
                         folderId: memo.previousFolderId || null,
-                        previousFolderId: undefined // 복원 후 제거
+                        previousFolderId: null // 복원 후 제거 (Firestore는 undefined를 허용하지 않음)
                     };
                 }
                 return memo;
@@ -2072,14 +2072,9 @@ function App() {
 
     useEffect(() => {
         const handleVisibilityChange = async () => {
-            console.log('🔔 Visibility 상태 변경:', document.hidden ? '숨김(백그라운드)' : '보임(포그라운드)');
-
             if (document.hidden) {
                 // 🔥 앱이 백그라운드로 전환됨 - Firestore에 즉시 저장
-                console.log('📱 백그라운드 전환 감지 - Firestore 즉시 저장');
-
                 if (userId && isAuthenticated) {
-                    console.log('🔄 백그라운드 동기화 실행 중...');
                     try {
                         await saveImmediately(); // Firestore에 즉시 저장
                         console.log('✅ 백그라운드 동기화 완료');
@@ -2089,16 +2084,15 @@ function App() {
                 }
             } else {
                 // 🔥 앱이 포그라운드로 복귀 - Firestore에서 최신 데이터 로드
-                console.log('👀 앱이 다시 활성화됨 (포그라운드) - 최신 데이터 확인');
-
                 if (userId && isAuthenticated) {
                     try {
                         const freshData = await fetchAllUserData(userId);
                         if (freshData.memos) syncMemos(freshData.memos);
                         if (freshData.folders) syncFolders(freshData.folders);
                         if (freshData.trash) syncTrash(freshData.trash);
+                        if (freshData.macros) syncMacros(freshData.macros);
                         if (freshData.calendar) syncCalendar(freshData.calendar);
-                        console.log('✅ 포그라운드 복귀 - 최신 데이터 로드 완료');
+                        console.log('✅ 포그라운드 복귀 - 데이터 동기화 완료');
                     } catch (error) {
                         console.error('❌ 포그라운드 데이터 로드 실패:', error);
                     }
@@ -2845,7 +2839,10 @@ function App() {
             />
             {/* ⚙️ 매크로 모달 */}
             {isMacroModalOpen && (
-                <MacroModal onClose={() => setIsMacroModalOpen(false)} />
+                <MacroModal
+                    onClose={() => setIsMacroModalOpen(false)}
+                    onSave={syncMacros}
+                />
             )}
             {/* ✨ 🔮 오늘의 운세 전체 플로우 컴포넌트 */}
             {isFortuneFlowOpen && (

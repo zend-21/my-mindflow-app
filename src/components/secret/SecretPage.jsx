@@ -1323,7 +1323,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
             const docWithoutPassword = {
                 ...doc,
                 hasPassword: false,
-                passwordHash: undefined
+                passwordHash: null // Firestore는 undefined를 허용하지 않음
             };
 
             // 휴지통으로 이동 이벤트 발생
@@ -1429,7 +1429,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                     const docWithoutPassword = {
                         ...doc,
                         hasPassword: false,
-                        passwordHash: undefined
+                        passwordHash: null // Firestore는 undefined를 허용하지 않음
                     };
 
                     // 휴지통으로 이동 이벤트 발생

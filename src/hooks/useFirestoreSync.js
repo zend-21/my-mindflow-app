@@ -8,7 +8,6 @@ import {
   setupMemosListener,
   setupFoldersListener,
   setupTrashListener,
-  setupMacrosListener,
   setupCalendarListener,
   setupActivitiesListener,
   setupSettingsListener,
@@ -22,7 +21,6 @@ import {
   deleteMemoFromFirestore,
   deleteFolderFromFirestore,
   deleteTrashItemFromFirestore,
-  deleteMacroFromFirestore,
   deleteCalendarDateFromFirestore,
   deleteActivityFromFirestore
 } from '../services/userDataService';
@@ -298,30 +296,8 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
       }
     });
 
-    // 매크로 리스너
-    const unsubMacros = setupMacrosListener(userId, (type, macro) => {
-      if (type === 'added') {
-        setMacros(prev => {
-          const exists = prev.find(m => m.id === macro.id);
-          if (exists) return prev;
-          const updated = [...prev, macro];
-          localStorage.setItem('macroTexts', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (type === 'modified') {
-        setMacros(prev => {
-          const updated = prev.map(m => m.id === macro.id ? macro : m);
-          localStorage.setItem('macroTexts', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (type === 'removed') {
-        setMacros(prev => {
-          const updated = prev.filter(m => m.id !== macro.id);
-          localStorage.setItem('macroTexts', JSON.stringify(updated));
-          return updated;
-        });
-      }
-    });
+    // 매크로는 사용자 문서의 단일 필드로 관리되므로 별도 리스너 불필요
+    // fetchAllUserData에서 초기 로드, syncMacros로 저장
 
     // 캘린더 리스너
     const unsubCalendar = setupCalendarListener(userId, (type, dateKey, schedule) => {
@@ -383,7 +359,6 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
       unsubMemos,
       unsubFolders,
       unsubTrash,
-      unsubMacros,
       unsubCalendar,
       unsubActivities,
       unsubSettings
@@ -498,31 +473,38 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     }
   }, [userId, enabled]);
 
-  // 매크로 저장
-  const syncMacro = useCallback((macro) => {
+  // 매크로 저장 (인덱스 기반)
+  const syncMacro = useCallback((index, macroText) => {
     setMacros(prev => {
-      const exists = prev.find(m => m.id === macro.id);
-      const updated = exists ? prev.map(m => m.id === macro.id ? macro : m) : [...prev, macro];
+      const updated = [...prev];
+      updated[index] = macroText;
       localStorage.setItem('macroTexts', JSON.stringify(updated));
+
+      // 전체 배열을 Firestore에 저장
+      if (userId && enabled) {
+        debouncedSave(saveMacroToFirestore, updated); // userId는 debouncedSave가 자동 추가
+      }
+
       return updated;
     });
+  }, [userId, enabled, debouncedSave]);
 
-    debouncedSave(saveMacroToFirestore, macro);
-  }, [debouncedSave]);
-
-  // 매크로 삭제
-  const deleteMacro = useCallback((macroId) => {
+  // 매크로 삭제 (인덱스 기반)
+  const deleteMacro = useCallback((index) => {
     setMacros(prev => {
-      const updated = prev.filter(m => m.id !== macroId);
+      const updated = [...prev];
+      updated[index] = '';
       localStorage.setItem('macroTexts', JSON.stringify(updated));
+
+      // 전체 배열을 Firestore에 저장
+      if (userId && enabled) {
+        saveMacroToFirestore(userId, updated).catch(err => {
+          console.error('매크로 삭제 실패:', err);
+        });
+      }
+
       return updated;
     });
-
-    if (userId && enabled) {
-      deleteMacroFromFirestore(userId, macroId).catch(err => {
-        console.error('매크로 삭제 실패:', err);
-      });
-    }
   }, [userId, enabled]);
 
   // 캘린더 날짜 저장
@@ -603,7 +585,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
         ...memos.map(memo => saveMemoToFirestore(userId, memo)),
         ...folders.map(folder => saveFolderToFirestore(userId, folder)),
         ...trash.map(item => saveTrashItemToFirestore(userId, item)),
-        ...macros.map(macro => saveMacroToFirestore(userId, macro)),
+        saveMacroToFirestore(userId, macros), // 전체 배열을 한 번에 저장
         ...Object.entries(calendar).map(([dateKey, schedule]) =>
           saveCalendarDateToFirestore(userId, dateKey, schedule)
         ),
@@ -655,13 +637,53 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
   // 매크로 배열 동기화 (하위 호환)
   const syncMacros = useCallback((newMacros) => {
+    // 방어: Firestore 데이터가 비어있거나 유효하지 않으면 기존 localStorage 유지
+    if (!newMacros || !Array.isArray(newMacros)) {
+      console.warn('⚠️ syncMacros: 유효하지 않은 데이터 무시', newMacros);
+      return;
+    }
+
+    // 빈 배열이거나 모두 빈 문자열인 경우, 기존 localStorage에 데이터가 있으면 유지
+    const hasValidMacro = newMacros.some(m => m && m.trim().length > 0);
+    if (!hasValidMacro) {
+      try {
+        const existing = JSON.parse(localStorage.getItem('macroTexts') || '[]');
+        const hasExistingData = existing.some(m => m && m.trim().length > 0);
+        if (hasExistingData) {
+          console.warn('⚠️ syncMacros: Firestore 데이터가 비어있어 기존 localStorage 유지');
+          return;
+        }
+      } catch (err) {
+        console.error('❌ localStorage 확인 실패:', err);
+      }
+    }
+
+    // 기존 데이터와 비교하여 변경된 경우에만 저장
+    try {
+      const existing = JSON.parse(localStorage.getItem('macroTexts') || '[]');
+      const hasChanged = newMacros.length !== existing.length ||
+                        newMacros.some((macro, index) => macro !== existing[index]);
+
+      if (!hasChanged) {
+        // 변경사항이 없으면 조용히 리턴 (로그 없음)
+        return;
+      }
+    } catch (err) {
+      console.error('❌ 기존 매크로 비교 실패:', err);
+    }
+
+    console.log('💾 매크로 localStorage 저장:', newMacros);
     setMacros(newMacros);
     localStorage.setItem('macroTexts', JSON.stringify(newMacros));
 
-    newMacros.forEach(macro => {
-      debouncedSave(saveMacroToFirestore, macro);
-    });
-  }, [debouncedSave]);
+    // 전체 배열을 한 번에 Firestore에 저장
+    if (userId && enabled) {
+      console.log('☁️ 매크로 Firestore 저장 시작:', userId, newMacros);
+      debouncedSave(saveMacroToFirestore, newMacros); // userId는 debouncedSave가 자동 추가
+    } else {
+      console.warn('⚠️ Firestore 저장 건너뜀 - userId:', userId, 'enabled:', enabled);
+    }
+  }, [userId, enabled, debouncedSave]);
 
   // 캘린더 객체 동기화 (하위 호환)
   const syncCalendar = useCallback((newCalendar) => {

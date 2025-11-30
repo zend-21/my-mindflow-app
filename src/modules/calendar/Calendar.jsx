@@ -2307,16 +2307,159 @@ const Calendar = ({
                             })()}
 
                             {scheduleText ? (
-                                <span style={{
-                                    whiteSpace: 'pre-wrap',
-                                    color: '#c0c0c0',
-                                    display: 'block',
-                                    paddingBottom: '12px',
-                                    padding: '0 5px 12px 5px'   // ✅ 위0, 오른쪽5, 아래12, 왼쪽5
-                                  }}
-                                >
-                                    {scheduleText}
-                                </span>
+                                <div style={{
+                                    padding: '0 5px 12px 5px'
+                                }}>
+                                    {/* HTML을 순서대로 파싱하여 텍스트, 이미지, 동영상 표시 */}
+                                    {(() => {
+                                        const parser = new DOMParser();
+                                        const doc = parser.parseFromString(scheduleText, 'text/html');
+
+                                        // DOM 트리를 순서대로 순회하며 콘텐츠 추출
+                                        const orderedContent = [];
+                                        let currentTextChunks = [];
+
+                                        const processNode = (node, isFirstChild = false) => {
+                                            // 텍스트 노드인 경우
+                                            if (node.nodeType === Node.TEXT_NODE) {
+                                                const text = node.textContent;
+                                                // 공백도 보존 (완전히 비어있지 않으면)
+                                                if (text) {
+                                                    currentTextChunks.push(text);
+                                                }
+                                            }
+                                            // 이미지 노드인 경우
+                                            else if (node.nodeName === 'IMG') {
+                                                // 이전까지 모인 텍스트를 먼저 저장
+                                                if (currentTextChunks.length > 0) {
+                                                    orderedContent.push({
+                                                        type: 'text',
+                                                        content: currentTextChunks.join('')
+                                                    });
+                                                    currentTextChunks = [];
+                                                }
+                                                // 이미지 저장
+                                                orderedContent.push({
+                                                    type: 'image',
+                                                    src: node.src,
+                                                    alt: node.alt || ''
+                                                });
+                                            }
+                                            // iframe 노드인 경우
+                                            else if (node.nodeName === 'IFRAME') {
+                                                // 이전까지 모인 텍스트를 먼저 저장
+                                                if (currentTextChunks.length > 0) {
+                                                    orderedContent.push({
+                                                        type: 'text',
+                                                        content: currentTextChunks.join('')
+                                                    });
+                                                    currentTextChunks = [];
+                                                }
+                                                // iframe 저장
+                                                orderedContent.push({
+                                                    type: 'iframe',
+                                                    src: node.src,
+                                                    title: node.title || ''
+                                                });
+                                            }
+                                            // 다른 요소 노드인 경우 자식 노드들을 재귀적으로 처리
+                                            else if (node.nodeType === Node.ELEMENT_NODE) {
+                                                // 블록 레벨 요소는 앞에 줄바꿈 추가 (첫 번째 자식 제외)
+                                                const blockElements = ['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'BLOCKQUOTE'];
+                                                if (blockElements.includes(node.nodeName) && !isFirstChild && currentTextChunks.length > 0) {
+                                                    currentTextChunks.push('\n');
+                                                }
+
+                                                // <br> 태그는 줄바꿈으로 처리
+                                                if (node.nodeName === 'BR') {
+                                                    currentTextChunks.push('\n');
+                                                } else {
+                                                    // 자식 노드들을 순서대로 처리
+                                                    node.childNodes.forEach((child, index) => processNode(child, index === 0));
+
+                                                    // 블록 레벨 요소는 뒤에도 줄바꿈 추가
+                                                    if (blockElements.includes(node.nodeName)) {
+                                                        currentTextChunks.push('\n');
+                                                    }
+                                                }
+                                            }
+                                        };
+
+                                        // body의 모든 자식 노드를 순서대로 처리
+                                        doc.body.childNodes.forEach((node, index) => processNode(node, index === 0));
+
+                                        // 마지막 남은 텍스트 저장
+                                        if (currentTextChunks.length > 0) {
+                                            orderedContent.push({
+                                                type: 'text',
+                                                content: currentTextChunks.join('')
+                                            });
+                                        }
+
+                                        // 렌더링
+                                        return (
+                                            <div style={{
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                gap: '8px'
+                                            }}>
+                                                {orderedContent.map((item, index) => {
+                                                    if (item.type === 'text') {
+                                                        return (
+                                                            <div
+                                                                key={`text-${index}`}
+                                                                style={{
+                                                                    whiteSpace: 'pre-wrap',
+                                                                    color: '#c0c0c0'
+                                                                }}
+                                                            >
+                                                                {item.content}
+                                                            </div>
+                                                        );
+                                                    } else if (item.type === 'image') {
+                                                        return (
+                                                            <img
+                                                                key={`image-${index}`}
+                                                                src={item.src}
+                                                                alt={item.alt}
+                                                                style={{
+                                                                    maxWidth: '100%',
+                                                                    width: 'auto',
+                                                                    height: 'auto',
+                                                                    borderRadius: '8px',
+                                                                    cursor: 'pointer',
+                                                                    display: 'block',
+                                                                    objectFit: 'contain'
+                                                                }}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    window.open(item.src, '_blank');
+                                                                }}
+                                                            />
+                                                        );
+                                                    } else if (item.type === 'iframe') {
+                                                        return (
+                                                            <iframe
+                                                                key={`iframe-${index}`}
+                                                                src={item.src}
+                                                                title={item.title || `video-${index}`}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    aspectRatio: '16 / 9',
+                                                                    borderRadius: '8px',
+                                                                    border: 'none'
+                                                                }}
+                                                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                                                allowFullScreen
+                                                            />
+                                                        );
+                                                    }
+                                                    return null;
+                                                })}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
                             ) : (
                                 <div className="placeholder-note">
                                     스케줄을 입력하거나 수정하려면 좌상단의 '일정' 버튼을 터치하거나 여기를 '더블탭' 하세요
