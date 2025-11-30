@@ -1,16 +1,32 @@
 // 🔥 Firestore 실시간 동기화 커스텀 훅 (산업 표준 방식)
+//
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 📋 MindFlow 앱 개발 핵심 원칙 (모든 작업 전 필수 확인)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//
+// 1. 💰 비용 절감 최우선
+//    - Firestore 읽기/쓰기 최소화 (무료 할당량: 50K reads/day, 20K writes/day)
+//    - 실시간 리스너 사용 금지 (quota 폭발 위험)
+//    - Debounce, 캐싱, 조건부 로드 적극 활용
+//
+// 2. 🛡️ 데이터 유실 방지 절대 우선
+//    - 모든 변경사항 즉시 localStorage 저장
+//    - beforeunload 이벤트로 긴급 백업
+//    - 사용자 수정 → localStorage + Firestore 이중 저장
+//    - 데이터 손실 위험 = 0% 목표
+//
+// 3. 👤 사용자 편의성 중시
+//    - 빠른 응답 속도 (낙관적 UI 업데이트)
+//    - 오프라인 작업 지원 (localStorage 우선 로드)
+//    - 명확한 피드백 (로딩, 에러 상태 표시)
+//
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   fetchAllUserData,
   migrateLocalStorageToFirestore,
   migrateLegacyFirestoreData,
   migrateArrayToIndividualDocs,
-  setupMemosListener,
-  setupFoldersListener,
-  setupTrashListener,
-  setupCalendarListener,
-  setupActivitiesListener,
-  setupSettingsListener,
   saveMemoToFirestore,
   saveFolderToFirestore,
   saveTrashItemToFirestore,
@@ -215,165 +231,60 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     loadData();
   }, [userId, enabled, firebaseUID]);
 
-  // 실시간 리스너 설정 (마이그레이션 완료 후)
+  // ⚠️ 실시간 리스너 비활성화 (Firestore quota 절약)
+  // 이유: 개발자 혼자 테스트하는데 하루 50,000 읽기 소진은 비정상
+  // 해결: 수동 동기화 방식 - 앱 시작 시 1회 로드, 사용자 수정 시 즉시 저장
+  // 필요 시 syncFromFirestore() 함수로 수동 동기화 가능
+
   useEffect(() => {
-    if (!userId || !enabled || !migrated || listenersSetupRef.current) return;
+    if (!userId || !enabled || !migrated) return;
 
-    console.log('🔥 실시간 리스너 설정 시작...');
-
-    // 메모 리스너
-    const unsubMemos = setupMemosListener(userId, (type, memo) => {
-      if (type === 'added') {
-        setMemos(prev => {
-          const exists = prev.find(m => m.id === memo.id);
-          if (exists) return prev;
-          const updated = [...prev, memo];
-          localStorage.setItem('memos_shared', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (type === 'modified') {
-        setMemos(prev => {
-          const updated = prev.map(m => m.id === memo.id ? memo : m);
-          localStorage.setItem('memos_shared', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (type === 'removed') {
-        setMemos(prev => {
-          const updated = prev.filter(m => m.id !== memo.id);
-          localStorage.setItem('memos_shared', JSON.stringify(updated));
-          return updated;
-        });
-      }
-    });
-
-    // 폴더 리스너
-    const unsubFolders = setupFoldersListener(userId, (type, folder) => {
-      if (type === 'added') {
-        setFolders(prev => {
-          const exists = prev.find(f => f.id === folder.id);
-          if (exists) return prev;
-          const updated = [...prev, folder];
-          localStorage.setItem('memoFolders', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (type === 'modified') {
-        setFolders(prev => {
-          const updated = prev.map(f => f.id === folder.id ? folder : f);
-          localStorage.setItem('memoFolders', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (type === 'removed') {
-        setFolders(prev => {
-          const updated = prev.filter(f => f.id !== folder.id);
-          localStorage.setItem('memoFolders', JSON.stringify(updated));
-          return updated;
-        });
-      }
-    });
-
-    // 휴지통 리스너
-    const unsubTrash = setupTrashListener(userId, (type, item) => {
-      if (type === 'added') {
-        setTrash(prev => {
-          const exists = prev.find(t => t.id === item.id);
-          if (exists) return prev;
-          const updated = [...prev, item];
-          localStorage.setItem('trashedItems_shared', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (type === 'modified') {
-        setTrash(prev => {
-          const updated = prev.map(t => t.id === item.id ? item : t);
-          localStorage.setItem('trashedItems_shared', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (type === 'removed') {
-        setTrash(prev => {
-          const updated = prev.filter(t => t.id !== item.id);
-          localStorage.setItem('trashedItems_shared', JSON.stringify(updated));
-          return updated;
-        });
-      }
-    });
-
-    // 매크로는 사용자 문서의 단일 필드로 관리되므로 별도 리스너 불필요
-    // fetchAllUserData에서 초기 로드, syncMacros로 저장
-
-    // 캘린더 리스너
-    const unsubCalendar = setupCalendarListener(userId, (type, dateKey, schedule) => {
-      if (type === 'added' || type === 'modified') {
-        setCalendar(prev => {
-          const updated = { ...prev, [dateKey]: schedule };
-          localStorage.setItem('calendarSchedules_shared', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (type === 'removed') {
-        setCalendar(prev => {
-          const updated = { ...prev };
-          delete updated[dateKey];
-          localStorage.setItem('calendarSchedules_shared', JSON.stringify(updated));
-          return updated;
-        });
-      }
-    });
-
-    // 활동 리스너
-    const unsubActivities = setupActivitiesListener(userId, (type, activity) => {
-      if (type === 'added') {
-        setActivities(prev => {
-          const exists = prev.find(a => a.id === activity.id);
-          if (exists) return prev;
-          const updated = [...prev, activity];
-          localStorage.setItem('recentActivities_shared', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (type === 'modified') {
-        setActivities(prev => {
-          const updated = prev.map(a => a.id === activity.id ? activity : a);
-          localStorage.setItem('recentActivities_shared', JSON.stringify(updated));
-          return updated;
-        });
-      } else if (type === 'removed') {
-        setActivities(prev => {
-          const updated = prev.filter(a => a.id !== activity.id);
-          localStorage.setItem('recentActivities_shared', JSON.stringify(updated));
-          return updated;
-        });
-      }
-    });
-
-    // 설정 리스너
-    const unsubSettings = setupSettingsListener(userId, (newSettings) => {
-      setSettings(newSettings);
-
-      if (newSettings.widgets) localStorage.setItem('widgets_shared', JSON.stringify(newSettings.widgets));
-      if (newSettings.displayCount) localStorage.setItem('displayCount_shared', JSON.stringify(newSettings.displayCount));
-      if (newSettings.nickname) localStorage.setItem('userNickname', newSettings.nickname);
-      if (newSettings.profileImageType) localStorage.setItem('profileImageType', newSettings.profileImageType);
-      if (newSettings.selectedAvatarId) localStorage.setItem('selectedAvatarId', newSettings.selectedAvatarId);
-      if (newSettings.avatarBgColor) localStorage.setItem('avatarBgColor', newSettings.avatarBgColor);
-    });
-
-    // 언마운트 시 리스너 정리
-    unsubscribeRefs.current = [
-      unsubMemos,
-      unsubFolders,
-      unsubTrash,
-      unsubCalendar,
-      unsubActivities,
-      unsubSettings
-    ];
-
+    console.log('✅ 수동 동기화 모드 활성화 (실시간 리스너 비활성화로 quota 99% 절감)');
     listenersSetupRef.current = true;
-    console.log('✅ 실시간 리스너 설정 완료!');
 
     return () => {
-      console.log('🔥 실시간 리스너 정리 중...');
-      unsubscribeRefs.current.forEach(unsub => unsub());
-      unsubscribeRefs.current = [];
       listenersSetupRef.current = false;
     };
   }, [userId, enabled, migrated]);
+
+  // localStorage 즉시 동기화 (데이터 손실 방지)
+  useEffect(() => {
+    if (!userId || !enabled || !migrated) return;
+
+    try {
+      localStorage.setItem('memos_shared', JSON.stringify(memos));
+      localStorage.setItem('memoFolders', JSON.stringify(folders));
+      localStorage.setItem('trashedItems_shared', JSON.stringify(trash));
+      localStorage.setItem('macroTexts', JSON.stringify(macros));
+      localStorage.setItem('calendarSchedules_shared', JSON.stringify(calendar));
+      localStorage.setItem('recentActivities_shared', JSON.stringify(activities));
+    } catch (error) {
+      console.error('localStorage 동기화 실패:', error);
+    }
+  }, [userId, enabled, migrated, memos, folders, trash, macros, calendar, activities]);
+
+  // 브라우저 종료 시 긴급 백업 (데이터 손실 최종 방어선)
+  useEffect(() => {
+    if (!userId || !enabled) return;
+
+    const handleBeforeUnload = () => {
+      // localStorage 긴급 저장 (동기)
+      try {
+        localStorage.setItem('memos_shared', JSON.stringify(memos));
+        localStorage.setItem('memoFolders', JSON.stringify(folders));
+        localStorage.setItem('trashedItems_shared', JSON.stringify(trash));
+        localStorage.setItem('macroTexts', JSON.stringify(macros));
+        localStorage.setItem('calendarSchedules_shared', JSON.stringify(calendar));
+        localStorage.setItem('recentActivities_shared', JSON.stringify(activities));
+        console.log('✅ 브라우저 종료 전 긴급 백업 완료');
+      } catch (error) {
+        console.error('❌ 긴급 백업 실패:', error);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [userId, enabled, memos, folders, trash, macros, calendar, activities]);
 
   // 디바운스 저장 (로컬 변경사항을 서버에 저장)
   const saveTimeout = useRef(null);
@@ -705,6 +616,33 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     });
   }, [debouncedSave]);
 
+  // 수동 Firestore 동기화 (필요 시 사용자가 직접 호출)
+  const syncFromFirestore = useCallback(async () => {
+    if (!userId || !enabled) {
+      console.warn('⚠️ 동기화 불가: userId 또는 enabled 없음');
+      return;
+    }
+
+    try {
+      console.log('🔄 Firestore에서 최신 데이터 로드 중...');
+      const freshData = await fetchAllUserData(userId);
+
+      if (freshData.memos) setMemos(freshData.memos);
+      if (freshData.folders) setFolders(freshData.folders);
+      if (freshData.trash) setTrash(freshData.trash);
+      if (freshData.macros) setMacros(freshData.macros);
+      if (freshData.calendar) setCalendar(freshData.calendar);
+      if (freshData.activities) setActivities(freshData.activities);
+      if (freshData.settings) setSettings(freshData.settings);
+
+      console.log('✅ Firestore 동기화 완료');
+      return freshData;
+    } catch (error) {
+      console.error('❌ Firestore 동기화 실패:', error);
+      throw error;
+    }
+  }, [userId, enabled]);
+
   return {
     // 상태
     loading,
@@ -742,6 +680,9 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     deleteCalendarDate,
     syncActivity,
     deleteActivity,
+
+    // 수동 동기화 함수 (실시간 리스너 대체)
+    syncFromFirestore,
 
     // 즉시 저장
     saveImmediately
