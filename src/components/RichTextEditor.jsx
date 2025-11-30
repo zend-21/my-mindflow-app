@@ -1052,7 +1052,6 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
 
           try {
             // R2에 업로드 (원본 파일명 전달)
-            const imageUrl = await uploadImage(blob, 'calendar-images', originalFileName);
             const imageUrl = await uploadImage(blob, 'images', originalFileName);
 
             // 에디터에 URL 삽입
