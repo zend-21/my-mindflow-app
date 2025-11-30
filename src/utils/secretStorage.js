@@ -305,7 +305,7 @@ export const getAllSecretDocs = async (pin, includeDeleted = false) => {
                 const decryptedJson = await decrypt(encDoc.encryptedData, pin);
                 console.log('📦 복호화된 JSON:', { id: encDoc.id, includesPasswordHash: decryptedJson.includes('passwordHash') });
                 const parsedDoc = JSON.parse(decryptedJson);
-                console.log('🔓 파싱된 문서:', { id: parsedDoc.id, hasPasswordHash: !!parsedDoc.passwordHash, passwordHash: parsedDoc.passwordHash?.substring(0, 20) });
+                console.log('🔓 파싱된 문서:', { id: parsedDoc.id, hasPasswordHash: !!parsedDoc.passwordHash, passwordHashFull: parsedDoc.passwordHash });
                 return parsedDoc;
             } catch (error) {
                 console.error(`문서 ${encDoc.id} 복호화 실패:`, error);
@@ -750,19 +750,18 @@ export const setDocPassword = async (pin, docId, password) => {
         throw new Error('문서를 찾을 수 없습니다.');
     }
 
-    // 문서 내용 암호화 전에 preview 생성 (원본 content 기반)
-    console.log('📝 Preview 생성 중...');
-    const preview = doc.content ? doc.content.substring(0, 100) : '';
-
     // 문서 내용 암호화
     console.log('🔒 문서 내용 암호화 중...');
     const encryptedContent = await encrypt(doc.content, password);
     const hashedPassword = await hashPassword(password);
 
+    // 🔒 비밀번호가 설정된 문서는 preview를 암호화된 텍스트로 설정
+    const preview = '🔐 비밀번호로 보호된 문서입니다';
+
     console.log('💾 암호화된 문서 저장 중...', { hashedPassword });
     const updatedDoc = await updateSecretDoc(pin, docId, {
         content: encryptedContent,
-        preview: preview,  // ← 원본 content 기반의 preview 보존
+        preview: preview,  // ← 암호화된 문서임을 나타내는 메시지
         hasPassword: true,
         passwordHash: hashedPassword,
         isContentEncrypted: true

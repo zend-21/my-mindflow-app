@@ -27,6 +27,7 @@ import {
     searchSecretDocs,
     setDocPassword,
     unlockDoc,
+    removeDocPassword,
     getSettings,
     saveSettings,
     cleanupPermanentlyDeletedDocs
@@ -1289,10 +1290,19 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                 if (docData.hasPassword && docData.password) {
                     console.log('🔐 개별 비밀번호 설정 시작 (수정)');
                     await setDocPassword(currentPin, editingDoc.id, docData.password);
-                } else if (!docData.hasPassword) {
+                } else if (!docData.hasPassword && editingDoc.hasPassword) {
                     // 비밀번호 해제: 기존 암호화된 내용을 평문으로 복원
+                    console.log('🔓 개별 비밀번호 해제 (수정)');
                     const { password, hasPassword, passwordHash, isContentEncrypted, ...updates } = docData;
-                    await updateSecretDoc(currentPin, editingDoc.id, updates);
+                    // content는 이미 편집 폼에서 복호화된 상태, preview 재생성
+                    const preview = updates.content ? updates.content.substring(0, 100) : '';
+                    await updateSecretDoc(currentPin, editingDoc.id, {
+                        ...updates,
+                        preview,
+                        hasPassword: false,
+                        passwordHash: null,
+                        isContentEncrypted: false
+                    });
                 } else {
                     // 비밀번호 없음: 일반 업데이트
                     const { password, ...updates } = docData;
