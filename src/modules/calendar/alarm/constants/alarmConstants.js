@@ -92,7 +92,7 @@ export const ALARM_REPEAT_CONFIG = {
     3: '3회'
   },
   defaultInterval: 60,                  // 기본: 1분 간격
-  defaultCount: 3,                      // 기본: 3회
+  defaultCount: 1,                      // 기본: 1회
   toastDuration: 3000,                  // 토스트 표시 시간: 3초
 };
 

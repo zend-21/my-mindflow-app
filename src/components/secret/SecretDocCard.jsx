@@ -289,6 +289,7 @@ const Preview = styled.div`
     position: relative;
     z-index: 1;
     word-wrap: break-word;
+    min-height: 21px; /* 최소 1줄 높이 보장 (14px * 1.5 line-height = 21px) */
     max-height: 60px; /* 약 2줄 높이로 제한 */
 
     /* HTML 콘텐츠 스타일링 */
