@@ -1207,9 +1207,26 @@ export const fetchSecretDocsMetadata = async (userId) => {
   }
 };
 
-export const fetchIndividualSecretDocsFromFirestore = async (userId) => {
+export const fetchIndividualSecretDocsFromFirestore = async (userId, docId = null) => {
   try {
     const colRef = collection(db, 'mindflowUsers', userId, 'secretDocs');
+
+    // 🚀 최적화: 단일 문서만 요청하는 경우
+    if (docId) {
+      const docRef = doc(colRef, docId);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        return null;
+      }
+
+      return {
+        id: docSnap.id,
+        encryptedData: docSnap.data().encryptedData || ''
+      };
+    }
+
+    // 전체 문서 요청
     const querySnapshot = await getDocs(colRef);
 
     const docs = [];

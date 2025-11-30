@@ -739,16 +739,28 @@ export const searchSecretDocs = async (pin, query) => {
  * @returns {Promise<void>}
  */
 export const setDocPassword = async (pin, docId, password) => {
-    // 🔧 race condition 방지: getAllSecretDocs 대신 직접 docs를 로드하고 수정
-    // 이렇게 하면 이전 save 작업과 겹치지 않음
     console.log('🔐 개별 비밀번호 설정 시작:', docId);
 
-    const docs = await getAllSecretDocs(pin);
-    const doc = docs.find(d => d.id === docId);
+    // 🚀 최적화: 해당 문서만 로드 (전체 문서 로드 불필요)
+    const userId = getUserId();
+    if (!userId) {
+        throw new Error('로그인이 필요합니다.');
+    }
 
-    if (!doc) {
+    // 개별 문서만 Firestore에서 로드
+    const encryptedDoc = await fetchIndividualSecretDocsFromFirestore(userId, docId);
+    if (!encryptedDoc) {
         throw new Error('문서를 찾을 수 없습니다.');
     }
+
+    // PIN으로 복호화
+    const isValid = await verifyPin(pin);
+    if (!isValid) {
+        throw new Error('PIN이 올바르지 않습니다.');
+    }
+
+    const decryptedJson = await decrypt(encryptedDoc.encryptedData, pin);
+    const doc = JSON.parse(decryptedJson);
 
     // 문서 내용 암호화
     console.log('🔒 문서 내용 암호화 중...');
@@ -758,15 +770,26 @@ export const setDocPassword = async (pin, docId, password) => {
     // 🔒 비밀번호가 설정된 문서는 preview를 암호화된 텍스트로 설정
     const preview = '🔐 비밀번호로 보호된 문서입니다';
 
-    console.log('💾 암호화된 문서 저장 중...', { hashedPassword });
-    const updatedDoc = await updateSecretDoc(pin, docId, {
+    // 업데이트된 문서 객체
+    const updatedDoc = {
+        ...doc,
         content: encryptedContent,
-        preview: preview,  // ← 암호화된 문서임을 나타내는 메시지
+        preview: preview,
         hasPassword: true,
         passwordHash: hashedPassword,
-        isContentEncrypted: true
-    });
+        isContentEncrypted: true,
+        updatedAt: new Date().toISOString()
+    };
+
+    console.log('💾 암호화된 문서 저장 중...', { hashedPassword });
+
+    // 🚀 최적화: 개별 문서만 Firestore에 저장 (전체 문서 저장 불필요)
+    const jsonString = JSON.stringify(updatedDoc);
+    const encryptedData = await encrypt(jsonString, pin);
+    await saveIndividualSecretDocsToFirestore(userId, [{ id: docId, encryptedData }]);
+
     console.log('✅ 개별 비밀번호 설정 완료:', { docId, passwordHash: updatedDoc.passwordHash });
+    return updatedDoc;
 };
 
 /**
