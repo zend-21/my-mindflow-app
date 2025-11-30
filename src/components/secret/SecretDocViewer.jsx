@@ -408,6 +408,10 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
     const [swipeOffset, setSwipeOffset] = useState(0);
     const [isSwiping, setIsSwiping] = useState(false);
 
+    // 더블 탭 관련 state
+    const [lastTap, setLastTap] = useState(0);
+    const DOUBLE_TAP_DELAY = 300; // 300ms 이내에 두 번 탭하면 더블 탭
+
     const formatDate = (dateString) => {
         const date = new Date(dateString);
         return date.toLocaleString('ko-KR', {
@@ -468,18 +472,23 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
         const currentTouch = e.targetTouches[0].clientX;
         const diff = currentTouch - touchStart;
 
-        // 스와이프 시작 (20px 이상 이동)
-        if (Math.abs(diff) > 20) {
-            setIsSwiping(true);
-            // 양쪽 끝에서는 저항 효과
-            const maxOffset = 100;
-            const resistance = 0.5;
+        // 좌우로 10px 이상 움직였을 때만 스와이프로 간주
+        if (Math.abs(diff) > 10) {
+            // 스와이프 시작
+            if (!isSwiping) {
+                setIsSwiping(true);
+            }
 
+            // 이전 문서가 없으면 오른쪽 스와이프 제한
             if (diff > 0 && !getAdjacentDoc('prev')) {
-                setSwipeOffset(diff * resistance);
-            } else if (diff < 0 && !getAdjacentDoc('next')) {
-                setSwipeOffset(diff * resistance);
-            } else {
+                setSwipeOffset(Math.min(diff * 0.2, 50)); // 최대 50px까지만
+            }
+            // 다음 문서가 없으면 왼쪽 스와이프 제한
+            else if (diff < 0 && !getAdjacentDoc('next')) {
+                setSwipeOffset(Math.max(diff * 0.2, -50)); // 최대 -50px까지만
+            }
+            // 정상적인 스와이프
+            else {
                 setSwipeOffset(diff);
             }
         }
@@ -488,7 +497,20 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
     };
 
     const handleTouchEnd = () => {
-        if (!touchStart || !touchEnd) return;
+        if (!touchStart) {
+            setIsSwiping(false);
+            setSwipeOffset(0);
+            return;
+        }
+
+        // 스와이프가 아니라 단순 탭이었다면 (10px 미만 이동)
+        if (!isSwiping || !touchEnd || Math.abs(touchStart - touchEnd) < 10) {
+            setIsSwiping(false);
+            setSwipeOffset(0);
+            setTouchStart(null);
+            setTouchEnd(null);
+            return;
+        }
 
         const distance = touchStart - touchEnd;
         const isLeftSwipe = distance > 50;
@@ -513,6 +535,21 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
         setIsSwiping(false);
         setTouchStart(null);
         setTouchEnd(null);
+    };
+
+    // 더블 탭 핸들러
+    const handleContentTap = (e) => {
+        const currentTime = new Date().getTime();
+        const tapLength = currentTime - lastTap;
+
+        if (tapLength < DOUBLE_TAP_DELAY && tapLength > 0) {
+            // 더블 탭 감지 - 편집 모드 열기
+            if (onEdit) {
+                onEdit();
+            }
+        }
+
+        setLastTap(currentTime);
     };
 
     // 키보드 네비게이션
@@ -588,7 +625,7 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
                 </TitleSection>
 
                 {doc.tags && doc.tags.length > 0 && (
-                    <TagsContainer>
+                    <TagsContainer onClick={handleContentTap}>
                         {doc.tags.map((tag, index) => (
                             <Tag key={index}>{tag}</Tag>
                         ))}
@@ -596,6 +633,7 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
                 )}
 
                 <ContentContainer
+                    onClick={handleContentTap}
                     dangerouslySetInnerHTML={{ __html: doc.content || '내용 없음' }}
                 />
             </ModalContent>

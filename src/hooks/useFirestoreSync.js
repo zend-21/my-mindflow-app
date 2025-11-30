@@ -624,7 +624,25 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     }
 
     try {
-      console.log('🔄 Firestore에서 최신 데이터 로드 중...');
+      console.log('🔄 Firestore 양방향 동기화 시작...');
+
+      // ✅ STEP 1: 로컬 변경사항을 먼저 Firestore에 저장 (데이터 손실 방지)
+      console.log('📤 로컬 변경사항 업로드 중...');
+      await Promise.all([
+        ...memos.map(memo => saveMemoToFirestore(userId, memo)),
+        ...folders.map(folder => saveFolderToFirestore(userId, folder)),
+        ...trash.map(item => saveTrashItemToFirestore(userId, item)),
+        saveMacroToFirestore(userId, macros),
+        ...Object.entries(calendar).map(([dateKey, schedule]) =>
+          saveCalendarDateToFirestore(userId, dateKey, schedule)
+        ),
+        ...activities.map(activity => saveActivityToFirestore(userId, activity)),
+        saveSettingsToFirestore(userId, settings)
+      ]);
+      console.log('✅ 로컬 변경사항 업로드 완료');
+
+      // ✅ STEP 2: Firestore에서 최신 데이터 가져오기
+      console.log('📥 Firestore 최신 데이터 다운로드 중...');
       const freshData = await fetchAllUserData(userId);
 
       if (freshData.memos) setMemos(freshData.memos);
@@ -635,13 +653,13 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
       if (freshData.activities) setActivities(freshData.activities);
       if (freshData.settings) setSettings(freshData.settings);
 
-      console.log('✅ Firestore 동기화 완료');
+      console.log('✅ Firestore 양방향 동기화 완료');
       return freshData;
     } catch (error) {
       console.error('❌ Firestore 동기화 실패:', error);
       throw error;
     }
-  }, [userId, enabled]);
+  }, [userId, enabled, memos, folders, trash, macros, calendar, activities, settings]);
 
   return {
     // 상태
