@@ -24,7 +24,11 @@
       "Bash(firebase deploy:*)",
       "Bash(firebase firestore:rules:list:*)",
       "Bash(npm install:*)",
-      "Bash(vercel env add:*)"
+      "Bash(vercel env add:*)",
+      "Bash(vercel env:*)",
+      "Bash(git push:*)",
+      "Bash(set NODE_ENV=production)",
+      "Bash(vercel inspect:*)"
     ],
     "deny": [],
     "ask": []
