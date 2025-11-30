@@ -604,8 +604,17 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     localStorage.setItem('calendarSchedules_shared', JSON.stringify(newCalendar));
 
     Object.entries(newCalendar).forEach(([dateKey, schedule]) => {
-      console.log('🔍 [syncCalendar] 저장 대기열:', dateKey, '알람 수:', schedule.alarm?.registeredAlarms?.length);
-      debouncedSave(saveCalendarDateToFirestore, dateKey, schedule);
+      // 의미 있는 데이터가 있는지 확인
+      const hasText = schedule.text && schedule.text.trim() !== '' && schedule.text !== '<p></p>';
+      const hasAlarms = schedule.alarm?.registeredAlarms && schedule.alarm.registeredAlarms.length > 0;
+
+      // 텍스트나 알람이 있는 경우에만 Firestore에 저장
+      if (hasText || hasAlarms) {
+        console.log('🔍 [syncCalendar] 저장 대기열:', dateKey, '알람 수:', schedule.alarm?.registeredAlarms?.length);
+        debouncedSave(saveCalendarDateToFirestore, dateKey, schedule);
+      } else {
+        console.log('⏭️ [syncCalendar] 빈 스케줄 건너뜀:', dateKey);
+      }
     });
   }, [debouncedSave]);
 
