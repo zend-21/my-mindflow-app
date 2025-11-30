@@ -20,13 +20,14 @@ import { storage } from '../firebase/config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 
-// 환경변수로 스토리지 제공자 선택 (기본값: firebase)
-// Vercel 배포 환경에서도 VITE_STORAGE_PROVIDER 환경변수 적용됨
-const STORAGE_PROVIDER = import.meta.env.VITE_STORAGE_PROVIDER || 'firebase';
+// 환경변수로 스토리지 제공자 선택
+// Production에서는 무조건 R2 사용
+const STORAGE_PROVIDER = 'r2';  // 임시로 하드코딩
 
 // 디버깅: 실제 사용되는 스토리지 제공자 확인
 console.log('🔧 Storage Provider:', STORAGE_PROVIDER);
-console.log('🔧 VITE_STORAGE_PROVIDER env:', import.meta.env.VITE_STORAGE_PROVIDER);
+console.log('🔧 R2 Endpoint:', import.meta.env.VITE_R2_ENDPOINT);
+console.log('🔧 R2 Bucket:', import.meta.env.VITE_R2_BUCKET_NAME);
 
 /**
  * 이미지 파일을 스토리지에 업로드
