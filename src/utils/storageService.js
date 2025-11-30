@@ -89,13 +89,13 @@ const uploadToR2 = async (file, folder, originalFileName = null) => {
       hasSecretKey: !!import.meta.env.VITE_R2_SECRET_ACCESS_KEY,
     });
 
-    // S3 Client 설정
+    // S3 Client 설정 (환경변수의 개행문자 제거)
     const s3Client = new S3Client({
       region: 'auto',
-      endpoint: import.meta.env.VITE_R2_ENDPOINT,
+      endpoint: import.meta.env.VITE_R2_ENDPOINT?.trim(),
       credentials: {
-        accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID,
-        secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY,
+        accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID?.trim(),
+        secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY?.trim(),
       },
     });
 
@@ -112,7 +112,7 @@ const uploadToR2 = async (file, folder, originalFileName = null) => {
 
     // R2에 업로드
     const command = new PutObjectCommand({
-      Bucket: import.meta.env.VITE_R2_BUCKET_NAME,
+      Bucket: import.meta.env.VITE_R2_BUCKET_NAME?.trim(),
       Key: key,
       Body: new Uint8Array(arrayBuffer),
       ContentType: file.type,
@@ -121,7 +121,7 @@ const uploadToR2 = async (file, folder, originalFileName = null) => {
     await s3Client.send(command);
 
     // 공개 URL 생성 (R2 Public Development URL 형식)
-    const publicUrl = `${import.meta.env.VITE_R2_PUBLIC_URL}/${key}`;
+    const publicUrl = `${import.meta.env.VITE_R2_PUBLIC_URL?.trim()}/${key}`;
 
     return publicUrl;
   } catch (error) {
@@ -164,13 +164,13 @@ const deleteFromFirebase = async (url) => {
  */
 const deleteFromR2 = async (url) => {
   try {
-    // S3 Client 설정
+    // S3 Client 설정 (환경변수의 개행문자 제거)
     const s3Client = new S3Client({
       region: 'auto',
-      endpoint: import.meta.env.VITE_R2_ENDPOINT,
+      endpoint: import.meta.env.VITE_R2_ENDPOINT?.trim(),
       credentials: {
-        accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID,
-        secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY,
+        accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID?.trim(),
+        secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY?.trim(),
       },
     });
 
