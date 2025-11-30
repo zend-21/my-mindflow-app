@@ -416,13 +416,8 @@ const removeUndefinedValues = (obj) => {
 
 export const saveCalendarDateToFirestore = async (userId, dateKey, schedule) => {
   try {
-    console.log('🔍 [saveCalendarDateToFirestore] 시작:', dateKey, 'alarm 수:', schedule.alarm?.registeredAlarms?.length);
-    console.log('🔍 [saveCalendarDateToFirestore] 원본 schedule:', JSON.stringify(schedule, null, 2));
-
     // undefined 값 제거 (재귀적으로 중첩된 객체도 처리)
     const cleanSchedule = removeUndefinedValues(schedule);
-
-    console.log('🔍 [saveCalendarDateToFirestore] 정리된 schedule:', JSON.stringify(cleanSchedule, null, 2));
 
     // 빈 스케줄이면 문서 삭제
     if (!cleanSchedule || Object.keys(cleanSchedule).length === 0) {

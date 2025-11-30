@@ -750,6 +750,9 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
 
   // content 초기 로드 플래그 (IME 중복 입력 방지)
   const isInitialMount = useRef(true);
+  const isComposingRef = useRef(false); // IME 조합 중 여부 추적
+  const pendingChangeRef = useRef(false); // 조합 완료 후 변경 전파 필요 여부
+  const lastSafeContentRef = useRef(content || ''); // IME 조합 중 사용할 안전한 content
 
   // localStorage에서 매크로 불러오기
   useEffect(() => {
@@ -817,10 +820,37 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
         'data-placeholder': placeholder,
         'spellcheck': 'false',
       },
+      // IME 입력 처리 (한글 입력 버그 방지)
+      handleDOMEvents: {
+        compositionstart: (view) => {
+          // 빈 노드나 빈 마크가 있으면 제거
+          const { state, dispatch } = view;
+          const { selection, tr } = state;
+          const { $from } = selection;
+
+          if ($from.parent.textContent.trim() === '') {
+            // 모든 마크 제거
+            const marks = $from.marks();
+            if (marks.length > 0) {
+              marks.forEach(mark => {
+                tr.removeMark($from.pos - $from.parentOffset, $from.pos - $from.parentOffset + $from.parent.content.size, mark.type);
+              });
+              dispatch(tr);
+            }
+          }
+          return false;
+        },
+      },
     },
     onUpdate: ({ editor }) => {
+      // IME 조합 중에는 onChange를 호출하지 않음 (한글 입력 버그 방지)
+      if (editor.view.composing || isComposingRef.current) {
+        pendingChangeRef.current = true;
+        return;
+      }
       const html = editor.getHTML();
       onChange?.(html);
+      pendingChangeRef.current = false;
     },
     onFocus: () => {
       onFocus?.();
@@ -841,46 +871,69 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
     }
   }, [editor, editorRef]);
 
-  // content prop이 변경되면 초기 마운트 플래그 리셋 (모달 재오픈 대응)
-  const prevContentRef = useRef(content);
+  // IME 조합 이벤트 처리 (한글 입력 버그 방지)
   useEffect(() => {
-    // content가 외부에서 완전히 새로운 값으로 변경된 경우 (모달 재오픈 등)
-    if (content !== prevContentRef.current) {
-      isInitialMount.current = true;
-      prevContentRef.current = content;
-    }
-  }, [content]);
+    if (!editor) return;
+
+    const editorElement = editor.view.dom;
+
+    const handleCompositionStart = () => {
+      isComposingRef.current = true;
+    };
+
+    const handleCompositionEnd = () => {
+      isComposingRef.current = false;
+
+      // 조합 완료 후 현재 에디터 내용을 안전한 content로 저장
+      requestAnimationFrame(() => {
+        if (editor && !editor.isDestroyed) {
+          const html = editor.getHTML();
+          lastSafeContentRef.current = html;
+
+          // 대기 중인 변경사항이 있으면 즉시 전파
+          if (pendingChangeRef.current) {
+            onChange?.(html);
+            pendingChangeRef.current = false;
+          }
+        }
+      });
+    };
+
+    editorElement.addEventListener('compositionstart', handleCompositionStart);
+    editorElement.addEventListener('compositionend', handleCompositionEnd);
+
+    return () => {
+      editorElement.removeEventListener('compositionstart', handleCompositionStart);
+      editorElement.removeEventListener('compositionend', handleCompositionEnd);
+    };
+  }, [editor, onChange]);
 
   // content prop 변경 시 에디터 업데이트
   useEffect(() => {
     if (!editor || editor.isDestroyed) return;
+
+    // IME 조합 중이면 content 업데이트를 완전히 무시
+    if (editor.view.composing || isComposingRef.current) {
+      return;
+    }
 
     const currentContent = editor.getHTML();
     const newContent = content || '';
 
     // 초기 로드 시에만 content를 설정
     if (isInitialMount.current && currentContent !== newContent) {
-      console.log('🔵 RichTextEditor 초기 로드:', { isInitialMount: isInitialMount.current });
       editor.commands.setContent(newContent, false);
+      lastSafeContentRef.current = newContent;
       isInitialMount.current = false;
       return;
     }
 
-    // 초기 로드 이후에는 포커스가 없고 IME 조합 중이 아닐 때만 업데이트
-    const shouldUpdate = currentContent !== newContent && !editor.isFocused && !editor.view.composing;
+    // 초기 로드 이후에는 포커스가 없을 때만 업데이트
+    const shouldUpdate = currentContent !== newContent && !editor.isFocused;
+
     if (shouldUpdate) {
-      console.log('🔵 RichTextEditor 업데이트:', {
-        isFocused: editor.isFocused,
-        isComposing: editor.view.composing,
-        contentChanged: currentContent !== newContent
-      });
       editor.commands.setContent(newContent, false);
-    } else if (currentContent !== newContent) {
-      console.log('⚠️ RichTextEditor 업데이트 건너뜀:', {
-        isFocused: editor.isFocused,
-        isComposing: editor.view.composing,
-        contentChanged: currentContent !== newContent
-      });
+      lastSafeContentRef.current = newContent;
     }
   }, [content, editor]);
 
@@ -939,9 +992,11 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
       return;
     }
 
+    // 원본 파일명 저장
+    const originalFileName = file.name;
+
     try {
       setIsUploading(true);
-      console.log('✅ R2 이미지 업로드 시작:', file.name);
 
       // 이미지를 로드하여 크기 확인 및 리사이즈
       const img = document.createElement('img');
@@ -988,7 +1043,6 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
 
           // Blob 크기 확인
           const blobSize = blob.size / (1024 * 1024);
-          console.log(`리사이즈 후 크기: ${blobSize.toFixed(2)}MB`);
 
           if (blobSize > 5) {
             alert('이미지를 리사이즈했지만 여전히 5MB를 초과합니다. 더 작은 이미지를 사용해주세요.');
@@ -997,13 +1051,11 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
           }
 
           try {
-            // R2에 업로드
-            const imageUrl = await uploadImage(blob, 'calendar-images');
-            console.log('✅ R2 업로드 성공:', imageUrl);
+            // R2에 업로드 (원본 파일명 전달)
+            const imageUrl = await uploadImage(blob, 'calendar-images', originalFileName);
 
             // 에디터에 URL 삽입
             editor.chain().focus().setImage({ src: imageUrl }).run();
-            console.log('✅ 이미지 삽입 완료');
 
             setIsUploading(false);
 

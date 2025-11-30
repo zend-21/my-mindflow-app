@@ -25,15 +25,16 @@ const STORAGE_PROVIDER = import.meta.env.VITE_STORAGE_PROVIDER || 'firebase';
 
 /**
  * 이미지 파일을 스토리지에 업로드
- * @param {File} file - 업로드할 파일
+ * @param {File|Blob} file - 업로드할 파일 또는 Blob
  * @param {string} folder - 저장할 폴더명 (기본: 'images')
+ * @param {string} originalFileName - 원본 파일명 (Blob일 경우 필수)
  * @returns {Promise<string>} 업로드된 파일의 URL
  */
-export const uploadImage = async (file, folder = 'images') => {
+export const uploadImage = async (file, folder = 'images', originalFileName = null) => {
   if (STORAGE_PROVIDER === 'r2') {
-    return await uploadToR2(file, folder);
+    return await uploadToR2(file, folder, originalFileName);
   } else {
-    return await uploadToFirebase(file, folder);
+    return await uploadToFirebase(file, folder, originalFileName);
   }
 };
 
@@ -41,16 +42,17 @@ export const uploadImage = async (file, folder = 'images') => {
  * Firebase Storage에 업로드
  * @private
  */
-const uploadToFirebase = async (file, folder) => {
+const uploadToFirebase = async (file, folder, originalFileName = null) => {
   try {
     // 파일명 생성: 타임스탬프_UUID.확장자
     const timestamp = Date.now();
-    const extension = file.name.split('.').pop();
+    const fileName = originalFileName || file.name || 'image.jpg';
+    const extension = fileName.split('.').pop();
     const randomId = Math.random().toString(36).substring(2, 15);
-    const fileName = `${timestamp}_${randomId}.${extension}`;
+    const newFileName = `${timestamp}_${randomId}.${extension}`;
 
     // Storage 레퍼런스 생성
-    const storageRef = ref(storage, `${folder}/${fileName}`);
+    const storageRef = ref(storage, `${folder}/${newFileName}`);
 
     // 파일 업로드
     const snapshot = await uploadBytes(storageRef, file, {
@@ -60,7 +62,6 @@ const uploadToFirebase = async (file, folder) => {
     // 다운로드 URL 가져오기
     const downloadURL = await getDownloadURL(snapshot.ref);
 
-    console.log('✅ Firebase Storage 업로드 성공:', downloadURL);
     return downloadURL;
   } catch (error) {
     console.error('❌ Firebase Storage 업로드 실패:', error);
@@ -72,7 +73,7 @@ const uploadToFirebase = async (file, folder) => {
  * Cloudflare R2에 업로드
  * @private
  */
-const uploadToR2 = async (file, folder) => {
+const uploadToR2 = async (file, folder, originalFileName = null) => {
   try {
     // S3 Client 설정
     const s3Client = new S3Client({
@@ -86,10 +87,11 @@ const uploadToR2 = async (file, folder) => {
 
     // 파일명 생성: 타임스탬프_UUID.확장자
     const timestamp = Date.now();
-    const extension = file.name.split('.').pop();
+    const fileName = originalFileName || file.name || 'image.jpg';
+    const extension = fileName.split('.').pop();
     const randomId = Math.random().toString(36).substring(2, 15);
-    const fileName = `${timestamp}_${randomId}.${extension}`;
-    const key = `${folder}/${fileName}`;
+    const newFileName = `${timestamp}_${randomId}.${extension}`;
+    const key = `${folder}/${newFileName}`;
 
     // 파일을 ArrayBuffer로 변환
     const arrayBuffer = await file.arrayBuffer();
@@ -107,7 +109,6 @@ const uploadToR2 = async (file, folder) => {
     // 공개 URL 생성 (R2 Public Development URL 형식)
     const publicUrl = `${import.meta.env.VITE_R2_PUBLIC_URL}/${key}`;
 
-    console.log('✅ Cloudflare R2 업로드 성공:', publicUrl);
     return publicUrl;
   } catch (error) {
     console.error('❌ Cloudflare R2 업로드 실패:', error);
