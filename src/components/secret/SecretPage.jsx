@@ -1285,23 +1285,29 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                 clearDraft();
                 showToast?.('문서가 수정되었습니다.');
 
-                // 3. 백그라운드에서 실제 저장
-                await updateSecretDoc(currentPin, editingDoc.id, docData);
-
-                // 개별 비밀번호 설정
+                // 3. 개별 비밀번호가 있으면 먼저 설정
                 if (docData.hasPassword && docData.password) {
+                    console.log('🔐 개별 비밀번호 설정 시작 (수정)');
                     await setDocPassword(currentPin, editingDoc.id, docData.password);
+                } else if (!docData.hasPassword) {
+                    // 비밀번호 해제: 기존 암호화된 내용을 평문으로 복원
+                    const { password, hasPassword, passwordHash, isContentEncrypted, ...updates } = docData;
+                    await updateSecretDoc(currentPin, editingDoc.id, updates);
+                } else {
+                    // 비밀번호 없음: 일반 업데이트
+                    const { password, ...updates } = docData;
+                    await updateSecretDoc(currentPin, editingDoc.id, updates);
+                }
 
-                    // ✅ 비밀번호 설정 후 업데이트된 문서 다시 로드
-                    const allDocs = await getAllSecretDocs(currentPin);
-                    setDocs(allDocs);
-                    setFilteredDocs(allDocs);
+                // ✅ 저장 후 문서 다시 로드
+                const allDocs = await getAllSecretDocs(currentPin);
+                setDocs(allDocs);
+                setFilteredDocs(allDocs);
 
-                    // 업데이트된 문서 찾기
-                    const freshDoc = allDocs.find(d => d.id === editingDoc.id);
-                    if (freshDoc) {
-                        setViewingDoc(freshDoc);
-                    }
+                // 업데이트된 문서 찾기
+                const freshDoc = allDocs.find(d => d.id === editingDoc.id);
+                if (freshDoc) {
+                    setViewingDoc(freshDoc);
                 }
             } else {
                 // === 새 문서 케이스 ===
@@ -1320,12 +1326,13 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                 clearDraft();
                 showToast?.('문서가 추가되었습니다.');
 
-                // 3. 백그라운드에서 실제 저장
-                const newDoc = await addSecretDoc(currentPin, docData);
+                // 3. 백그라운드에서 실제 저장 (password 필드 제외)
+                const { password, ...docDataWithoutPassword } = docData;
+                const newDoc = await addSecretDoc(currentPin, docDataWithoutPassword);
 
                 // 개별 비밀번호 설정
                 if (docData.hasPassword && docData.password) {
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    console.log('🔐 개별 비밀번호 설정 시작 (신규)');
                     await setDocPassword(currentPin, newDoc.id, docData.password);
 
                     // ✅ 비밀번호 설정 후 업데이트된 문서 다시 로드
