@@ -1141,8 +1141,8 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
     };
 
     // 읽기 모드에서 편집 버튼 클릭
-    const handleViewerEdit = () => {
-        setEditingDoc(viewingDoc);
+    const handleViewerEdit = (doc) => {
+        setEditingDoc(doc);
         setIsEditorOpen(true);
         // isViewerOpen과 viewingDoc은 유지 - 편집창 위에 레이어됨
     };

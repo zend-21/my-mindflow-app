@@ -601,7 +601,7 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
         if (tapLength < DOUBLE_TAP_DELAY && tapLength > 0) {
             // 더블 탭 감지 - 편집 모드 열기
             if (onEdit) {
-                onEdit();
+                onEdit(doc);
             }
         }
 
@@ -658,7 +658,7 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
                         )}
                     </LeftButtons>
                     <RightButtons>
-                        <Button onClick={onEdit}>
+                        <Button onClick={() => onEdit(doc)}>
                             <span className="material-icons">edit</span>
                         </Button>
                     </RightButtons>

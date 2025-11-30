@@ -288,6 +288,7 @@ const EditorContentWrapper = styled.div`
   background: transparent;
   min-height: 0;
   box-sizing: border-box;
+  cursor: text; /* 전체 영역에서 텍스트 커서 표시 */
 
   /* 반투명 스크롤바 */
   &::-webkit-scrollbar {
@@ -1341,7 +1342,18 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
         </MacroButton>
       </TopToolbar>
 
-      <EditorContentWrapper>
+      <EditorContentWrapper
+        onClick={(e) => {
+          // 클릭한 요소가 ProseMirror 에디터가 아닌 경우 (빈 공간 클릭)
+          if (editor && e.target === e.currentTarget) {
+            editor.chain().focus().run();
+            // 커서를 마지막으로 이동
+            const { doc } = editor.state;
+            const endPos = doc.content.size;
+            editor.commands.setTextSelection(endPos);
+          }
+        }}
+      >
         <EditorContent editor={editor} />
       </EditorContentWrapper>
 

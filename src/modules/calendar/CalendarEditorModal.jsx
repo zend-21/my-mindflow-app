@@ -270,6 +270,7 @@ const EditorWrapper = styled.div`
   display: flex;
   flex-direction: column;
   min-height: 0;
+  cursor: text; /* 전체 영역에서 텍스트 커서 표시 */
 `;
 
 /* 토스트 */
@@ -520,7 +521,18 @@ const CalendarEditorModal = ({ isOpen, data, onSave, onClose }) => {
           )}
 
           {/* 본문 입력 */}
-          <EditorWrapper onDoubleClick={handleDoubleClick}>
+          <EditorWrapper
+            onDoubleClick={handleDoubleClick}
+            onClick={(e) => {
+              // 빈 공간 클릭 시 에디터 포커스 및 커서 마지막으로 이동
+              if (e.target === e.currentTarget && editorRef.current) {
+                editorRef.current.chain().focus().run();
+                const { doc } = editorRef.current.state;
+                const endPos = doc.content.size;
+                editorRef.current.commands.setTextSelection(endPos);
+              }
+            }}
+          >
             <RichTextEditor
               content={text}
               onChange={handleTextChange}

@@ -944,6 +944,25 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                             data-placeholder="내용을 입력하세요"
                             onInput={(e) => handleChange('content', e.currentTarget.innerHTML)}
                             onBlur={(e) => handleChange('content', e.currentTarget.innerHTML)}
+                            onClick={(e) => {
+                                // 클릭한 위치가 contentEditor 자체일 때만 (자식 요소가 아닐 때)
+                                if (e.target === contentEditorRef.current && isInputEnabled) {
+                                    // 포커스 이동 및 커서를 마지막으로
+                                    contentEditorRef.current.focus();
+                                    const range = document.createRange();
+                                    const sel = window.getSelection();
+                                    if (contentEditorRef.current.childNodes.length > 0) {
+                                        const lastNode = contentEditorRef.current.childNodes[contentEditorRef.current.childNodes.length - 1];
+                                        range.setStartAfter(lastNode);
+                                        range.collapse(true);
+                                    } else {
+                                        range.selectNodeContents(contentEditorRef.current);
+                                        range.collapse(false);
+                                    }
+                                    sel.removeAllRanges();
+                                    sel.addRange(range);
+                                }
+                            }}
                             style={{ pointerEvents: isInputEnabled ? 'auto' : 'none' }}
                             suppressContentEditableWarning
                         />
