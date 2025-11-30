@@ -1,7 +1,7 @@
 // src/components/secret/SecretDocViewer.jsx
 // 시크릿 문서 읽기 모드 컴포넌트
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import styled, { keyframes } from 'styled-components';
 import { ALL_ICONS } from './categoryIcons';
@@ -256,6 +256,18 @@ const ContentContainer = styled.div`
     border-radius: 12px;
     margin: 0;
     color: #d0d0d0;
+
+    /* 이미지 드래그 방지 - 스와이프 동작 우선 */
+    img {
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-drag: none;
+    }
+
+    video {
+        pointer-events: none;
+        user-select: none;
+    }
     line-height: 1.9;
     font-size: 17px;
     font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
@@ -451,21 +463,21 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
     };
 
     // 현재 카테고리에 맞는 문서 목록 가져오기
-    const getFilteredDocs = () => {
+    const getFilteredDocs = useCallback(() => {
         if (selectedCategory === 'all') {
             return docs;
         }
         return docs.filter(d => d.category === selectedCategory);
-    };
+    }, [docs, selectedCategory]);
 
     // 현재 문서의 인덱스 찾기
-    const getCurrentIndex = () => {
+    const getCurrentIndex = useCallback(() => {
         const filteredDocs = getFilteredDocs();
         return filteredDocs.findIndex(d => d.id === doc.id);
-    };
+    }, [doc, getFilteredDocs]);
 
     // 이전/다음 문서 가져오기
-    const getAdjacentDoc = (direction) => {
+    const getAdjacentDoc = useCallback((direction) => {
         const filteredDocs = getFilteredDocs();
         const currentIndex = getCurrentIndex();
 
@@ -474,22 +486,22 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
         } else {
             return currentIndex < filteredDocs.length - 1 ? filteredDocs[currentIndex + 1] : null;
         }
-    };
+    }, [getFilteredDocs, getCurrentIndex]);
 
     // 네비게이션 가능 여부 체크
-    const canNavigatePrev = () => {
+    const canNavigatePrev = useCallback(() => {
         const currentIndex = getCurrentIndex();
         return currentIndex > 0;
-    };
+    }, [getCurrentIndex]);
 
-    const canNavigateNext = () => {
+    const canNavigateNext = useCallback(() => {
         const filteredDocs = getFilteredDocs();
         const currentIndex = getCurrentIndex();
         return currentIndex < filteredDocs.length - 1 && currentIndex !== -1;
-    };
+    }, [getFilteredDocs, getCurrentIndex]);
 
     // 이전/다음 문서로 이동 (애니메이션 포함)
-    const navigateToPrevDoc = () => {
+    const navigateToPrevDoc = useCallback(() => {
         if (canNavigatePrev()) {
             const prevDoc = getAdjacentDoc('prev');
             setSlideDirection('right'); // 오른쪽으로 슬라이드
@@ -498,9 +510,9 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
                 setSlideDirection(null);
             }, 250);
         }
-    };
+    }, [canNavigatePrev, getAdjacentDoc, onNavigate]);
 
-    const navigateToNextDoc = () => {
+    const navigateToNextDoc = useCallback(() => {
         if (canNavigateNext()) {
             const nextDoc = getAdjacentDoc('next');
             setSlideDirection('left'); // 왼쪽으로 슬라이드
@@ -509,7 +521,7 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
                 setSlideDirection(null);
             }, 250);
         }
-    };
+    }, [canNavigateNext, getAdjacentDoc, onNavigate]);
 
     // 스와이프 핸들러
     const handleTouchStart = (e) => {
@@ -608,7 +620,7 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [doc, docs, selectedCategory]);
+    }, [navigateToPrevDoc, navigateToNextDoc]);
 
     return createPortal(
         <Overlay onClick={onClose}>
@@ -673,6 +685,9 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
 
                 <ContentContainer
                     onClick={handleContentTap}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
                     dangerouslySetInnerHTML={{ __html: doc.content || '내용 없음' }}
                 />
             </ModalContent>
