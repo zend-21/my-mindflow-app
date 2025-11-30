@@ -303,7 +303,10 @@ export const getAllSecretDocs = async (pin, includeDeleted = false) => {
         const decryptionPromises = encryptedDocs.map(async (encDoc) => {
             try {
                 const decryptedJson = await decrypt(encDoc.encryptedData, pin);
-                return JSON.parse(decryptedJson);
+                console.log('📦 복호화된 JSON:', { id: encDoc.id, includesPasswordHash: decryptedJson.includes('passwordHash') });
+                const parsedDoc = JSON.parse(decryptedJson);
+                console.log('🔓 파싱된 문서:', { id: parsedDoc.id, hasPasswordHash: !!parsedDoc.passwordHash, passwordHash: parsedDoc.passwordHash?.substring(0, 20) });
+                return parsedDoc;
             } catch (error) {
                 console.error(`문서 ${encDoc.id} 복호화 실패:`, error);
                 return null;
@@ -387,7 +390,9 @@ export const saveSecretDocs = async (pin, docs) => {
 
         // 각 문서를 개별적으로 암호화 (병렬 처리)
         const encryptionPromises = docs.map(async (doc) => {
+            console.log('🔒 암호화 전 문서:', { id: doc.id, hasPasswordHash: !!doc.passwordHash, passwordHash: doc.passwordHash?.substring(0, 20) });
             const jsonString = JSON.stringify(doc);
+            console.log('📦 JSON 문자열:', { id: doc.id, includesPasswordHash: jsonString.includes('passwordHash') });
             const encryptedData = await encrypt(jsonString, pin);
             return {
                 id: doc.id,
@@ -459,11 +464,16 @@ export const updateSecretDoc = async (pin, docId, updates) => {
         throw new Error('문서를 찾을 수 없습니다.');
     }
 
+    console.log('📝 updateSecretDoc - 업데이트 전:', { id: docId, oldPasswordHash: docs[index].passwordHash?.substring(0, 20) });
+    console.log('📝 updateSecretDoc - 업데이트 내용:', { hasPasswordHash: !!updates.passwordHash, passwordHash: updates.passwordHash?.substring(0, 20) });
+
     docs[index] = {
         ...docs[index],
         ...updates,
         updatedAt: new Date().toISOString()
     };
+
+    console.log('📝 updateSecretDoc - 업데이트 후:', { id: docId, newPasswordHash: docs[index].passwordHash?.substring(0, 20) });
 
     await saveSecretDocs(pin, docs);
     return docs[index];
