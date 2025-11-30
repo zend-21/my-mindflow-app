@@ -88,7 +88,7 @@ export const ALARM_REPEAT_CONFIG = {
     60: '1분 간격'
   },
   counts: {
-    1: '1회',
+    1: '1회 (반복 없음)',
     3: '3회'
   },
   defaultInterval: 60,                  // 기본: 1분 간격

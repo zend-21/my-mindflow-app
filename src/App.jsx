@@ -901,11 +901,16 @@ function App() {
         }
         const key = format(new Date(scheduleForAlarm.date), 'yyyy-MM-dd');
 
-        // 2. calendarSchedules 상태를 업데이트합니다.
-        const updatedSchedules = { ...calendarSchedules };
-        const targetSchedule = updatedSchedules[key];
+        console.log('🔍 [handleSaveAlarm] 시작:', { key, alarmSettings, actionType });
+
+        // 2. localStorage에서 최신 데이터 읽기 (AlarmModal이 직접 수정한 데이터 포함)
+        const allSchedulesStr = localStorage.getItem('calendarSchedules_shared');
+        const updatedSchedules = allSchedulesStr ? JSON.parse(allSchedulesStr) : { ...calendarSchedules };
+
+        console.log('🔍 [handleSaveAlarm] localStorage 읽기:', updatedSchedules[key]);
 
         // 3. 해당 날짜의 스케줄에 'alarm' 객체를 추가하거나 업데이트합니다.
+        const targetSchedule = updatedSchedules[key];
         if (targetSchedule) {
             // 기존 일정이 있는 경우
             updatedSchedules[key] = {
@@ -919,6 +924,9 @@ function App() {
                 alarm: alarmSettings
             };
         }
+
+        console.log('🔍 [handleSaveAlarm] 업데이트된 스케줄:', updatedSchedules[key]);
+        console.log('🔍 [handleSaveAlarm] 전체 알람 수:', alarmSettings.registeredAlarms?.length);
 
         syncCalendar(updatedSchedules);
 

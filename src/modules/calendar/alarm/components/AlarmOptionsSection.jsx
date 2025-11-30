@@ -61,6 +61,13 @@ const OptionLabel = styled.label`
   color: #495057;
 `;
 
+const OptionDescription = styled.span`
+  font-size: 11px;
+  color: #868e96;
+  font-weight: normal;
+  margin-left: 4px;
+`;
+
 const RadioGroup = styled.div`
   display: flex;
   gap: 16px;
@@ -288,7 +295,10 @@ export const AlarmOptionsSection = ({
 
         {/* ✨ 미리 알림 */}
         <OptionRow>
-          <OptionLabel>미리 알림</OptionLabel>
+          <OptionLabel>
+            미리 알림
+            <OptionDescription>(알람 시간 전에 미리 한 번 더 울립니다)</OptionDescription>
+          </OptionLabel>
           <Select
             value={advanceNotice}
             onChange={(e) => onAdvanceNoticeChange && onAdvanceNoticeChange(parseInt(e.target.value, 10))}
@@ -299,28 +309,12 @@ export const AlarmOptionsSection = ({
           </Select>
         </OptionRow>
 
-        {/* ✨ 반복 간격 */}
-        <OptionRow>
-          <OptionLabel>반복 간격</OptionLabel>
-          <RadioGroup>
-            {Object.entries(ALARM_REPEAT_CONFIG.intervals).map(([value, label]) => (
-              <RadioLabel key={value}>
-                <input
-                  type="radio"
-                  name="repeatInterval"
-                  value={value}
-                  checked={repeatInterval === parseInt(value, 10)}
-                  onChange={(e) => onRepeatIntervalChange && onRepeatIntervalChange(parseInt(e.target.value, 10))}
-                />
-                {label}
-              </RadioLabel>
-            ))}
-          </RadioGroup>
-        </OptionRow>
-
         {/* ✨ 반복 횟수 */}
         <OptionRow>
-          <OptionLabel>반복 횟수</OptionLabel>
+          <OptionLabel>
+            반복 횟수
+            <OptionDescription>(특정 간격으로 알람을 반복하여 울립니다)</OptionDescription>
+          </OptionLabel>
           <RadioGroup>
             {Object.entries(ALARM_REPEAT_CONFIG.counts).map(([value, label]) => (
               <RadioLabel key={value}>
@@ -336,6 +330,27 @@ export const AlarmOptionsSection = ({
             ))}
           </RadioGroup>
         </OptionRow>
+
+        {/* ✨ 반복 간격 - 반복 횟수가 3회일 때만 활성화 */}
+        {repeatCount === 3 && (
+          <OptionRow>
+            <OptionLabel>반복 간격</OptionLabel>
+            <RadioGroup>
+              {Object.entries(ALARM_REPEAT_CONFIG.intervals).map(([value, label]) => (
+                <RadioLabel key={value}>
+                  <input
+                    type="radio"
+                    name="repeatInterval"
+                    value={value}
+                    checked={repeatInterval === parseInt(value, 10)}
+                    onChange={(e) => onRepeatIntervalChange && onRepeatIntervalChange(parseInt(e.target.value, 10))}
+                  />
+                  {label}
+                </RadioLabel>
+              ))}
+            </RadioGroup>
+          </OptionRow>
+        )}
 
         {/* 기본값으로 되돌리기 */}
         <ResetButton onClick={onResetDefaults}>

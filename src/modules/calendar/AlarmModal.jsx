@@ -798,25 +798,8 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
     const updatedAlarms = [...alarms, newAlarm];
     setAlarms(updatedAlarms);
 
-    // localStorage에 저장 (반복 알람 제외)
+    // onSave 호출 (App.jsx의 handleSaveAlarm이 localStorage와 Firestore 저장 처리)
     try {
-      const allSchedulesStr = localStorage.getItem('calendarSchedules_shared');
-      const allSchedules = allSchedulesStr ? JSON.parse(allSchedulesStr) : {};
-      const dateKey = format(new Date(scheduleData.date), 'yyyy-MM-dd');
-
-      if (!allSchedules[dateKey]) {
-        allSchedules[dateKey] = {};
-      }
-      if (!allSchedules[dateKey].alarm) {
-        allSchedules[dateKey].alarm = {};
-      }
-
-      // 반복 알람(isRepeated)은 localStorage에 저장하지 않음
-      const alarmsToSave = updatedAlarms.filter(a => !a.isRepeated);
-      allSchedules[dateKey].alarm.registeredAlarms = alarmsToSave;
-      localStorage.setItem('calendarSchedules_shared', JSON.stringify(allSchedules));
-
-      // onSave 호출
       if (onSave) {
         const alarmType = isAnniversary ? 'anniversary' : 'normal';
         onSave({ registeredAlarms: updatedAlarms, alarmType }, 'register');
@@ -1565,7 +1548,7 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   <Section>
                     <SectionTitle>
                       <ClockIcon />
-                      미리 알림
+                      미리 알림 <span style={{ fontSize: '11px', color: '#868e96', fontWeight: 'normal', marginLeft: '4px' }}>(알람 시간 전에 미리 한 번 더 울립니다)</span>
                     </SectionTitle>
                     <select
                       value={advanceNotice}
@@ -1586,8 +1569,32 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                   </Section>
                 )}
 
-                {/* Repeat Interval */}
+                {/* Repeat Count */}
                 {showOptions && (
+                  <Section>
+                    <SectionTitle>
+                      <AlertIcon />
+                      반복 횟수 <span style={{ fontSize: '11px', color: '#868e96', fontWeight: 'normal', marginLeft: '4px' }}>(특정 간격으로 알람을 반복하여 울립니다)</span>
+                    </SectionTitle>
+                    <RadioGroup>
+                      {Object.entries(ALARM_REPEAT_CONFIG.counts).map(([value, label]) => (
+                        <RadioOption key={value} $checked={repeatCount === parseInt(value, 10)}>
+                          <input
+                            type="radio"
+                            name="repeatCount"
+                            value={value}
+                            checked={repeatCount === parseInt(value, 10)}
+                            onChange={(e) => setRepeatCount(parseInt(e.target.value, 10))}
+                          />
+                          <span>{label}</span>
+                        </RadioOption>
+                      ))}
+                    </RadioGroup>
+                  </Section>
+                )}
+
+                {/* Repeat Interval - 반복 횟수가 3회일 때만 표시 */}
+                {showOptions && repeatCount === 3 && (
                   <Section>
                     <SectionTitle>
                       <BellIcon />
@@ -1602,30 +1609,6 @@ const AlarmModal = ({ isOpen, scheduleData, onSave, onClose }) => {
                             value={value}
                             checked={repeatInterval === parseInt(value, 10)}
                             onChange={(e) => setRepeatInterval(parseInt(e.target.value, 10))}
-                          />
-                          <span>{label}</span>
-                        </RadioOption>
-                      ))}
-                    </RadioGroup>
-                  </Section>
-                )}
-
-                {/* Repeat Count */}
-                {showOptions && (
-                  <Section>
-                    <SectionTitle>
-                      <AlertIcon />
-                      반복 횟수
-                    </SectionTitle>
-                    <RadioGroup>
-                      {Object.entries(ALARM_REPEAT_CONFIG.counts).map(([value, label]) => (
-                        <RadioOption key={value} $checked={repeatCount === parseInt(value, 10)}>
-                          <input
-                            type="radio"
-                            name="repeatCount"
-                            value={value}
-                            checked={repeatCount === parseInt(value, 10)}
-                            onChange={(e) => setRepeatCount(parseInt(e.target.value, 10))}
                           />
                           <span>{label}</span>
                         </RadioOption>

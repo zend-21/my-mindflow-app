@@ -289,8 +289,9 @@ const Preview = styled.div`
     position: relative;
     z-index: 1;
     word-wrap: break-word;
-    min-height: 21px; /* 최소 1줄 높이 보장 (14px * 1.5 line-height = 21px) */
-    max-height: 60px; /* 약 2줄 높이로 제한 */
+    height: 21px; /* 정확히 1줄 높이로 고정 (14px * 1.5 line-height = 21px) */
+    text-overflow: ellipsis;
+    white-space: nowrap;
 
     /* HTML 콘텐츠 스타일링 */
     h1, h2, h3, h4, h5, h6 {
@@ -307,12 +308,13 @@ const Preview = styled.div`
 
     img, video {
         max-width: 100%;
-        max-height: 60px;
+        max-height: 38px; /* 카드 미리보기 높이(42px) 내에 맞춤 */
         height: auto;
-        display: block;
+        display: inline-block; /* block 대신 inline-block으로 변경 */
         border-radius: 4px;
-        margin: 4px 0;
+        margin: 2px 4px 2px 0;
         object-fit: cover;
+        vertical-align: middle;
     }
 
     ul, ol {

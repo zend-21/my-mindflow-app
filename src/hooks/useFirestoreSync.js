@@ -598,10 +598,13 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
   // 캘린더 객체 동기화 (하위 호환)
   const syncCalendar = useCallback((newCalendar) => {
+    console.log('🔍 [syncCalendar] 시작:', Object.keys(newCalendar).length, '개 날짜');
+
     setCalendar(newCalendar);
     localStorage.setItem('calendarSchedules_shared', JSON.stringify(newCalendar));
 
     Object.entries(newCalendar).forEach(([dateKey, schedule]) => {
+      console.log('🔍 [syncCalendar] 저장 대기열:', dateKey, '알람 수:', schedule.alarm?.registeredAlarms?.length);
       debouncedSave(saveCalendarDateToFirestore, dateKey, schedule);
     });
   }, [debouncedSave]);

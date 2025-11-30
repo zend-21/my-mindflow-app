@@ -941,17 +941,17 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
 
     try {
       setIsUploading(true);
-      console.log('이미지 업로드 시작:', file.name);
+      console.log('✅ R2 이미지 업로드 시작:', file.name);
 
-      // 이미지를 로드하여 크기 확인
+      // 이미지를 로드하여 크기 확인 및 리사이즈
       const img = document.createElement('img');
       const reader = new FileReader();
 
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         img.src = e.target?.result;
       };
 
-      img.onload = () => {
+      img.onload = async () => {
         const maxWidth = 1200; // 최대 너비
         const maxHeight = 1200; // 최대 높이
         let width = img.width;
@@ -977,29 +977,46 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Canvas를 Base64로 변환 (품질 조정으로 파일 크기 감소)
-        const resizedBase64 = canvas.toDataURL('image/jpeg', 0.85);
+        // Canvas를 Blob으로 변환 (품질 조정으로 파일 크기 감소)
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            console.error('이미지 Blob 생성 실패');
+            alert('이미지 처리 실패');
+            setIsUploading(false);
+            return;
+          }
 
-        // Base64 크기 확인 (1MB 제한)
-        const base64Size = (resizedBase64.length * 3) / 4 / (1024 * 1024);
-        console.log(`리사이즈 후 크기: ${base64Size.toFixed(2)}MB`);
+          // Blob 크기 확인
+          const blobSize = blob.size / (1024 * 1024);
+          console.log(`리사이즈 후 크기: ${blobSize.toFixed(2)}MB`);
 
-        if (base64Size > 1) {
-          alert('이미지를 리사이즈했지만 여전히 1MB를 초과합니다. 더 작은 이미지를 사용해주세요.');
-          setIsUploading(false);
-          return;
-        }
+          if (blobSize > 5) {
+            alert('이미지를 리사이즈했지만 여전히 5MB를 초과합니다. 더 작은 이미지를 사용해주세요.');
+            setIsUploading(false);
+            return;
+          }
 
-        // 에디터에 이미지 삽입
-        editor.chain().focus().setImage({ src: resizedBase64 }).run();
-        console.log('이미지 삽입 완료');
+          try {
+            // R2에 업로드
+            const imageUrl = await uploadImage(blob, 'calendar-images');
+            console.log('✅ R2 업로드 성공:', imageUrl);
 
-        setIsUploading(false);
+            // 에디터에 URL 삽입
+            editor.chain().focus().setImage({ src: imageUrl }).run();
+            console.log('✅ 이미지 삽입 완료');
 
-        // input 초기화
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
+            setIsUploading(false);
+
+            // input 초기화
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+          } catch (uploadError) {
+            console.error('❌ R2 업로드 실패:', uploadError);
+            alert(`이미지 업로드 실패: ${uploadError.message}`);
+            setIsUploading(false);
+          }
+        }, 'image/jpeg', 0.85);
       };
 
       img.onerror = () => {

@@ -374,7 +374,11 @@ export const fetchCalendarFromFirestore = async (userId) => {
     snapshot.forEach((docSnap) => {
       const data = convertTimestampsToMillis(docSnap.data());
       calendar[docSnap.id] = data.schedule || {};
+
+      console.log('🔍 [fetchCalendarFromFirestore] 날짜:', docSnap.id, '알람 수:', data.schedule?.alarm?.registeredAlarms?.length);
     });
+
+    console.log('✅ [fetchCalendarFromFirestore] 총', Object.keys(calendar).length, '개 날짜 로드됨');
 
     return calendar;
   } catch (error) {
@@ -386,18 +390,42 @@ export const fetchCalendarFromFirestore = async (userId) => {
 /**
  * Firestore에 특정 날짜의 일정 저장
  */
-export const saveCalendarDateToFirestore = async (userId, dateKey, schedule) => {
-  try {
-    // undefined 값 제거
-    const cleanSchedule = {};
-    Object.keys(schedule).forEach(key => {
-      if (schedule[key] !== undefined && schedule[key] !== null) {
-        cleanSchedule[key] = schedule[key];
+// 재귀적으로 undefined/null 값 제거하는 헬퍼 함수
+const removeUndefinedValues = (obj) => {
+  if (obj === null || obj === undefined) {
+    return null;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => removeUndefinedValues(item)).filter(item => item !== null && item !== undefined);
+  }
+
+  if (typeof obj === 'object') {
+    const cleaned = {};
+    Object.keys(obj).forEach(key => {
+      const value = removeUndefinedValues(obj[key]);
+      if (value !== null && value !== undefined) {
+        cleaned[key] = value;
       }
     });
+    return cleaned;
+  }
+
+  return obj;
+};
+
+export const saveCalendarDateToFirestore = async (userId, dateKey, schedule) => {
+  try {
+    console.log('🔍 [saveCalendarDateToFirestore] 시작:', dateKey, 'alarm 수:', schedule.alarm?.registeredAlarms?.length);
+    console.log('🔍 [saveCalendarDateToFirestore] 원본 schedule:', JSON.stringify(schedule, null, 2));
+
+    // undefined 값 제거 (재귀적으로 중첩된 객체도 처리)
+    const cleanSchedule = removeUndefinedValues(schedule);
+
+    console.log('🔍 [saveCalendarDateToFirestore] 정리된 schedule:', JSON.stringify(cleanSchedule, null, 2));
 
     // 빈 스케줄이면 문서 삭제
-    if (Object.keys(cleanSchedule).length === 0) {
+    if (!cleanSchedule || Object.keys(cleanSchedule).length === 0) {
       const docRef = doc(db, 'mindflowUsers', userId, 'calendar', dateKey);
       await deleteDoc(docRef);
       return;
@@ -408,6 +436,8 @@ export const saveCalendarDateToFirestore = async (userId, dateKey, schedule) => 
       schedule: cleanSchedule,
       updatedAt: serverTimestamp()
     });
+
+    console.log('✅ [saveCalendarDateToFirestore] Firestore 저장 완료:', dateKey);
   } catch (error) {
     console.error('캘린더 일정 저장 실패:', error);
     throw error;

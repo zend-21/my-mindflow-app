@@ -1429,31 +1429,24 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
         }
 
         try {
-            showToast?.('이미지 처리 중...');
+            showToast?.('이미지 업로드 중...');
 
-            // 이미지 압축 및 Base64 변환
-            const compressedBase64 = await compressAndConvertImage(file);
+            // R2에 이미지 업로드 (uploadImage는 이미 압축/리사이즈 처리됨)
+            const { uploadImage } = await import('../utils/storageService');
+            const imageUrl = await uploadImage(file, 'profile-images');
 
-            // Base64 크기 체크 (2MB 제한 - localStorage 여유 공간 확보)
-            const sizeInBytes = compressedBase64.length * 0.75; // Base64는 원본의 약 1.33배
-            const sizeInMB = sizeInBytes / (1024 * 1024);
-
-            if (sizeInMB > 2) {
-                showToast?.('압축 후에도 이미지가 너무 큽니다. 더 작은 이미지를 선택해주세요');
-                e.target.value = '';
-                return;
-            }
+            console.log('✅ 프로필 이미지 R2 업로드 성공:', imageUrl);
 
             // 해시 계산
-            const hash = await calculateHash(compressedBase64);
+            const hash = await calculateHash(imageUrl);
 
             try {
-                // localStorage에 저장 시도
-                localStorage.setItem('customProfilePicture', compressedBase64);
+                // localStorage에 URL만 저장 (Base64 대신)
+                localStorage.setItem('customProfilePicture', imageUrl);
                 localStorage.setItem('customProfilePictureHash', hash);
             } catch (storageError) {
                 if (storageError.name === 'QuotaExceededError') {
-                    showToast?.('저장 공간이 부족합니다. 더 작은 이미지를 선택해주세요');
+                    showToast?.('저장 공간이 부족합니다');
                 } else {
                     showToast?.('이미지 저장에 실패했습니다');
                 }
@@ -1462,12 +1455,12 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                 return;
             }
 
-            // 프로필 상태 업데이트
-            setCustomPicture(compressedBase64);
+            // 프로필 상태 업데이트 (URL로)
+            setCustomPicture(imageUrl);
 
             // 프로필 상태 업데이트 이벤트 발생
             window.dispatchEvent(new CustomEvent('profilePictureChanged', {
-                detail: { picture: compressedBase64, hash }
+                detail: { picture: imageUrl, hash }
             }));
 
             showToast?.('프로필 사진이 변경되었습니다 📸');
