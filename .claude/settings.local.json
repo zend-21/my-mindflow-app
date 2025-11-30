@@ -23,7 +23,8 @@
       "Bash(del \"src\\services\\syncMetadataService.js\")",
       "Bash(firebase deploy:*)",
       "Bash(firebase firestore:rules:list:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(vercel env add:*)"
     ],
     "deny": [],
     "ask": []
