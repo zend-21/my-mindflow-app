@@ -81,6 +81,14 @@ const uploadToFirebase = async (file, folder, originalFileName = null) => {
  */
 const uploadToR2 = async (file, folder, originalFileName = null) => {
   try {
+    console.log('🔧 R2 업로드 시작:', {
+      fileType: file.type,
+      endpoint: import.meta.env.VITE_R2_ENDPOINT,
+      bucket: import.meta.env.VITE_R2_BUCKET_NAME,
+      hasAccessKey: !!import.meta.env.VITE_R2_ACCESS_KEY_ID,
+      hasSecretKey: !!import.meta.env.VITE_R2_SECRET_ACCESS_KEY,
+    });
+
     // S3 Client 설정
     const s3Client = new S3Client({
       region: 'auto',
