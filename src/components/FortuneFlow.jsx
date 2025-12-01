@@ -32,7 +32,7 @@ import {
  * 4. 결과 확인 후 종료 또는 다시 보기
  */
 
-const FortuneFlow = ({ onClose, profile }) => {
+const FortuneFlow = ({ onClose, profile, userId, saveFortuneProfileToFirestore, fetchFortuneProfileFromFirestore }) => {
     // Flow states: 'notice' | 'checkProfile' | 'inputProfile' | 'confirmProfile' | 'checkFortune' | 'gacha' | 'result'
     const [flowState, setFlowState] = useState('notice');
     const [isEditMode, setIsEditMode] = useState(false); // 편집 모드 플래그
@@ -64,9 +64,9 @@ const FortuneFlow = ({ onClose, profile }) => {
     }, []);
 
     // 프로필 확인 및 진행
-    const checkProfileAndProceed = () => {
-        // Check user profile
-        const savedProfile = getUserProfile();
+    const checkProfileAndProceed = async () => {
+        // ⭐ Evernote 방식: Firestore 우선, localStorage 폴백
+        const savedProfile = await getUserProfile(userId, fetchFortuneProfileFromFirestore);
         if (savedProfile) {
             setUserProfile(savedProfile);
             // Profile exists, show confirmation modal
@@ -100,8 +100,9 @@ const FortuneFlow = ({ onClose, profile }) => {
     };
 
     // 🎯 Handler: 프로필 입력 완료
-    const handleProfileSubmit = (userData) => {
-        saveUserProfile(userData);
+    const handleProfileSubmit = async (userData) => {
+        // ⭐ Evernote 방식: Firestore + localStorage 동시 저장
+        await saveUserProfile(userData, userId, saveFortuneProfileToFirestore);
         setUserProfile(userData);
         // Move to fortune check
         setFlowState('checkFortune');
@@ -146,7 +147,8 @@ const FortuneFlow = ({ onClose, profile }) => {
                 ...userProfile,
                 zodiacSign: result.zodiacSign
             };
-            saveUserProfile(updatedProfile);
+            // ⭐ Evernote 방식: Firestore + localStorage 동시 저장
+            await saveUserProfile(updatedProfile, userId, saveFortuneProfileToFirestore);
             setUserProfile(updatedProfile);
         }
 

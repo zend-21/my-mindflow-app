@@ -1134,15 +1134,28 @@ export const isUserLoggedIn = () => {
 
 /**
  * 사용자 프로필 저장
- * ✨ 로그인 사용자와 게스트 모두 저장 (게스트는 당일만 유지)
+ * ⭐ Evernote 방식: Firestore + localStorage 동기화
  * @param {Object} userData - 사용자 정보
+ * @param {string} userId - 사용자 ID (로그인 시 필수)
+ * @param {Function} saveToFirestore - Firestore 저장 함수 (선택, 제공 시 사용)
  */
-export const saveUserProfile = (userData) => {
-    if (isUserLoggedIn()) {
-        // 로그인 사용자: 영구 저장
+export const saveUserProfile = async (userData, userId = null, saveToFirestore = null) => {
+    if (isUserLoggedIn() && userId) {
+        // ⭐ 로그인 사용자: localStorage + Firestore 동시 저장
         localStorage.setItem('fortuneUserProfile', JSON.stringify(userData));
+
+        // Firestore 저장 (제공된 경우)
+        if (saveToFirestore && typeof saveToFirestore === 'function') {
+            try {
+                await saveToFirestore(userId, userData);
+                console.log('✅ 운세 프로필 Firestore 저장 완료');
+            } catch (error) {
+                console.error('❌ 운세 프로필 Firestore 저장 실패:', error);
+                // localStorage는 이미 저장됨 - 다음 로드 시 재시도
+            }
+        }
     } else {
-        // 게스트: 날짜와 함께 저장 (당일만 유효)
+        // 게스트: localStorage만 사용 (당일만 유효)
         const dataWithDate = {
             ...userData,
             savedDate: new Date().toLocaleDateString('ko-KR')
@@ -1153,16 +1166,40 @@ export const saveUserProfile = (userData) => {
 
 /**
  * 사용자 프로필 불러오기
- * ✨ 로그인 사용자는 영구 프로필, 게스트는 당일 프로필만 반환
- * @returns {Object|null} 사용자 정보 또는 null
+ * ⭐ Evernote 방식: Firestore 우선, localStorage 폴백
+ * @param {string} userId - 사용자 ID (로그인 시 필수)
+ * @param {Function} fetchFromFirestore - Firestore 가져오기 함수 (선택, 제공 시 사용)
+ * @returns {Promise<Object|null>} 사용자 정보 또는 null
  */
-export const getUserProfile = () => {
-    if (isUserLoggedIn()) {
-        // 로그인 사용자: 영구 저장된 프로필 반환
+export const getUserProfile = async (userId = null, fetchFromFirestore = null) => {
+    if (isUserLoggedIn() && userId) {
+        // ⭐ 로그인 사용자: Firestore 우선, 없으면 localStorage
+        if (fetchFromFirestore && typeof fetchFromFirestore === 'function') {
+            try {
+                const firestoreProfile = await fetchFromFirestore(userId);
+                if (firestoreProfile) {
+                    // Firestore 데이터를 localStorage에도 캐싱
+                    localStorage.setItem('fortuneUserProfile', JSON.stringify(firestoreProfile));
+                    console.log('✅ 운세 프로필 Firestore 로드 완료');
+                    return firestoreProfile;
+                }
+            } catch (error) {
+                console.error('❌ 운세 프로필 Firestore 로드 실패:', error);
+                // localStorage 폴백으로 진행
+            }
+        }
+
+        // Firestore 실패 시 localStorage 폴백
         const saved = localStorage.getItem('fortuneUserProfile');
-        return saved ? JSON.parse(saved) : null;
+        const localProfile = saved ? JSON.parse(saved) : null;
+
+        if (localProfile) {
+            console.log('⚠️ localStorage 폴백 사용 (Firestore 로드 실패)');
+        }
+
+        return localProfile;
     } else {
-        // 게스트: 당일 저장된 프로필만 반환
+        // 게스트: localStorage만 사용 (당일만 유효)
         const saved = localStorage.getItem('fortuneUserProfile_guest');
         if (!saved) return null;
 

@@ -692,6 +692,93 @@ export const setupSettingsListener = (userId, callback) => {
 };
 
 // ========================================
+// 운세 프로필 데이터 (Evernote 방식)
+// ========================================
+
+/**
+ * Firestore에서 운세 프로필 가져오기
+ * @param {string} userId - 사용자 ID
+ * @returns {Promise<Object|null>} 운세 프로필 또는 null
+ */
+export const fetchFortuneProfileFromFirestore = async (userId) => {
+  try {
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'fortuneProfile');
+    const docSnap = await getDoc(docRef);
+
+    if (!docSnap.exists()) {
+      return null;
+    }
+
+    const rawData = docSnap.data();
+    const data = convertTimestampsToMillis(rawData);
+
+    // ⭐ deleted 체크
+    if (data.deleted === true) {
+      return null;
+    }
+
+    return {
+      ...data,
+      deleted: data.deleted ?? false
+    };
+  } catch (error) {
+    console.error('운세 프로필 가져오기 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * Firestore에 운세 프로필 저장
+ * @param {string} userId - 사용자 ID
+ * @param {Object} fortuneProfile - 운세 프로필 객체 { name, birthYear, birthMonth, birthDay, birthHour, birthMinute, gender, birthCity, ... }
+ */
+export const saveFortuneProfileToFirestore = async (userId, fortuneProfile) => {
+  try {
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'fortuneProfile');
+
+    // ⭐ Evernote 방식: deleted: false, serverTimestamp 추가
+    const dataToSave = {
+      ...fortuneProfile,
+      deleted: false,
+      updatedAt: serverTimestamp(),
+      createdAt: fortuneProfile.createdAt || serverTimestamp()
+    };
+
+    // undefined 값 제거
+    const sanitizedData = Object.fromEntries(
+      Object.entries(dataToSave).map(([key, value]) => [key, value === undefined ? null : value])
+    );
+
+    await setDoc(docRef, sanitizedData, { merge: true });
+    console.log('✅ 운세 프로필 Firestore 저장 완료');
+  } catch (error) {
+    console.error('운세 프로필 저장 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * Firestore에서 운세 프로필 삭제 (Soft Delete)
+ * @param {string} userId - 사용자 ID
+ */
+export const deleteFortuneProfileFromFirestore = async (userId) => {
+  try {
+    const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'fortuneProfile');
+
+    // ⭐ Soft Delete
+    await setDoc(docRef, {
+      deleted: true,
+      deletedAt: serverTimestamp()
+    }, { merge: true });
+
+    console.log('✅ 운세 프로필 soft delete 완료');
+  } catch (error) {
+    console.error('운세 프로필 삭제 실패:', error);
+    throw error;
+  }
+};
+
+// ========================================
 // 일괄 데이터 로드
 // ========================================
 

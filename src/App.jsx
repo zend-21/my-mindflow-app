@@ -595,7 +595,10 @@ function App() {
         syncFolder,
         deleteFolder,
         syncTrashItem,
-        deleteTrashItem
+        deleteTrashItem,
+        // ⭐ 운세 프로필 Firestore 함수
+        saveFortuneProfileToFirestore,
+        fetchFortuneProfileFromFirestore
     } = useFirestoreSync(userId, isAuthenticated, firebaseUser?.uid);
 
     // settings에서 개별 값 추출
@@ -2846,6 +2849,9 @@ function App() {
                 <FortuneFlow
                     onClose={() => setIsFortuneFlowOpen(false)}
                     profile={profile}
+                    userId={userId}
+                    saveFortuneProfileToFirestore={saveFortuneProfileToFirestore}
+                    fetchFortuneProfileFromFirestore={fetchFortuneProfileFromFirestore}
                     // 운세 결과 및 기타 상태를 FortuneFlow 내부에서 관리
                 />
             )}

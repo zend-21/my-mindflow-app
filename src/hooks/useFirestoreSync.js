@@ -34,11 +34,13 @@ import {
   saveCalendarDateToFirestore,
   saveActivityToFirestore,
   saveSettingsToFirestore,
+  saveFortuneProfileToFirestore,
   deleteMemoFromFirestore,
   deleteFolderFromFirestore,
   deleteTrashItemFromFirestore,
   deleteCalendarDateFromFirestore,
-  deleteActivityFromFirestore
+  deleteActivityFromFirestore,
+  fetchFortuneProfileFromFirestore
 } from '../services/userDataService';
 
 /**
@@ -795,6 +797,10 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     deleteActivity,
 
     // 즉시 저장
-    saveImmediately
+    saveImmediately,
+
+    // ⭐ 운세 프로필 Firestore 함수 (fortuneLogic.js에서 사용)
+    saveFortuneProfileToFirestore,
+    fetchFortuneProfileFromFirestore
   };
 };
