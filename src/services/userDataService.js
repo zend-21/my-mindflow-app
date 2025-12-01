@@ -1616,3 +1616,37 @@ export const saveActivitiesToFirestore = async (userId, activities) => {
   });
   await batch.commit();
 };
+
+/**
+ * base64 이미지가 포함된 캘린더 데이터 삭제
+ * @param {string} userId - User ID
+ * @returns {Promise<number>} - 삭제된 항목 수
+ */
+export const deleteBase64ImagesFromCalendar = async (userId) => {
+  console.log('🧹 캘린더에서 base64 이미지 정리 시작...\n');
+
+  const calendarRef = collection(db, 'mindflowUsers', userId, 'calendar');
+  const snapshot = await getDocs(calendarRef);
+
+  let deletedCount = 0;
+
+  for (const docSnap of snapshot.docs) {
+    const dateKey = docSnap.id;
+    const data = docSnap.data();
+
+    if (data.text && data.text.includes('data:image')) {
+      console.log(`📅 ${dateKey}: base64 이미지 발견 - 삭제 중...`);
+      await deleteDoc(doc(db, 'mindflowUsers', userId, 'calendar', dateKey));
+      deletedCount++;
+    }
+  }
+
+  console.log(`✅ 완료! ${deletedCount}개 날짜 데이터 삭제됨`);
+
+  // localStorage도 정리
+  localStorage.removeItem('firestore_saved_calendar_all');
+  localStorage.removeItem('calendarSchedules_shared');
+  console.log('✅ localStorage 캘린더 데이터도 정리됨');
+
+  return deletedCount;
+};

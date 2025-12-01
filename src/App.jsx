@@ -48,6 +48,7 @@ import { TrashProvider, useTrashContext } from './contexts/TrashContext';
 import TrashPage from './components/TrashPage.jsx';
 import AppContent from './components/AppContent.jsx';
 import SecretPage from './components/secret/SecretPage.jsx';
+import { deleteBase64ImagesFromCalendar } from './services/userDataService';
 import MessagingHub from './components/messaging/MessagingHub.jsx';
 import AuthRequiredModal from './components/AuthRequiredModal.jsx';
 import AdBanner from './components/messaging/AdBanner.jsx';
@@ -357,6 +358,21 @@ function App() {
 
                 // localStorage에 저장 (기존 코드와의 호환성)
                 localStorage.setItem('firebaseUserId', user.uid);
+
+                // 🧹 base64 이미지 데이터 자동 정리 (1회만 실행)
+                const cleanedKey = `base64_cleaned_${user.uid}`;
+                if (!localStorage.getItem(cleanedKey)) {
+                    try {
+                        console.log('🧹 base64 이미지 데이터 정리 시작...');
+                        const deletedCount = await deleteBase64ImagesFromCalendar(user.uid);
+                        localStorage.setItem(cleanedKey, 'true');
+                        if (deletedCount > 0) {
+                            console.log(`✅ ${deletedCount}개 base64 이미지 데이터 삭제 완료`);
+                        }
+                    } catch (error) {
+                        console.error('❌ base64 정리 실패:', error);
+                    }
+                }
 
                 // 프로필 복원 시도
                 const savedProfile = localStorage.getItem('userProfile');
