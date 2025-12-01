@@ -1059,8 +1059,12 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
               'image/jpeg' // 리사이즈된 이미지 타입 명시
             );
 
+            console.log('✅ [RichTextEditor] R2 업로드 완료, URL 삽입:', imageUrl);
+
             // 에디터에 URL 삽입
             editor.chain().focus().setImage({ src: imageUrl }).run();
+
+            console.log('✅ [RichTextEditor] 에디터 이미지 URL 교체 완료');
 
             setIsUploading(false);
 

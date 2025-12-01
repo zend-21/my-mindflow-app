@@ -214,15 +214,21 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
               const lastSavedMemo = lastSaved ? JSON.parse(lastSaved) : {};
               const lastSyncedTime = lastSavedMemo.updatedAt?.toMillis ? lastSavedMemo.updatedAt.toMillis() : (lastSavedMemo.updatedAt || 0);
 
-              if (firestoreTime > lastSyncedTime) {
+              // 🆕 로컬 메모의 실제 타임스탬프 (Firestore 저장 실패 시에도 사용)
+              const localTime = localMemo.updatedAt || 0;
+
+              // ✅ lastSaved가 없으면 로컬 타임스탬프 사용 (Firestore 저장 실패한 경우)
+              const effectiveSyncedTime = lastSaved ? lastSyncedTime : localTime;
+
+              if (firestoreTime > effectiveSyncedTime) {
                 // Firestore가 더 최신 → 다른 기기에서 수정됨
                 console.warn(`⚠️ 다른 기기에서 수정 감지: ${firestoreMemo.id}`);
-                console.warn(`  → Firestore 우선 (${new Date(firestoreTime).toLocaleString()} > ${new Date(lastSyncedTime).toLocaleString()})`);
+                console.warn(`  → Firestore 우선 (${new Date(firestoreTime).toLocaleString()} > ${new Date(effectiveSyncedTime).toLocaleString()})`);
                 return firestoreMemo;
               } else {
                 // 로컬이 더 최신 또는 저장 실패 → 로컬 우선
                 console.warn(`⚠️ 로컬 변경 감지: ${firestoreMemo.id}`);
-                console.warn(`  → 로컬 우선 (${new Date(localMemo.updatedAt || 0).toLocaleString()}) - 재저장 시도`);
+                console.warn(`  → 로컬 우선 (${new Date(localTime).toLocaleString()}) - 재저장 시도`);
 
                 // 재저장 시도 (할당량 초과 시 자동으로 실패하고 다음에 재시도)
                 saveMemoToFirestore(userId, localMemo).catch(err => {
@@ -272,7 +278,13 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
               const lastSavedFolder = lastSaved ? JSON.parse(lastSaved) : {};
               const lastSyncedTime = lastSavedFolder.updatedAt?.toMillis ? lastSavedFolder.updatedAt.toMillis() : (lastSavedFolder.updatedAt || 0);
 
-              if (firestoreTime > lastSyncedTime) {
+              // 🆕 로컬 폴더의 실제 타임스탬프 (Firestore 저장 실패 시에도 사용)
+              const localTime = localFolder.updatedAt || 0;
+
+              // ✅ lastSaved가 없으면 로컬 타임스탬프 사용 (Firestore 저장 실패한 경우)
+              const effectiveSyncedTime = lastSaved ? lastSyncedTime : localTime;
+
+              if (firestoreTime > effectiveSyncedTime) {
                 // Firestore가 더 최신 → 다른 기기에서 수정됨
                 console.warn(`⚠️ 폴더 다른 기기에서 수정: ${firestoreFolder.id}`);
                 return firestoreFolder;

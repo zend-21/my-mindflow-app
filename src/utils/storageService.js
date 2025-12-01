@@ -123,6 +123,7 @@ const uploadToR2 = async (file, folder, originalFileName = null) => {
     // 공개 URL 생성 (R2 Public Development URL 형식)
     const publicUrl = `${import.meta.env.VITE_R2_PUBLIC_URL?.trim()}/${key}`;
 
+    console.log('✅ R2 업로드 완료:', publicUrl);
     return publicUrl;
   } catch (error) {
     console.error('❌ Cloudflare R2 업로드 실패:', error);
