@@ -292,6 +292,7 @@ const Preview = styled.div`
     height: 21px; /* 정확히 1줄 높이로 고정 (14px * 1.5 line-height = 21px) */
     text-overflow: ellipsis;
     white-space: nowrap;
+    padding-right: 30px; /* 닫기 버튼 침범 방지 */
 
     /* HTML 콘텐츠 스타일링 */
     h1, h2, h3, h4, h5, h6 {
