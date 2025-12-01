@@ -1038,6 +1038,9 @@ export const migrateLocalStorageToFirestore = async (userId) => {
 
     // 캘린더 저장
     Object.entries(calendar).forEach(([dateKey, schedule]) => {
+      // dateKey가 문자열이 아니면 문자열로 변환
+      const safeKey = typeof dateKey === 'string' ? dateKey : String(dateKey);
+
       const cleanSchedule = {};
       Object.keys(schedule).forEach(key => {
         if (schedule[key] !== undefined && schedule[key] !== null) {
@@ -1046,7 +1049,7 @@ export const migrateLocalStorageToFirestore = async (userId) => {
       });
 
       if (Object.keys(cleanSchedule).length > 0) {
-        const docRef = doc(db, 'mindflowUsers', userId, 'calendar', dateKey);
+        const docRef = doc(db, 'mindflowUsers', userId, 'calendar', safeKey);
         batch.set(docRef, { schedule: cleanSchedule, updatedAt: serverTimestamp() });
       }
     });
@@ -1156,6 +1159,9 @@ export const migrateLegacyFirestoreData = async (firebaseUID, userId) => {
     });
 
     Object.entries(calendar).forEach(([dateKey, schedule]) => {
+      // dateKey가 문자열이 아니면 문자열로 변환
+      const safeKey = typeof dateKey === 'string' ? dateKey : String(dateKey);
+
       const cleanSchedule = {};
       Object.keys(schedule).forEach(key => {
         if (schedule[key] !== undefined && schedule[key] !== null) {
@@ -1164,7 +1170,7 @@ export const migrateLegacyFirestoreData = async (firebaseUID, userId) => {
       });
 
       if (Object.keys(cleanSchedule).length > 0) {
-        const docRef = doc(db, 'mindflowUsers', userId, 'calendar', dateKey);
+        const docRef = doc(db, 'mindflowUsers', userId, 'calendar', safeKey);
         batch.set(docRef, { schedule: cleanSchedule, updatedAt: serverTimestamp() });
       }
     });

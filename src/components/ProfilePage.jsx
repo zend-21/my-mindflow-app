@@ -1162,7 +1162,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     const fileInputRef = useRef(null);
 
     // 이미지 타입 변경 핸들러
-    const handleImageTypeChange = (type) => {
+    const handleImageTypeChange = async (type) => {
         console.log('🔄 프로필 이미지 타입 변경:', type);
         setProfileImageType(type);
         localStorage.setItem('profileImageType', type);
@@ -1170,15 +1170,48 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
         // Header에 알림
         window.dispatchEvent(new CustomEvent('profileImageTypeChanged', { detail: type }));
 
+        // 🔥 Firestore settings에도 동기화
+        try {
+            const userId = localStorage.getItem('firebaseUserId');
+            if (userId) {
+                const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
+                const currentSettings = await fetchSettingsFromFirestore(userId);
+                await saveSettingsToFirestore(userId, {
+                    ...currentSettings,
+                    profileImageType: type
+                });
+                console.log('✅ 프로필 이미지 타입 Firestore 동기화 완료');
+            }
+        } catch (error) {
+            console.error('프로필 이미지 타입 동기화 실패:', error);
+        }
+
         // 버튼 클릭 시에는 모달을 열지 않고 타입만 변경
         // 아바타 모드에서 프로필 사진을 클릭하면 모달이 열림
     };
 
     // 아바타 선택 핸들러
-    const handleAvatarSelect = (avatarId) => {
+    const handleAvatarSelect = async (avatarId) => {
         setSelectedAvatarId(avatarId);
         localStorage.setItem('selectedAvatarId', avatarId);
         showToast?.('아바타가 변경되었습니다');
+
+        // 🔥 Firestore settings에도 동기화
+        try {
+            const userId = localStorage.getItem('firebaseUserId');
+            if (userId) {
+                const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
+                const currentSettings = await fetchSettingsFromFirestore(userId);
+                await saveSettingsToFirestore(userId, {
+                    ...currentSettings,
+                    selectedAvatarId: avatarId,
+                    avatarBgColor: avatarBgColor // 현재 배경색도 함께 저장
+                });
+                console.log('✅ 아바타 선택 Firestore 동기화 완료');
+            }
+        } catch (error) {
+            console.error('아바타 선택 동기화 실패:', error);
+        }
     };
 
     // 아바타 아이콘 렌더링
@@ -1214,8 +1247,25 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
 
     // 배경색 변경 이벤트 리스너
     useEffect(() => {
-        const handleBgColorChange = (e) => {
-            setAvatarBgColor(e.detail);
+        const handleBgColorChange = async (e) => {
+            const newColor = e.detail;
+            setAvatarBgColor(newColor);
+
+            // 🔥 Firestore settings에도 동기화
+            try {
+                const userId = localStorage.getItem('firebaseUserId');
+                if (userId) {
+                    const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
+                    const currentSettings = await fetchSettingsFromFirestore(userId);
+                    await saveSettingsToFirestore(userId, {
+                        ...currentSettings,
+                        avatarBgColor: newColor
+                    });
+                    console.log('✅ 아바타 배경색 Firestore 동기화 완료');
+                }
+            } catch (error) {
+                console.error('아바타 배경색 동기화 실패:', error);
+            }
         };
         window.addEventListener('avatarBgColorChanged', handleBgColorChange);
         return () => window.removeEventListener('avatarBgColorChanged', handleBgColorChange);
@@ -1379,7 +1429,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     };
 
     // 프로필 사진/아바타 제거 (초기화)
-    const handleRemoveProfile = () => {
+    const handleRemoveProfile = async () => {
         if (profileImageType === 'avatar') {
             // 아바타 제거
             setSelectedAvatarId(null);
@@ -1391,6 +1441,23 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
             window.dispatchEvent(new CustomEvent('avatarChanged', {
                 detail: { avatarId: null, bgColor: 'none' }
             }));
+
+            // 🔥 Firestore settings에도 동기화
+            try {
+                const userId = localStorage.getItem('firebaseUserId');
+                if (userId) {
+                    const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
+                    const currentSettings = await fetchSettingsFromFirestore(userId);
+                    await saveSettingsToFirestore(userId, {
+                        ...currentSettings,
+                        selectedAvatarId: null,
+                        avatarBgColor: 'none'
+                    });
+                    console.log('✅ 아바타 제거 Firestore 동기화 완료');
+                }
+            } catch (error) {
+                console.error('아바타 제거 동기화 실패:', error);
+            }
 
             showToast?.('아바타가 제거되었습니다');
         } else {
@@ -1404,6 +1471,23 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
             window.dispatchEvent(new CustomEvent('profilePictureChanged', {
                 detail: { picture: null, hash: null }
             }));
+
+            // 🔥 Firestore settings에도 동기화
+            try {
+                const userId = localStorage.getItem('firebaseUserId');
+                if (userId) {
+                    const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
+                    const currentSettings = await fetchSettingsFromFirestore(userId);
+                    await saveSettingsToFirestore(userId, {
+                        ...currentSettings,
+                        customProfilePicture: null,
+                        customProfilePictureHash: null
+                    });
+                    console.log('✅ 커스텀 프로필 사진 제거 Firestore 동기화 완료');
+                }
+            } catch (error) {
+                console.error('커스텀 프로필 사진 제거 동기화 실패:', error);
+            }
 
             showToast?.('프로필 사진이 제거되었습니다');
         }
@@ -1462,6 +1546,23 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
             window.dispatchEvent(new CustomEvent('profilePictureChanged', {
                 detail: { picture: imageUrl, hash }
             }));
+
+            // 🔥 Firestore settings에도 동기화
+            try {
+                const userId = localStorage.getItem('firebaseUserId');
+                if (userId) {
+                    const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
+                    const currentSettings = await fetchSettingsFromFirestore(userId);
+                    await saveSettingsToFirestore(userId, {
+                        ...currentSettings,
+                        customProfilePicture: imageUrl,
+                        customProfilePictureHash: hash
+                    });
+                    console.log('✅ 커스텀 프로필 사진 Firestore 동기화 완료');
+                }
+            } catch (error) {
+                console.error('커스텀 프로필 사진 동기화 실패:', error);
+            }
 
             showToast?.('프로필 사진이 변경되었습니다 📸');
 

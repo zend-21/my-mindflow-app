@@ -1519,10 +1519,13 @@ function App() {
                 // 프로필은 항상 복원 (로그인 상태 유지)
                 const profileData = JSON.parse(savedProfile);
 
-                // Firestore에서 최신 닉네임 가져오기
+                // Firestore에서 최신 닉네임 및 프로필 이미지 설정 가져오기
                 if (userId) {
                     try {
                         const { getUserNickname } = await import('./services/nicknameService');
+                        const { fetchSettingsFromFirestore } = await import('./services/userDataService');
+
+                        // 닉네임 로드
                         const firestoreNickname = await getUserNickname(userId);
                         if (firestoreNickname) {
                             profileData.nickname = firestoreNickname;
@@ -1533,6 +1536,34 @@ function App() {
                             if (savedNickname) {
                                 profileData.nickname = savedNickname;
                             }
+                        }
+
+                        // 🔥 프로필 이미지 설정 로드
+                        try {
+                            const settings = await fetchSettingsFromFirestore(userId);
+                            if (settings) {
+                                // profileImageType 복원
+                                if (settings.profileImageType) {
+                                    localStorage.setItem('profileImageType', settings.profileImageType);
+                                }
+                                // 아바타 설정 복원
+                                if (settings.selectedAvatarId) {
+                                    localStorage.setItem('selectedAvatarId', settings.selectedAvatarId);
+                                }
+                                if (settings.avatarBgColor) {
+                                    localStorage.setItem('avatarBgColor', settings.avatarBgColor);
+                                }
+                                // 커스텀 프로필 사진 복원
+                                if (settings.customProfilePicture) {
+                                    localStorage.setItem('customProfilePicture', settings.customProfilePicture);
+                                }
+                                if (settings.customProfilePictureHash) {
+                                    localStorage.setItem('customProfilePictureHash', settings.customProfilePictureHash);
+                                }
+                                console.log('✅ 프로필 이미지 설정 복원 완료');
+                            }
+                        } catch (settingsError) {
+                            console.error('프로필 이미지 설정 로드 실패:', settingsError);
                         }
                     } catch (error) {
                         console.error('닉네임 로드 실패:', error);

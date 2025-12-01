@@ -116,9 +116,14 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
             if (migrated) {
               localStorage.setItem(legacyMigrationKey, 'true');
               console.log('✅ 구 구조 데이터 마이그레이션 완료!');
+            } else {
+              // 마이그레이션할 데이터가 없으면 플래그 설정
+              localStorage.setItem(legacyMigrationKey, 'true');
             }
           } catch (error) {
             console.warn('⚠️ 구 구조 마이그레이션 건너뜀:', error);
+            // 오류 발생 시에도 플래그 설정하여 다음부터 건너뛰기
+            localStorage.setItem(legacyMigrationKey, 'true');
           }
         }
 
