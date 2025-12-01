@@ -306,6 +306,12 @@ export const getAllSecretDocs = async (pin, includeDeleted = false) => {
                 console.log('📦 복호화된 JSON:', { id: encDoc.id, includesPasswordHash: decryptedJson.includes('passwordHash') });
                 const parsedDoc = JSON.parse(decryptedJson);
                 console.log('🔓 파싱된 문서:', { id: parsedDoc.id, hasPasswordHash: !!parsedDoc.passwordHash, passwordHashFull: parsedDoc.passwordHash });
+
+                // ⭐ Firestore 타임스탬프 추가 (timestamp comparison용)
+                if (encDoc.updatedAt) {
+                    parsedDoc.firestoreUpdatedAt = encDoc.updatedAt;
+                }
+
                 return parsedDoc;
             } catch (error) {
                 console.error(`문서 ${encDoc.id} 복호화 실패:`, error);
@@ -314,8 +320,38 @@ export const getAllSecretDocs = async (pin, includeDeleted = false) => {
         });
 
         const decryptedDocs = await Promise.all(decryptionPromises);
-        const allDocs = decryptedDocs.filter(doc => doc !== null);
+        let allDocs = decryptedDocs.filter(doc => doc !== null);
         console.timeEnd('  ↳ 개별 복호화 (병렬)');
+
+        // 🆕 타임스탬프 비교: Firestore 저장 실패 감지
+        allDocs = allDocs.map(doc => {
+            const lastSavedKey = `firestore_saved_secret_${doc.id}`;
+            const lastSaved = localStorage.getItem(lastSavedKey);
+
+            if (!lastSaved) {
+                // lastSaved가 없으면 처음 불러온 문서이거나 저장 실패한 문서
+                return doc;
+            }
+
+            try {
+                const lastSavedData = JSON.parse(lastSaved);
+                const firestoreTime = doc.firestoreUpdatedAt?.toMillis ? doc.firestoreUpdatedAt.toMillis() :
+                                     (doc.firestoreUpdatedAt?.seconds ? doc.firestoreUpdatedAt.seconds * 1000 : 0);
+                const lastSavedTime = new Date(lastSavedData.updatedAt).getTime();
+
+                if (firestoreTime < lastSavedTime) {
+                    console.warn(`⚠️ [Secret] Firestore 데이터가 로컬보다 오래됨: ${doc.id}`);
+                    console.warn(`  → Firestore: ${new Date(firestoreTime).toLocaleString()}`);
+                    console.warn(`  → 마지막 저장: ${new Date(lastSavedTime).toLocaleString()}`);
+                    console.warn(`  → ⚠️ 이전 저장 실패 가능성 - Firestore 데이터 사용 (보안상 암호화된 데이터만 신뢰)`);
+                }
+
+                return doc;
+            } catch (error) {
+                console.error(`타임스탬프 비교 오류 (${doc.id}):`, error);
+                return doc;
+            }
+        });
 
         console.log(`✅ 시크릿 문서 ${allDocs.length}개 개별 복호화 완료`);
         console.timeEnd('⏱️ getAllSecretDocs - 전체 시간');
@@ -406,6 +442,16 @@ export const saveSecretDocs = async (pin, docs) => {
         console.time('  ↳ Firestore 저장 (배치)');
         await saveIndividualSecretDocsToFirestore(userId, encryptedDocs);
         console.timeEnd('  ↳ Firestore 저장 (배치)');
+
+        // ✅ 저장 성공 시 각 문서의 마지막 저장 시간 기록 (타임스탬프 비교용)
+        docs.forEach(doc => {
+            const lastSavedKey = `firestore_saved_secret_${doc.id}`;
+            localStorage.setItem(lastSavedKey, JSON.stringify({
+                id: doc.id,
+                updatedAt: doc.updatedAt,
+                savedAt: new Date().toISOString()
+            }));
+        });
 
         console.log(`✅ 시크릿 문서 ${docs.length}개 개별 암호화 저장 완료`);
     } catch (error) {

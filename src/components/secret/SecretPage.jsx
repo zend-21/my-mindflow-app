@@ -1309,16 +1309,10 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                     await updateSecretDoc(currentPin, editingDoc.id, updates);
                 }
 
-                // ✅ 저장 후 문서 다시 로드
-                const allDocs = await getAllSecretDocs(currentPin);
-                setDocs(allDocs);
-                setFilteredDocs(allDocs);
-
-                // 업데이트된 문서 찾기
-                const freshDoc = allDocs.find(d => d.id === editingDoc.id);
-                if (freshDoc) {
-                    setViewingDoc(freshDoc);
-                }
+                // ✅ 저장 성공 - 낙관적 업데이트 유지 (이미 updatedDoc에 적용됨)
+                // 💡 Firestore serverTimestamp가 적용되기 전에 reload하면 오래된 데이터가 올 수 있으므로
+                //    저장 직후에는 reload하지 않고 낙관적 업데이트만 유지
+                console.log('✅ [Secret] 문서 저장 완료 - 낙관적 업데이트 유지:', editingDoc.id);
             } else {
                 // === 새 문서 케이스 ===
                 // 2. 임시 ID로 낙관적 UI 업데이트
@@ -1344,16 +1338,16 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                 if (docData.hasPassword && docData.password) {
                     console.log('🔐 개별 비밀번호 설정 시작 (신규)');
                     await setDocPassword(currentPin, newDoc.id, docData.password);
-
-                    // ✅ 비밀번호 설정 후 업데이트된 문서 다시 로드
-                    const allDocs = await getAllSecretDocs(currentPin);
-                    setDocs(allDocs);
-                    setFilteredDocs(allDocs);
-                } else {
-                    // 4. 임시 문서를 실제 문서로 교체 (비밀번호 없는 경우만)
-                    setDocs(prev => prev.map(d => d.id === tempId ? newDoc : d));
-                    setFilteredDocs(prev => prev.map(d => d.id === tempId ? newDoc : d));
                 }
+
+                // 4. 임시 문서를 실제 문서로 교체
+                setDocs(prev => prev.map(d => d.id === tempId ? newDoc : d));
+                setFilteredDocs(prev => prev.map(d => d.id === tempId ? newDoc : d));
+
+                // ✅ 저장 성공 - 낙관적 업데이트 유지
+                // 💡 Firestore serverTimestamp가 적용되기 전에 reload하면 오래된 데이터가 올 수 있으므로
+                //    저장 직후에는 reload하지 않고 낙관적 업데이트만 유지
+                console.log('✅ [Secret] 새 문서 저장 완료 - 낙관적 업데이트 유지:', newDoc.id);
             }
         } catch (error) {
             // 5. 실패 시 롤백

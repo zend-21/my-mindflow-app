@@ -1426,7 +1426,8 @@ export const fetchIndividualSecretDocsFromFirestore = async (userId, docId = nul
         docs.push({
           id: docSnap.id,
           encryptedData: data.encryptedData || '',
-          deleted: data.deleted ?? false
+          deleted: data.deleted ?? false,
+          updatedAt: data.updatedAt  // ⭐ Firestore 타임스탬프 추가 (timestamp comparison용)
         });
       }
     });
