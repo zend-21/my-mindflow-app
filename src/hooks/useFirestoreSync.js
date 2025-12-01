@@ -185,6 +185,9 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
           const localMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
           const localFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
           const localCalendar = JSON.parse(localStorage.getItem('calendarSchedules_shared') || '{}');
+          const localTrash = JSON.parse(localStorage.getItem('trashedItems_shared') || '[]');
+          const localActivities = JSON.parse(localStorage.getItem('recentActivities_shared') || '[]');
+          const localMacros = JSON.parse(localStorage.getItem('macroTexts') || '[]');
 
           // 📝 메모 병합 (개별 문서별로 처리)
           const mergedMemos = data.memos.map(firestoreMemo => {
@@ -201,25 +204,15 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
               return firestoreMemo;
             } else {
               // ⚠️ 로컬 ≠ 마지막 저장 버전 → 이 기기에서 수정함 또는 저장 실패
+              // 💡 타임스탬프 비교 제거: 미저장 변경사항은 무조건 로컬 우선!
               console.warn(`⚠️ 미저장 변경 감지: ${firestoreMemo.id}`);
+              console.warn(`  → 로컬 우선 (미저장 변경사항 보호) - 재저장 시도`);
 
-              // 서버 시간 비교로 충돌 해결 (기기 시간 조작 방지)
-              const firestoreTime = firestoreMemo.updatedAt || 0;
-              const lastSavedMemo = lastSaved ? JSON.parse(lastSaved) : {};
-              const lastSyncedTime = lastSavedMemo.updatedAt || 0;
-
-              if (firestoreTime > lastSyncedTime) {
-                // Firestore가 더 최신 (다른 기기에서 수정)
-                console.warn(`  → Firestore 우선 (다른 기기에서 수정됨)`);
-                return firestoreMemo;
-              } else {
-                // 로컬이 최신 (이 기기에서 수정 또는 저장 실패)
-                console.warn(`  → 로컬 우선 (이 기기에서 수정됨) - 재저장 시도`);
-                saveMemoToFirestore(userId, localMemo).catch(err => {
-                  console.error('재저장 실패:', err);
-                });
-                return localMemo;
-              }
+              // 재저장 시도 (할당량 초과 시 자동으로 실패하고 다음에 재시도)
+              saveMemoToFirestore(userId, localMemo).catch(err => {
+                console.error('재저장 실패:', err);
+              });
+              return localMemo;
             }
           });
 
@@ -257,18 +250,11 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
             if (lastSaved === localData) {
               return firestoreFolder;
             } else {
-              const firestoreTime = firestoreFolder.updatedAt || 0;
-              const lastSavedFolder = lastSaved ? JSON.parse(lastSaved) : {};
-              const lastSyncedTime = lastSavedFolder.updatedAt || 0;
-
-              if (firestoreTime > lastSyncedTime) {
-                return firestoreFolder;
-              } else {
-                saveFolderToFirestore(userId, localFolder).catch(err => {
-                  console.error('폴더 재저장 실패:', err);
-                });
-                return localFolder;
-              }
+              // 💡 타임스탬프 비교 제거: 미저장 변경사항은 무조건 로컬 우선!
+              saveFolderToFirestore(userId, localFolder).catch(err => {
+                console.error('폴더 재저장 실패:', err);
+              });
+              return localFolder;
             }
           });
 
@@ -289,13 +275,40 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
             }
           });
 
+          // 🗑️ 휴지통, 📅 캘린더, 📊 활동, 매크로도 미저장 변경 보호 (Evernote 방식)
+          // 💡 간단한 체크: localStorage와 firestore_saved 비교
+          const useLocalTrash = localStorage.getItem('firestore_saved_trash_all') !== JSON.stringify(localTrash);
+          const useLocalCalendar = localStorage.getItem('firestore_saved_calendar_all') !== JSON.stringify(localCalendar);
+          const useLocalActivities = localStorage.getItem('firestore_saved_activities_all') !== JSON.stringify(localActivities);
+          const useLocalMacros = localStorage.getItem('firestore_saved_macros_all') !== JSON.stringify(localMacros);
+
           setMemos(mergedMemos);
           setFolders(mergedFolders);
-          setTrash(data.trash || []);
-          setMacros(data.macros || []);
-          setCalendar(data.calendar || {});
-          setActivities(data.activities || []);
-          setSettings(data.settings || settings);
+          setTrash(useLocalTrash ? localTrash : (data.trash || []));
+          setMacros(useLocalMacros ? localMacros : (data.macros || []));
+          setCalendar(useLocalCalendar ? localCalendar : (data.calendar || {}));
+          setActivities(useLocalActivities ? localActivities : (data.activities || []));
+          setSettings(data.settings || settings);  // Settings는 개별 필드라 복잡함, 일단 Firestore 우선
+
+          // 미저장 데이터 재저장 시도
+          if (useLocalTrash) {
+            console.warn('⚠️ 휴지통 미저장 변경 감지 - 로컬 데이터 사용');
+            localTrash.forEach(item => saveTrashItemToFirestore(userId, item).catch(() => {}));
+          }
+          if (useLocalCalendar) {
+            console.warn('⚠️ 캘린더 미저장 변경 감지 - 로컬 데이터 사용');
+            Object.entries(localCalendar).forEach(([dateKey, schedule]) =>
+              saveCalendarDateToFirestore(userId, dateKey, schedule).catch(() => {})
+            );
+          }
+          if (useLocalActivities) {
+            console.warn('⚠️ 활동 미저장 변경 감지 - 로컬 데이터 사용');
+            localActivities.forEach(activity => saveActivityToFirestore(userId, activity).catch(() => {}));
+          }
+          if (useLocalMacros) {
+            console.warn('⚠️ 매크로 미저장 변경 감지 - 로컬 데이터 사용');
+            saveMacroToFirestore(userId, localMacros).catch(() => {});
+          }
 
           console.log('✅ Evernote 방식 다중 기기 동기화 완료');
         }
