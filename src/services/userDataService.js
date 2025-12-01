@@ -73,10 +73,18 @@ export const fetchMemosFromFirestore = async (userId) => {
 
     const memos = [];
     snapshot.forEach((docSnap) => {
-      const data = convertTimestampsToMillis(docSnap.data());
+      const rawData = docSnap.data();
+      const data = convertTimestampsToMillis(rawData);
+
+      // ⭐ Evernote 방식: deleted가 true면 제외 (하위 호환: deleted 없으면 false로 간주)
+      if (data.deleted === true) {
+        return;  // 삭제된 메모는 스킵
+      }
+
       memos.push({
         id: docSnap.id,
-        ...data
+        ...data,
+        deleted: data.deleted ?? false  // 명시적으로 false 설정
       });
     });
 
@@ -94,11 +102,13 @@ export const saveMemoToFirestore = async (userId, memo) => {
   try {
     const docRef = doc(db, 'mindflowUsers', userId, 'memos', memo.id);
 
-    // 새로 생성된 메모(updatedAt이 없음)는 updatedAt을 추가하지 않음
-    // 수정된 메모(updatedAt이 이미 있음)만 updatedAt을 업데이트
-    const dataToSave = memo.updatedAt
-      ? { ...memo, updatedAt: serverTimestamp() }
-      : { ...memo };
+    // ⭐ Evernote 방식: 모든 저장에 deleted: false와 serverTimestamp 추가
+    const dataToSave = {
+      ...memo,
+      deleted: false,  // 활성 문서 표시
+      updatedAt: serverTimestamp(),  // 서버 시간으로 강제 (기기 시간 조작 방지)
+      createdAt: memo.createdAt || serverTimestamp()  // 신규 생성 시에만 설정
+    };
 
     // ⚠️ Firestore는 undefined를 허용하지 않으므로 null로 변환
     const sanitizedData = Object.fromEntries(
@@ -113,12 +123,21 @@ export const saveMemoToFirestore = async (userId, memo) => {
 };
 
 /**
- * Firestore에서 단일 메모 삭제
+ * Firestore에서 단일 메모 삭제 (Soft Delete)
+ * ⭐ Evernote 방식: 실제 삭제 대신 deleted 플래그만 설정
+ * 다른 기기에서 삭제를 감지할 수 있도록 함
  */
 export const deleteMemoFromFirestore = async (userId, memoId) => {
   try {
     const docRef = doc(db, 'mindflowUsers', userId, 'memos', memoId);
-    await deleteDoc(docRef);
+
+    // ⭐ Soft Delete: deleted 플래그만 설정 (문서는 유지)
+    await setDoc(docRef, {
+      deleted: true,
+      deletedAt: serverTimestamp()
+    }, { merge: true });  // 기존 필드 유지
+
+    console.log(`✅ 메모 soft delete 완료: ${memoId}`);
   } catch (error) {
     console.error('메모 삭제 실패:', error);
     throw error;
@@ -159,10 +178,17 @@ export const fetchFoldersFromFirestore = async (userId) => {
 
     const folders = [];
     snapshot.forEach((docSnap) => {
-      const data = convertTimestampsToMillis(docSnap.data());
+      const rawData = docSnap.data();
+      const data = convertTimestampsToMillis(rawData);
+
+      if (data.deleted === true) {
+        return;  // 삭제된 폴더는 스킵
+      }
+
       folders.push({
         id: docSnap.id,
-        ...data
+        ...data,
+        deleted: data.deleted ?? false
       });
     });
 
@@ -181,7 +207,9 @@ export const saveFolderToFirestore = async (userId, folder) => {
     const docRef = doc(db, 'mindflowUsers', userId, 'folders', folder.id);
     await setDoc(docRef, {
       ...folder,
-      updatedAt: serverTimestamp()
+      deleted: false,
+      updatedAt: serverTimestamp(),
+      createdAt: folder.createdAt || serverTimestamp()
     });
   } catch (error) {
     console.error('폴더 저장 실패:', error);
@@ -190,12 +218,16 @@ export const saveFolderToFirestore = async (userId, folder) => {
 };
 
 /**
- * Firestore에서 단일 폴더 삭제
+ * Firestore에서 단일 폴더 삭제 (Soft Delete)
  */
 export const deleteFolderFromFirestore = async (userId, folderId) => {
   try {
     const docRef = doc(db, 'mindflowUsers', userId, 'folders', folderId);
-    await deleteDoc(docRef);
+    await setDoc(docRef, {
+      deleted: true,
+      deletedAt: serverTimestamp()
+    }, { merge: true });
+    console.log(`✅ 폴더 soft delete 완료: ${folderId}`);
   } catch (error) {
     console.error('폴더 삭제 실패:', error);
     throw error;
@@ -235,10 +267,17 @@ export const fetchTrashFromFirestore = async (userId) => {
 
     const trash = [];
     snapshot.forEach((docSnap) => {
-      const data = convertTimestampsToMillis(docSnap.data());
+      const rawData = docSnap.data();
+      const data = convertTimestampsToMillis(rawData);
+
+      if (data.deleted === true) {
+        return;  // 삭제된 휴지통 항목은 스킵
+      }
+
       trash.push({
         id: docSnap.id,
-        ...data
+        ...data,
+        deleted: data.deleted ?? false
       });
     });
 
@@ -266,7 +305,9 @@ export const saveTrashItemToFirestore = async (userId, trashItem) => {
 
     await setDoc(docRef, {
       ...cleanData,
-      updatedAt: serverTimestamp()
+      deleted: false,
+      updatedAt: serverTimestamp(),
+      createdAt: cleanData.createdAt || serverTimestamp()
     });
   } catch (error) {
     console.error('휴지통 항목 저장 실패:', error);
@@ -275,12 +316,16 @@ export const saveTrashItemToFirestore = async (userId, trashItem) => {
 };
 
 /**
- * Firestore에서 단일 휴지통 항목 삭제
+ * Firestore에서 단일 휴지통 항목 삭제 (Soft Delete)
  */
 export const deleteTrashItemFromFirestore = async (userId, trashId) => {
   try {
     const docRef = doc(db, 'mindflowUsers', userId, 'trash', trashId);
-    await deleteDoc(docRef);
+    await setDoc(docRef, {
+      deleted: true,
+      deletedAt: serverTimestamp()
+    }, { merge: true });
+    console.log(`✅ 휴지통 항목 soft delete 완료: ${trashId}`);
   } catch (error) {
     console.error('휴지통 항목 삭제 실패:', error);
     throw error;
@@ -343,6 +388,7 @@ export const saveMacroToFirestore = async (userId, macrosArray) => {
     await setDoc(userDocRef, {
       macros: {
         items: macrosArray,
+        deleted: false,
         updatedAt: serverTimestamp()
       }
     }, { merge: true });
@@ -372,7 +418,13 @@ export const fetchCalendarFromFirestore = async (userId) => {
 
     const calendar = {};
     snapshot.forEach((docSnap) => {
-      const data = convertTimestampsToMillis(docSnap.data());
+      const rawData = docSnap.data();
+      const data = convertTimestampsToMillis(rawData);
+
+      if (data.deleted === true) {
+        return;  // 삭제된 캘린더 일정은 스킵
+      }
+
       calendar[docSnap.id] = data.schedule || {};
 
       console.log('🔍 [fetchCalendarFromFirestore] 날짜:', docSnap.id, '알람 수:', data.schedule?.alarm?.registeredAlarms?.length);
@@ -416,36 +468,52 @@ const removeUndefinedValues = (obj) => {
 
 export const saveCalendarDateToFirestore = async (userId, dateKey, schedule) => {
   try {
+    console.log('🔍 [saveCalendarDateToFirestore] 저장 시작:', dateKey);
+    console.log('📦 원본 schedule:', JSON.stringify(schedule, null, 2));
+
     // undefined 값 제거 (재귀적으로 중첩된 객체도 처리)
     const cleanSchedule = removeUndefinedValues(schedule);
 
-    // 빈 스케줄이면 문서 삭제
+    console.log('🧹 cleanSchedule:', JSON.stringify(cleanSchedule, null, 2));
+    console.log('📏 cleanSchedule keys:', cleanSchedule ? Object.keys(cleanSchedule) : 'null');
+
+    const docRef = doc(db, 'mindflowUsers', userId, 'calendar', dateKey);
+
+    // 빈 스케줄이면 soft delete
     if (!cleanSchedule || Object.keys(cleanSchedule).length === 0) {
-      const docRef = doc(db, 'mindflowUsers', userId, 'calendar', dateKey);
-      await deleteDoc(docRef);
+      console.warn('⚠️ [saveCalendarDateToFirestore] 빈 스케줄 감지 - soft delete:', dateKey);
+      await setDoc(docRef, {
+        deleted: true,
+        deletedAt: serverTimestamp()
+      }, { merge: true });
       return;
     }
 
-    const docRef = doc(db, 'mindflowUsers', userId, 'calendar', dateKey);
     await setDoc(docRef, {
       schedule: cleanSchedule,
-      updatedAt: serverTimestamp()
+      deleted: false,
+      updatedAt: serverTimestamp(),
+      createdAt: schedule.createdAt || serverTimestamp()
     });
 
     console.log('✅ [saveCalendarDateToFirestore] Firestore 저장 완료:', dateKey);
   } catch (error) {
-    console.error('캘린더 일정 저장 실패:', error);
+    console.error('❌ 캘린더 일정 저장 실패:', error);
     throw error;
   }
 };
 
 /**
- * Firestore에서 특정 날짜의 일정 삭제
+ * Firestore에서 특정 날짜의 일정 삭제 (Soft Delete)
  */
 export const deleteCalendarDateFromFirestore = async (userId, dateKey) => {
   try {
     const docRef = doc(db, 'mindflowUsers', userId, 'calendar', dateKey);
-    await deleteDoc(docRef);
+    await setDoc(docRef, {
+      deleted: true,
+      deletedAt: serverTimestamp()
+    }, { merge: true });
+    console.log(`✅ 캘린더 일정 soft delete 완료: ${dateKey}`);
   } catch (error) {
     console.error('캘린더 일정 삭제 실패:', error);
     throw error;
@@ -484,10 +552,17 @@ export const fetchActivitiesFromFirestore = async (userId) => {
 
     const activities = [];
     snapshot.forEach((docSnap) => {
-      const data = convertTimestampsToMillis(docSnap.data());
+      const rawData = docSnap.data();
+      const data = convertTimestampsToMillis(rawData);
+
+      if (data.deleted === true) {
+        return;  // 삭제된 활동은 스킵
+      }
+
       activities.push({
         id: docSnap.id,
-        ...data
+        ...data,
+        deleted: data.deleted ?? false
       });
     });
 
@@ -506,7 +581,9 @@ export const saveActivityToFirestore = async (userId, activity) => {
     const docRef = doc(db, 'mindflowUsers', userId, 'activities', activity.id);
     await setDoc(docRef, {
       ...activity,
-      updatedAt: serverTimestamp()
+      deleted: false,
+      updatedAt: serverTimestamp(),
+      createdAt: activity.createdAt || serverTimestamp()
     });
   } catch (error) {
     console.error('활동 저장 실패:', error);
@@ -515,12 +592,16 @@ export const saveActivityToFirestore = async (userId, activity) => {
 };
 
 /**
- * Firestore에서 단일 활동 삭제
+ * Firestore에서 단일 활동 삭제 (Soft Delete)
  */
 export const deleteActivityFromFirestore = async (userId, activityId) => {
   try {
     const docRef = doc(db, 'mindflowUsers', userId, 'activities', activityId);
-    await deleteDoc(docRef);
+    await setDoc(docRef, {
+      deleted: true,
+      deletedAt: serverTimestamp()
+    }, { merge: true });
+    console.log(`✅ 활동 soft delete 완료: ${activityId}`);
   } catch (error) {
     console.error('활동 삭제 실패:', error);
     throw error;
@@ -584,7 +665,9 @@ export const saveSettingsToFirestore = async (userId, settings) => {
     const docRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
     await setDoc(docRef, {
       ...settings,
-      updatedAt: serverTimestamp()
+      deleted: false,
+      updatedAt: serverTimestamp(),
+      createdAt: settings.createdAt || serverTimestamp()
     }, { merge: true });
   } catch (error) {
     console.error('설정 데이터 저장 실패:', error);
@@ -1220,9 +1303,17 @@ export const fetchIndividualSecretDocsFromFirestore = async (userId, docId = nul
         return null;
       }
 
+      const data = docSnap.data();
+
+      // ⭐ deleted 체크
+      if (data.deleted === true) {
+        return null;
+      }
+
       return {
         id: docSnap.id,
-        encryptedData: docSnap.data().encryptedData || ''
+        encryptedData: data.encryptedData || '',
+        deleted: data.deleted ?? false
       };
     }
 
@@ -1232,9 +1323,17 @@ export const fetchIndividualSecretDocsFromFirestore = async (userId, docId = nul
     const docs = [];
     querySnapshot.forEach((docSnap) => {
       if (docSnap.id !== 'metadata') {
+        const data = docSnap.data();
+
+        // ⭐ deleted 체크
+        if (data.deleted === true) {
+          return;  // 스킵
+        }
+
         docs.push({
           id: docSnap.id,
-          encryptedData: docSnap.data().encryptedData || ''
+          encryptedData: data.encryptedData || '',
+          deleted: data.deleted ?? false
         });
       }
     });
@@ -1255,7 +1354,9 @@ export const saveIndividualSecretDocsToFirestore = async (userId, encryptedDocs)
       const docRef = doc(colRef, encDoc.id);
       batch.set(docRef, {
         encryptedData: encDoc.encryptedData,
-        updatedAt: serverTimestamp()
+        deleted: false,  // ⭐ Evernote 방식
+        updatedAt: serverTimestamp(),
+        createdAt: encDoc.createdAt || serverTimestamp()
       }, { merge: true });
     });
 
@@ -1279,10 +1380,15 @@ export const deleteIndividualSecretDocsFromFirestore = async (userId, docIds) =>
 
     docIds.forEach((docId) => {
       const docRef = doc(colRef, docId);
-      batch.delete(docRef);
+      // ⭐ Soft Delete
+      batch.set(docRef, {
+        deleted: true,
+        deletedAt: serverTimestamp()
+      }, { merge: true });
     });
 
     await batch.commit();
+    console.log(`✅ 시크릿 문서 soft delete 완료: ${docIds.join(', ')}`);
   } catch (error) {
     console.error('개별 시크릿 문서 삭제 실패:', error);
     throw error;

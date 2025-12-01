@@ -182,52 +182,9 @@ const ContentArea = styled.div`
     padding-top: ${props => props.$showHeader ? '90px' : '20px'};
     overflow-y: auto;
     position: relative;
-    transition: ${props => props.$isPulling ? 'none' : 'transform 0.3s ease, padding-top 0.3s ease'};
-    transform: translateY(${props => props.$pullDistance || 0}px);
     overscroll-behavior: none;
     touch-action: pan-y;
     background: ${props => props.$isSecretTab ? 'linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%)' : '#1a1a1a'};
-`;
-
-const PullToRefreshIndicator = styled.div`
-    position: fixed;
-    top: ${props => props.$showHeader ? '100px' : '20px'};
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-    opacity: ${props => Math.min(props.$distance / 60, 1)};
-    transition: opacity 0.2s;
-    pointer-events: none;
-    z-index: 1000;
-`;
-
-const spinAnimation = keyframes`
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-`;
-
-const RefreshIcon = styled.div`
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    border: 3px solid rgba(92, 103, 242, 0.2);
-    border-top-color: rgba(92, 103, 242, 0.9);
-    box-shadow: 0 4px 12px rgba(92, 103, 242, 0.3);
-
-    ${props => props.$isActive && css`
-        animation: ${spinAnimation} 0.8s linear infinite;
-    `}
-`;
-
-const RefreshText = styled.div`
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 12px;
-    font-weight: 500;
-    white-space: nowrap;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 `;
 
 const LoginScreen = styled.div`
@@ -376,11 +333,6 @@ function App() {
     const idleTimerRef = useRef(null);
     const IDLE_TIMEOUT = 5 * 60 * 1000; // 5분
 
-    // 🔄 Pull to Refresh 상태
-    const [isPulling, setIsPulling] = useState(false);
-    const [pullDistance, setPullDistance] = useState(0);
-    const touchStartY = useRef(0);
-    const scrollTop = useRef(0);
     const contentRef = useRef(null);
 
     // 기존 useEffect (앱 활성 상태 리스너)
@@ -643,9 +595,7 @@ function App() {
         syncFolder,
         deleteFolder,
         syncTrashItem,
-        deleteTrashItem,
-        // 수동 동기화 함수
-        syncFromFirestore
+        deleteTrashItem
     } = useFirestoreSync(userId, isAuthenticated, firebaseUser?.uid);
 
     // settings에서 개별 값 추출
@@ -787,54 +737,6 @@ function App() {
         syncActivities(updatedActivities.slice(0, 15));
     };
 
-    // 🔄 Pull to Refresh 핸들러
-    const handleTouchStart = (e) => {
-        const target = contentRef.current;
-        if (!target) return;
-
-        touchStartY.current = e.touches[0].clientY;
-        scrollTop.current = target.scrollTop;
-    };
-
-    const handleTouchMove = (e) => {
-        const target = contentRef.current;
-        if (!target || scrollTop.current > 0) return;
-
-        const touchY = e.touches[0].clientY;
-        const distance = touchY - touchStartY.current;
-
-        if (distance > 0 && target.scrollTop === 0) {
-            e.preventDefault();
-            const maxDistance = 120;
-            const finalDistance = Math.min(distance * 0.5, maxDistance);
-            setPullDistance(finalDistance);
-            setIsPulling(finalDistance > 60);
-        } else if (distance <= 0) {
-            // 다시 위로 올리면 취소
-            setPullDistance(0);
-            setIsPulling(false);
-        }
-    };
-
-    const handleTouchEnd = async () => {
-        // 손을 뗄 때 60px 이상이어야만 동기화
-        const shouldSync = pullDistance > 60 && userId && isAuthenticated;
-
-        setPullDistance(0);
-        setIsPulling(false);
-
-        if (shouldSync) {
-            try {
-                console.log('🔄 Pull to Refresh 시작...');
-                await syncFromFirestore();
-                showToast('✅ 동기화 완료');
-                addActivity('동기화', 'Firestore 동기화');
-            } catch (error) {
-                console.error('❌ 동기화 실패:', error);
-                showToast('❌ 동기화 실패');
-            }
-        }
-    };
     
     const [isNewMemoModalOpen, setIsNewMemoModalOpen] = useState(false);
     const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -2672,28 +2574,10 @@ function App() {
                         onProfileClick={handleProfileClick}
                     />
 
-                    {pullDistance > 0 && (
-                        <PullToRefreshIndicator
-                            $distance={pullDistance}
-                            $isActive={isPulling}
-                            $showHeader={showHeader}
-                        >
-                            <RefreshIcon $isActive={isPulling} />
-                            <RefreshText>
-                                {isPulling ? '손을 떼면 동기화' : '당겨서 새로고침'}
-                            </RefreshText>
-                        </PullToRefreshIndicator>
-                    )}
-
                     <ContentArea
                         ref={contentRef}
                         $showHeader={showHeader}
                         $isSecretTab={activeTab === 'secret'}
-                        $pullDistance={pullDistance}
-                        $isPulling={pullDistance > 0}
-                        onTouchStart={handleTouchStart}
-                        onTouchMove={handleTouchMove}
-                        onTouchEnd={handleTouchEnd}
                     >
                         {activeTab === 'home' && (
                             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>

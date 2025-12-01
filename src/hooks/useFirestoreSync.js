@@ -176,23 +176,138 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
             setSettings(data.settings || settings);
           }
         } else {
-          // Firestore에 데이터가 있음 - 서버 데이터 사용 (Single Source of Truth)
+          // Firestore에 데이터가 있음
           console.log('✅ Firestore 데이터 로드');
-          setMemos(data.memos || []);
-          setFolders(data.folders || []);
+
+          // ⭐ Evernote 방식: 다중 기기 동기화 + 오프라인 병합
+          const localMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
+          const localFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
+          const localCalendar = JSON.parse(localStorage.getItem('calendarSchedules_shared') || '{}');
+
+          // 📝 메모 병합 (개별 문서별로 처리)
+          const mergedMemos = data.memos.map(firestoreMemo => {
+            const localMemo = localMemos.find(m => m.id === firestoreMemo.id);
+            if (!localMemo) return firestoreMemo;  // Firestore만 있음
+
+            // firestore_saved와 비교하여 미저장 변경사항 감지
+            const lastSavedKey = `firestore_saved_memo_${firestoreMemo.id}`;
+            const lastSaved = localStorage.getItem(lastSavedKey);
+            const localData = JSON.stringify(localMemo);
+
+            if (lastSaved === localData) {
+              // ✅ 로컬 = 마지막 저장 버전 → 이 기기에서 수정 안 함 → Firestore 신뢰
+              return firestoreMemo;
+            } else {
+              // ⚠️ 로컬 ≠ 마지막 저장 버전 → 이 기기에서 수정함 또는 저장 실패
+              console.warn(`⚠️ 미저장 변경 감지: ${firestoreMemo.id}`);
+
+              // 서버 시간 비교로 충돌 해결 (기기 시간 조작 방지)
+              const firestoreTime = firestoreMemo.updatedAt || 0;
+              const lastSavedMemo = lastSaved ? JSON.parse(lastSaved) : {};
+              const lastSyncedTime = lastSavedMemo.updatedAt || 0;
+
+              if (firestoreTime > lastSyncedTime) {
+                // Firestore가 더 최신 (다른 기기에서 수정)
+                console.warn(`  → Firestore 우선 (다른 기기에서 수정됨)`);
+                return firestoreMemo;
+              } else {
+                // 로컬이 최신 (이 기기에서 수정 또는 저장 실패)
+                console.warn(`  → 로컬 우선 (이 기기에서 수정됨) - 재저장 시도`);
+                saveMemoToFirestore(userId, localMemo).catch(err => {
+                  console.error('재저장 실패:', err);
+                });
+                return localMemo;
+              }
+            }
+          });
+
+          // 로컬에만 있는 메모 처리 (새 생성 또는 다른 기기에서 삭제됨)
+          const localOnlyMemos = localMemos.filter(localMemo =>
+            !data.memos.find(m => m.id === localMemo.id)
+          );
+
+          localOnlyMemos.forEach(localMemo => {
+            const lastSaved = localStorage.getItem(`firestore_saved_memo_${localMemo.id}`);
+
+            if (!lastSaved) {
+              // 한 번도 저장 안 됨 → 진짜 새 메모
+              console.log(`🆕 새 메모 발견: ${localMemo.id} - 업로드 시도`);
+              mergedMemos.push(localMemo);
+              saveMemoToFirestore(userId, localMemo).catch(err => {
+                console.error('새 메모 업로드 실패:', err);
+              });
+            } else {
+              // 저장 기록 있는데 Firestore에 없음 → 다른 기기에서 삭제됨
+              console.warn(`🗑️ 다른 기기에서 삭제됨: ${localMemo.id}`);
+              localStorage.removeItem(`firestore_saved_memo_${localMemo.id}`);
+              // mergedMemos에 추가 안 함 (삭제 반영)
+            }
+          });
+
+          // 📁 폴더도 동일하게 병합
+          const mergedFolders = data.folders.map(firestoreFolder => {
+            const localFolder = localFolders.find(f => f.id === firestoreFolder.id);
+            if (!localFolder) return firestoreFolder;
+
+            const lastSaved = localStorage.getItem(`firestore_saved_folder_${firestoreFolder.id}`);
+            const localData = JSON.stringify(localFolder);
+
+            if (lastSaved === localData) {
+              return firestoreFolder;
+            } else {
+              const firestoreTime = firestoreFolder.updatedAt || 0;
+              const lastSavedFolder = lastSaved ? JSON.parse(lastSaved) : {};
+              const lastSyncedTime = lastSavedFolder.updatedAt || 0;
+
+              if (firestoreTime > lastSyncedTime) {
+                return firestoreFolder;
+              } else {
+                saveFolderToFirestore(userId, localFolder).catch(err => {
+                  console.error('폴더 재저장 실패:', err);
+                });
+                return localFolder;
+              }
+            }
+          });
+
+          const localOnlyFolders = localFolders.filter(localFolder =>
+            !data.folders.find(f => f.id === localFolder.id)
+          );
+
+          localOnlyFolders.forEach(localFolder => {
+            const lastSaved = localStorage.getItem(`firestore_saved_folder_${localFolder.id}`);
+            if (!lastSaved) {
+              mergedFolders.push(localFolder);
+              saveFolderToFirestore(userId, localFolder).catch(err => {
+                console.error('새 폴더 업로드 실패:', err);
+              });
+            } else {
+              console.warn(`🗑️ 폴더 다른 기기에서 삭제됨: ${localFolder.id}`);
+              localStorage.removeItem(`firestore_saved_folder_${localFolder.id}`);
+            }
+          });
+
+          setMemos(mergedMemos);
+          setFolders(mergedFolders);
           setTrash(data.trash || []);
           setMacros(data.macros || []);
           setCalendar(data.calendar || {});
           setActivities(data.activities || []);
           setSettings(data.settings || settings);
+
+          console.log('✅ Evernote 방식 다중 기기 동기화 완료');
         }
 
-        // localStorage에도 캐싱 (오프라인 지원)
-        localStorage.setItem('memos_shared', JSON.stringify(data.memos || []));
-        localStorage.setItem('memoFolders', JSON.stringify(data.folders || []));
+        // localStorage에 병합된 데이터 캐싱
+        const currentMemos = memos.length > 0 ? memos : (data.memos || []);
+        const currentFolders = folders.length > 0 ? folders : (data.folders || []);
+        const currentCalendar = Object.keys(calendar).length > 0 ? calendar : (data.calendar || {});
+
+        localStorage.setItem('memos_shared', JSON.stringify(currentMemos));
+        localStorage.setItem('memoFolders', JSON.stringify(currentFolders));
         localStorage.setItem('trashedItems_shared', JSON.stringify(data.trash || []));
         localStorage.setItem('macroTexts', JSON.stringify(data.macros || []));
-        localStorage.setItem('calendarSchedules_shared', JSON.stringify(data.calendar || {}));
+        localStorage.setItem('calendarSchedules_shared', JSON.stringify(currentCalendar));
         localStorage.setItem('recentActivities_shared', JSON.stringify(data.activities || []));
         localStorage.setItem('widgets_shared', JSON.stringify(data.settings?.widgets || ['StatsGrid', 'QuickActions', 'RecentActivity']));
         localStorage.setItem('displayCount_shared', JSON.stringify(data.settings?.displayCount || 5));
@@ -288,15 +403,35 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
   // 디바운스 저장 (로컬 변경사항을 서버에 저장)
   const saveTimeout = useRef(null);
-  const debouncedSave = useCallback((saveFn, ...args) => {
+  const debouncedSave = useCallback((saveFn, itemId, dataForComparison, ...saveArgs) => {
     if (saveTimeout.current) {
       clearTimeout(saveTimeout.current);
     }
-    saveTimeout.current = setTimeout(() => {
-      if (userId && enabled) {
-        saveFn(userId, ...args).catch(err => {
-          console.error('Firestore 저장 실패:', err);
-        });
+    saveTimeout.current = setTimeout(async () => {
+      if (!userId || !enabled) return;
+
+      try {
+        // 🚀 변경 감지: localStorage에서 마지막 저장 버전 확인
+        const lastSavedKey = `firestore_saved_${itemId}`;
+        const lastSaved = localStorage.getItem(lastSavedKey);
+        const currentData = JSON.stringify(dataForComparison);
+
+        if (lastSaved === currentData) {
+          console.log(`⏭️ [변경 감지] 변경사항 없음 - 저장 생략: ${itemId}`);
+          return;
+        }
+
+        console.log(`💾 [변경 감지] 변경 감지됨 - Firestore 저장: ${itemId}`);
+
+        // Firestore 저장 실행 (userId는 자동으로 첫 번째 인자로 전달)
+        await saveFn(userId, ...saveArgs);
+
+        // ✅ 성공 시에만 마지막 저장 버전 업데이트
+        localStorage.setItem(lastSavedKey, currentData);
+        console.log(`✅ [변경 감지] 저장 완료 및 버전 기록: ${itemId}`);
+      } catch (err) {
+        console.error(`❌ [변경 감지] Firestore 저장 실패 (${itemId}):`, err);
+        // 실패 시 lastSaved 업데이트 안 함 → 다음 저장 시도 시 재시도
       }
     }, 300); // 300ms 디바운스
   }, [userId, enabled]);
@@ -311,8 +446,8 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
       return updated;
     });
 
-    // 서버에 저장
-    debouncedSave(saveMemoToFirestore, memo);
+    // 🚀 변경 감지 후 서버에 저장
+    debouncedSave(saveMemoToFirestore, `memo_${memo.id}`, memo);
   }, [debouncedSave]);
 
   // 메모 삭제
@@ -339,7 +474,8 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
       return updated;
     });
 
-    debouncedSave(saveFolderToFirestore, folder);
+    // 🚀 변경 감지 후 서버에 저장
+    debouncedSave(saveFolderToFirestore, `folder_${folder.id}`, folder);
   }, [debouncedSave]);
 
   // 폴더 삭제
@@ -366,7 +502,8 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
       return updated;
     });
 
-    debouncedSave(saveTrashItemToFirestore, item);
+    // 🚀 변경 감지 후 서버에 저장
+    debouncedSave(saveTrashItemToFirestore, `trash_${item.id}`, item, item);
   }, [debouncedSave]);
 
   // 휴지통 항목 삭제
@@ -391,9 +528,9 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
       updated[index] = macroText;
       localStorage.setItem('macroTexts', JSON.stringify(updated));
 
-      // 전체 배열을 Firestore에 저장
+      // 🚀 변경 감지 후 전체 배열을 Firestore에 저장
       if (userId && enabled) {
-        debouncedSave(saveMacroToFirestore, updated); // userId는 debouncedSave가 자동 추가
+        debouncedSave(saveMacroToFirestore, `macros_all`, updated, updated);
       }
 
       return updated;
@@ -426,7 +563,9 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
       return updated;
     });
 
-    debouncedSave(saveCalendarDateToFirestore, dateKey, schedule);
+    // 🚀 변경 감지 후 서버에 저장
+    // saveCalendarDateToFirestore(userId, dateKey, schedule) 형식으로 호출됨
+    debouncedSave(saveCalendarDateToFirestore, `calendar_${dateKey}`, schedule, dateKey, schedule);
   }, [debouncedSave]);
 
   // 캘린더 날짜 삭제
@@ -454,7 +593,8 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
       return updated;
     });
 
-    debouncedSave(saveActivityToFirestore, activity);
+    // 🚀 변경 감지 후 서버에 저장
+    debouncedSave(saveActivityToFirestore, `activity_${activity.id}`, activity, activity);
   }, [debouncedSave]);
 
   // 활동 삭제
@@ -483,33 +623,19 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     if (newSettings.selectedAvatarId) localStorage.setItem('selectedAvatarId', newSettings.selectedAvatarId);
     if (newSettings.avatarBgColor) localStorage.setItem('avatarBgColor', newSettings.avatarBgColor);
 
-    debouncedSave(saveSettingsToFirestore, newSettings);
+    // 🚀 변경 감지 후 서버에 저장
+    debouncedSave(saveSettingsToFirestore, `settings_main`, newSettings, newSettings);
   }, [debouncedSave]);
 
   // 즉시 저장 (디바운스 없이) - 로그아웃 등에서 사용
+  // ⚠️ 2025-12-01: 할당량 절약을 위해 비활성화
+  // 디바운스 자동 저장(300ms)으로 충분하며, 전체 저장은 할당량을 과도하게 소모함
   const saveImmediately = useCallback(async () => {
-    if (!userId || !enabled) return;
-
-    try {
-      // 현재 상태를 모두 서버에 즉시 저장
-      await Promise.all([
-        ...memos.map(memo => saveMemoToFirestore(userId, memo)),
-        ...folders.map(folder => saveFolderToFirestore(userId, folder)),
-        ...trash.map(item => saveTrashItemToFirestore(userId, item)),
-        saveMacroToFirestore(userId, macros), // 전체 배열을 한 번에 저장
-        ...Object.entries(calendar).map(([dateKey, schedule]) =>
-          saveCalendarDateToFirestore(userId, dateKey, schedule)
-        ),
-        ...activities.map(activity => saveActivityToFirestore(userId, activity)),
-        saveSettingsToFirestore(userId, settings)
-      ]);
-
-      console.log('✅ 모든 데이터 즉시 저장 완료');
-    } catch (err) {
-      console.error('❌ 즉시 저장 실패:', err);
-      throw err;
-    }
-  }, [userId, enabled, memos, folders, trash, macros, calendar, activities, settings]);
+    console.log('⚠️ saveImmediately 호출 무시 (Firestore 할당량 절약)');
+    console.log('💡 변경사항은 디바운스 자동 저장(300ms)으로 저장됩니다.');
+    // 아무 작업도 하지 않음 - 할당량 절약
+    return Promise.resolve();
+  }, []);
 
   // ========================================
   // 🔄 하위 호환성 래퍼 함수 (기존 배열 기반 코드 지원)
@@ -520,9 +646,9 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     setMemos(newMemos);
     localStorage.setItem('memos_shared', JSON.stringify(newMemos));
 
-    // 각 메모를 개별 저장 (실시간 리스너가 자동으로 반영)
+    // 🚀 변경 감지 후 각 메모를 개별 저장
     newMemos.forEach(memo => {
-      debouncedSave(saveMemoToFirestore, memo);
+      debouncedSave(saveMemoToFirestore, `memo_${memo.id}`, memo, memo);
     });
   }, [debouncedSave]);
 
@@ -531,8 +657,9 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     setFolders(newFolders);
     localStorage.setItem('memoFolders', JSON.stringify(newFolders));
 
+    // 🚀 변경 감지 후 각 폴더를 개별 저장
     newFolders.forEach(folder => {
-      debouncedSave(saveFolderToFirestore, folder);
+      debouncedSave(saveFolderToFirestore, `folder_${folder.id}`, folder, folder);
     });
   }, [debouncedSave]);
 
@@ -628,50 +755,6 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     });
   }, [debouncedSave]);
 
-  // 수동 Firestore 동기화 (필요 시 사용자가 직접 호출)
-  const syncFromFirestore = useCallback(async () => {
-    if (!userId || !enabled) {
-      console.warn('⚠️ 동기화 불가: userId 또는 enabled 없음');
-      return;
-    }
-
-    try {
-      console.log('🔄 Firestore 양방향 동기화 시작...');
-
-      // ✅ STEP 1: 로컬 변경사항을 먼저 Firestore에 저장 (데이터 손실 방지)
-      console.log('📤 로컬 변경사항 업로드 중...');
-      await Promise.all([
-        ...memos.map(memo => saveMemoToFirestore(userId, memo)),
-        ...folders.map(folder => saveFolderToFirestore(userId, folder)),
-        ...trash.map(item => saveTrashItemToFirestore(userId, item)),
-        saveMacroToFirestore(userId, macros),
-        ...Object.entries(calendar).map(([dateKey, schedule]) =>
-          saveCalendarDateToFirestore(userId, dateKey, schedule)
-        ),
-        ...activities.map(activity => saveActivityToFirestore(userId, activity)),
-        saveSettingsToFirestore(userId, settings)
-      ]);
-      console.log('✅ 로컬 변경사항 업로드 완료');
-
-      // ✅ STEP 2: Firestore에서 최신 데이터 가져오기
-      console.log('📥 Firestore 최신 데이터 다운로드 중...');
-      const freshData = await fetchAllUserData(userId);
-
-      if (freshData.memos) setMemos(freshData.memos);
-      if (freshData.folders) setFolders(freshData.folders);
-      if (freshData.trash) setTrash(freshData.trash);
-      if (freshData.macros) setMacros(freshData.macros);
-      if (freshData.calendar) setCalendar(freshData.calendar);
-      if (freshData.activities) setActivities(freshData.activities);
-      if (freshData.settings) setSettings(freshData.settings);
-
-      console.log('✅ Firestore 양방향 동기화 완료');
-      return freshData;
-    } catch (error) {
-      console.error('❌ Firestore 동기화 실패:', error);
-      throw error;
-    }
-  }, [userId, enabled, memos, folders, trash, macros, calendar, activities, settings]);
 
   return {
     // 상태
@@ -710,9 +793,6 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     deleteCalendarDate,
     syncActivity,
     deleteActivity,
-
-    // 수동 동기화 함수 (실시간 리스너 대체)
-    syncFromFirestore,
 
     // 즉시 저장
     saveImmediately
