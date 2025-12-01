@@ -545,7 +545,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     });
 
     // 🚀 변경 감지 후 서버에 저장
-    debouncedSave(saveMemoToFirestore, `memo_${memo.id}`, memo);
+    debouncedSave(saveMemoToFirestore, `memo_${memo.id}`, memo, memo);
   }, [debouncedSave]);
 
   // 메모 삭제
@@ -573,7 +573,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     });
 
     // 🚀 변경 감지 후 서버에 저장
-    debouncedSave(saveFolderToFirestore, `folder_${folder.id}`, folder);
+    debouncedSave(saveFolderToFirestore, `folder_${folder.id}`, folder, folder);
   }, [debouncedSave]);
 
   // 폴더 삭제
@@ -767,7 +767,9 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     localStorage.setItem('trashedItems_shared', JSON.stringify(newTrash));
 
     newTrash.forEach(item => {
-      debouncedSave(saveTrashItemToFirestore, item);
+      if (item && item.id) {
+        debouncedSave(saveTrashItemToFirestore, `trash_${item.id}`, item, item);
+      }
     });
   }, [debouncedSave]);
 
@@ -815,7 +817,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     // 전체 배열을 한 번에 Firestore에 저장
     if (userId && enabled) {
       console.log('☁️ 매크로 Firestore 저장 시작:', userId, newMacros);
-      debouncedSave(saveMacroToFirestore, newMacros); // userId는 debouncedSave가 자동 추가
+      debouncedSave(saveMacroToFirestore, `macros_all`, newMacros, newMacros);
     } else {
       console.warn('⚠️ Firestore 저장 건너뜀 - userId:', userId, 'enabled:', enabled);
     }
@@ -836,7 +838,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
       // 텍스트나 알람이 있는 경우에만 Firestore에 저장
       if (hasText || hasAlarms) {
         console.log('🔍 [syncCalendar] 저장 대기열:', dateKey, '알람 수:', schedule.alarm?.registeredAlarms?.length);
-        debouncedSave(saveCalendarDateToFirestore, dateKey, schedule);
+        debouncedSave(saveCalendarDateToFirestore, `calendar_${dateKey}`, schedule, dateKey, schedule);
       } else {
         console.log('⏭️ [syncCalendar] 빈 스케줄 건너뜀:', dateKey);
       }
@@ -849,7 +851,9 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     localStorage.setItem('recentActivities_shared', JSON.stringify(newActivities));
 
     newActivities.forEach(activity => {
-      debouncedSave(saveActivityToFirestore, activity);
+      if (activity && activity.id) {
+        debouncedSave(saveActivityToFirestore, `activity_${activity.id}`, activity, activity);
+      }
     });
   }, [debouncedSave]);
 
