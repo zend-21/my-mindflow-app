@@ -26,6 +26,27 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+          VITE_STORAGE_PROVIDER: r2
+          VITE_R2_ACCOUNT_ID: ${{ secrets.VITE_R2_ACCOUNT_ID }}
+          VITE_R2_ACCESS_KEY_ID: ${{ secrets.VITE_R2_ACCESS_KEY_ID }}
+          VITE_R2_SECRET_ACCESS_KEY: ${{ secrets.VITE_R2_SECRET_ACCESS_KEY }}
+          VITE_R2_BUCKET_NAME: mindflow-images
+          VITE_R2_ENDPOINT: https://c6a09a035095a1ef0f9cfb4e974df8c6.r2.cloudflarestorage.com
+          VITE_R2_PUBLIC_URL: https://pub-2d9c7a35b3284bf78a76c4cf385faa3c.r2.dev
+          VITE_ADMIN_SECRET_KEY: ${{ secrets.VITE_ADMIN_SECRET_KEY }}
+          VITE_SPCDE_API_KEY: ${{ secrets.VITE_SPCDE_API_KEY }}
+          VITE_GOOGLE_CLIENT_ID: 652517048202-7noqdl7itir2gbfdj6itd91ocnsaho4h.apps.googleusercontent.com
+          VITE_LUNAR_API_KEY: ${{ secrets.VITE_LUNAR_API_KEY }}
+          VITE_RESEND_API_KEY: ${{ secrets.VITE_RESEND_API_KEY }}
+          VITE_KAKAO_REST_API_KEY: ${{ secrets.VITE_KAKAO_REST_API_KEY }}
+          VITE_APP_URL: https://mindflow-app-379c7.web.app
+          VITE_FIREBASE_API_KEY: AIzaSyAkgh7RiRkgc_9A2ovgnCcgtCckVnxv95I
+          VITE_FIREBASE_AUTH_DOMAIN: mindflow-app-379c7.firebaseapp.com
+          VITE_FIREBASE_PROJECT_ID: mindflow-app-379c7
+          VITE_FIREBASE_STORAGE_BUCKET: mindflow-app-379c7.firebasestorage.app
+          VITE_FIREBASE_MESSAGING_SENDER_ID: 652517048202
+          VITE_FIREBASE_APP_ID: 1:652517048202:web:1c9a21cf98e57e28325273
+          VITE_FIREBASE_MEASUREMENT_ID: G-3CVEJR909W
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
