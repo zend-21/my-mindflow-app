@@ -5,6 +5,7 @@ import styled from 'styled-components';
 import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Plus } from 'lucide-react';
 import { subscribeToMessages, sendMessage, markDMAsRead } from '../../services/directMessageService';
 import CollapsibleDocumentEditor from './CollapsibleDocumentEditor';
+import CollaborativeDocumentEditor from './CollaborativeDocumentEditor';
 import SharedMemoSelectorModal from './SharedMemoSelectorModal';
 
 // 전체화면 컨테이너
@@ -692,19 +693,19 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
         </HeaderRight>
       </Header>
 
-      {/* 공유 문서 (펼쳤을 때만 표시) */}
+      {/* 협업 문서 (펼쳤을 때만 표시) */}
       {showDocument && (
         <div style={{ padding: '12px 20px', maxHeight: '500px', overflowY: 'auto' }}>
-          <CollapsibleDocumentEditor
-            document={currentDocument}
+          <CollaborativeDocumentEditor
+            chatRoomId={chat.id}
             currentUserId={currentUserId}
-            isRoomOwner={isRoomOwner}
+            currentUserName={localStorage.getItem('userDisplayName') || '익명'}
+            isManager={isRoomOwner}
+            canEdit={isRoomOwner} // 일단 방장만 편집 가능 (나중에 권한 시스템 추가)
             showToast={showToast}
             onClose={() => {
               setShowDocument(false);
-              setCurrentDocument(null);
             }}
-            onDocumentUpdated={handleDocumentUpdated}
             onLoadFromShared={handleLoadFromShared}
           />
         </div>
