@@ -28,7 +28,8 @@
       "Bash(vercel env:*)",
       "Bash(git push:*)",
       "Bash(set NODE_ENV=production)",
-      "Bash(vercel inspect:*)"
+      "Bash(vercel inspect:*)",
+      "Bash(firebase init:*)"
     ],
     "deny": [],
     "ask": []
