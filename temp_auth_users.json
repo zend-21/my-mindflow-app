@@ -1,0 +1,49 @@
+{"users": [
+{
+  "localId": "8dNGkW2bzYUJJFutx6byBx9OUeo2",
+  "lastSignedInAt": "1763632703464",
+  "createdAt": "1763632703464"
+},
+{
+  "localId": "SjbJqvcwc3RMZGoNDVxFzxzuCfJ3",
+  "lastSignedInAt": "1764071502281",
+  "createdAt": "1764071490056",
+  "phoneNumber": "+821085553880",
+  "providerUserInfo": []
+},
+{
+  "localId": "cW6sqYDFrSXUlZ31LMpIKrVeMa43",
+  "email": "5260ml@gmail.com",
+  "emailVerified": true,
+  "displayName": "Lee minho",
+  "photoUrl": "https://lh3.googleusercontent.com/a/ACg8ocKYmiUtVm7V9yCb7vHNqcYDFgw9ssD4k-mKWq-a9BEpsgAkFA=s96-c",
+  "lastSignedInAt": "1764355347975",
+  "createdAt": "1763875081984",
+  "providerUserInfo": [
+    {
+      "providerId": "google.com",
+      "rawId": "115151521565554428340",
+      "email": "5260ml@gmail.com",
+      "displayName": "Lee minho",
+      "photoUrl": "https://lh3.googleusercontent.com/a/ACg8ocKYmiUtVm7V9yCb7vHNqcYDFgw9ssD4k-mKWq-a9BEpsgAkFA=s96-c"
+    }
+  ]
+},
+{
+  "localId": "jmtWg574EaO0gpCusXdgBfJnZd52",
+  "email": "ksi21jiho@gmail.com",
+  "emailVerified": true,
+  "displayName": "김ᄉ",
+  "photoUrl": "https://lh3.googleusercontent.com/a/ACg8ocLg6NYpVOiilWDU7Xv4bUA4Zjug906LU8z2l5q2j8BRtRxRjQ=s96-c",
+  "lastSignedInAt": "1764678006999",
+  "createdAt": "1763713401571",
+  "providerUserInfo": [
+    {
+      "providerId": "google.com",
+      "rawId": "118206273409933239868",
+      "email": "ksi21jiho@gmail.com",
+      "displayName": "김ᄉ",
+      "photoUrl": "https://lh3.googleusercontent.com/a/ACg8ocLg6NYpVOiilWDU7Xv4bUA4Zjug906LU8z2l5q2j8BRtRxRjQ=s96-c"
+    }
+  ]
+}]}

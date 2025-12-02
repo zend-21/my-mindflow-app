@@ -1948,6 +1948,9 @@ function App() {
             const { accessToken, pictureUrl, expiresAt } = pendingAuthData;
             await completeMindFlowLogin(phoneNumber, firebaseUID, accessToken, userInfo, pictureUrl, expiresAt);
 
+            // ✅ 휴대폰 인증 완료 플래그 설정
+            localStorage.setItem('isPhoneVerified', 'true');
+
             // 3. 상태 정리
             setIsPhoneVerifying(false);
             setPendingAuthData(null);
@@ -1991,14 +1994,41 @@ function App() {
         setIsAuthRequiredModalOpen(false);
 
         // 로그인되어 있는지 확인
-        if (!profile || !pendingAuthData) {
+        if (!profile) {
             // 로그인 안되어 있음 → 먼저 로그인 필요
             showToast('⚠ 먼저 Google 로그인이 필요합니다');
             setIsLoginModalOpen(true);
-        } else {
-            // 로그인 되어 있음 → 휴대폰 인증 시작
-            setIsPhoneVerifying(true);
+            return;
         }
+
+        // 로그인은 되어 있는데 pendingAuthData가 없는 경우 (페이지 새로고침 등)
+        if (!pendingAuthData) {
+            const firebaseUserId = localStorage.getItem('firebaseUserId');
+            const accessToken = localStorage.getItem('accessToken');
+            const expiresAtStr = localStorage.getItem('tokenExpiresAt');
+
+            if (firebaseUserId && accessToken && expiresAtStr) {
+                // localStorage에서 복원
+                setPendingAuthData({
+                    firebaseUserId,
+                    accessToken,
+                    userInfo: {
+                        email: profile.email,
+                        name: profile.name
+                    },
+                    pictureUrl: profile.picture,
+                    expiresAt: parseInt(expiresAtStr, 10)
+                });
+            } else {
+                // localStorage에도 없으면 재로그인 필요
+                showToast('⚠ 세션이 만료되었습니다. 다시 로그인해주세요');
+                setIsLoginModalOpen(true);
+                return;
+            }
+        }
+
+        // 로그인 되어 있음 → 휴대폰 인증 시작
+        setIsPhoneVerifying(true);
     };
 
     const handleLoginError = () => {
