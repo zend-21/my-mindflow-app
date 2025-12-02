@@ -14,7 +14,7 @@ const Overlay = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10002;
+  z-index: 100000; /* Higher than footer (9999) and ad banner (10000) */
   padding: 20px;
 `;
 
