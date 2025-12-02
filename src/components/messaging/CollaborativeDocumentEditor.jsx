@@ -12,7 +12,10 @@ import {
   addDoc,
   serverTimestamp,
   updateDoc,
-  deleteDoc
+  deleteDoc,
+  getDocs,
+  query,
+  where
 } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 
@@ -213,6 +216,9 @@ const SaveButton = styled(ToolbarButton)`
   background: linear-gradient(135deg, #2ed573, #26bf62);
   border: none;
   color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 
   &:hover:not(:disabled) {
     transform: translateY(-2px);
@@ -224,6 +230,9 @@ const LoadButton = styled(ToolbarButton)`
   background: rgba(74, 144, 226, 0.15);
   border: 1px solid rgba(74, 144, 226, 0.3);
   color: #4a90e2;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 
   &:hover:not(:disabled) {
     background: rgba(74, 144, 226, 0.25);
@@ -489,8 +498,8 @@ const CollaborativeDocumentEditor = ({
   chatRoomId,
   currentUserId,
   currentUserName,
-  isManager, // 방 매니저 여부
-  canEdit, // 편집 권한 여부
+  isManager, // 방 매니저 여부 (prop으로 받지만 실시간 갱신)
+  canEdit, // 편집 권한 여부 (prop으로 받지만 실시간 갱신)
   showToast,
   onClose,
   onLoadFromShared
@@ -502,46 +511,114 @@ const CollaborativeDocumentEditor = ({
   const [pendingEdits, setPendingEdits] = useState([]);
   const [selectedEdit, setSelectedEdit] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [actualCanEdit, setActualCanEdit] = useState(canEdit); // 실시간 권한
+  const [actualIsManager, setActualIsManager] = useState(isManager); // 실시간 매니저 여부
 
   const contentRef = useRef(null);
   const saveTimeoutRef = useRef(null);
+
+  // Firestore 실시간 구독 - 권한
+  useEffect(() => {
+    if (!chatRoomId || !currentUserId) return;
+
+    let isMounted = true;
+    const permRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'permissions');
+
+    const unsubscribe = onSnapshot(
+      permRef,
+      (permSnap) => {
+        if (!isMounted) return;
+
+        if (permSnap.exists()) {
+          const permissions = permSnap.data();
+          const isActualManager = permissions.manager === currentUserId;
+          const isEditor = permissions.editors?.includes(currentUserId) || false;
+
+          setActualIsManager(isActualManager);
+          setActualCanEdit(isActualManager || isEditor);
+        } else {
+          // 권한 문서가 없으면 초기값 사용
+          setActualIsManager(isManager);
+          setActualCanEdit(canEdit);
+        }
+      },
+      (error) => {
+        console.error('권한 구독 오류:', error);
+      }
+    );
+
+    return () => {
+      isMounted = false;
+      try {
+        unsubscribe();
+      } catch (e) {
+        // Cleanup 중 발생하는 오류 무시
+      }
+    };
+  }, [chatRoomId, currentUserId, isManager, canEdit]);
 
   // Firestore 실시간 구독 - 문서 및 편집 이력
   useEffect(() => {
     if (!chatRoomId) return;
 
+    let isMounted = true;
     const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
 
     // 문서 구독
-    const unsubscribeDoc = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setTitle(data.title || '');
-        setContent(data.content || '');
+    const unsubscribeDoc = onSnapshot(
+      docRef,
+      (docSnap) => {
+        if (!isMounted) return;
 
-        // contentEditable 영역 업데이트
-        if (contentRef.current && data.content) {
-          contentRef.current.innerHTML = data.content;
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setTitle(data.title || '');
+          setContent(data.content || '');
+
+          // contentEditable 영역 업데이트
+          if (contentRef.current && data.content) {
+            contentRef.current.innerHTML = data.content;
+          }
         }
+      },
+      (error) => {
+        console.error('문서 구독 오류:', error);
       }
-    });
+    );
 
     // 편집 이력 구독 (pending 상태만)
     const editsRef = collection(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory');
-    const unsubscribeEdits = onSnapshot(editsRef, (snapshot) => {
-      const edits = [];
-      snapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data.status === 'pending') {
-          edits.push({ id: doc.id, ...data });
-        }
-      });
-      setPendingEdits(edits);
-    });
+    const unsubscribeEdits = onSnapshot(
+      editsRef,
+      (snapshot) => {
+        if (!isMounted) return;
+
+        const edits = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.status === 'pending') {
+            edits.push({ id: doc.id, ...data });
+          }
+        });
+        setPendingEdits(edits);
+      },
+      (error) => {
+        console.error('편집 이력 구독 오류:', error);
+      }
+    );
 
     return () => {
-      unsubscribeDoc();
-      unsubscribeEdits();
+      isMounted = false;
+      try {
+        unsubscribeDoc();
+      } catch (e) {
+        // Cleanup 중 발생하는 오류 무시
+      }
+      try {
+        unsubscribeEdits();
+      } catch (e) {
+        // Cleanup 중 발생하는 오류 무시
+      }
     };
   }, [chatRoomId]);
 
@@ -597,7 +674,7 @@ const CollaborativeDocumentEditor = ({
 
   // contentEditable 변경 핸들러 (형광펜 표시 로직 포함)
   const handleContentChange = useCallback(async () => {
-    if (!contentRef.current || !canEdit) return;
+    if (!contentRef.current || !actualCanEdit) return;
 
     const selection = window.getSelection();
 
@@ -658,7 +735,7 @@ const CollaborativeDocumentEditor = ({
     const newContent = contentRef.current.innerHTML;
     setContent(newContent);
     debouncedSave(newContent);
-  }, [canEdit, debouncedSave, lastSelection, chatRoomId, currentUserId, currentUserName]);
+  }, [actualCanEdit, debouncedSave, lastSelection, chatRoomId, currentUserId, currentUserName]);
 
   // 형광펜 클릭 핸들러
   const handleHighlightClick = useCallback((editId) => {
@@ -671,7 +748,7 @@ const CollaborativeDocumentEditor = ({
 
   // 컨펌 핸들러 (매니저만)
   const handleConfirmEdit = useCallback(async () => {
-    if (!isManager || !selectedEdit) return;
+    if (!actualIsManager || !selectedEdit) return;
 
     try {
       const editRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory', selectedEdit.id);
@@ -698,11 +775,11 @@ const CollaborativeDocumentEditor = ({
       console.error('승인 실패:', error);
       showToast?.('승인에 실패했습니다');
     }
-  }, [isManager, selectedEdit, chatRoomId, currentUserId, showToast]);
+  }, [actualIsManager, selectedEdit, chatRoomId, currentUserId, showToast]);
 
   // 거부 핸들러 (매니저만)
   const handleRejectEdit = useCallback(async () => {
-    if (!isManager || !selectedEdit) return;
+    if (!actualIsManager || !selectedEdit) return;
 
     try {
       const editRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory', selectedEdit.id);
@@ -725,12 +802,69 @@ const CollaborativeDocumentEditor = ({
       console.error('거부 실패:', error);
       showToast?.('거부에 실패했습니다');
     }
-  }, [isManager, selectedEdit, chatRoomId, showToast]);
+  }, [actualIsManager, selectedEdit, chatRoomId, showToast]);
+
+  // 저장 핸들러 - 공유 폴더에 수정본 저장 (매니저만 가능)
+  const handleSaveToShared = useCallback(async () => {
+    if (!actualIsManager) {
+      showToast?.('매니저만 저장할 수 있습니다');
+      return;
+    }
+
+    if (!title.trim()) {
+      showToast?.('제목을 입력하세요');
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      // HTML 태그 제거한 순수 텍스트 추출
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = content;
+      const plainTextContent = tempDiv.textContent || tempDiv.innerText || '';
+
+      // 공유 폴더에 수정본 저장
+      const memosRef = collection(db, 'memos');
+
+      // 수정본 제목 생성 (이미 "-수정본"이 있는지 확인)
+      let modifiedTitle = title;
+      if (!title.includes('-수정본')) {
+        // 같은 제목의 수정본 개수 확인
+        const existingMemosSnapshot = await getDocs(
+          query(memosRef, where('title', '>=', title + '-수정본'), where('title', '<', title + '-수정본\uf8ff'))
+        );
+        const count = existingMemosSnapshot.size;
+        modifiedTitle = count > 0 ? `${title}-수정본(${count + 1})` : `${title}-수정본`;
+      }
+
+      const newMemo = {
+        title: modifiedTitle,
+        content: plainTextContent,
+        folder: 'shared',
+        userId: currentUserId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        tags: ['대화방수정본'],
+        modifiedInChatRoom: true,
+        chatRoomId: chatRoomId
+      };
+
+      await addDoc(memosRef, newMemo);
+
+      showToast?.(`"${modifiedTitle}"이(가) 공유 폴더에 저장되었습니다`);
+    } catch (error) {
+      console.error('문서 저장 실패:', error);
+      showToast?.('문서 저장에 실패했습니다');
+    } finally {
+      setSaving(false);
+    }
+  }, [actualIsManager, title, content, currentUserId, chatRoomId, showToast]);
 
   // 권한 타입 결정
-  const permissionType = isManager ? 'manager' : canEdit ? 'editor' : 'viewer';
-  const permissionLabel = isManager ? '매니저' : canEdit ? '편집자' : '읽기 전용';
-  const PermissionIcon = isManager ? Lock : canEdit ? Users : Info;
+  const permissionType = actualIsManager ? 'manager' : actualCanEdit ? 'editor' : 'viewer';
+  const permissionLabel = actualIsManager ? '매니저' : actualCanEdit ? '편집자' : '읽기 전용';
+  const PermissionIcon = actualIsManager ? Lock : actualCanEdit ? Users : Info;
 
   return (
     <EditorContainer $collapsed={collapsed}>
@@ -750,7 +884,7 @@ const CollaborativeDocumentEditor = ({
               onChange={(e) => setTitle(e.target.value)}
               placeholder="문서 제목을 입력하세요"
               onClick={(e) => e.stopPropagation()}
-              disabled={!canEdit}
+              disabled={!actualCanEdit}
             />
           )}
         </HeaderLeft>
@@ -783,11 +917,22 @@ const CollaborativeDocumentEditor = ({
       <EditorContent $collapsed={collapsed}>
         {/* 도구 모음 */}
         <Toolbar>
-          {onLoadFromShared && canEdit && (
+          {onLoadFromShared && actualCanEdit && (
             <LoadButton onClick={onLoadFromShared} title="공유 폴더에서 불러오기">
               <FolderOpen size={14} />
               불러오기
             </LoadButton>
+          )}
+
+          {actualIsManager && (
+            <SaveButton
+              onClick={handleSaveToShared}
+              disabled={saving || !title.trim()}
+              title="공유 폴더에 수정본 저장"
+            >
+              <Save size={14} />
+              {saving ? '저장 중...' : '공유 폴더에 저장'}
+            </SaveButton>
           )}
 
           {pendingEdits.length > 0 && (
@@ -797,7 +942,7 @@ const CollaborativeDocumentEditor = ({
             </PendingEditsCount>
           )}
 
-          {!canEdit && (
+          {!actualCanEdit && (
             <span style={{ color: '#888', fontSize: '12px' }}>
               • 읽기 전용 모드
             </span>
@@ -807,7 +952,7 @@ const CollaborativeDocumentEditor = ({
         {/* contentEditable 영역 */}
         <ContentEditableArea
           ref={contentRef}
-          contentEditable={canEdit}
+          contentEditable={actualCanEdit}
           suppressContentEditableWarning
           onInput={handleContentChange}
           onClick={(e) => {
@@ -860,7 +1005,7 @@ const CollaborativeDocumentEditor = ({
                 </ComparisonBox>
               </TextComparison>
 
-              {isManager && (
+              {actualIsManager && (
                 <ModalActions>
                   <ConfirmButton onClick={handleConfirmEdit}>
                     <Check size={18} />
@@ -873,7 +1018,7 @@ const CollaborativeDocumentEditor = ({
                 </ModalActions>
               )}
 
-              {!isManager && (
+              {!actualIsManager && (
                 <div style={{ padding: '12px', background: 'rgba(255, 193, 7, 0.1)', borderRadius: '8px', marginTop: '12px' }}>
                   <span style={{ color: '#ffc107', fontSize: '13px' }}>
                     매니저만 승인/거부할 수 있습니다

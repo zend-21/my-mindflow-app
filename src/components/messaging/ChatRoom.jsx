@@ -2,11 +2,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
-import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Plus } from 'lucide-react';
+import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Plus, Settings } from 'lucide-react';
 import { subscribeToMessages, sendMessage, markDMAsRead } from '../../services/directMessageService';
 import CollapsibleDocumentEditor from './CollapsibleDocumentEditor';
 import CollaborativeDocumentEditor from './CollaborativeDocumentEditor';
 import SharedMemoSelectorModal from './SharedMemoSelectorModal';
+import PermissionManagementModal from './PermissionManagementModal';
 
 // 전체화면 컨테이너
 const FullScreenContainer = styled.div`
@@ -459,6 +460,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
   const [showDocument, setShowDocument] = useState(false);
   const [currentDocument, setCurrentDocument] = useState(null); // 현재 편집중인 문서
   const [showSharedMemoSelector, setShowSharedMemoSelector] = useState(false); // 공유 폴더 메모 선택 모달
+  const [showPermissionModal, setShowPermissionModal] = useState(false); // 권한 관리 모달
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const currentUserId = localStorage.getItem('firebaseUserId');
@@ -508,15 +510,20 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
   useEffect(() => {
     if (!chat.id) return;
 
+    let isMounted = true;
     console.log('📬 채팅방 메시지 구독 시작:', chat.id);
 
     const unsubscribe = subscribeToMessages(chat.id, (newMessages) => {
+      if (!isMounted) return;
+
       console.log('📨 새 메시지:', newMessages);
       setMessages(newMessages);
 
       // 스크롤을 맨 아래로
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        if (isMounted) {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
       }, 100);
     });
 
@@ -524,7 +531,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
     markDMAsRead(chat.id);
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      isMounted = false;
+      try {
+        if (unsubscribe) unsubscribe();
+      } catch (e) {
+        // Cleanup 중 발생하는 오류 무시
+      }
     };
   }, [chat.id]);
 
@@ -684,6 +696,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
           </ChatInfo>
         </HeaderLeft>
         <HeaderRight>
+          {chat.type === 'group' && isRoomOwner && (
+            <MenuButton onClick={() => setShowPermissionModal(true)} title="권한 관리">
+              <Settings size={20} />
+            </MenuButton>
+          )}
           <MenuButton onClick={handleToggleDocument} title="공유 문서">
             <FileText size={20} />
           </MenuButton>
@@ -818,6 +835,17 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
           onSelectMemo={handleSelectSharedMemo}
           showToast={showToast}
           allMemos={memos}
+        />
+      )}
+
+      {/* 권한 관리 모달 (그룹 채팅만, 방장만) */}
+      {showPermissionModal && chat.type === 'group' && (
+        <PermissionManagementModal
+          chatRoomId={chat.id}
+          currentUserId={currentUserId}
+          isManager={isRoomOwner}
+          showToast={showToast}
+          onClose={() => setShowPermissionModal(false)}
         />
       )}
     </FullScreenContainer>,
