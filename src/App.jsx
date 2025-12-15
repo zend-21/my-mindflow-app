@@ -1975,18 +1975,35 @@ function App() {
         return localStorage.getItem('isPhoneVerified') === 'true';
     };
 
-    // 🚪 기능별 인증 게이트 (Feature-Gated Authentication)
+    // 🚪 기능별 권한 체크 (Progressive Onboarding)
     const requirePhoneAuth = (featureName, callback) => {
         const isVerified = checkPhoneVerification();
 
-        if (isVerified) {
-            // 인증 완료 → 기능 실행
-            callback();
-        } else {
-            // 미인증 → 인증 요구 모달 표시
-            setAuthRequiredFeature(featureName);
-            setIsAuthRequiredModalOpen(true);
+        // 🔐 인증 필수 기능 (문서 편집/삭제 + 방장 권한만)
+        const verifiedOnlyActions = [
+            '문서 편집',      // 공유 문서 수정
+            '문서 삭제',      // 공유 문서 삭제
+            '문서 권한 변경', // 공유 문서 권한 관리
+            '방장 권한 위임'  // 방장 권한 다른 사람에게 주기
+        ];
+
+        // ❌ 문서 편집/삭제, 방장 권한은 반드시 인증 필요
+        if (verifiedOnlyActions.includes(featureName)) {
+            if (isVerified) {
+                console.log('✅ 인증 완료 - 기능 실행:', featureName);
+                callback();
+            } else {
+                console.log('⚠️ 이 기능은 본인인증 필요:', featureName);
+                setAuthRequiredFeature(featureName);
+                setIsAuthRequiredModalOpen(true);
+            }
+            return;
         }
+
+        // ✅ 그 외 모든 기능은 인증 없이 허용 (단, 미인증 배지 표시)
+        // - 대화 참여, 메시지 보내기, 친구 추가, 방 생성, 대화 걸기 등
+        console.log('✅ 인증 불필요 (미인증 배지 표시):', featureName);
+        callback();
     };
 
     // 인증 모달에서 "지금 인증하기" 클릭 시

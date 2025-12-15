@@ -29,7 +29,8 @@
       "Bash(git push:*)",
       "Bash(set NODE_ENV=production)",
       "Bash(vercel inspect:*)",
-      "Bash(firebase init:*)"
+      "Bash(firebase init:*)",
+      "Bash(python fix_aquarius_fortune.py:*)"
     ],
     "deny": [],
     "ask": []
