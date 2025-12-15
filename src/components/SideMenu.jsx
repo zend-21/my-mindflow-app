@@ -5,8 +5,6 @@ import styled, { keyframes } from 'styled-components';
 import { avatarList } from './avatars/AvatarIcons';
 import SecurityDocViewer from './SecurityDocViewer';
 import ConfirmationModal from './ConfirmationModal';
-import { db } from '../firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
 
 // 문제를 단순화하기 위해, 일단 Roulette 컴포넌트는 잠시 제외했습니다.
 // 이 코드로 오류가 사라진다면, 문제는 Roulette.jsx 파일에 있을 수 있습니다.
@@ -316,7 +314,7 @@ const SideMenu = ({
     onImport,
     onRestoreFromDrive,
     profile,
-    userId,  // ✅ userId prop 추가
+    wsCode,  // ✅ wsCode를 App에서 prop으로 받음 (헤더처럼)
     onProfileClick,
     onLogout,
     onLoginClick,
@@ -335,7 +333,6 @@ const SideMenu = ({
     const [selectedAvatarId, setSelectedAvatarId] = useState(null);
     const [avatarBgColor, setAvatarBgColor] = useState('none');
     const [customPicture, setCustomPicture] = useState(null);
-    const [wsCode, setWsCode] = useState(null); // WS 코드 (친구 코드)
     // 협업 관련 상태
     const [isSecurityDocViewerOpen, setIsSecurityDocViewerOpen] = useState(false);
     const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false); // 서버 복원 확인 모달
@@ -399,64 +396,6 @@ const SideMenu = ({
         const AvatarComponent = avatar.component;
         return <AvatarComponent />;
     };
-
-    // WS 코드 로드 (localStorage에서 먼저 확인, 없으면 Firebase에서 가져오기)
-    useEffect(() => {
-        const loadWsCode = async () => {
-            // ✅ userId가 없으면 firebaseUserId를 폴백으로 사용
-            const effectiveUserId = userId || localStorage.getItem('firebaseUserId');
-            console.log('🔍 SideMenu - WS 코드 로드 시작');
-            console.log('  - userId prop:', userId);
-            console.log('  - firebaseUserId (localStorage):', localStorage.getItem('firebaseUserId'));
-            console.log('  - effectiveUserId:', effectiveUserId);
-
-            if (!effectiveUserId || !profile) {
-                console.log('❌ SideMenu - userId 또는 profile 없음, userId:', effectiveUserId, 'profile:', !!profile);
-                setWsCode(null);
-                return;
-            }
-
-            // 먼저 localStorage에서 확인
-            const cachedWsCode = localStorage.getItem(`wsCode_${effectiveUserId}`);
-            console.log('💾 SideMenu - localStorage에서 조회 (wsCode_' + effectiveUserId + '):', cachedWsCode);
-
-            if (cachedWsCode) {
-                console.log('✅ SideMenu - localStorage에서 로드 성공:', cachedWsCode);
-                setWsCode(cachedWsCode);
-                return;
-            }
-
-            // localStorage에 없으면 Firebase에서 가져오기 (workspaces 컬렉션)
-            try {
-                const workspaceId = `workspace_${effectiveUserId}`;
-                console.log('🔥 SideMenu - Firebase 조회 시작:', workspaceId);
-
-                const workspaceRef = doc(db, 'workspaces', workspaceId);
-                const workspaceDoc = await getDoc(workspaceRef);
-
-                console.log('🔥 SideMenu - Firebase 문서 존재:', workspaceDoc.exists());
-
-                if (workspaceDoc.exists()) {
-                    const code = workspaceDoc.data().workspaceCode;
-                    console.log('✅ SideMenu - Firebase에서 로드 성공:', code);
-                    setWsCode(code);
-                    // localStorage에 저장
-                    if (code) {
-                        localStorage.setItem(`wsCode_${effectiveUserId}`, code);
-                        console.log('💾 SideMenu - localStorage에 저장 완료');
-                    }
-                } else {
-                    console.log('❌ SideMenu - Firebase 문서가 존재하지 않음');
-                }
-            } catch (error) {
-                console.error('❌ SideMenu - WS 코드 로드 오류:', error);
-            }
-        };
-
-        if (profile) {
-            loadWsCode();
-        }
-    }, [profile, userId]);
 
     const handleImportClick = () => {
         if (fileInputRef.current) {

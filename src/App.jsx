@@ -298,6 +298,7 @@ function App() {
 
     // 🔥 Firebase Auth 상태
     const [firebaseUser, setFirebaseUser] = useState(null); // Firebase Auth User 객체
+    const [wsCode, setWsCode] = useState(null); // 🆔 Workspace 고유 코드
 
     // 🔐 휴대폰 인증 관련 상태
     const [isPhoneVerifying, setIsPhoneVerifying] = useState(false);
@@ -397,6 +398,42 @@ function App() {
     const phoneId = localStorage.getItem('mindflowUserId'); // 휴대폰 번호 (캐시)
     const userId = phoneId || (firebaseUser?.uid); // ✅ Firebase Auth를 Source of Truth로 사용
     const isAuthenticated = !!(firebaseUser || profile);
+
+    // 🆔 WS 코드 로드 (헤더처럼 App에서 관리)
+    useEffect(() => {
+        const loadWsCode = async () => {
+            if (!userId || !profile) {
+                setWsCode(null);
+                return;
+            }
+
+            // localStorage에서 먼저 확인
+            const cachedWsCode = localStorage.getItem(`wsCode_${userId}`);
+            if (cachedWsCode) {
+                setWsCode(cachedWsCode);
+                return;
+            }
+
+            // Firebase에서 가져오기
+            try {
+                const workspaceId = `workspace_${userId}`;
+                const workspaceRef = doc(db, 'workspaces', workspaceId);
+                const workspaceDoc = await getDoc(workspaceRef);
+
+                if (workspaceDoc.exists()) {
+                    const code = workspaceDoc.data().workspaceCode;
+                    setWsCode(code);
+                    if (code) {
+                        localStorage.setItem(`wsCode_${userId}`, code);
+                    }
+                }
+            } catch (error) {
+                console.error('❌ WS 코드 로드 오류:', error);
+            }
+        };
+
+        loadWsCode();
+    }, [userId, profile]);
 
     // 🔐 E2EE DISABLED - 마스터 비밀번호 자동 프롬프트 (향후 재활성화 시 사용)
     // ⚠️ UX 이슈로 인해 비활성화: 앱 실행 시 즉시 비밀번호 요구는 사용자가 앱을 이해하기 전에 삭제하게 만듦
@@ -2765,7 +2802,7 @@ function App() {
                         onRestoreFromDrive={handleRestoreFromDrive}
                         onSync={handleSync}
                         profile={profile}
-                        userId={userId}
+                        wsCode={wsCode}
                         onProfileClick={handleProfileClick}
                         onLogout={handleLogout}
                         onLoginClick={() => setIsLoginModalOpen(true)}
