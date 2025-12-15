@@ -129,6 +129,9 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
         onSuccess: async (tokenResponse) => {
             console.log('✅ Google OAuth 성공:', tokenResponse);
 
+            // ✅ Google 계정 선택이 완료되면 즉시 모달 닫기
+            onClose();
+
             try {
                 // Access Token으로 사용자 정보 가져오기
                 const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {

@@ -1663,6 +1663,9 @@ function App() {
     // ✅ 로그인 성공 시 처리 - 휴대폰 인증 통합
     const handleLoginSuccess = async (response) => {
         try {
+            // ✅ 로그인 처리 중 토스트 표시
+            showToast('🔄 로그인 처리 중...');
+
             const { accessToken, userInfo, expiresAt } = response;
 
             // ★★★ 수정: 강력한 URL HTTPS 강제 변환 로직 ★★★
@@ -1734,7 +1737,6 @@ function App() {
 
                 // Google 로그인만으로도 앱 사용 가능
                 await handleSimpleLogin(firebaseUserId, accessToken, userInfo, pictureUrl, expiresAt);
-                setIsLoginModalOpen(false);
             }
         } catch (error) {
             console.error('❌ 로그인 처리 중 오류:', error);
@@ -1905,7 +1907,6 @@ function App() {
                 console.warn('⚠️ GAPI가 아직 준비되지 않음 - 토큰은 저장됨');
             }
 
-            setIsLoginModalOpen(false);
             showToast('✓ 로그인되었습니다');
         } catch (error) {
             console.error('로그인 처리 중 오류:', error);
