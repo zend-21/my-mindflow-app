@@ -2764,6 +2764,7 @@ function App() {
                         onRestoreFromDrive={handleRestoreFromDrive}
                         onSync={handleSync}
                         profile={profile}
+                        userId={userId}
                         onProfileClick={handleProfileClick}
                         onLogout={handleLogout}
                         onLoginClick={() => setIsLoginModalOpen(true)}

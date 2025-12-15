@@ -316,6 +316,7 @@ const SideMenu = ({
     onImport,
     onRestoreFromDrive,
     profile,
+    userId,  // ✅ userId prop 추가
     onProfileClick,
     onLogout,
     onLoginClick,
@@ -402,7 +403,6 @@ const SideMenu = ({
     // WS 코드 로드 (localStorage에서 먼저 확인, 없으면 Firebase에서 가져오기)
     useEffect(() => {
         const loadWsCode = async () => {
-            const userId = localStorage.getItem('firebaseUserId');
             console.log('🔍 SideMenu - WS 코드 로드 시작, userId:', userId);
 
             if (!userId || !profile) {
@@ -448,10 +448,10 @@ const SideMenu = ({
             }
         };
 
-        if (profile) {
+        if (profile && userId) {
             loadWsCode();
         }
-    }, [profile]);
+    }, [profile, userId]);
 
     const handleImportClick = () => {
         if (fileInputRef.current) {
