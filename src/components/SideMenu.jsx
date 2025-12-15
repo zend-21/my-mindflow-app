@@ -403,17 +403,22 @@ const SideMenu = ({
     // WS 코드 로드 (localStorage에서 먼저 확인, 없으면 Firebase에서 가져오기)
     useEffect(() => {
         const loadWsCode = async () => {
-            console.log('🔍 SideMenu - WS 코드 로드 시작, userId:', userId);
+            // ✅ userId가 없으면 firebaseUserId를 폴백으로 사용
+            const effectiveUserId = userId || localStorage.getItem('firebaseUserId');
+            console.log('🔍 SideMenu - WS 코드 로드 시작');
+            console.log('  - userId prop:', userId);
+            console.log('  - firebaseUserId (localStorage):', localStorage.getItem('firebaseUserId'));
+            console.log('  - effectiveUserId:', effectiveUserId);
 
-            if (!userId || !profile) {
-                console.log('❌ SideMenu - userId 또는 profile 없음, userId:', userId, 'profile:', !!profile);
+            if (!effectiveUserId || !profile) {
+                console.log('❌ SideMenu - userId 또는 profile 없음, userId:', effectiveUserId, 'profile:', !!profile);
                 setWsCode(null);
                 return;
             }
 
             // 먼저 localStorage에서 확인
-            const cachedWsCode = localStorage.getItem(`wsCode_${userId}`);
-            console.log('💾 SideMenu - localStorage에서 조회:', cachedWsCode);
+            const cachedWsCode = localStorage.getItem(`wsCode_${effectiveUserId}`);
+            console.log('💾 SideMenu - localStorage에서 조회 (wsCode_' + effectiveUserId + '):', cachedWsCode);
 
             if (cachedWsCode) {
                 console.log('✅ SideMenu - localStorage에서 로드 성공:', cachedWsCode);
@@ -423,7 +428,7 @@ const SideMenu = ({
 
             // localStorage에 없으면 Firebase에서 가져오기 (workspaces 컬렉션)
             try {
-                const workspaceId = `workspace_${userId}`;
+                const workspaceId = `workspace_${effectiveUserId}`;
                 console.log('🔥 SideMenu - Firebase 조회 시작:', workspaceId);
 
                 const workspaceRef = doc(db, 'workspaces', workspaceId);
@@ -437,7 +442,7 @@ const SideMenu = ({
                     setWsCode(code);
                     // localStorage에 저장
                     if (code) {
-                        localStorage.setItem(`wsCode_${userId}`, code);
+                        localStorage.setItem(`wsCode_${effectiveUserId}`, code);
                         console.log('💾 SideMenu - localStorage에 저장 완료');
                     }
                 } else {
@@ -448,7 +453,7 @@ const SideMenu = ({
             }
         };
 
-        if (profile && userId) {
+        if (profile) {
             loadWsCode();
         }
     }, [profile, userId]);
