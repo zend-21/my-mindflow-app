@@ -10,7 +10,7 @@ import CollaborativeDocumentEditor from './CollaborativeDocumentEditor';
 import SharedMemoSelectorModal from './SharedMemoSelectorModal';
 import PermissionManagementModal from './PermissionManagementModal';
 import { db } from '../../firebase/config';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, onSnapshot, getDoc } from 'firebase/firestore';
 
 // 전체화면 컨테이너
 const FullScreenContainer = styled.div`
@@ -191,6 +191,23 @@ const MessageAvatar = styled(Avatar)`
   width: 32px;
   height: 32px;
   font-size: 14px;
+  position: relative;
+`;
+
+const RoleBadge = styled.div`
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: rgba(26, 26, 26, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 `;
 
 const MessageContent = styled.div`
@@ -529,6 +546,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
   const [currentDocument, setCurrentDocument] = useState(null); // 현재 편집중인 문서
   const [showSharedMemoSelector, setShowSharedMemoSelector] = useState(false); // 공유 폴더 메모 선택 모달
   const [showPermissionModal, setShowPermissionModal] = useState(false); // 권한 관리 모달
+  const [permissions, setPermissions] = useState({ editors: [], manager: null }); // 권한 정보
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const currentUserId = localStorage.getItem('firebaseUserId');
@@ -638,6 +656,47 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
 
   const otherUser = getOtherUserInfo();
 
+  // 권한 정보 실시간 구독 (그룹 채팅만)
+  useEffect(() => {
+    if (!chat.id || chat.type !== 'group') return;
+
+    let isMounted = true;
+
+    // 권한 문서와 현재 문서 정보 구독
+    const permRef = doc(db, 'chatRooms', chat.id, 'sharedDocument', 'permissions');
+    const docRef = doc(db, 'chatRooms', chat.id, 'sharedDocument', 'currentDoc');
+
+    const unsubscribePerm = onSnapshot(permRef, (permDoc) => {
+      if (!isMounted) return;
+      const permData = permDoc.data();
+
+      // 권한 정보 업데이트
+      setPermissions(prev => ({
+        ...prev,
+        editors: permData?.editors || []
+      }));
+    });
+
+    const unsubscribeDoc = onSnapshot(docRef, (docSnapshot) => {
+      if (!isMounted) return;
+      const docData = docSnapshot.data();
+
+      // 문서 매니저 정보 업데이트 (문서를 업로드한 사람)
+      if (docData?.lastEditedBy) {
+        setPermissions(prev => ({
+          ...prev,
+          manager: docData.lastEditedBy
+        }));
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribePerm();
+      unsubscribeDoc();
+    };
+  }, [chat.id, chat.type]);
+
   // 메시지 실시간 구독
   useEffect(() => {
     if (!chat.id) return;
@@ -695,6 +754,31 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
   const isRoomOwner = chat.type === 'group'
     ? chat.createdBy === currentUserId
     : true; // DM은 모두 편집 가능
+
+  // 사용자 역할 확인 함수
+  const getUserRole = (userId) => {
+    // 1:1 채팅은 역할 표시 안 함
+    if (chat.type !== 'group') return null;
+
+    // 방장 체크 (최우선)
+    if (chat.createdBy === userId) {
+      return { type: 'owner', icon: '🪄', label: '방장' };
+    }
+
+    // 문서 매니저 체크 (문서를 업로드한 사람)
+    // 방장과 매니저가 같으면 매니저 표시 우선
+    if (permissions.manager === userId) {
+      return { type: 'manager', icon: '💪', label: '매니저' };
+    }
+
+    // 편집 권한자 체크
+    if (permissions.editors?.includes(userId)) {
+      return { type: 'editor', icon: '✏️', label: '편집권한자' };
+    }
+
+    // 일반 참여자는 아이콘 없음
+    return null;
+  };
 
   // 메시지 전송
   const handleSendMessage = async () => {
@@ -889,7 +973,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
             currentUserId={currentUserId}
             currentUserName={localStorage.getItem('userDisplayName') || '익명'}
             isManager={isRoomOwner}
-            canEdit={isRoomOwner} // 일단 방장만 편집 가능 (나중에 권한 시스템 추가)
+            canEdit={true} // 1:1은 자동 편집 권한, 그룹은 권한 시스템 적용
+            chatType={chat.type} // 1:1 vs 그룹 구분
             showToast={showToast}
             onClose={() => {
               setShowDocument(false);
@@ -921,6 +1006,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
               // 상대방이 읽지 않은 메시지인지 확인 (내가 보낸 메시지만)
               const isUnreadByOther = isMine && (chat.unreadCount?.[otherUserId] > 0);
 
+              const userRole = getUserRole(message.senderId);
+
               return (
                 <div key={message.id}>
                   {showDate && (
@@ -932,6 +1019,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
                     {!isMine && showAvatar && (
                       <MessageAvatar $color={getAvatarColor(message.senderId)}>
                         {message.senderName?.charAt(0).toUpperCase() || '?'}
+                        {userRole && (
+                          <RoleBadge title={userRole.label}>
+                            {userRole.icon}
+                          </RoleBadge>
+                        )}
                       </MessageAvatar>
                     )}
                     {!isMine && !showAvatar && <div style={{ width: '32px' }} />}
