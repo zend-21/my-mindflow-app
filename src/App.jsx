@@ -1862,7 +1862,7 @@ function App() {
                 console.warn('⚠️ GAPI가 아직 준비되지 않음 - 토큰은 저장됨');
             }
 
-            showToast('✓ 로그인되었습니다');
+            // showToast('✓ 로그인되었습니다'); // 토스트 메시지 제거
         } catch (error) {
             console.error('로그인 처리 중 오류:', error);
             showToast('⚠ 로그인에 실패했습니다');
@@ -1954,7 +1954,7 @@ function App() {
                 console.warn('⚠️ GAPI가 아직 준비되지 않음 - 토큰은 저장됨');
             }
 
-            showToast('✓ 로그인되었습니다');
+            // showToast('✓ 로그인되었습니다'); // 토스트 메시지 제거
         } catch (error) {
             console.error('로그인 처리 중 오류:', error);
             showToast('⚠ 로그인에 실패했습니다');

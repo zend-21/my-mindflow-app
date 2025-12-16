@@ -1276,17 +1276,52 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
         const loadWsCode = async () => {
             // localStorage에서 userId 가져오기
             const userId = localStorage.getItem('firebaseUserId');
-            if (!userId || !profile) return;
+            console.log('🔍 [ProfilePage] WS 코드 로드 시작 - userId:', userId, 'profile:', profile?.name);
+
+            if (!userId || !profile) {
+                console.log('⚠️ [ProfilePage] WS 코드 로드 실패: userId 또는 profile 없음');
+                return;
+            }
+
+            // localStorage에서 먼저 확인
+            const cachedWsCode = localStorage.getItem(`wsCode_${userId}`);
+            if (cachedWsCode) {
+                console.log('✅ [ProfilePage] localStorage에서 WS 코드 로드:', cachedWsCode);
+                setWsCode(cachedWsCode);
+
+                // QR 코드 생성
+                try {
+                    const qrUrl = await QRCode.toDataURL(cachedWsCode, {
+                        width: 200,
+                        margin: 2,
+                        color: {
+                            dark: '#000000',
+                            light: '#FFFFFF'
+                        }
+                    });
+                    setQrCodeUrl(qrUrl);
+                } catch (qrErr) {
+                    console.error('QR 코드 생성 오류:', qrErr);
+                }
+                return;
+            }
 
             try {
                 // workspaces 컬렉션에서 WS 코드 가져오기
                 const workspaceId = `workspace_${userId}`;
+                console.log('🔍 [ProfilePage] Firestore에서 WS 코드 조회:', workspaceId);
                 const workspaceRef = doc(db, 'workspaces', workspaceId);
                 const workspaceDoc = await getDoc(workspaceRef);
 
                 if (workspaceDoc.exists()) {
                     const code = workspaceDoc.data().workspaceCode;
+                    console.log('✅ [ProfilePage] Firestore에서 WS 코드 로드:', code);
                     setWsCode(code);
+
+                    // localStorage에 캐시
+                    if (code) {
+                        localStorage.setItem(`wsCode_${userId}`, code);
+                    }
 
                     // QR 코드 생성
                     if (code) {
@@ -1300,9 +1335,11 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                         });
                         setQrCodeUrl(qrUrl);
                     }
+                } else {
+                    console.log('⚠️ [ProfilePage] Firestore에 workspace 문서 없음:', workspaceId);
                 }
             } catch (err) {
-                console.error('WS 코드 로드 오류:', err);
+                console.error('❌ [ProfilePage] WS 코드 로드 오류:', err);
             }
         };
 
@@ -1794,7 +1831,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                         )}
 
                         {/* 아이디 + QR 섹션 */}
-                        {profile && wsCode && qrCodeUrl && (
+                        {profile && wsCode && (
                             <WsCodeQrContainer>
                                 <WsCodeSection>
                                     <WsCodeText>ID: {(wsCode.split('-')[1] || wsCode).toLowerCase()}</WsCodeText>
@@ -1803,9 +1840,11 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                                         복사
                                     </CopyButtonInHeader>
                                 </WsCodeSection>
-                                <QrImageSection onClick={() => setIsQRModalOpen(true)}>
-                                    <QrImageSmall src={qrCodeUrl} alt="내 아이디 QR" />
-                                </QrImageSection>
+                                {qrCodeUrl && (
+                                    <QrImageSection onClick={() => setIsQRModalOpen(true)}>
+                                        <QrImageSmall src={qrCodeUrl} alt="내 아이디 QR" />
+                                    </QrImageSection>
+                                )}
                             </WsCodeQrContainer>
                         )}
 

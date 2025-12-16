@@ -484,7 +484,7 @@ const SideMenu = ({
                                 <ProfileInfo>
                                     <ProfileName>{profile ? (profile.nickname || profile.name) : '로그인'}</ProfileName>
                                     <ProfileEmail>
-                                        {profile ? (wsCode ? `ID: ${(wsCode.split('-')[1] || wsCode).toLowerCase()}` : 'ID 로딩중...') : '로그인이 필요합니다'}
+                                        {profile ? (profile.email || '') : '로그인이 필요합니다'}
                                     </ProfileEmail>
                                 </ProfileInfo>
                             </ProfileCluster>
