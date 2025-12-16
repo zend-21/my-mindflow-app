@@ -16,7 +16,7 @@ const Container = styled.div`
 
 // 헤더
 const Header = styled.div`
-  padding: 0px 20px 0 20px;
+  padding: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
@@ -37,15 +37,16 @@ const Subtitle = styled.p`
 // 탭 컨테이너
 const TabContainer = styled.div`
   display: flex;
-  gap: 8px;
-  padding: 0 20px;
+  gap: 0;
+  padding: 0;
   margin-bottom: 0;
 `;
 
 const Tab = styled.button`
-  flex: ${props => props.$flex || 1};
+  flex: 1;
   background: ${props => props.$active ? 'rgba(74, 144, 226, 0.15)' : 'transparent'};
   border: none;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
   border-bottom: 3px solid ${props => props.$active ? '#4a90e2' : 'transparent'};
   color: ${props => props.$active ? '#4a90e2' : '#888'};
   padding: 6px 16px;
@@ -70,7 +71,7 @@ const Tab = styled.button`
 `;
 
 const SettingsTab = styled.button`
-  flex: 0.22; /* 10% 비율 */
+  flex: 0 0 60px; /* 고정 너비 60px */
   background: ${props => props.$active ? 'rgba(74, 144, 226, 0.15)' : 'transparent'};
   border: none;
   border-bottom: 3px solid ${props => props.$active ? '#4a90e2' : 'transparent'};
@@ -140,7 +141,6 @@ const MessagingHub = ({ showToast, memos, requirePhoneAuth }) => {
       <Header>
         <TabContainer>
           <Tab
-            $flex={0.45}
             $active={activeTab === 'chat'}
             onClick={() => setActiveTab('chat')}
           >
@@ -148,7 +148,6 @@ const MessagingHub = ({ showToast, memos, requirePhoneAuth }) => {
             <TabLabel>채팅</TabLabel>
           </Tab>
           <Tab
-            $flex={0.45}
             $active={activeTab === 'friends'}
             onClick={() => setActiveTab('friends')}
           >

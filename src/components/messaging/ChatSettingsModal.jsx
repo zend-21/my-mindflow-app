@@ -1,7 +1,7 @@
 // 채팅 설정 모달
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { X, Volume2, VolumeX, Bell, BellOff } from 'lucide-react';
+import { X, Volume2, VolumeX, Bell, BellOff, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   notificationSettings,
   toggleNotificationSound,
@@ -95,14 +95,34 @@ const Section = styled.div`
   }
 `;
 
-const SectionTitle = styled.h3`
+const SectionTitle = styled.div`
   font-size: 16px;
   font-weight: 600;
   color: #ffffff;
   margin: 0 0 16px 0;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #4a90e2;
+  }
+`;
+
+const SectionTitleLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const SectionContent = styled.div`
+  max-height: ${props => props.$isOpen ? '1000px' : '0'};
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
 `;
 
 const SettingItem = styled.div`
@@ -227,16 +247,17 @@ const TestButton = styled.button`
   background: rgba(74, 144, 226, 0.1);
   border: 1px solid rgba(74, 144, 226, 0.3);
   color: #4a90e2;
-  padding: 10px 16px;
+  padding: 12px 16px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
 
   &:hover:not(:disabled) {
     background: rgba(74, 144, 226, 0.2);
@@ -262,12 +283,22 @@ const PlaceholderSection = styled.div`
 const ChatSettingsModal = ({ onClose }) => {
   const [soundEnabled, setSoundEnabled] = useState(notificationSettings.enabled);
   const [volume, setVolume] = useState(notificationSettings.volume * 100);
+  const [isSoundSectionOpen, setIsSoundSectionOpen] = useState(() => {
+    const saved = localStorage.getItem('chatSettings_soundSectionOpen');
+    return saved !== null ? saved === 'true' : true;
+  });
 
   useEffect(() => {
     // 현재 설정 로드
     setSoundEnabled(notificationSettings.enabled);
     setVolume(notificationSettings.volume * 100);
   }, []);
+
+  const toggleSoundSection = () => {
+    const newState = !isSoundSectionOpen;
+    setIsSoundSectionOpen(newState);
+    localStorage.setItem('chatSettings_soundSectionOpen', newState.toString());
+  };
 
   const handleToggleSound = () => {
     const newValue = !soundEnabled;
@@ -302,69 +333,69 @@ const ChatSettingsModal = ({ onClose }) => {
         <Content>
           {/* 알림음 설정 */}
           <Section>
-            <SectionTitle>
-              <Bell size={18} />
-              알림음 설정
+            <SectionTitle onClick={toggleSoundSection}>
+              <SectionTitleLeft>
+                <Bell size={18} />
+                알림음 설정
+              </SectionTitleLeft>
+              {isSoundSectionOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
             </SectionTitle>
 
-            <SettingItem>
-              <SettingHeader>
-                <div>
+            <SectionContent $isOpen={isSoundSectionOpen}>
+              <SettingItem>
+                <SettingHeader>
                   <SettingLabel>알림음 사용</SettingLabel>
-                  <SettingDescription>
-                    새 메시지가 도착하면 소리로 알려드립니다
-                  </SettingDescription>
+                  <ToggleSwitch
+                    $active={soundEnabled}
+                    onClick={handleToggleSound}
+                  />
+                </SettingHeader>
+              </SettingItem>
+
+              <SettingItem>
+                <SettingHeader $hasContent>
+                  <SettingLabel>음량 조절</SettingLabel>
+                </SettingHeader>
+
+                <VolumeControl>
+                  <VolumeIcon>
+                    {soundEnabled && volume > 0 ? <Volume2 size={20} /> : <VolumeX size={20} />}
+                  </VolumeIcon>
+                  <VolumeSlider
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={volume}
+                    onChange={handleVolumeChange}
+                    disabled={!soundEnabled}
+                  />
+                  <VolumeValue>{Math.round(volume)}%</VolumeValue>
+                </VolumeControl>
+              </SettingItem>
+
+              <SettingItem>
+                <SettingHeader $hasContent>
+                  <SettingLabel>효과음 테스트</SettingLabel>
+                </SettingHeader>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <TestButton
+                    onClick={handleTestNotification}
+                    disabled={!soundEnabled}
+                  >
+                    <Bell size={20} />
+                    메시지 알림음
+                  </TestButton>
+                  <TestButton
+                    onClick={handleTestChatSound}
+                    disabled={!soundEnabled}
+                  >
+                    <Volume2 size={20} />
+                    채팅중 수신음
+                  </TestButton>
                 </div>
-                <ToggleSwitch
-                  $active={soundEnabled}
-                  onClick={handleToggleSound}
-                />
-              </SettingHeader>
-            </SettingItem>
-
-            <SettingItem>
-              <SettingHeader $hasContent>
-                <SettingLabel>음량 조절</SettingLabel>
-              </SettingHeader>
-
-              <VolumeControl>
-                <VolumeIcon>
-                  {soundEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
-                </VolumeIcon>
-                <VolumeSlider
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={volume}
-                  onChange={handleVolumeChange}
-                  disabled={!soundEnabled}
-                />
-                <VolumeValue>{Math.round(volume)}%</VolumeValue>
-              </VolumeControl>
-            </SettingItem>
-
-            <SettingItem>
-              <SettingHeader $hasContent>
-                <SettingLabel>효과음 테스트</SettingLabel>
-              </SettingHeader>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <TestButton
-                  onClick={handleTestNotification}
-                  disabled={!soundEnabled}
-                >
-                  <Bell size={16} />
-                  새 메시지 알림
-                </TestButton>
-                <TestButton
-                  onClick={handleTestChatSound}
-                  disabled={!soundEnabled}
-                >
-                  <Volume2 size={16} />
-                  채팅 수신음
-                </TestButton>
-              </div>
-            </SettingItem>
+              </SettingItem>
+            </SectionContent>
           </Section>
 
           {/* 향후 추가될 설정들 */}

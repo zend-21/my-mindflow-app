@@ -18,6 +18,8 @@ const getAudioContext = () => {
  */
 export const playNewMessageNotification = () => {
   try {
+    if (!notificationSettings.enabled) return;
+
     const ctx = getAudioContext();
     const currentTime = ctx.currentTime;
 
@@ -33,10 +35,12 @@ export const playNewMessageNotification = () => {
     oscillator2.type = 'sine';
     oscillator2.frequency.setValueAtTime(1318.5, currentTime); // E6
 
-    // 볼륨 설정 (부드러운 페이드 인/아웃)
+    // 볼륨 설정 (부드러운 페이드 인/아웃) - 사용자 설정 음량 적용
+    const maxVolume = 0.3 * notificationSettings.volume;
+    const minVolume = 0.01 * notificationSettings.volume;
     gainNode.gain.setValueAtTime(0, currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.3, currentTime + 0.05); // 페이드 인
-    gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + 0.5); // 페이드 아웃
+    gainNode.gain.linearRampToValueAtTime(maxVolume, currentTime + 0.05); // 페이드 인
+    gainNode.gain.exponentialRampToValueAtTime(Math.max(minVolume, 0.001), currentTime + 0.5); // 페이드 아웃
 
     // 연결
     oscillator1.connect(gainNode);
@@ -49,7 +53,7 @@ export const playNewMessageNotification = () => {
     oscillator1.stop(currentTime + 0.5);
     oscillator2.stop(currentTime + 0.5);
 
-    console.log('🔔 새 메시지 알림음 재생');
+    console.log('🔔 새 메시지 알림음 재생 (음량:', Math.round(notificationSettings.volume * 100) + '%)');
   } catch (error) {
     console.error('알림음 재생 오류:', error);
   }
@@ -61,6 +65,8 @@ export const playNewMessageNotification = () => {
  */
 export const playChatMessageSound = () => {
   try {
+    if (!notificationSettings.enabled) return;
+
     const ctx = getAudioContext();
     const currentTime = ctx.currentTime;
 
@@ -73,10 +79,12 @@ export const playChatMessageSound = () => {
     oscillator.frequency.setValueAtTime(800, currentTime);
     oscillator.frequency.exponentialRampToValueAtTime(400, currentTime + 0.1);
 
-    // 볼륨 설정 (매우 짧고 조용하게)
+    // 볼륨 설정 (매우 짧고 조용하게) - 사용자 설정 음량 적용
+    const maxVolume = 0.15 * notificationSettings.volume;
+    const minVolume = 0.01 * notificationSettings.volume;
     gainNode.gain.setValueAtTime(0, currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.15, currentTime + 0.01); // 빠른 페이드 인
-    gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + 0.15); // 빠른 페이드 아웃
+    gainNode.gain.linearRampToValueAtTime(maxVolume, currentTime + 0.01); // 빠른 페이드 인
+    gainNode.gain.exponentialRampToValueAtTime(Math.max(minVolume, 0.001), currentTime + 0.15); // 빠른 페이드 아웃
 
     // 연결
     oscillator.connect(gainNode);
@@ -86,7 +94,7 @@ export const playChatMessageSound = () => {
     oscillator.start(currentTime);
     oscillator.stop(currentTime + 0.15);
 
-    console.log('💬 채팅 메시지 수신음 재생');
+    console.log('💬 채팅 메시지 수신음 재생 (음량:', Math.round(notificationSettings.volume * 100) + '%)');
   } catch (error) {
     console.error('메시지 수신음 재생 오류:', error);
   }
@@ -98,6 +106,8 @@ export const playChatMessageSound = () => {
  */
 export const playBubblePopSound = () => {
   try {
+    if (!notificationSettings.enabled) return;
+
     const ctx = getAudioContext();
     const currentTime = ctx.currentTime;
 
@@ -110,10 +120,12 @@ export const playBubblePopSound = () => {
     oscillator.frequency.linearRampToValueAtTime(1200, currentTime + 0.05);
     oscillator.frequency.linearRampToValueAtTime(300, currentTime + 0.1);
 
-    // 볼륨 (짧고 귀엽게)
+    // 볼륨 (짧고 귀엽게) - 사용자 설정 음량 적용
+    const maxVolume = 0.2 * notificationSettings.volume;
+    const minVolume = 0.01 * notificationSettings.volume;
     gainNode.gain.setValueAtTime(0, currentTime);
-    gainNode.gain.linearRampToValueAtTime(0.2, currentTime + 0.02);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, currentTime + 0.12);
+    gainNode.gain.linearRampToValueAtTime(maxVolume, currentTime + 0.02);
+    gainNode.gain.exponentialRampToValueAtTime(Math.max(minVolume, 0.001), currentTime + 0.12);
 
     oscillator.connect(gainNode);
     gainNode.connect(ctx.destination);
@@ -121,7 +133,7 @@ export const playBubblePopSound = () => {
     oscillator.start(currentTime);
     oscillator.stop(currentTime + 0.12);
 
-    console.log('🫧 버블 팝 사운드 재생');
+    console.log('🫧 버블 팝 사운드 재생 (음량:', Math.round(notificationSettings.volume * 100) + '%)');
   } catch (error) {
     console.error('버블 팝 사운드 재생 오류:', error);
   }
@@ -132,7 +144,7 @@ export const playBubblePopSound = () => {
  */
 export const notificationSettings = {
   enabled: true,
-  volume: 0.7,
+  volume: 0.1,
 };
 
 /**
