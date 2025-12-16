@@ -1643,8 +1643,8 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     // 아이디 복사 (WS 코드의 6자리 부분만)
     const handleCopyWsCode = () => {
         if (wsCode) {
-            // "WS-Y3T1ZM"에서 "Y3T1ZM"만 추출하고 소문자로 변환
-            const idOnly = (wsCode.split('-')[1] || wsCode).toLowerCase();
+            // "WS-Y3T1ZM"에서 "Y3T1ZM"만 추출하고 대문자로 변환
+            const idOnly = (wsCode.split('-')[1] || wsCode).toUpperCase();
             navigator.clipboard.writeText(idOnly);
             showToast?.('아이디가 복사되었습니다');
         }
@@ -1834,7 +1834,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                         {profile && wsCode && (
                             <WsCodeQrContainer>
                                 <WsCodeSection>
-                                    <WsCodeText>ID: {(wsCode.split('-')[1] || wsCode).toLowerCase()}</WsCodeText>
+                                    <WsCodeText>ID: {(wsCode.split('-')[1] || wsCode).toUpperCase()}</WsCodeText>
                                     <CopyButtonInHeader onClick={handleCopyWsCode}>
                                         <Copy size={14} />
                                         복사

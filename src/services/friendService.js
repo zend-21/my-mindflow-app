@@ -16,12 +16,16 @@ import {
 
 /**
  * WS 코드로 사용자 검색
+ * @param {string} workspaceCode - WS 코드 (대소문자 구분 없이 자동 변환)
  */
 export const getUserByWorkspaceCode = async (workspaceCode) => {
   try {
+    // 입력값을 대문자로 변환하여 대소문자 구분 없이 검색
+    const normalizedCode = workspaceCode.toUpperCase();
+
     const q = query(
       collection(db, 'workspaces'),
-      where('workspaceCode', '==', workspaceCode)
+      where('workspaceCode', '==', normalizedCode)
     );
 
     const snapshot = await getDocs(q);
@@ -42,7 +46,7 @@ export const getUserByWorkspaceCode = async (workspaceCode) => {
 
     return {
       id: userId,
-      workspaceCode: workspaceCode,
+      workspaceCode: normalizedCode,
       ...userDoc.data(),
     };
   } catch (error) {
