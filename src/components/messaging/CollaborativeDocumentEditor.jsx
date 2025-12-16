@@ -26,16 +26,46 @@ const EditorContainer = styled.div`
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   margin-bottom: 12px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: ${props => props.$isResizing ? 'none' : 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'};
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  height: ${props => props.$collapsed ? '56px' : `${props.$height}px`};
+  min-height: ${props => props.$collapsed ? '56px' : '200px'};
+  max-height: ${props => props.$collapsed ? '56px' : '800px'};
+`;
 
-  ${props => props.$collapsed ? `
-    height: 56px;
-  ` : `
-    min-height: 400px;
-    max-height: 600px;
-  `}
+// 리사이저 핸들 (하단 드래그)
+const ResizeHandle = styled.div`
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: linear-gradient(180deg, transparent, rgba(74, 144, 226, 0.1));
+  cursor: ns-resize;
+  display: ${props => props.$collapsed ? 'none' : 'flex'};
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  z-index: 10;
+
+  &:hover {
+    background: linear-gradient(180deg, transparent, rgba(74, 144, 226, 0.2));
+  }
+
+  &::before {
+    content: '';
+    width: 40px;
+    height: 3px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 2px;
+    transition: all 0.2s;
+  }
+
+  &:hover::before {
+    width: 60px;
+    background: rgba(74, 144, 226, 0.5);
+  }
 `;
 
 const EditorHeader = styled.div`
@@ -259,6 +289,13 @@ const ContentEditableArea = styled.div`
     outline: none;
     border-color: #4a90e2;
     background: rgba(0, 0, 0, 0.3);
+  }
+
+  /* Placeholder 스타일 (빈 상태일 때) */
+  &:empty::before {
+    content: '문서 내용을 입력하세요...';
+    color: #666;
+    pointer-events: none;
   }
 
   /* 형광펜 스타일 (pending 상태) */
@@ -514,8 +551,18 @@ const CollaborativeDocumentEditor = ({
   const [actualCanEdit, setActualCanEdit] = useState(canEdit); // 실시간 권한
   const [actualIsManager, setActualIsManager] = useState(isManager); // 실시간 매니저 여부
 
+  // 리사이징 관련 상태
+  const [editorHeight, setEditorHeight] = useState(() => {
+    const saved = localStorage.getItem('collaborativeEditorHeight');
+    return saved ? parseInt(saved) : 400;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
   const contentRef = useRef(null);
   const saveTimeoutRef = useRef(null);
+  const resizeStartY = useRef(0);
+  const resizeStartHeight = useRef(0);
+  const resizeHandleRef = useRef(null);
 
   // 권한 확인 (일회성 읽기)
   useEffect(() => {
@@ -604,13 +651,13 @@ const CollaborativeDocumentEditor = ({
   }, [loadDocument]);
 
   // 문서 불러오기 버튼 클릭 시 실행될 핸들러
-  const handleLoadClick = () => {
+  const handleLoadClick = async () => {
     if (onLoadFromShared) {
-      onLoadFromShared();
-      // 불러오기 후 문서 재로드
+      await onLoadFromShared();
+      // Firestore 저장 완료 후 문서 재로드 (약간의 지연)
       setTimeout(() => {
         loadDocument();
-      }, 500);
+      }, 200);
     }
   };
 
@@ -853,13 +900,90 @@ const CollaborativeDocumentEditor = ({
     }
   }, [actualIsManager, title, content, currentUserId, chatRoomId, showToast]);
 
+  // 리사이징 핸들러
+  useEffect(() => {
+    const handleRef = resizeHandleRef.current;
+    if (!handleRef) return;
+
+    let rafId = null;
+    let currentHeight = editorHeight;
+
+    const handleResizeStart = (e) => {
+      // 터치 이벤트에서는 preventDefault 시도하지 않음
+      if (e.type === 'mousedown') {
+        e.preventDefault();
+      }
+
+      setIsResizing(true);
+      resizeStartY.current = e.clientY || e.touches?.[0]?.clientY;
+      resizeStartHeight.current = editorHeight;
+      currentHeight = editorHeight;
+
+      // 마우스/터치 이벤트 리스너 추가
+      document.addEventListener('mousemove', handleResizeMove);
+      document.addEventListener('mouseup', handleResizeEnd);
+      document.addEventListener('touchmove', handleResizeMove);
+      document.addEventListener('touchend', handleResizeEnd);
+    };
+
+    const handleResizeMove = (e) => {
+      // RAF를 사용하여 부드러운 애니메이션
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+
+      rafId = requestAnimationFrame(() => {
+        const currentY = e.clientY || e.touches?.[0]?.clientY;
+        const deltaY = currentY - resizeStartY.current;
+        const newHeight = Math.max(200, Math.min(800, resizeStartHeight.current + deltaY));
+
+        currentHeight = newHeight;
+        setEditorHeight(newHeight);
+      });
+    };
+
+    const handleResizeEnd = () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+
+      setIsResizing(false);
+
+      // localStorage에 높이 저장
+      localStorage.setItem('collaborativeEditorHeight', currentHeight.toString());
+
+      // 이벤트 리스너 제거
+      document.removeEventListener('mousemove', handleResizeMove);
+      document.removeEventListener('mouseup', handleResizeEnd);
+      document.removeEventListener('touchmove', handleResizeMove);
+      document.removeEventListener('touchend', handleResizeEnd);
+    };
+
+    // 리사이즈 핸들에 이벤트 리스너 등록
+    handleRef.addEventListener('mousedown', handleResizeStart);
+    handleRef.addEventListener('touchstart', handleResizeStart);
+
+    return () => {
+      // 클린업
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+      }
+      handleRef.removeEventListener('mousedown', handleResizeStart);
+      handleRef.removeEventListener('touchstart', handleResizeStart);
+      document.removeEventListener('mousemove', handleResizeMove);
+      document.removeEventListener('mouseup', handleResizeEnd);
+      document.removeEventListener('touchmove', handleResizeMove);
+      document.removeEventListener('touchend', handleResizeEnd);
+    };
+  }, [editorHeight]);
+
   // 권한 타입 결정
   const permissionType = actualIsManager ? 'manager' : actualCanEdit ? 'editor' : 'viewer';
   const permissionLabel = actualIsManager ? '매니저' : actualCanEdit ? '편집자' : '읽기 전용';
   const PermissionIcon = actualIsManager ? Lock : actualCanEdit ? Users : Info;
 
   return (
-    <EditorContainer $collapsed={collapsed}>
+    <EditorContainer $collapsed={collapsed} $height={editorHeight} $isResizing={isResizing}>
       {/* 헤더 */}
       <EditorHeader onClick={() => !collapsed && setCollapsed(false)}>
         <HeaderLeft>
@@ -953,9 +1077,8 @@ const CollaborativeDocumentEditor = ({
               handleHighlightClick(editId);
             }
           }}
-        >
-          {!content && <span style={{ color: '#666' }}>문서 내용을 입력하세요...</span>}
-        </ContentEditableArea>
+        />
+        {/* Placeholder는 CSS ::before로 처리 */}
 
         {/* 하단 정보 */}
         <Footer>
@@ -1021,6 +1144,12 @@ const CollaborativeDocumentEditor = ({
           </ModalContent>
         </Modal>
       )}
+
+      {/* 리사이즈 핸들 */}
+      <ResizeHandle
+        ref={resizeHandleRef}
+        $collapsed={collapsed}
+      />
     </EditorContainer>
   );
 };

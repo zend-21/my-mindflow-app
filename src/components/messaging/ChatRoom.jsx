@@ -9,6 +9,8 @@ import CollapsibleDocumentEditor from './CollapsibleDocumentEditor';
 import CollaborativeDocumentEditor from './CollaborativeDocumentEditor';
 import SharedMemoSelectorModal from './SharedMemoSelectorModal';
 import PermissionManagementModal from './PermissionManagementModal';
+import { db } from '../../firebase/config';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 // 전체화면 컨테이너
 const FullScreenContainer = styled.div`
@@ -746,17 +748,35 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
   };
 
   // 공유 메모 선택 핸들러
-  const handleSelectSharedMemo = (memo) => {
-    // 메모 내용을 복사하여 현재 문서로 설정
-    setCurrentDocument({
-      title: memo.title || '제목 없음',
-      content: memo.content || '',
-      originalMemoId: memo.id, // 원본 메모 ID 저장
-      updatedAt: memo.updatedAt
-    });
-    setShowDocument(true);
-    setShowSharedMemoSelector(false);
-    showToast?.('문서를 불러왔습니다');
+  const handleSelectSharedMemo = async (memo) => {
+    try {
+      // Firestore의 currentDoc에 저장 (CollaborativeDocumentEditor가 읽을 수 있도록)
+      const docRef = doc(db, 'chatRooms', chat.id, 'sharedDocument', 'currentDoc');
+      await setDoc(docRef, {
+        title: memo.title || '제목 없음',
+        content: memo.content || '',
+        originalMemoId: memo.id, // 원본 메모 ID 저장
+        lastEditedBy: currentUserId,
+        lastEditedByName: localStorage.getItem('userDisplayName') || '익명',
+        lastEditedAt: serverTimestamp(),
+        version: 1
+      });
+
+      // 로컬 상태도 업데이트
+      setCurrentDocument({
+        title: memo.title || '제목 없음',
+        content: memo.content || '',
+        originalMemoId: memo.id,
+        updatedAt: memo.updatedAt
+      });
+
+      setShowDocument(true);
+      setShowSharedMemoSelector(false);
+      showToast?.('문서를 불러왔습니다');
+    } catch (error) {
+      console.error('문서 불러오기 실패:', error);
+      showToast?.('문서 불러오기에 실패했습니다');
+    }
   };
 
   // 문서 업데이트 핸들러
@@ -864,6 +884,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
       {showDocument && (
         <div style={{ padding: '12px 20px', maxHeight: '500px', overflowY: 'auto' }}>
           <CollaborativeDocumentEditor
+            key={currentDocument?.originalMemoId || 'default'} // 문서 변경 시 재마운트
             chatRoomId={chat.id}
             currentUserId={currentUserId}
             currentUserName={localStorage.getItem('userDisplayName') || '익명'}
