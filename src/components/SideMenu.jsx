@@ -561,7 +561,7 @@ const SideMenu = ({
                                     onClose();
                                     setIsSecurityDocViewerOpen(true);
                                 }}>
-                                    <span className="icon">🔒</span> 보안 & 개인정보
+                                    <span className="icon">🔒</span> 보안 &amp; 개인정보
                                 </MenuItem>
                                 <MenuItem onClick={() => {
                                     onClose();
