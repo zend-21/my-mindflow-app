@@ -348,7 +348,7 @@ const EmojiPicker = styled.div`
   background: rgba(26, 26, 26, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
-  padding: 16px;
+  padding: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(20px);
   z-index: 100;
@@ -417,9 +417,10 @@ const CategoryTab = styled.button`
 const EmojiGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(6, 1fr);
-  gap: 8px;
+  gap: 6px;
   max-height: 200px;
   overflow-y: auto;
+  overflow-x: hidden; /* 가로 스크롤 방지 */
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -439,13 +440,15 @@ const EmojiButton = styled.button`
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px;
   font-size: 24px;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
 
   &:hover {
     background: rgba(255, 255, 255, 0.1);

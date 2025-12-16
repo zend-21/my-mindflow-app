@@ -203,6 +203,24 @@ service cloud.firestore {
     }
 
     // ========================================
+    // 채팅방 (Chat Rooms) - 공유 문서 기능
+    // ========================================
+    match /chatRooms/{roomId} {
+      // 읽기/쓰기: 로그인한 사용자
+      allow read, write: if isSignedIn();
+
+      // 공유 문서 서브컬렉션
+      match /sharedDocument/{docId} {
+        allow read, write: if isSignedIn();
+
+        // 편집 이력 서브컬렉션
+        match /editHistory/{editId} {
+          allow read, write: if isSignedIn();
+        }
+      }
+    }
+
+    // ========================================
     // 닉네임 (Nicknames)
     // ========================================
     match /nicknames/{userId} {

@@ -517,110 +517,102 @@ const CollaborativeDocumentEditor = ({
   const contentRef = useRef(null);
   const saveTimeoutRef = useRef(null);
 
-  // Firestore 실시간 구독 - 권한
+  // 권한 확인 (일회성 읽기)
   useEffect(() => {
     if (!chatRoomId || !currentUserId) return;
 
     let isMounted = true;
-    const permRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'permissions');
 
-    const unsubscribe = onSnapshot(
-      permRef,
-      (permSnap) => {
-        if (!isMounted) return;
+    // 기본값 먼저 설정
+    setActualIsManager(isManager);
+    setActualCanEdit(canEdit);
 
-        if (permSnap.exists()) {
+    // 권한 문서 읽기 (실시간 리스너 대신 일회성)
+    const loadPermissions = async () => {
+      try {
+        const permRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'permissions');
+        const permSnap = await getDoc(permRef);
+
+        if (isMounted && permSnap.exists()) {
           const permissions = permSnap.data();
           const isActualManager = permissions.manager === currentUserId;
           const isEditor = permissions.editors?.includes(currentUserId) || false;
 
           setActualIsManager(isActualManager);
           setActualCanEdit(isActualManager || isEditor);
-        } else {
-          // 권한 문서가 없으면 초기값 사용
-          setActualIsManager(isManager);
-          setActualCanEdit(canEdit);
         }
-      },
-      (error) => {
-        console.error('권한 구독 오류:', error);
+      } catch (error) {
+        if (error.code !== 'permission-denied') {
+          console.error('권한 로드 오류:', error);
+        }
       }
-    );
+    };
+
+    loadPermissions();
 
     return () => {
       isMounted = false;
-      try {
-        unsubscribe();
-      } catch (e) {
-        // Cleanup 중 발생하는 오류 무시
-      }
     };
   }, [chatRoomId, currentUserId, isManager, canEdit]);
 
-  // Firestore 실시간 구독 - 문서 및 편집 이력
-  useEffect(() => {
+  // 문서 및 편집 이력 로드 (일회성 읽기)
+  const loadDocument = useCallback(async () => {
     if (!chatRoomId) return;
 
-    let isMounted = true;
-    const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+    try {
+      const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+      const docSnap = await getDoc(docRef);
 
-    // 문서 구독
-    const unsubscribeDoc = onSnapshot(
-      docRef,
-      (docSnap) => {
-        if (!isMounted) return;
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setTitle(data.title || '');
+        setContent(data.content || '');
 
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setTitle(data.title || '');
-          setContent(data.content || '');
-
-          // contentEditable 영역 업데이트
-          if (contentRef.current && data.content) {
-            contentRef.current.innerHTML = data.content;
-          }
+        // contentEditable 영역 업데이트
+        if (contentRef.current) {
+          contentRef.current.innerHTML = data.content || '';
         }
-      },
-      (error) => {
-        console.error('문서 구독 오류:', error);
+      } else {
+        // 문서가 없으면 빈 상태로 초기화
+        setTitle('');
+        setContent('');
+        if (contentRef.current) {
+          contentRef.current.innerHTML = '';
+        }
       }
-    );
 
-    // 편집 이력 구독 (pending 상태만)
-    const editsRef = collection(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory');
-    const unsubscribeEdits = onSnapshot(
-      editsRef,
-      (snapshot) => {
-        if (!isMounted) return;
+      // 편집 이력 로드 (pending 상태만)
+      const editsRef = collection(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory');
+      const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
 
-        const edits = [];
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data.status === 'pending') {
-            edits.push({ id: doc.id, ...data });
-          }
-        });
-        setPendingEdits(edits);
-      },
-      (error) => {
-        console.error('편집 이력 구독 오류:', error);
-      }
-    );
+      const edits = [];
+      editsSnap.forEach((doc) => {
+        edits.push({ id: doc.id, ...doc.data() });
+      });
+      setPendingEdits(edits);
 
-    return () => {
-      isMounted = false;
-      try {
-        unsubscribeDoc();
-      } catch (e) {
-        // Cleanup 중 발생하는 오류 무시
+    } catch (error) {
+      if (error.code !== 'permission-denied') {
+        console.error('문서 로드 오류:', error);
       }
-      try {
-        unsubscribeEdits();
-      } catch (e) {
-        // Cleanup 중 발생하는 오류 무시
-      }
-    };
+    }
   }, [chatRoomId]);
+
+  // 초기 로드
+  useEffect(() => {
+    loadDocument();
+  }, [loadDocument]);
+
+  // 문서 불러오기 버튼 클릭 시 실행될 핸들러
+  const handleLoadClick = () => {
+    if (onLoadFromShared) {
+      onLoadFromShared();
+      // 불러오기 후 문서 재로드
+      setTimeout(() => {
+        loadDocument();
+      }, 500);
+    }
+  };
 
   // 디바운스 저장 (500ms)
   const debouncedSave = useCallback((newContent) => {
@@ -918,7 +910,7 @@ const CollaborativeDocumentEditor = ({
         {/* 도구 모음 */}
         <Toolbar>
           {onLoadFromShared && actualCanEdit && (
-            <LoadButton onClick={onLoadFromShared} title="공유 폴더에서 불러오기">
+            <LoadButton onClick={handleLoadClick} title="공유 폴더에서 불러오기">
               <FolderOpen size={14} />
               불러오기
             </LoadButton>

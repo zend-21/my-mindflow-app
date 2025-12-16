@@ -1,5 +1,5 @@
 // 📄 공유 폴더 메모 선택 모달
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { X, Search, FileText, Calendar, Folder } from 'lucide-react';
 
@@ -225,8 +225,10 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos })
   const [filteredMemos, setFilteredMemos] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // allMemos에서 folderId === 'shared'인 메모만 필터링
-  const sharedMemos = allMemos?.filter(memo => memo.folderId === 'shared') || [];
+  // allMemos에서 folderId === 'shared'인 메모만 필터링 (useMemo로 메모이제이션)
+  const sharedMemos = useMemo(() => {
+    return allMemos?.filter(memo => memo.folderId === 'shared') || [];
+  }, [allMemos]);
 
   useEffect(() => {
     if (!searchQuery) {
