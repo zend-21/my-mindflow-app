@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
-import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Plus, Settings } from 'lucide-react';
+import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Plus, Settings, X } from 'lucide-react';
 import { subscribeToMessages, sendMessage, markDMAsRead } from '../../services/directMessageService';
 import { playChatMessageSound, notificationSettings } from '../../utils/notificationSounds';
 import CollapsibleDocumentEditor from './CollapsibleDocumentEditor';
@@ -532,16 +532,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
     let prevMessageCount = 0;
     let unsubscribe = null;
 
-    console.log('📬 채팅방 메시지 구독 시작:', chat.id);
-
     // 약간의 지연을 두고 구독 시작 (Firestore 내부 상태 안정화)
     const timeoutId = setTimeout(() => {
       if (!isMounted) return;
 
       unsubscribe = subscribeToMessages(chat.id, (newMessages) => {
         if (!isMounted) return;
-
-        console.log('📨 새 메시지:', newMessages);
 
         // 새 메시지가 추가되었고, 내가 보낸 메시지가 아니면 효과음 재생
         if (prevMessageCount > 0 && newMessages.length > prevMessageCount && notificationSettings.enabled) {
@@ -595,7 +591,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
     setSending(true);
 
     try {
-      await sendMessage(chat.id, textToSend);
+      // quota 최적화: roomData 전달하여 getDoc() 생략
+      await sendMessage(chat.id, textToSend, chat);
 
       // 스크롤을 맨 아래로
       setTimeout(() => {

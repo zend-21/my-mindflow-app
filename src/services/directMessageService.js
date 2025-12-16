@@ -153,7 +153,7 @@ export const getMyDMRooms = async () => {
 };
 
 /**
- * 내 1:1 대화방 목록 실시간 구독
+ * 내 1:1 대화방 목록 실시간 구독 (quota 최적화: 최근 20개만)
  * @param {function} callback
  * @returns {function} unsubscribe 함수
  */
@@ -163,10 +163,11 @@ export const subscribeToMyDMRooms = (callback) => {
     return () => {};
   }
 
-  // 임시: orderBy 제거하고 클라이언트에서 정렬 (인덱스 생성 대기)
+  // quota 최적화: 최근 20개 대화방만 로드
   const q = query(
     collection(db, 'directMessages'),
-    where('participants', 'array-contains', auth.currentUser.uid)
+    where('participants', 'array-contains', auth.currentUser.uid),
+    limit(20) // quota 절약: 최근 20개만
   );
 
   return onSnapshot(q, (snapshot) => {
@@ -210,32 +211,44 @@ export const subscribeToDMRoom = (roomId, callback) => {
 };
 
 /**
- * 읽음 표시 업데이트
+ * 읽음 표시 업데이트 (디바운스 적용 - quota 최적화)
  * @param {string} roomId
  */
-export const markDMAsRead = async (roomId) => {
-  try {
-    if (!auth.currentUser) return;
+const markDMAsReadDebounced = (() => {
+  const timeouts = new Map();
 
-    const roomRef = doc(db, 'directMessages', roomId);
+  return async (roomId) => {
+    try {
+      if (!auth.currentUser) return;
 
-    console.log('📖 읽음 표시 업데이트:', {
-      roomId,
-      userId: auth.currentUser.uid
-    });
+      // 기존 타이머 취소
+      if (timeouts.has(roomId)) {
+        clearTimeout(timeouts.get(roomId));
+      }
 
-    const updateData = {
-      [`unreadCount.${auth.currentUser.uid}`]: 0,
-      [`lastAccessTime.${auth.currentUser.uid}`]: serverTimestamp()
-    };
+      // 3초 후 실행 (quota 절약)
+      const timeoutId = setTimeout(async () => {
+        const roomRef = doc(db, 'directMessages', roomId);
 
-    await updateDoc(roomRef, updateData);
-    console.log('✅ 읽음 표시 완료');
+        const updateData = {
+          [`unreadCount.${auth.currentUser.uid}`]: 0,
+          [`lastAccessTime.${auth.currentUser.uid}`]: serverTimestamp()
+        };
 
-  } catch (error) {
-    console.error('❌ 읽음 표시 업데이트 오류:', error);
-  }
-};
+        await updateDoc(roomRef, updateData);
+        timeouts.delete(roomId);
+      }, 3000);
+
+      timeouts.set(roomId, timeoutId);
+
+    } catch (error) {
+      console.error('❌ 읽음 표시 업데이트 오류:', error);
+    }
+  };
+})();
+
+// 기존 함수명 유지 (호환성)
+export const markDMAsRead = markDMAsReadDebounced;
 
 /**
  * 대화방 나가기 (숨기기)
@@ -286,12 +299,13 @@ export const blockUser = async (roomId) => {
 };
 
 /**
- * 메시지 전송
+ * 메시지 전송 (quota 최적화: roomData 캐싱)
  * @param {string} roomId
  * @param {string} text - 메시지 내용
+ * @param {object} roomData - 대화방 정보 (선택사항, 전달 시 getDoc 생략)
  * @returns {Promise<{success: boolean, messageId: string}>}
  */
-export const sendMessage = async (roomId, text) => {
+export const sendMessage = async (roomId, text, roomData = null) => {
   try {
     if (!auth.currentUser) {
       throw new Error('로그인이 필요합니다');
@@ -317,17 +331,20 @@ export const sendMessage = async (roomId, text) => {
     const messageDoc = await addDoc(messagesRef, messageData);
 
     // 대화방의 lastMessage 업데이트
-    const roomSnap = await getDoc(roomRef);
-    if (roomSnap.exists()) {
-      const roomData = roomSnap.data();
-      const otherUserId = roomData.participants.find(id => id !== auth.currentUser.uid);
-      const newUnreadCount = (roomData.unreadCount?.[otherUserId] || 0) + 1;
+    // quota 최적화: roomData가 전달되면 getDoc() 생략
+    let actualRoomData = roomData;
 
-      console.log('📤 메시지 전송 - 상대방 unreadCount 증가:', {
-        otherUserId,
-        currentCount: roomData.unreadCount?.[otherUserId] || 0,
-        newCount: newUnreadCount
-      });
+    if (!actualRoomData) {
+      // fallback: roomData 없으면 읽기 (1 read)
+      const roomSnap = await getDoc(roomRef);
+      if (roomSnap.exists()) {
+        actualRoomData = roomSnap.data();
+      }
+    }
+
+    if (actualRoomData) {
+      const otherUserId = actualRoomData.participants?.find(id => id !== auth.currentUser.uid);
+      const newUnreadCount = (actualRoomData.unreadCount?.[otherUserId] || 0) + 1;
 
       await updateDoc(roomRef, {
         lastMessage: text.trim(),
@@ -335,8 +352,6 @@ export const sendMessage = async (roomId, text) => {
         [`unreadCount.${otherUserId}`]: newUnreadCount
       });
     }
-
-    console.log('✅ 메시지 전송 완료:', messageDoc.id);
 
     return {
       success: true,
@@ -350,20 +365,58 @@ export const sendMessage = async (roomId, text) => {
 };
 
 /**
- * 메시지 목록 실시간 구독
+ * 메시지 목록 실시간 구독 (quota 최적화: 최근 50개 + 증분 업데이트)
  * @param {string} roomId
  * @param {function} callback
  * @returns {function} unsubscribe 함수
  */
 export const subscribeToMessages = (roomId, callback) => {
   const messagesRef = collection(db, 'directMessages', roomId, 'messages');
-  const q = query(messagesRef, orderBy('createdAt', 'asc'));
+
+  // quota 최적화: 최근 50개 메시지만 로드
+  const q = query(
+    messagesRef,
+    orderBy('createdAt', 'desc'),
+    limit(50)
+  );
+
+  let isInitialLoad = true;
 
   return onSnapshot(q, (snapshot) => {
-    const messages = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-    callback(messages);
+    if (isInitialLoad) {
+      // 초기 로드: 전체 메시지 (최근 50개)
+      const messages = snapshot.docs
+        .map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+        .reverse(); // 오름차순으로 변경 (오래된 것 → 최신)
+
+      callback(messages);
+      isInitialLoad = false;
+    } else {
+      // 증분 업데이트: 변경된 메시지만 처리
+      const changes = [];
+      snapshot.docChanges().forEach(change => {
+        if (change.type === 'added') {
+          changes.push({
+            id: change.doc.id,
+            ...change.doc.data()
+          });
+        }
+      });
+
+      if (changes.length > 0) {
+        // 전체 메시지 재조합 (역순 정렬 후 reverse)
+        const messages = snapshot.docs
+          .map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }))
+          .reverse();
+
+        callback(messages);
+      }
+    }
   });
 };

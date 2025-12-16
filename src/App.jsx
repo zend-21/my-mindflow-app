@@ -1592,17 +1592,27 @@ function App() {
                                 // profileImageType 복원
                                 if (settings.profileImageType) {
                                     localStorage.setItem('profileImageType', settings.profileImageType);
+                                    // Header와 SideMenu에 알림
+                                    window.dispatchEvent(new CustomEvent('profileImageTypeChanged', { detail: settings.profileImageType }));
                                 }
                                 // 아바타 설정 복원
                                 if (settings.selectedAvatarId) {
                                     localStorage.setItem('selectedAvatarId', settings.selectedAvatarId);
+                                    window.dispatchEvent(new CustomEvent('avatarChanged', {
+                                        detail: { avatarId: settings.selectedAvatarId, bgColor: settings.avatarBgColor || 'none' }
+                                    }));
                                 }
                                 if (settings.avatarBgColor) {
                                     localStorage.setItem('avatarBgColor', settings.avatarBgColor);
+                                    window.dispatchEvent(new CustomEvent('avatarBgColorChanged', { detail: settings.avatarBgColor }));
                                 }
                                 // 커스텀 프로필 사진 복원
                                 if (settings.customProfilePicture) {
                                     localStorage.setItem('customProfilePicture', settings.customProfilePicture);
+                                    // ✅ Header와 SideMenu에 알림 (다른 기기에서 변경된 프사 반영)
+                                    window.dispatchEvent(new CustomEvent('profilePictureChanged', {
+                                        detail: { picture: settings.customProfilePicture, hash: settings.customProfilePictureHash }
+                                    }));
                                 }
                                 if (settings.customProfilePictureHash) {
                                     localStorage.setItem('customProfilePictureHash', settings.customProfilePictureHash);
