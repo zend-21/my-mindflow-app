@@ -1,8 +1,9 @@
 // 💬 채팅 탭 - 최근 대화 목록 (1:1 + 그룹)
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { subscribeToMyDMRooms } from '../../services/directMessageService';
 import { subscribeToMyGroupChats } from '../../services/groupChatService';
+import { playNewMessageNotification, notificationSettings } from '../../utils/notificationSounds';
 import { Search, Plus, Pin, Users } from 'lucide-react';
 import CreateGroupModal from './CreateGroupModal';
 import ChatRoom from './ChatRoom';
@@ -306,13 +307,33 @@ const ChatList = ({ showToast, memos, requirePhoneAuth }) => {
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [selectedChat, setSelectedChat] = useState(null);
 
+  // 이전 읽지 않은 메시지 개수 추적 (알림음 재생 여부 판단)
+  const prevUnreadCountRef = useRef({});
+
   useEffect(() => {
     let dmLoaded = false;
     let groupLoaded = false;
+    const currentUserId = localStorage.getItem('firebaseUserId');
 
     // 1:1 대화방 목록 실시간 구독
     const unsubscribeDM = subscribeToMyDMRooms((rooms) => {
       console.log('📬 1:1 대화방 목록 업데이트:', rooms);
+
+      // 새 메시지 알림음 재생 (읽지 않은 메시지가 증가한 경우)
+      if (dmLoaded && notificationSettings.enabled && currentUserId) {
+        rooms.forEach(room => {
+          const currentUnread = room.unreadCount?.[currentUserId] || 0;
+          const prevUnread = prevUnreadCountRef.current[room.id] || 0;
+
+          // 읽지 않은 메시지가 증가했으면 알림음 재생
+          if (currentUnread > prevUnread && currentUnread > 0) {
+            playNewMessageNotification();
+          }
+
+          prevUnreadCountRef.current[room.id] = currentUnread;
+        });
+      }
+
       setChatRooms(rooms);
       dmLoaded = true;
       if (groupLoaded) setLoading(false);
@@ -321,6 +342,21 @@ const ChatList = ({ showToast, memos, requirePhoneAuth }) => {
     // 그룹 채팅방 목록 실시간 구독
     const unsubscribeGroup = subscribeToMyGroupChats((groups) => {
       console.log('📁 그룹 채팅방 목록 업데이트:', groups);
+
+      // 그룹 채팅도 동일하게 알림음 재생
+      if (groupLoaded && notificationSettings.enabled && currentUserId) {
+        groups.forEach(group => {
+          const currentUnread = group.unreadCount?.[currentUserId] || 0;
+          const prevUnread = prevUnreadCountRef.current[group.id] || 0;
+
+          if (currentUnread > prevUnread && currentUnread > 0) {
+            playNewMessageNotification();
+          }
+
+          prevUnreadCountRef.current[group.id] = currentUnread;
+        });
+      }
+
       setGroupChats(groups);
       groupLoaded = true;
       if (dmLoaded) setLoading(false);

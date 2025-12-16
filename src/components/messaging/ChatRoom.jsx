@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Plus, Settings } from 'lucide-react';
 import { subscribeToMessages, sendMessage, markDMAsRead } from '../../services/directMessageService';
+import { playChatMessageSound, notificationSettings } from '../../utils/notificationSounds';
 import CollapsibleDocumentEditor from './CollapsibleDocumentEditor';
 import CollaborativeDocumentEditor from './CollaborativeDocumentEditor';
 import SharedMemoSelectorModal from './SharedMemoSelectorModal';
@@ -511,12 +512,24 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
     if (!chat.id) return;
 
     let isMounted = true;
+    let prevMessageCount = 0;
     console.log('📬 채팅방 메시지 구독 시작:', chat.id);
 
     const unsubscribe = subscribeToMessages(chat.id, (newMessages) => {
       if (!isMounted) return;
 
       console.log('📨 새 메시지:', newMessages);
+
+      // 새 메시지가 추가되었고, 내가 보낸 메시지가 아니면 효과음 재생
+      if (prevMessageCount > 0 && newMessages.length > prevMessageCount && notificationSettings.enabled) {
+        const latestMessage = newMessages[newMessages.length - 1];
+        // 상대방이 보낸 메시지인 경우만 효과음 재생
+        if (latestMessage?.senderId !== currentUserId) {
+          playChatMessageSound();
+        }
+      }
+
+      prevMessageCount = newMessages.length;
       setMessages(newMessages);
 
       // 스크롤을 맨 아래로

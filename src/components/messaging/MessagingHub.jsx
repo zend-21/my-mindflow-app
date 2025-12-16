@@ -103,6 +103,13 @@ const Content = styled.div`
   }
 `;
 
+// 탭 콘텐츠 래퍼 (display로 보이기/숨기기)
+const TabContent = styled.div`
+  display: ${props => props.$active ? 'flex' : 'none'};
+  flex-direction: column;
+  height: 100%;
+`;
+
 const MessagingHub = ({ showToast, memos, requirePhoneAuth }) => {
   const [activeTab, setActiveTab] = useState('chat'); // chat, friends
 
@@ -128,8 +135,13 @@ const MessagingHub = ({ showToast, memos, requirePhoneAuth }) => {
       </Header>
 
       <Content>
-        {activeTab === 'chat' && <ChatList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} />}
-        {activeTab === 'friends' && <FriendList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} />}
+        {/* 두 컴포넌트를 모두 마운트하여 실시간 구독 유지, display로 보이기/숨기기 */}
+        <TabContent $active={activeTab === 'chat'}>
+          <ChatList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} />
+        </TabContent>
+        <TabContent $active={activeTab === 'friends'}>
+          <FriendList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} />
+        </TabContent>
       </Content>
     </Container>
   );

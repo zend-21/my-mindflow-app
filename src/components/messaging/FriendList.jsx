@@ -8,6 +8,7 @@ import { createOrGetDMRoom } from '../../services/directMessageService';
 import { addTestFriend, removeAllTestFriends } from '../../services/testFriendService';
 import VerificationModal from './VerificationModal';
 import ChatRoom from './ChatRoom';
+import AddFriendModal from './AddFriendModal';
 
 // 컨테이너
 const Container = styled.div`
@@ -359,6 +360,7 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
   const [isVerified, setIsVerified] = useState(false);
   const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [selectedChat, setSelectedChat] = useState(null);
+  const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState(false);
 
   useEffect(() => {
     loadMyProfile();
@@ -468,11 +470,11 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
     if (requirePhoneAuth) {
       requirePhoneAuth('친구 추가', () => {
         // 인증 후 실행
-        showToast?.('친구 추가 기능 구현 예정');
+        setIsAddFriendModalOpen(true);
       });
     } else {
       // requirePhoneAuth가 없으면 바로 실행 (fallback)
-      showToast?.('친구 추가 기능 구현 예정');
+      setIsAddFriendModalOpen(true);
     }
   };
 
@@ -685,6 +687,16 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
           onClose={() => setSelectedChat(null)}
           showToast={showToast}
           memos={memos}
+        />
+      )}
+
+      {/* 친구 추가 모달 */}
+      {isAddFriendModalOpen && (
+        <AddFriendModal
+          onClose={() => setIsAddFriendModalOpen(false)}
+          userId={myProfile?.userId}
+          showToast={showToast}
+          onFriendAdded={loadFriends}
         />
       )}
     </Container>

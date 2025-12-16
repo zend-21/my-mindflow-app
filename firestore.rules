@@ -42,9 +42,21 @@ service cloud.firestore {
       allow create: if isSignedIn() && isOwner(userId);
       allow update, delete: if isOwner(userId);
 
-      // 🆕 친구 서브컬렉션 - 본인만 읽기/쓰기 가능
+      // 🆕 친구 서브컬렉션
       match /friends/{friendId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+        // 읽기: 본인만
+        allow read: if isSignedIn() && request.auth.uid == userId;
+
+        // 생성: 본인의 친구 목록에 추가하거나, 다른 사람이 나를 친구로 추가하는 경우
+        allow create: if isSignedIn() && (
+          // 내 친구 목록에 추가 (userId == 내 ID)
+          request.auth.uid == userId ||
+          // 다른 사람이 나를 친구로 추가 (friendId == 내 ID, userId == 다른 사람 ID)
+          request.resource.data.friendId == request.auth.uid
+        );
+
+        // 수정/삭제: 본인만
+        allow update, delete: if isSignedIn() && request.auth.uid == userId;
       }
     }
 
