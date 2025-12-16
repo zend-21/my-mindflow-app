@@ -513,45 +513,56 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
 
     let isMounted = true;
     let prevMessageCount = 0;
+    let unsubscribe = null;
+
     console.log('📬 채팅방 메시지 구독 시작:', chat.id);
 
-    const unsubscribe = subscribeToMessages(chat.id, (newMessages) => {
+    // 약간의 지연을 두고 구독 시작 (Firestore 내부 상태 안정화)
+    const timeoutId = setTimeout(() => {
       if (!isMounted) return;
 
-      console.log('📨 새 메시지:', newMessages);
+      unsubscribe = subscribeToMessages(chat.id, (newMessages) => {
+        if (!isMounted) return;
 
-      // 새 메시지가 추가되었고, 내가 보낸 메시지가 아니면 효과음 재생
-      if (prevMessageCount > 0 && newMessages.length > prevMessageCount && notificationSettings.enabled) {
-        const latestMessage = newMessages[newMessages.length - 1];
-        // 상대방이 보낸 메시지인 경우만 효과음 재생
-        if (latestMessage?.senderId !== currentUserId) {
-          playChatMessageSound();
+        console.log('📨 새 메시지:', newMessages);
+
+        // 새 메시지가 추가되었고, 내가 보낸 메시지가 아니면 효과음 재생
+        if (prevMessageCount > 0 && newMessages.length > prevMessageCount && notificationSettings.enabled) {
+          const latestMessage = newMessages[newMessages.length - 1];
+          // 상대방이 보낸 메시지인 경우만 효과음 재생
+          if (latestMessage?.senderId !== currentUserId) {
+            playChatMessageSound();
+          }
         }
-      }
 
-      prevMessageCount = newMessages.length;
-      setMessages(newMessages);
+        prevMessageCount = newMessages.length;
+        setMessages(newMessages);
 
-      // 스크롤을 맨 아래로
-      setTimeout(() => {
-        if (isMounted) {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }
-      }, 100);
-    });
+        // 스크롤을 맨 아래로
+        setTimeout(() => {
+          if (isMounted) {
+            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+          }
+        }, 100);
+      });
 
-    // 읽음 표시
-    markDMAsRead(chat.id);
+      // 읽음 표시
+      markDMAsRead(chat.id);
+    }, 50);
 
     return () => {
       isMounted = false;
-      try {
-        if (unsubscribe) unsubscribe();
-      } catch (e) {
-        // Cleanup 중 발생하는 오류 무시
+      clearTimeout(timeoutId);
+
+      if (unsubscribe && typeof unsubscribe === 'function') {
+        try {
+          unsubscribe();
+        } catch (e) {
+          console.error('구독 해제 중 오류:', e);
+        }
       }
     };
-  }, [chat.id]);
+  }, [chat.id, currentUserId]);
 
   // 방장 여부 확인 (그룹 채팅인 경우 createdBy가 방장, DM은 모두 방장)
   const isRoomOwner = chat.type === 'group'

@@ -319,6 +319,18 @@ const ChatList = ({ showToast, memos, requirePhoneAuth }) => {
     const unsubscribeDM = subscribeToMyDMRooms((rooms) => {
       console.log('📬 1:1 대화방 목록 업데이트:', rooms);
 
+      // unreadCount 로그
+      rooms.forEach(room => {
+        const unread = room.unreadCount?.[currentUserId] || 0;
+        if (unread > 0) {
+          console.log('🔴 읽지 않은 메시지:', {
+            roomId: room.id,
+            unreadCount: unread,
+            fullUnreadData: room.unreadCount
+          });
+        }
+      });
+
       // 새 메시지 알림음 재생 (읽지 않은 메시지가 증가한 경우)
       if (dmLoaded && notificationSettings.enabled && currentUserId) {
         rooms.forEach(room => {
@@ -363,8 +375,21 @@ const ChatList = ({ showToast, memos, requirePhoneAuth }) => {
     });
 
     return () => {
-      if (unsubscribeDM) unsubscribeDM();
-      if (unsubscribeGroup) unsubscribeGroup();
+      try {
+        if (unsubscribeDM && typeof unsubscribeDM === 'function') {
+          unsubscribeDM();
+        }
+      } catch (e) {
+        console.error('DM 구독 해제 중 오류:', e);
+      }
+
+      try {
+        if (unsubscribeGroup && typeof unsubscribeGroup === 'function') {
+          unsubscribeGroup();
+        }
+      } catch (e) {
+        console.error('그룹 구독 해제 중 오류:', e);
+      }
     };
   }, []);
 

@@ -219,12 +219,18 @@ export const markDMAsRead = async (roomId) => {
 
     const roomRef = doc(db, 'directMessages', roomId);
 
+    console.log('📖 읽음 표시 업데이트:', {
+      roomId,
+      userId: auth.currentUser.uid
+    });
+
     const updateData = {
       [`unreadCount.${auth.currentUser.uid}`]: 0,
       [`lastAccessTime.${auth.currentUser.uid}`]: serverTimestamp()
     };
 
     await updateDoc(roomRef, updateData);
+    console.log('✅ 읽음 표시 완료');
 
   } catch (error) {
     console.error('❌ 읽음 표시 업데이트 오류:', error);
@@ -315,11 +321,18 @@ export const sendMessage = async (roomId, text) => {
     if (roomSnap.exists()) {
       const roomData = roomSnap.data();
       const otherUserId = roomData.participants.find(id => id !== auth.currentUser.uid);
+      const newUnreadCount = (roomData.unreadCount?.[otherUserId] || 0) + 1;
+
+      console.log('📤 메시지 전송 - 상대방 unreadCount 증가:', {
+        otherUserId,
+        currentCount: roomData.unreadCount?.[otherUserId] || 0,
+        newCount: newUnreadCount
+      });
 
       await updateDoc(roomRef, {
         lastMessage: text.trim(),
         lastMessageTime: serverTimestamp(),
-        [`unreadCount.${otherUserId}`]: (roomData.unreadCount?.[otherUserId] || 0) + 1
+        [`unreadCount.${otherUserId}`]: newUnreadCount
       });
     }
 
