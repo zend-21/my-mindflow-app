@@ -60,6 +60,7 @@ import {
 export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [syncStatus, setSyncStatus] = useState('idle'); // 'idle', 'syncing', 'synced', 'offline'
 
   // 데이터 상태
   const [memos, setMemos] = useState([]);
@@ -602,6 +603,197 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [userId, enabled, memos, folders, trash, macros, calendar, activities]);
 
+  // 📱 포그라운드 복귀 시 자동 동기화 체크 (Evernote 방식)
+  useEffect(() => {
+    if (!userId || !enabled || !migrated) return;
+
+    const handleVisibilityChange = async () => {
+      // 앱이 포그라운드로 복귀 (백그라운드 → 포그라운드)
+      if (!document.hidden) {
+        console.log('📱 앱 포그라운드 복귀 - 동기화 체크 시작');
+        setSyncStatus('syncing');
+
+        try {
+          // Firestore에서 최신 데이터 가져오기
+          const data = await fetchAllUserData(userId);
+
+          // localStorage와 비교하여 변경사항 확인
+          const localMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
+          const localCalendar = JSON.parse(localStorage.getItem('calendarSchedules_shared') || '{}');
+          const localFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
+
+          // localStorage에만 있는 항목 찾기 (Firestore 저장 실패했던 것들)
+          const unsyncedMemos = localMemos.filter(localMemo => {
+            const inFirestore = data.memos.find(m => m.id === localMemo.id);
+            if (!inFirestore) {
+              const lastSaved = localStorage.getItem(`firestore_saved_memo_${localMemo.id}`);
+              return !lastSaved; // 한 번도 저장 안 된 것만
+            }
+            return false;
+          });
+
+          const unsyncedCalendar = Object.keys(localCalendar).filter(dateKey => {
+            const inFirestore = data.calendar?.[dateKey];
+            if (!inFirestore) {
+              const lastSaved = localStorage.getItem(`firestore_saved_calendar_${dateKey}`);
+              return !lastSaved; // 한 번도 저장 안 된 것만
+            }
+            return false;
+          });
+
+          // 미동기화 항목 자동 업로드
+          if (unsyncedMemos.length > 0) {
+            console.log(`📤 미동기화 메모 ${unsyncedMemos.length}개 발견 - 업로드 시작`);
+            for (const memo of unsyncedMemos) {
+              try {
+                await saveMemoToFirestore(userId, memo);
+                localStorage.setItem(`firestore_saved_memo_${memo.id}`, JSON.stringify(memo));
+                console.log(`✅ 메모 ${memo.id} 업로드 완료`);
+              } catch (err) {
+                console.error(`❌ 메모 ${memo.id} 업로드 실패:`, err);
+              }
+            }
+          }
+
+          if (unsyncedCalendar.length > 0) {
+            console.log(`📤 미동기화 일정 ${unsyncedCalendar.length}개 발견 - 업로드 시작`);
+            for (const dateKey of unsyncedCalendar) {
+              const schedule = localCalendar[dateKey];
+              if (schedule) {
+                try {
+                  await saveCalendarDateToFirestore(userId, dateKey, schedule);
+                  localStorage.setItem(`firestore_saved_calendar_${dateKey}`, JSON.stringify(schedule));
+                  console.log(`✅ 일정 ${dateKey} 업로드 완료`);
+                } catch (err) {
+                  console.error(`❌ 일정 ${dateKey} 업로드 실패:`, err);
+                }
+              }
+            }
+          }
+
+          if (unsyncedMemos.length === 0 && unsyncedCalendar.length === 0) {
+            console.log('✅ 모든 데이터 동기화됨');
+          }
+
+          setSyncStatus('synced');
+          setTimeout(() => setSyncStatus('idle'), 2000); // 2초 후 idle로 전환
+        } catch (err) {
+          console.error('❌ 포그라운드 복귀 동기화 실패:', err);
+          setSyncStatus('offline');
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [userId, enabled, migrated]);
+
+  // 🌐 온라인/오프라인 상태 감지
+  useEffect(() => {
+    if (!userId || !enabled || !migrated) return;
+
+    const handleOffline = () => {
+      console.log('📴 네트워크 오프라인 감지');
+      setSyncStatus('offline');
+    };
+
+    const handleOnline = async () => {
+      console.log('🌐 네트워크 온라인 복귀 - 미동기화 항목 업로드 시작');
+      setSyncStatus('syncing');
+
+      try {
+        // localStorage에서 모든 항목 가져오기
+        const localMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
+        const localCalendar = JSON.parse(localStorage.getItem('calendarSchedules_shared') || '{}');
+        const localFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
+        const localMacros = JSON.parse(localStorage.getItem('macroTexts') || '[]');
+        const localActivities = JSON.parse(localStorage.getItem('recentActivities_shared') || '[]');
+
+        // 미동기화 항목 찾기 (firestore_saved가 없거나 다른 것들)
+        const pendingItems = [];
+
+        localMemos.forEach(memo => {
+          const lastSaved = localStorage.getItem(`firestore_saved_memo_${memo.id}`);
+          if (!lastSaved || lastSaved !== JSON.stringify(memo)) {
+            pendingItems.push({ type: 'memo', id: memo.id, data: memo });
+          }
+        });
+
+        Object.entries(localCalendar).forEach(([dateKey, schedule]) => {
+          const lastSaved = localStorage.getItem(`firestore_saved_calendar_${dateKey}`);
+          if (!lastSaved || lastSaved !== JSON.stringify(schedule)) {
+            pendingItems.push({ type: 'calendar', id: dateKey, data: schedule });
+          }
+        });
+
+        localFolders.forEach(folder => {
+          const lastSaved = localStorage.getItem(`firestore_saved_folder_${folder.id}`);
+          if (!lastSaved || lastSaved !== JSON.stringify(folder)) {
+            pendingItems.push({ type: 'folder', id: folder.id, data: folder });
+          }
+        });
+
+        localMacros.forEach(macro => {
+          const lastSaved = localStorage.getItem(`firestore_saved_macro_${macro.id}`);
+          if (!lastSaved || lastSaved !== JSON.stringify(macro)) {
+            pendingItems.push({ type: 'macro', id: macro.id, data: macro });
+          }
+        });
+
+        if (pendingItems.length > 0) {
+          console.log(`📤 미동기화 항목 ${pendingItems.length}개 발견 - 업로드 시작`);
+
+          for (const item of pendingItems) {
+            try {
+              switch (item.type) {
+                case 'memo':
+                  await saveMemoToFirestore(userId, item.data);
+                  localStorage.setItem(`firestore_saved_memo_${item.id}`, JSON.stringify(item.data));
+                  console.log(`✅ 메모 ${item.id} 업로드 완료`);
+                  break;
+                case 'calendar':
+                  await saveCalendarDateToFirestore(userId, item.id, item.data);
+                  localStorage.setItem(`firestore_saved_calendar_${item.id}`, JSON.stringify(item.data));
+                  console.log(`✅ 일정 ${item.id} 업로드 완료`);
+                  break;
+                case 'folder':
+                  await saveFolderToFirestore(userId, item.data);
+                  localStorage.setItem(`firestore_saved_folder_${item.id}`, JSON.stringify(item.data));
+                  console.log(`✅ 폴더 ${item.id} 업로드 완료`);
+                  break;
+                case 'macro':
+                  await saveMacroToFirestore(userId, item.data);
+                  localStorage.setItem(`firestore_saved_macro_${item.id}`, JSON.stringify(item.data));
+                  console.log(`✅ 매크로 ${item.id} 업로드 완료`);
+                  break;
+              }
+            } catch (err) {
+              console.error(`❌ ${item.type} ${item.id} 업로드 실패:`, err);
+            }
+          }
+
+          console.log('✅ 온라인 복귀 동기화 완료');
+        } else {
+          console.log('✅ 모든 데이터 이미 동기화됨');
+        }
+
+        setSyncStatus('synced');
+        setTimeout(() => setSyncStatus('idle'), 2000); // 2초 후 idle로 전환
+      } catch (err) {
+        console.error('❌ 온라인 복귀 동기화 실패:', err);
+        setSyncStatus('offline');
+      }
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [userId, enabled, migrated]);
+
   // 디바운스 저장 (로컬 변경사항을 서버에 저장)
   const saveTimeout = useRef(null);
   const debouncedSave = useCallback((saveFn, itemId, dataForComparison, ...saveArgs) => {
@@ -960,12 +1152,117 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     });
   }, [debouncedSave]);
 
+  // 수동 동기화 함수
+  const manualSync = useCallback(async () => {
+    if (!userId || !enabled) {
+      console.log('⚠️ 수동 동기화 실패: 로그인 필요');
+      return false;
+    }
+
+    console.log('🔄 수동 동기화 시작...');
+    setSyncStatus('syncing');
+
+    try {
+      // localStorage에서 모든 항목 가져오기
+      const localMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
+      const localCalendar = JSON.parse(localStorage.getItem('calendarSchedules_shared') || '{}');
+      const localFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
+      const localMacros = JSON.parse(localStorage.getItem('macroTexts') || '[]');
+      const localTrash = JSON.parse(localStorage.getItem('trashMemos_shared') || '[]');
+
+      // 미동기화 항목 찾기
+      const pendingItems = [];
+
+      localMemos.forEach(memo => {
+        const lastSaved = localStorage.getItem(`firestore_saved_memo_${memo.id}`);
+        if (!lastSaved || lastSaved !== JSON.stringify(memo)) {
+          pendingItems.push({ type: 'memo', id: memo.id, data: memo });
+        }
+      });
+
+      Object.entries(localCalendar).forEach(([dateKey, schedule]) => {
+        const lastSaved = localStorage.getItem(`firestore_saved_calendar_${dateKey}`);
+        if (!lastSaved || lastSaved !== JSON.stringify(schedule)) {
+          pendingItems.push({ type: 'calendar', id: dateKey, data: schedule });
+        }
+      });
+
+      localFolders.forEach(folder => {
+        const lastSaved = localStorage.getItem(`firestore_saved_folder_${folder.id}`);
+        if (!lastSaved || lastSaved !== JSON.stringify(folder)) {
+          pendingItems.push({ type: 'folder', id: folder.id, data: folder });
+        }
+      });
+
+      localMacros.forEach(macro => {
+        const lastSaved = localStorage.getItem(`firestore_saved_macro_${macro.id}`);
+        if (!lastSaved || lastSaved !== JSON.stringify(macro)) {
+          pendingItems.push({ type: 'macro', id: macro.id, data: macro });
+        }
+      });
+
+      localTrash.forEach(item => {
+        const lastSaved = localStorage.getItem(`firestore_saved_trash_${item.id}`);
+        if (!lastSaved || lastSaved !== JSON.stringify(item)) {
+          pendingItems.push({ type: 'trash', id: item.id, data: item });
+        }
+      });
+
+      if (pendingItems.length > 0) {
+        console.log(`📤 미동기화 항목 ${pendingItems.length}개 발견 - 업로드 시작`);
+
+        for (const item of pendingItems) {
+          try {
+            switch (item.type) {
+              case 'memo':
+                await saveMemoToFirestore(userId, item.data);
+                localStorage.setItem(`firestore_saved_memo_${item.id}`, JSON.stringify(item.data));
+                break;
+              case 'calendar':
+                await saveCalendarDateToFirestore(userId, item.id, item.data);
+                localStorage.setItem(`firestore_saved_calendar_${item.id}`, JSON.stringify(item.data));
+                break;
+              case 'folder':
+                await saveFolderToFirestore(userId, item.data);
+                localStorage.setItem(`firestore_saved_folder_${item.id}`, JSON.stringify(item.data));
+                break;
+              case 'macro':
+                await saveMacroToFirestore(userId, item.data);
+                localStorage.setItem(`firestore_saved_macro_${item.id}`, JSON.stringify(item.data));
+                break;
+              case 'trash':
+                await saveTrashItemToFirestore(userId, item.data);
+                localStorage.setItem(`firestore_saved_trash_${item.id}`, JSON.stringify(item.data));
+                break;
+            }
+            console.log(`✅ ${item.type} ${item.id} 업로드 완료`);
+          } catch (err) {
+            console.error(`❌ ${item.type} ${item.id} 업로드 실패:`, err);
+          }
+        }
+
+        console.log('✅ 수동 동기화 완료');
+      } else {
+        console.log('✅ 모든 데이터 이미 동기화됨');
+      }
+
+      setSyncStatus('synced');
+      setTimeout(() => setSyncStatus('idle'), 2000);
+      return true;
+    } catch (err) {
+      console.error('❌ 수동 동기화 실패:', err);
+      setSyncStatus('offline');
+      return false;
+    }
+  }, [userId, enabled]);
+
 
   return {
     // 상태
     loading,
     error,
     migrated,
+    syncStatus,
 
     // 데이터
     memos,
@@ -1001,6 +1298,9 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
     // 즉시 저장
     saveImmediately,
+
+    // 수동 동기화
+    manualSync,
 
     // ⭐ 운세 프로필 Firestore 함수 (fortuneLogic.js에서 사용)
     saveFortuneProfileToFirestore,

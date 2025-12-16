@@ -627,6 +627,7 @@ function App() {
 
     const {
         loading: dataLoading,
+        syncStatus,
         memos,
         folders,
         trash,
@@ -642,6 +643,7 @@ function App() {
         syncActivities,
         syncSettings,
         saveImmediately,
+        manualSync,
         // 개별 항목 동기화 함수
         syncMemo,
         deleteMemo,
@@ -2707,6 +2709,7 @@ function App() {
                         isHidden={!showHeader}
                         onLoginClick={() => setIsLoginModalOpen(true)}
                         onProfileClick={handleProfileClick}
+                        syncStatus={syncStatus}
                     />
 
                     <ContentArea
@@ -2801,6 +2804,8 @@ function App() {
                         onImport={handleDataImport}
                         onRestoreFromDrive={handleRestoreFromDrive}
                         onSync={handleSync}
+                        onManualSync={manualSync}
+                        syncStatus={syncStatus}
                         profile={profile}
                         wsCode={wsCode}
                         onProfileClick={handleProfileClick}

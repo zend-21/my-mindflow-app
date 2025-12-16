@@ -319,6 +319,8 @@ const SideMenu = ({
     onLogout,
     onLoginClick,
     onSync,
+    onManualSync,  // 🔄 수동 동기화 함수
+    syncStatus = 'idle',  // 🔄 동기화 상태
     onOpenMacro,  // ⚙️ 매크로 기능 추가
     onOpenFortune,
     onOpenTimer,  // ⏱️ 타이머 기능 추가
@@ -402,7 +404,29 @@ const SideMenu = ({
             fileInputRef.current.click();
         }
     };
-    
+
+    // 수동 동기화 핸들러
+    const handleManualSync = async () => {
+        if (!onManualSync) return;
+
+        const success = await onManualSync();
+        if (success) {
+            showToast?.('동기화가 완료되었습니다', 'success');
+        } else {
+            showToast?.('동기화에 실패했습니다. 다시 시도해주세요.', 'error');
+        }
+    };
+
+    // 동기화 상태 텍스트
+    const getSyncStatusText = () => {
+        switch (syncStatus) {
+            case 'syncing': return '동기화 중...';
+            case 'synced': return '동기화됨';
+            case 'offline': return '오프라인';
+            default: return '동기화';
+        }
+    };
+
     return (
         <>
             {isOpen && (
@@ -512,6 +536,21 @@ const SideMenu = ({
                                     <span className="icon">☁️</span> 서버에서 복원
                                 </MenuItem>
                             </MenuGroup>
+
+                            {/* 🔄 그룹 2.5: 수동 동기화 */}
+                            {profile && (
+                                <MenuGroup>
+                                    <MenuItem
+                                        onClick={handleManualSync}
+                                        style={{
+                                            opacity: syncStatus === 'syncing' ? 0.6 : 1,
+                                            pointerEvents: syncStatus === 'syncing' ? 'none' : 'auto'
+                                        }}
+                                    >
+                                        <span className="icon">🔄</span> {getSyncStatusText()}
+                                    </MenuItem>
+                                </MenuGroup>
+                            )}
 
                             {/* ⚙️ 그룹 3: 설정/관리 */}
                             <MenuGroup>
