@@ -402,7 +402,10 @@ function App() {
     // 🆔 WS 코드 로드 (헤더처럼 App에서 관리)
     useEffect(() => {
         const loadWsCode = async () => {
+            console.log('🔍 WS 코드 로드 시작 - userId:', userId, 'profile:', profile?.name);
+
             if (!userId || !profile) {
+                console.log('⚠️ WS 코드 로드 실패: userId 또는 profile 없음');
                 setWsCode(null);
                 return;
             }
@@ -410,6 +413,7 @@ function App() {
             // localStorage에서 먼저 확인
             const cachedWsCode = localStorage.getItem(`wsCode_${userId}`);
             if (cachedWsCode) {
+                console.log('✅ localStorage에서 WS 코드 로드:', cachedWsCode);
                 setWsCode(cachedWsCode);
                 return;
             }
@@ -417,15 +421,19 @@ function App() {
             // Firebase에서 가져오기
             try {
                 const workspaceId = `workspace_${userId}`;
+                console.log('🔍 Firestore에서 WS 코드 조회:', workspaceId);
                 const workspaceRef = doc(db, 'workspaces', workspaceId);
                 const workspaceDoc = await getDoc(workspaceRef);
 
                 if (workspaceDoc.exists()) {
                     const code = workspaceDoc.data().workspaceCode;
+                    console.log('✅ Firestore에서 WS 코드 로드:', code);
                     setWsCode(code);
                     if (code) {
                         localStorage.setItem(`wsCode_${userId}`, code);
                     }
+                } else {
+                    console.log('⚠️ Firestore에 workspace 문서 없음:', workspaceId);
                 }
             } catch (error) {
                 console.error('❌ WS 코드 로드 오류:', error);
