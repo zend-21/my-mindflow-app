@@ -42,40 +42,6 @@ const RightContainer = styled.div`
     gap: 25px;
 `;
 
-const SyncStatusIndicator = styled.div`
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: ${props => {
-        switch (props.$status) {
-            case 'syncing': return '#4A9EFF';
-            case 'synced': return '#4CAF50';
-            case 'offline': return '#FF9800';
-            default: return 'transparent';
-        }
-    }};
-    opacity: ${props => props.$status === 'idle' ? 0 : 1};
-    transition: opacity 0.3s ease;
-`;
-
-const SyncIcon = styled.div`
-    width: 16px;
-    height: 16px;
-    animation: ${props => props.$status === 'syncing' ? 'spin 1s linear infinite' : 'none'};
-
-    @keyframes spin {
-        from { transform: rotate(0deg); }
-        to { transform: rotate(360deg); }
-    }
-
-    svg {
-        width: 100%;
-        height: 100%;
-        stroke: currentColor;
-    }
-`;
-
 const ProfileImage = styled.img`
     width: 35px;
     height: 35px;
@@ -188,7 +154,7 @@ const BACKGROUND_COLORS = {
 };
 
 // Header 컴포넌트
-const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, onProfileClick, syncStatus = 'idle' }) => {
+const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, onProfileClick }) => {
     const [imageError, setImageError] = useState(false);
     const [greeting, setGreeting] = useState('');
     const [profileImageType, setProfileImageType] = useState('avatar');
@@ -280,25 +246,6 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
         setImageError(true);
     };
 
-    // 동기화 상태 렌더링
-    const renderSyncStatus = () => {
-        const statusConfig = {
-            syncing: { icon: '↻', text: '동기화 중...' },
-            synced: { icon: '✓', text: '동기화됨' },
-            offline: { icon: '⚠', text: '오프라인' },
-            idle: { icon: '', text: '' }
-        };
-
-        const config = statusConfig[syncStatus] || statusConfig.idle;
-
-        return (
-            <SyncStatusIndicator $status={syncStatus}>
-                {config.icon && <SyncIcon $status={syncStatus}>{config.icon}</SyncIcon>}
-                <span>{config.text}</span>
-            </SyncStatusIndicator>
-        );
-    };
-
     console.log('🎯 Header 렌더링 - isHidden:', isHidden);
     
     return (
@@ -367,7 +314,6 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
             </LeftContainer>
             
             <RightContainer>
-                {profile && renderSyncStatus()}
                 <ActionButton onClick={onSearchClick}>
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="11" cy="11" r="8"></circle>
@@ -381,10 +327,9 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
         </HeaderWrapper>
     );
 }, (prevProps, nextProps) => {
-    // profile, isHidden, syncStatus 값이 변경되지 않으면 리렌더링 방지
+    // profile, isHidden 값이 변경되지 않으면 리렌더링 방지
     return (
         prevProps.isHidden === nextProps.isHidden &&
-        prevProps.syncStatus === nextProps.syncStatus &&
         prevProps.profile?.name === nextProps.profile?.name &&
         prevProps.profile?.nickname === nextProps.profile?.nickname &&
         prevProps.profile?.picture === nextProps.profile?.picture

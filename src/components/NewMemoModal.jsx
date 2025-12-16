@@ -463,6 +463,8 @@ const NewMemoModal = ({ isOpen, onSave, onCancel, openSource }) => {
                         content={newMemoContent}
                         onChange={setNewMemoContent}
                         placeholder={placeholderText}
+                        onFocus={handleTextareaFocus}
+                        onBlur={handleTextareaBlur}
                     />
                     
                 </ModalContent>

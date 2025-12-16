@@ -2709,7 +2709,6 @@ function App() {
                         isHidden={!showHeader}
                         onLoginClick={() => setIsLoginModalOpen(true)}
                         onProfileClick={handleProfileClick}
-                        syncStatus={syncStatus}
                     />
 
                     <ContentArea
