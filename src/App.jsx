@@ -1852,6 +1852,45 @@ function App() {
                 console.error('⚠️ 사용자 문서 생성/업데이트 오류:', userError);
             }
 
+            // 🆔 Workspace 문서 생성/확인 (친구 추가용 WS 코드)
+            try {
+                const workspaceRef = doc(db, 'workspaces', `workspace_${firebaseUserId}`);
+                const workspaceDoc = await getDoc(workspaceRef);
+
+                if (!workspaceDoc.exists()) {
+                    // WS 코드 생성 (6자리 알파벳+숫자 조합)
+                    const generateWsCode = () => {
+                        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                        let code = 'WS-';
+                        for (let i = 0; i < 6; i++) {
+                            code += chars.charAt(Math.floor(Math.random() * chars.length));
+                        }
+                        return code;
+                    };
+
+                    const wsCode = generateWsCode();
+
+                    await setDoc(workspaceRef, {
+                        userId: firebaseUserId,
+                        workspaceCode: wsCode,
+                        createdAt: Date.now()
+                    });
+
+                    // localStorage에 캐시
+                    localStorage.setItem(`wsCode_${firebaseUserId}`, wsCode);
+                    console.log('✅ Workspace 문서 생성 완료 - WS 코드:', wsCode);
+                } else {
+                    // 기존 WS 코드 캐시
+                    const existingWsCode = workspaceDoc.data().workspaceCode;
+                    if (existingWsCode) {
+                        localStorage.setItem(`wsCode_${firebaseUserId}`, existingWsCode);
+                        console.log('✅ 기존 Workspace 확인 - WS 코드:', existingWsCode);
+                    }
+                }
+            } catch (workspaceError) {
+                console.error('⚠️ Workspace 문서 생성/확인 오류:', workspaceError);
+            }
+
             // GAPI에 토큰 설정
             if (isGapiReady) {
                 console.log('🔑 로그인 성공 - GAPI에 토큰 설정');
@@ -1942,6 +1981,45 @@ function App() {
                 }
             } catch (userError) {
                 console.error('⚠️ 사용자 문서 생성/업데이트 오류:', userError);
+            }
+
+            // 🆔 Workspace 문서 생성/확인 (친구 추가용 WS 코드)
+            try {
+                const workspaceRef = doc(db, 'workspaces', `workspace_${firebaseUserId}`);
+                const workspaceDoc = await getDoc(workspaceRef);
+
+                if (!workspaceDoc.exists()) {
+                    // WS 코드 생성 (6자리 알파벳+숫자 조합)
+                    const generateWsCode = () => {
+                        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                        let code = 'WS-';
+                        for (let i = 0; i < 6; i++) {
+                            code += chars.charAt(Math.floor(Math.random() * chars.length));
+                        }
+                        return code;
+                    };
+
+                    const wsCode = generateWsCode();
+
+                    await setDoc(workspaceRef, {
+                        userId: firebaseUserId,
+                        workspaceCode: wsCode,
+                        createdAt: Date.now()
+                    });
+
+                    // localStorage에 캐시
+                    localStorage.setItem(`wsCode_${firebaseUserId}`, wsCode);
+                    console.log('✅ Workspace 문서 생성 완료 - WS 코드:', wsCode);
+                } else {
+                    // 기존 WS 코드 캐시
+                    const existingWsCode = workspaceDoc.data().workspaceCode;
+                    if (existingWsCode) {
+                        localStorage.setItem(`wsCode_${firebaseUserId}`, existingWsCode);
+                        console.log('✅ 기존 Workspace 확인 - WS 코드:', existingWsCode);
+                    }
+                }
+            } catch (workspaceError) {
+                console.error('⚠️ Workspace 문서 생성/확인 오류:', workspaceError);
             }
 
             // GAPI에 토큰 설정
