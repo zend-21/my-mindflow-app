@@ -1,8 +1,10 @@
 // 💬 대화 탭 - 메시징 허브 (채팅, 친구)
 import { useState } from 'react';
 import styled from 'styled-components';
+import { Settings } from 'lucide-react';
 import ChatList from './ChatList';
 import FriendList from './FriendList';
+import ChatSettingsModal from './ChatSettingsModal';
 
 // 메인 컨테이너
 const Container = styled.div`
@@ -41,7 +43,7 @@ const TabContainer = styled.div`
 `;
 
 const Tab = styled.button`
-  flex: 1;
+  flex: ${props => props.$flex || 1};
   background: ${props => props.$active ? 'rgba(74, 144, 226, 0.15)' : 'transparent'};
   border: none;
   border-bottom: 3px solid ${props => props.$active ? '#4a90e2' : 'transparent'};
@@ -64,6 +66,25 @@ const Tab = styled.button`
   @media (max-width: 768px) {
     font-size: 14px;
     padding: 4px 12px;
+  }
+`;
+
+const SettingsTab = styled.button`
+  flex: 0.22; /* 10% 비율 */
+  background: ${props => props.$active ? 'rgba(74, 144, 226, 0.15)' : 'transparent'};
+  border: none;
+  border-bottom: 3px solid ${props => props.$active ? '#4a90e2' : 'transparent'};
+  color: ${props => props.$active ? '#4a90e2' : '#888'};
+  padding: 6px 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    color: #4a90e2;
+    background: rgba(74, 144, 226, 0.08);
   }
 `;
 
@@ -112,12 +133,14 @@ const TabContent = styled.div`
 
 const MessagingHub = ({ showToast, memos, requirePhoneAuth }) => {
   const [activeTab, setActiveTab] = useState('chat'); // chat, friends
+  const [showSettings, setShowSettings] = useState(false);
 
   return (
     <Container>
       <Header>
         <TabContainer>
           <Tab
+            $flex={0.45}
             $active={activeTab === 'chat'}
             onClick={() => setActiveTab('chat')}
           >
@@ -125,12 +148,19 @@ const MessagingHub = ({ showToast, memos, requirePhoneAuth }) => {
             <TabLabel>채팅</TabLabel>
           </Tab>
           <Tab
+            $flex={0.45}
             $active={activeTab === 'friends'}
             onClick={() => setActiveTab('friends')}
           >
             <TabIcon>👥</TabIcon>
             <TabLabel>친구</TabLabel>
           </Tab>
+          <SettingsTab
+            onClick={() => setShowSettings(true)}
+            title="채팅 설정"
+          >
+            <Settings size={20} />
+          </SettingsTab>
         </TabContainer>
       </Header>
 
@@ -143,6 +173,11 @@ const MessagingHub = ({ showToast, memos, requirePhoneAuth }) => {
           <FriendList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} />
         </TabContent>
       </Content>
+
+      {/* 설정 모달 */}
+      {showSettings && (
+        <ChatSettingsModal onClose={() => setShowSettings(false)} />
+      )}
     </Container>
   );
 };
