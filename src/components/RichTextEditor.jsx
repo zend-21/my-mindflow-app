@@ -843,14 +843,16 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
       },
     },
     onUpdate: ({ editor }) => {
-      // IME 조합 중에는 onChange를 호출하지 않음 (한글 입력 버그 방지)
-      if (editor.view.composing || isComposingRef.current) {
-        pendingChangeRef.current = true;
-        return;
-      }
+      // IME 조합 중에도 onChange를 호출하여 버튼 상태 실시간 업데이트
+      // (한글 입력 시 중복 문자 방지는 compositionend 이벤트에서 처리)
       const html = editor.getHTML();
       onChange?.(html);
-      pendingChangeRef.current = false;
+
+      if (editor.view.composing || isComposingRef.current) {
+        pendingChangeRef.current = true;
+      } else {
+        pendingChangeRef.current = false;
+      }
     },
     onFocus: () => {
       onFocus?.();
