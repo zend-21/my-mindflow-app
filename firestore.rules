@@ -52,20 +52,20 @@ service cloud.firestore {
     // 워크스페이스 (Workspaces)
     // ========================================
     match /workspaces/{workspaceId} {
-      // 생성: 로그인 + 소유자 확인
+      // 생성: 로그인 + 소유자 확인 (userId 필드 사용)
       allow create: if isSignedIn() &&
-        request.resource.data.ownerId == request.auth.uid;
+        request.resource.data.userId == request.auth.uid;
 
       // 읽기: 로그인한 모든 사용자 (워크스페이스 코드로 접근)
       allow read: if isSignedIn();
 
-      // 수정: 워크스페이스 소유자만
+      // 수정: 워크스페이스 소유자만 (userId 필드 사용)
       allow update: if isSignedIn() &&
-        request.auth.uid == resource.data.ownerId;
+        request.auth.uid == resource.data.userId;
 
-      // 삭제: 워크스페이스 소유자만
+      // 삭제: 워크스페이스 소유자만 (userId 필드 사용)
       allow delete: if isSignedIn() &&
-        request.auth.uid == resource.data.ownerId;
+        request.auth.uid == resource.data.userId;
     }
 
     // ========================================
