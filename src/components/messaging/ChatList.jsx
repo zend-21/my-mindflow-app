@@ -318,13 +318,29 @@ const ChatList = ({ showToast, memos, requirePhoneAuth }) => {
     // 1:1 대화방 목록 실시간 구독
     const unsubscribeDM = subscribeToMyDMRooms((rooms) => {
       console.log('📬 1:1 대화방 목록 업데이트:', rooms);
+      console.log('👤 현재 사용자 ID (localStorage):', currentUserId);
 
-      // unreadCount 로그
+      // unreadCount 상세 로그
       rooms.forEach(room => {
-        const unread = room.unreadCount?.[currentUserId] || 0;
+        // 상대방 ID 찾기
+        const otherUserId = room.participants?.find(id => id !== currentUserId);
+
+        console.log('📊 대화방 unreadCount 상세 분석:', {
+          roomId: room.id,
+          currentUserId: currentUserId,
+          otherUserId: otherUserId,
+          unreadCountObject: room.unreadCount,
+          unreadCountKeys: room.unreadCount ? Object.keys(room.unreadCount) : [],
+          myUnreadCount: room.unreadCount?.[currentUserId],
+          otherUnreadCount: room.unreadCount?.[otherUserId],
+          calculatedUnread: room.unreadCount?.[otherUserId] || 0  // 상대방이 읽지 않은 개수!
+        });
+
+        const unread = room.unreadCount?.[otherUserId] || 0;  // 상대방이 읽지 않은 개수
         if (unread > 0) {
-          console.log('🔴 읽지 않은 메시지:', {
+          console.log('🔴 상대방이 읽지 않은 메시지 발견!:', {
             roomId: room.id,
+            otherUserId: otherUserId,
             unreadCount: unread,
             fullUnreadData: room.unreadCount
           });

@@ -222,10 +222,27 @@ const MessageBubble = styled.div`
     : 'none'};
 `;
 
+const MessageMeta = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 2px;
+`;
+
 const MessageTime = styled.div`
   font-size: 11px;
   color: #666;
   padding: 0 4px;
+`;
+
+const UnreadBadge = styled.div`
+  font-size: 11px;
+  color: #4a90e2;
+  font-weight: 700;
+  padding: 0 4px;
+  min-width: 16px;
+  text-align: center;
 `;
 
 // 입력 영역
@@ -769,6 +786,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
               const showDate = shouldShowDateSeparator(message, messages[index - 1]);
               const showAvatar = !isMine && (index === messages.length - 1 || messages[index + 1]?.senderId !== message.senderId);
 
+              // 상대방 ID 찾기
+              const otherUserId = chat.participants?.find(id => id !== currentUserId);
+              // 상대방이 읽지 않은 메시지인지 확인 (내가 보낸 메시지만)
+              const isUnreadByOther = isMine && (chat.unreadCount?.[otherUserId] > 0);
+
               return (
                 <div key={message.id}>
                   {showDate && (
@@ -789,7 +811,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
                         {message.text}
                       </MessageBubble>
                     </MessageContent>
-                    <MessageTime>{formatMessageTime(message.createdAt)}</MessageTime>
+                    <MessageMeta>
+                      {/* 내가 보낸 메시지 중 상대방이 읽지 않은 경우 표시 (시간 위에) */}
+                      {isUnreadByOther && <UnreadBadge>1</UnreadBadge>}
+                      <MessageTime>{formatMessageTime(message.createdAt)}</MessageTime>
+                    </MessageMeta>
                   </MessageItem>
                 </div>
               );
