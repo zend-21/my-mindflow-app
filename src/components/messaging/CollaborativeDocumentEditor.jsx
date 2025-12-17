@@ -776,7 +776,7 @@ const CollaborativeDocumentEditor = ({
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [pendingEdits, setPendingEdits] = useState([]);
-  const [selectedEdit, setSelectedEdit] = useState(null);
+  const [selectedEdits, setSelectedEdits] = useState([]); // 여러 편집 내역 배열
   const [showEditModal, setShowEditModal] = useState(false);
   const [actualCanEdit, setActualCanEdit] = useState(canEdit); // 실시간 권한
   const [actualIsManager, setActualIsManager] = useState(isManager); // 실시간 매니저 여부
@@ -784,10 +784,14 @@ const CollaborativeDocumentEditor = ({
   const [commentText, setCommentText] = useState('');
   const [selectedCommentRange, setSelectedCommentRange] = useState(null);
   const [showFullScreenEdit, setShowFullScreenEdit] = useState(false);
+  const [showEditInputModal, setShowEditInputModal] = useState(false); // 수정 내용 입력 모달
+  const [editInputText, setEditInputText] = useState(''); // 수정할 텍스트
+  const [pendingMarker, setPendingMarker] = useState(null); // 대기 중인 마커 정보
 
   const contentRef = useRef(null);
   const fullScreenContentRef = useRef(null);
   const saveTimeoutRef = useRef(null);
+  const savedRangeRef = useRef(null); // 선택 영역 저장용
 
   // 권한 확인 (1:1은 자동 편집 권한, 그룹은 권한 시스템 적용)
   useEffect(() => {
@@ -1032,37 +1036,257 @@ const CollaborativeDocumentEditor = ({
     const newContent = activeRef.current.innerHTML;
     setContent(newContent);
     debouncedSave(newContent);
-
-    // 양쪽 ref 모두 동기화 (전체 화면 모달과 미리보기 모두 업데이트)
-    if (showFullScreenEdit && contentRef.current) {
-      contentRef.current.innerHTML = newContent;
-    } else if (!showFullScreenEdit && fullScreenContentRef.current) {
-      fullScreenContentRef.current.innerHTML = newContent;
-    }
   }, [actualCanEdit, debouncedSave, lastSelection, chatRoomId, currentUserId, currentUserName, showFullScreenEdit]);
 
-  // 편집 마커 클릭 핸들러 (형광펜, 취소선, 주석 모두 처리)
-  const handleEditMarkerClick = useCallback(async (editId) => {
-    // pendingEdits에서 먼저 찾기
-    let edit = pendingEdits.find(e => e.id === editId);
+  // 키보드 기반 편집 핸들러
+  const handleKeyDown = useCallback((e) => {
+    if (!actualCanEdit) return;
 
-    // 없으면 Firestore에서 직접 가져오기
-    if (!edit) {
-      try {
-        const editRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory', editId);
-        const editSnap = await getDoc(editRef);
-        if (editSnap.exists()) {
-          edit = { id: editSnap.id, ...editSnap.data() };
-        }
-      } catch (error) {
-        console.error('편집 이력 로드 실패:', error);
+    const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
+    const selection = window.getSelection();
+
+    // Backspace: 취소선 적용
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+
+      if (!selection || selection.isCollapsed || !selection.rangeCount) {
+        showToast?.('텍스트를 선택해주세요');
         return;
       }
+
+      const range = selection.getRangeAt(0);
+      const selectedText = range.toString();
+
+      if (!selectedText.trim() || !activeRef.current?.contains(range.commonAncestorContainer)) {
+        showToast?.('유효한 텍스트를 선택해주세요');
+        return;
+      }
+
+      // 선택 영역과 텍스트 저장
+      savedRangeRef.current = range.cloneRange();
+      setPendingMarker({
+        type: 'strikethrough',
+        text: selectedText,
+        range: savedRangeRef.current
+      });
+      setEditInputText(''); // 기본값 비어있음
+      setShowEditInputModal(true);
+      return;
     }
 
-    if (edit) {
-      setSelectedEdit(edit);
+    // Space: 형광펜 적용
+    if (e.key === ' ') {
+      e.preventDefault();
+
+      if (!selection || selection.isCollapsed || !selection.rangeCount) {
+        showToast?.('텍스트를 선택해주세요');
+        return;
+      }
+
+      const range = selection.getRangeAt(0);
+      const selectedText = range.toString();
+
+      if (!selectedText.trim() || !activeRef.current?.contains(range.commonAncestorContainer)) {
+        showToast?.('유효한 텍스트를 선택해주세요');
+        return;
+      }
+
+      // 선택 영역과 텍스트 저장
+      savedRangeRef.current = range.cloneRange();
+      setPendingMarker({
+        type: 'highlight',
+        text: selectedText,
+        range: savedRangeRef.current
+      });
+      setEditInputText(''); // 기본값 비어있음
+      setShowEditInputModal(true);
+      return;
+    }
+
+    // Enter: 주석 추가
+    if (e.key === 'Enter') {
+      e.preventDefault();
+
+      if (!selection || !selection.rangeCount) {
+        showToast?.('커서 위치를 지정해주세요');
+        return;
+      }
+
+      const range = selection.getRangeAt(0);
+
+      if (!activeRef.current?.contains(range.commonAncestorContainer)) {
+        showToast?.('유효한 위치에 커서를 두세요');
+        return;
+      }
+
+      // 커서 위치 저장
+      savedRangeRef.current = range.cloneRange();
+      setPendingMarker({
+        type: 'comment',
+        text: '', // 주석은 텍스트 없음
+        range: savedRangeRef.current
+      });
+      setEditInputText(''); // 주석 내용 입력
+      setShowEditInputModal(true);
+      return;
+    }
+
+    // 기타 모든 텍스트 입력 차단
+    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      return;
+    }
+  }, [actualCanEdit, showFullScreenEdit, showToast]);
+
+  // 편집 입력 모달 확인 핸들러
+  const handleConfirmEditInput = useCallback(async () => {
+    if (!pendingMarker) return;
+
+    const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
+
+    try {
+      const editHistoryRef = collection(
+        db,
+        'chatRooms',
+        chatRoomId,
+        'sharedDocument',
+        'currentDoc',
+        'editHistory'
+      );
+
+      // Firestore에 편집 이력 저장
+      const editData = {
+        editedBy: currentUserId,
+        editedByName: currentUserName,
+        editedAt: serverTimestamp(),
+        type: pendingMarker.type,
+        status: 'pending'
+      };
+
+      if (pendingMarker.type === 'comment') {
+        editData.text = editInputText; // 주석 내용
+      } else {
+        editData.oldText = pendingMarker.text; // 원본 텍스트
+        editData.newText = editInputText; // 수정할 텍스트
+      }
+
+      const editDoc = await addDoc(editHistoryRef, editData);
+
+      // 마커 생성
+      const span = document.createElement('span');
+      span.dataset.editId = editDoc.id;
+      span.dataset.editType = pendingMarker.type;
+
+      if (pendingMarker.type === 'strikethrough') {
+        span.className = 'strikethrough';
+        span.textContent = pendingMarker.text;
+      } else if (pendingMarker.type === 'highlight') {
+        span.className = 'highlight';
+        span.textContent = pendingMarker.text;
+      } else if (pendingMarker.type === 'comment') {
+        span.className = 'comment';
+        span.textContent = '[주석]';
+      }
+
+      // 선택 영역에 마커 삽입
+      const range = savedRangeRef.current;
+      if (range) {
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+
+        if (pendingMarker.type === 'comment') {
+          // 주석은 커서 위치에 삽입
+          range.insertNode(span);
+
+          // 주석 마커 다음으로 커서 이동
+          const newRange = document.createRange();
+          newRange.setStartAfter(span);
+          newRange.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(newRange);
+        } else {
+          // 취소선/형광펜은 선택 영역을 감싸기
+          try {
+            range.surroundContents(span);
+
+            // 마커 다음으로 커서 이동
+            const newRange = document.createRange();
+            newRange.setStartAfter(span);
+            newRange.collapse(true);
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+          } catch (e) {
+            console.warn('마커 적용 실패:', e);
+            showToast?.('마커를 적용할 수 없습니다');
+            return;
+          }
+        }
+      }
+
+      // 콘텐츠 저장 (현재 활성 ref의 내용만 저장)
+      const newContent = activeRef.current.innerHTML;
+      setContent(newContent);
+      debouncedSave(newContent);
+
+      // 모달 닫기
+      setShowEditInputModal(false);
+      setPendingMarker(null);
+      setEditInputText('');
+      savedRangeRef.current = null;
+
+      showToast?.('편집 표시를 추가했습니다');
+    } catch (error) {
+      console.error('편집 저장 실패:', error);
+      showToast?.('편집 저장에 실패했습니다');
+    }
+  }, [pendingMarker, editInputText, chatRoomId, currentUserId, currentUserName, showFullScreenEdit, debouncedSave, showToast]);
+
+  // 편집 마커 클릭 핸들러 - 같은 텍스트에 대한 모든 편집 찾기
+  const handleEditMarkerClick = useCallback(async (clickedEditId) => {
+    try {
+      // 1. 클릭한 편집의 텍스트 찾기
+      let clickedEdit = pendingEdits.find(e => e.id === clickedEditId);
+
+      if (!clickedEdit) {
+        const editRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory', clickedEditId);
+        const editSnap = await getDoc(editRef);
+        if (editSnap.exists()) {
+          clickedEdit = { id: editSnap.id, ...editSnap.data() };
+        }
+      }
+
+      if (!clickedEdit) return;
+
+      // 2. 같은 텍스트(oldText 또는 text)를 가진 모든 편집 찾기
+      const targetText = clickedEdit.oldText || clickedEdit.text || '';
+
+      // Firestore에서 모든 pending 편집 가져오기
+      const editsRef = collection(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory');
+      const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
+
+      const relatedEdits = [];
+      editsSnap.forEach((doc) => {
+        const editData = { id: doc.id, ...doc.data() };
+        const editText = editData.oldText || editData.text || '';
+
+        // 같은 텍스트를 대상으로 한 편집만 포함
+        if (editText === targetText) {
+          relatedEdits.push(editData);
+        }
+      });
+
+      // 3. 시간순 정렬 (최신순)
+      relatedEdits.sort((a, b) => {
+        const timeA = a.editedAt?.toMillis?.() || 0;
+        const timeB = b.editedAt?.toMillis?.() || 0;
+        return timeB - timeA;
+      });
+
+      setSelectedEdits(relatedEdits);
       setShowEditModal(true);
+    } catch (error) {
+      console.error('편집 이력 로드 실패:', error);
     }
   }, [pendingEdits, chatRoomId]);
 
@@ -1497,7 +1721,101 @@ const CollaborativeDocumentEditor = ({
     }
   }, [actualIsManager, title, content, currentUserId, currentUserName, chatRoomId, showToast]);
 
-  // 최종 적용 핸들러 - 모든 마커 처리 (취소선 삭제, 형광펜/주석 제거)
+  // 개별 편집 승인 핸들러 (매니저만)
+  const handleApproveEdit = useCallback(async (editId) => {
+    if (!actualIsManager) {
+      showToast?.('매니저만 승인할 수 있습니다');
+      return;
+    }
+
+    try {
+      // 1. 편집 이력 가져오기
+      const editRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory', editId);
+      const editSnap = await getDoc(editRef);
+
+      if (!editSnap.exists()) {
+        showToast?.('편집 내역을 찾을 수 없습니다');
+        return;
+      }
+
+      const editData = editSnap.data();
+
+      // 2. HTML에서 해당 마커 찾아서 처리
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = content;
+
+      // editId로 마커 찾기
+      const marker = tempDiv.querySelector(`[data-edit-id="${editId}"]`);
+
+      if (marker) {
+        const editType = editData.type;
+
+        if (editType === 'strikethrough') {
+          // 취소선: newText가 있으면 교체, 없으면 삭제
+          if (editData.newText && editData.newText.trim()) {
+            const textNode = document.createTextNode(editData.newText);
+            marker.parentNode.replaceChild(textNode, marker);
+          } else {
+            marker.remove();
+          }
+        } else if (editType === 'highlight') {
+          // 형광펜: newText가 있으면 교체, 없으면 마커만 제거
+          if (editData.newText && editData.newText.trim()) {
+            const textNode = document.createTextNode(editData.newText);
+            marker.parentNode.replaceChild(textNode, marker);
+          } else {
+            const textNode = document.createTextNode(marker.textContent);
+            marker.parentNode.replaceChild(textNode, marker);
+          }
+        } else if (editType === 'comment') {
+          // 주석: 마커만 제거
+          const textNode = document.createTextNode(marker.textContent);
+          marker.parentNode.replaceChild(textNode, marker);
+        }
+
+        // 3. 변경된 HTML 저장
+        const newContent = tempDiv.innerHTML;
+        setContent(newContent);
+
+        if (contentRef.current) {
+          contentRef.current.innerHTML = newContent;
+        }
+        if (fullScreenContentRef.current) {
+          fullScreenContentRef.current.innerHTML = newContent;
+        }
+
+        // 4. Firestore에 저장
+        const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+        await setDoc(docRef, {
+          title,
+          content: newContent,
+          lastEditedBy: currentUserId,
+          lastEditedByName: currentUserName,
+          lastEditedAt: serverTimestamp(),
+          version: (await getDoc(docRef)).data()?.version || 0 + 1
+        }, { merge: true });
+
+        // 5. 편집 이력 삭제
+        await deleteDoc(editRef);
+
+        // 6. UI 업데이트
+        setPendingEdits(prev => prev.filter(e => e.id !== editId));
+        setSelectedEdits(prev => prev.filter(e => e.id !== editId));
+
+        // 모든 편집이 승인되었으면 모달 닫기
+        if (selectedEdits.length <= 1) {
+          setShowEditModal(false);
+        }
+
+        showToast?.('편집이 승인되었습니다');
+      }
+    } catch (error) {
+      console.error('편집 승인 실패:', error);
+      showToast?.('편집 승인에 실패했습니다');
+    }
+  }, [actualIsManager, content, chatRoomId, title, currentUserId, currentUserName, selectedEdits, showToast]);
+
+  // 최종 적용 핸들러 - 모든 마커 처리 (편집 이력 기반)
   const handleFinalApply = useCallback(async () => {
     if (!actualIsManager) {
       showToast?.('매니저만 최종 적용할 수 있습니다');
@@ -1507,24 +1825,53 @@ const CollaborativeDocumentEditor = ({
     setSaving(true);
 
     try {
-      // HTML 파싱
+      // 1. 모든 pending 편집 이력 가져오기
+      const editsRef = collection(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory');
+      const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
+
+      const editHistoryMap = new Map();
+      editsSnap.forEach((doc) => {
+        editHistoryMap.set(doc.id, doc.data());
+      });
+
+      // 2. HTML 파싱
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = content;
 
-      // 1. 취소선 처리 - 해당 텍스트 삭제
+      // 3. 취소선 처리 - 수정내용이 있으면 교체, 없으면 삭제
       const strikethroughs = tempDiv.querySelectorAll('.strikethrough');
       strikethroughs.forEach(el => {
-        el.remove(); // 취소선 텍스트 완전 삭제
+        const editId = el.dataset.editId;
+        const editData = editHistoryMap.get(editId);
+
+        if (editData && editData.newText && editData.newText.trim()) {
+          // 수정내용이 있으면 교체
+          const textNode = document.createTextNode(editData.newText);
+          el.parentNode.replaceChild(textNode, el);
+        } else {
+          // 수정내용이 없으면 삭제
+          el.remove();
+        }
       });
 
-      // 2. 형광펜 처리 - 마커만 제거하고 텍스트 유지
+      // 4. 형광펜 처리 - 수정내용이 있으면 교체, 없으면 마커만 제거
       const highlights = tempDiv.querySelectorAll('.highlight');
       highlights.forEach(el => {
-        const textNode = document.createTextNode(el.textContent);
-        el.parentNode.replaceChild(textNode, el);
+        const editId = el.dataset.editId;
+        const editData = editHistoryMap.get(editId);
+
+        if (editData && editData.newText && editData.newText.trim()) {
+          // 수정내용이 있으면 교체
+          const textNode = document.createTextNode(editData.newText);
+          el.parentNode.replaceChild(textNode, el);
+        } else {
+          // 수정내용이 없으면 마커만 제거하고 원본 유지
+          const textNode = document.createTextNode(el.textContent);
+          el.parentNode.replaceChild(textNode, el);
+        }
       });
 
-      // 3. 주석 처리 - 마커만 제거하고 텍스트 유지
+      // 5. 주석 처리 - 마커만 제거하고 텍스트 유지
       const comments = tempDiv.querySelectorAll('.comment');
       comments.forEach(el => {
         const textNode = document.createTextNode(el.textContent);
@@ -1547,8 +1894,6 @@ const CollaborativeDocumentEditor = ({
       }, { merge: true });
 
       // 모든 pending 편집 이력 삭제
-      const editsRef = collection(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory');
-      const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
       const deletePromises = [];
       editsSnap.forEach((doc) => {
         deletePromises.push(deleteDoc(doc.ref));
@@ -1705,11 +2050,12 @@ const CollaborativeDocumentEditor = ({
           )}
         </Toolbar>
 
-        {/* contentEditable 영역 - 미리보기는 읽기 전용 */}
+        {/* contentEditable 영역 - 편집 권한 있으면 편집 가능 */}
         <ContentEditableArea
           ref={contentRef}
-          contentEditable={false}
+          contentEditable={actualCanEdit}
           suppressContentEditableWarning
+          onKeyDown={handleKeyDown}
           onClick={(e) => {
             const editId = e.target.dataset.editId;
             if (editId) {
@@ -1727,59 +2073,85 @@ const CollaborativeDocumentEditor = ({
         </Footer>
       </EditorContent>
 
-      {/* 수정 이력 모달 */}
-      {showEditModal && selectedEdit && (
+      {/* 수정 이력 모달 - 여러 편집 표시 */}
+      {showEditModal && selectedEdits.length > 0 && (
         <Modal onClick={() => setShowEditModal(false)}>
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
-              <ModalTitle>수정 내용 확인</ModalTitle>
+              <ModalTitle>
+                수정 내용 확인
+                {selectedEdits.length > 1 && (
+                  <span style={{ marginLeft: '8px', fontSize: '14px', color: '#ffc107' }}>
+                    ({selectedEdits.length}명의 편집)
+                  </span>
+                )}
+              </ModalTitle>
               <IconButton onClick={() => setShowEditModal(false)}>
                 <X size={20} />
               </IconButton>
             </ModalHeader>
 
             <ModalBody>
-              <EditInfo>
-                <InfoRow>
-                  <strong>수정자:</strong> {selectedEdit.editedByName}
-                </InfoRow>
-                <InfoRow>
-                  <strong>수정 시각:</strong> {selectedEdit.editedAt?.toDate?.().toLocaleString('ko-KR')}
-                </InfoRow>
-                {selectedEdit.type && (
-                  <InfoRow>
-                    <strong>타입:</strong> {
-                      selectedEdit.type === 'strikethrough' ? '취소선' :
-                      selectedEdit.type === 'highlight' ? '형광펜' :
-                      selectedEdit.type === 'comment' ? '주석' : '일반 수정'
-                    }
-                  </InfoRow>
-                )}
-                {selectedEdit.comment && (
-                  <InfoRow>
-                    <strong>주석:</strong> {selectedEdit.comment}
-                  </InfoRow>
-                )}
-              </EditInfo>
+              {selectedEdits.map((edit, index) => (
+                <div key={edit.id} style={{ marginBottom: index < selectedEdits.length - 1 ? '20px' : '0' }}>
+                  <EditInfo>
+                    <InfoRow>
+                      <strong>수정자:</strong> {edit.editedByName}
+                    </InfoRow>
+                    <InfoRow>
+                      <strong>수정 시각:</strong> {edit.editedAt?.toDate?.().toLocaleString('ko-KR')}
+                    </InfoRow>
+                    {edit.type && (
+                      <InfoRow>
+                        <strong>타입:</strong> {
+                          edit.type === 'strikethrough' ? '취소선' :
+                          edit.type === 'highlight' ? '형광펜' :
+                          edit.type === 'comment' ? '주석' : '일반 수정'
+                        }
+                      </InfoRow>
+                    )}
+                    {edit.comment && (
+                      <InfoRow>
+                        <strong>주석:</strong> {edit.comment}
+                      </InfoRow>
+                    )}
+                  </EditInfo>
 
-              <TextComparison>
-                <ComparisonBox $type="old">
-                  <ComparisonLabel $type="old">수정 전</ComparisonLabel>
-                  <ComparisonText>{selectedEdit.oldText || selectedEdit.text || '(없음)'}</ComparisonText>
-                </ComparisonBox>
+                  <TextComparison>
+                    <ComparisonBox $type="old">
+                      <ComparisonLabel $type="old">수정 전</ComparisonLabel>
+                      <ComparisonText>{edit.oldText || edit.text || '(없음)'}</ComparisonText>
+                    </ComparisonBox>
 
-                <ComparisonBox $type="new">
-                  <ComparisonLabel $type="new">수정 후</ComparisonLabel>
-                  <ComparisonText>{selectedEdit.newText || selectedEdit.text}</ComparisonText>
-                </ComparisonBox>
-              </TextComparison>
+                    <ComparisonBox $type="new">
+                      <ComparisonLabel $type="new">수정 후</ComparisonLabel>
+                      <ComparisonText>{edit.newText || edit.text}</ComparisonText>
+                    </ComparisonBox>
+                  </TextComparison>
 
-              <div style={{ padding: '12px', background: 'rgba(74, 144, 226, 0.1)', borderRadius: '8px', marginTop: '12px' }}>
-                <span style={{ color: '#4a90e2', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Info size={16} />
-                  수정 내용은 팀원들과 검토 후 일괄 적용됩니다
-                </span>
-              </div>
+                  {actualIsManager && (
+                    <div style={{ marginTop: '12px' }}>
+                      <ConfirmButton onClick={() => handleApproveEdit(edit.id)}>
+                        <Check size={18} />
+                        이 편집 승인
+                      </ConfirmButton>
+                    </div>
+                  )}
+
+                  {index < selectedEdits.length - 1 && (
+                    <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.1)', margin: '16px 0' }} />
+                  )}
+                </div>
+              ))}
+
+              {!actualIsManager && (
+                <div style={{ padding: '12px', background: 'rgba(74, 144, 226, 0.1)', borderRadius: '8px', marginTop: '12px' }}>
+                  <span style={{ color: '#4a90e2', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Info size={16} />
+                    수정 내용은 매니저가 검토 후 승인합니다
+                  </span>
+                </div>
+              )}
             </ModalBody>
           </ModalContent>
         </Modal>
@@ -1850,6 +2222,86 @@ const CollaborativeDocumentEditor = ({
         </Modal>
       )}
 
+      {/* 편집 내용 입력 모달 (키보드 기반 편집용) */}
+      {showEditInputModal && pendingMarker && (
+        <Modal onClick={() => {
+          setShowEditInputModal(false);
+          setPendingMarker(null);
+          setEditInputText('');
+        }}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <ModalTitle>
+                {pendingMarker.type === 'strikethrough' && '취소선 - 수정 내용 입력'}
+                {pendingMarker.type === 'highlight' && '형광펜 - 수정 내용 입력'}
+                {pendingMarker.type === 'comment' && '주석 입력'}
+              </ModalTitle>
+              <IconButton onClick={() => {
+                setShowEditInputModal(false);
+                setPendingMarker(null);
+                setEditInputText('');
+              }}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+
+            <ModalBody>
+              {pendingMarker.text && (
+                <EditInfo>
+                  <InfoRow>
+                    <strong>원본 텍스트:</strong> {pendingMarker.text}
+                  </InfoRow>
+                </EditInfo>
+              )}
+
+              <div style={{ marginTop: '16px' }}>
+                <label style={{ display: 'block', marginBottom: '8px', color: '#e0e0e0', fontSize: '14px', fontWeight: '600' }}>
+                  {pendingMarker.type === 'comment' ? '주석 내용' : '수정할 내용 (비어있으면 삭제)'}
+                </label>
+                <textarea
+                  value={editInputText}
+                  onChange={(e) => setEditInputText(e.target.value)}
+                  placeholder={
+                    pendingMarker.type === 'comment'
+                      ? '주석 내용을 입력하세요...'
+                      : '수정할 내용을 입력하세요 (비워두면 삭제)'
+                  }
+                  style={{
+                    width: '100%',
+                    minHeight: '100px',
+                    background: 'rgba(0, 0, 0, 0.3)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    color: '#e0e0e0',
+                    fontSize: '14px',
+                    lineHeight: '1.6',
+                    resize: 'vertical',
+                    fontFamily: 'inherit'
+                  }}
+                  autoFocus
+                />
+              </div>
+
+              <ModalActions>
+                <ConfirmButton onClick={handleConfirmEditInput}>
+                  <Check size={18} />
+                  확인
+                </ConfirmButton>
+                <RejectButton onClick={() => {
+                  setShowEditInputModal(false);
+                  setPendingMarker(null);
+                  setEditInputText('');
+                }}>
+                  <X size={18} />
+                  취소
+                </RejectButton>
+              </ModalActions>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
       {/* 전체 화면 편집 모달 */}
       {showFullScreenEdit && (
         <FullScreenModal onClick={() => setShowFullScreenEdit(false)}>
@@ -1909,6 +2361,7 @@ const CollaborativeDocumentEditor = ({
                 contentEditable={actualCanEdit}
                 suppressContentEditableWarning
                 onInput={handleContentChange}
+                onKeyDown={handleKeyDown}
                 onClick={(e) => {
                   const editId = e.target.dataset.editId;
                   if (editId) {
