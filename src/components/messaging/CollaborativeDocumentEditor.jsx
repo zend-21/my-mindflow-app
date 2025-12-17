@@ -793,6 +793,12 @@ const CollaborativeDocumentEditor = ({
   const saveTimeoutRef = useRef(null);
   const savedRangeRef = useRef(null); // 선택 영역 저장용
 
+  // 키보드 선택 모드 상태
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectionType, setSelectionType] = useState(null); // 'strikethrough' | 'highlight'
+  const selectionStartRef = useRef(null); // 선택 시작 위치
+  const currentSelectionRef = useRef(null); // 현재 선택 범위
+
   // 권한 확인 (1:1은 자동 편집 권한, 그룹은 권한 시스템 적용)
   useEffect(() => {
     if (!chatRoomId || !currentUserId) return;
@@ -1038,105 +1044,227 @@ const CollaborativeDocumentEditor = ({
     debouncedSave(newContent);
   }, [actualCanEdit, debouncedSave, lastSelection, chatRoomId, currentUserId, currentUserName, showFullScreenEdit]);
 
+  // 선택 확정 (마커 생성)
+  const finalizeSelection = useCallback(async () => {
+    if (!isSelecting || !currentSelectionRef.current || !selectionType) return;
+
+    const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
+    const range = currentSelectionRef.current;
+    const selectedText = range.toString();
+
+    if (!selectedText.trim()) {
+      // 선택된 텍스트가 없으면 취소
+      setIsSelecting(false);
+      setSelectionType(null);
+      selectionStartRef.current = null;
+      currentSelectionRef.current = null;
+      return;
+    }
+
+    try {
+      const editHistoryRef = collection(
+        db,
+        'chatRooms',
+        chatRoomId,
+        'sharedDocument',
+        'currentDoc',
+        'editHistory'
+      );
+
+      // Firestore에 편집 이력 저장
+      const editData = {
+        editedBy: currentUserId,
+        editedByName: currentUserName,
+        editedAt: serverTimestamp(),
+        type: selectionType,
+        oldText: selectedText,
+        newText: '', // 일단 빈 값
+        status: 'pending'
+      };
+
+      const editDoc = await addDoc(editHistoryRef, editData);
+
+      // 마커 생성
+      const span = document.createElement('span');
+      span.dataset.editId = editDoc.id;
+      span.dataset.editType = selectionType;
+      span.className = selectionType;
+      span.textContent = selectedText;
+
+      // 선택 영역에 마커 삽입
+      try {
+        range.surroundContents(span);
+      } catch (e) {
+        console.warn('마커 적용 실패:', e);
+      }
+
+      // 콘텐츠 저장
+      const newContent = activeRef.current.innerHTML;
+      setContent(newContent);
+      debouncedSave(newContent);
+
+      // 선택 모드 종료
+      setIsSelecting(false);
+      setSelectionType(null);
+      selectionStartRef.current = null;
+      currentSelectionRef.current = null;
+
+      // 선택 해제
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+
+    } catch (error) {
+      console.error('편집 저장 실패:', error);
+      showToast?.('편집 저장에 실패했습니다');
+    }
+  }, [isSelecting, selectionType, chatRoomId, currentUserId, currentUserName, showFullScreenEdit, debouncedSave, showToast]);
+
   // 키보드 기반 편집 핸들러
   const handleKeyDown = useCallback((e) => {
-    if (!actualCanEdit) return;
+    if (!actualCanEdit) {
+      if (!e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+      }
+      return;
+    }
 
     const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
     const selection = window.getSelection();
 
-    // Backspace: 취소선 적용
+    // Backspace: 왼쪽으로 선택 확장 (취소선)
     if (e.key === 'Backspace') {
       e.preventDefault();
+      e.stopPropagation();
 
-      if (!selection || selection.isCollapsed || !selection.rangeCount) {
-        showToast?.('텍스트를 선택해주세요');
+      // 이미 선택 중이고 다른 타입이면 먼저 확정
+      if (isSelecting && selectionType !== 'strikethrough') {
+        finalizeSelection();
         return;
       }
 
-      const range = selection.getRangeAt(0);
-      const selectedText = range.toString();
+      // 선택 모드 시작
+      if (!isSelecting) {
+        setIsSelecting(true);
+        setSelectionType('strikethrough');
 
-      if (!selectedText.trim() || !activeRef.current?.contains(range.commonAncestorContainer)) {
-        showToast?.('유효한 텍스트를 선택해주세요');
-        return;
+        // 현재 커서 위치 저장
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          selectionStartRef.current = range.cloneRange();
+        }
       }
 
-      // 선택 영역과 텍스트 저장
-      savedRangeRef.current = range.cloneRange();
-      setPendingMarker({
-        type: 'strikethrough',
-        text: selectedText,
-        range: savedRangeRef.current
-      });
-      setEditInputText(''); // 기본값 비어있음
-      setShowEditInputModal(true);
+      // 왼쪽으로 한 글자 확장
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+
+        // 왼쪽으로 확장
+        selection.modify('extend', 'backward', 'character');
+
+        // 현재 선택 범위 저장
+        if (selection.rangeCount > 0) {
+          currentSelectionRef.current = selection.getRangeAt(0).cloneRange();
+        }
+      }
+
       return;
     }
 
-    // Space: 형광펜 적용
+    // Space: 오른쪽으로 선택 확장 (형광펜)
     if (e.key === ' ') {
       e.preventDefault();
+      e.stopPropagation();
 
-      if (!selection || selection.isCollapsed || !selection.rangeCount) {
-        showToast?.('텍스트를 선택해주세요');
+      // 이미 선택 중이고 다른 타입이면 먼저 확정
+      if (isSelecting && selectionType !== 'highlight') {
+        finalizeSelection();
         return;
       }
 
-      const range = selection.getRangeAt(0);
-      const selectedText = range.toString();
+      // 선택 모드 시작
+      if (!isSelecting) {
+        setIsSelecting(true);
+        setSelectionType('highlight');
 
-      if (!selectedText.trim() || !activeRef.current?.contains(range.commonAncestorContainer)) {
-        showToast?.('유효한 텍스트를 선택해주세요');
-        return;
+        // 현재 커서 위치 저장
+        if (selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0);
+          selectionStartRef.current = range.cloneRange();
+        }
       }
 
-      // 선택 영역과 텍스트 저장
-      savedRangeRef.current = range.cloneRange();
-      setPendingMarker({
-        type: 'highlight',
-        text: selectedText,
-        range: savedRangeRef.current
-      });
-      setEditInputText(''); // 기본값 비어있음
-      setShowEditInputModal(true);
+      // 오른쪽으로 한 글자 확장
+      if (selection.rangeCount > 0) {
+        // 오른쪽으로 확장
+        selection.modify('extend', 'forward', 'character');
+
+        // 현재 선택 범위 저장
+        if (selection.rangeCount > 0) {
+          currentSelectionRef.current = selection.getRangeAt(0).cloneRange();
+        }
+      }
+
       return;
     }
 
-    // Enter: 주석 추가
+    // Enter: 주석 추가 또는 선택 확정
     if (e.key === 'Enter') {
       e.preventDefault();
+      e.stopPropagation();
 
-      if (!selection || !selection.rangeCount) {
-        showToast?.('커서 위치를 지정해주세요');
-        return;
+      if (isSelecting) {
+        // 선택 중이면 확정
+        finalizeSelection();
+      } else {
+        // 주석 추가
+        if (!selection || !selection.rangeCount) {
+          showToast?.('커서 위치를 지정해주세요');
+          return;
+        }
+
+        const range = selection.getRangeAt(0);
+
+        if (!activeRef.current?.contains(range.commonAncestorContainer)) {
+          showToast?.('유효한 위치에 커서를 두세요');
+          return;
+        }
+
+        // 커서 위치 저장
+        savedRangeRef.current = range.cloneRange();
+        setPendingMarker({
+          type: 'comment',
+          text: '',
+          range: savedRangeRef.current
+        });
+        setEditInputText('');
+        setShowEditInputModal(true);
       }
 
-      const range = selection.getRangeAt(0);
-
-      if (!activeRef.current?.contains(range.commonAncestorContainer)) {
-        showToast?.('유효한 위치에 커서를 두세요');
-        return;
-      }
-
-      // 커서 위치 저장
-      savedRangeRef.current = range.cloneRange();
-      setPendingMarker({
-        type: 'comment',
-        text: '', // 주석은 텍스트 없음
-        range: savedRangeRef.current
-      });
-      setEditInputText(''); // 주석 내용 입력
-      setShowEditInputModal(true);
       return;
     }
 
-    // 기타 모든 텍스트 입력 차단
-    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    // 기타 모든 키: 선택 확정
+    if (isSelecting) {
       e.preventDefault();
+      e.stopPropagation();
+      finalizeSelection();
       return;
     }
-  }, [actualCanEdit, showFullScreenEdit, showToast]);
+
+    // Ctrl/Cmd 조합 허용
+    if (e.ctrlKey || e.metaKey) {
+      if (e.key === 'v' || e.key === 'V') {
+        e.preventDefault();
+        showToast?.('붙여넣기는 지원되지 않습니다');
+        return;
+      }
+      return;
+    }
+
+    // 기타 모든 키 입력 차단
+    e.preventDefault();
+    e.stopPropagation();
+  }, [actualCanEdit, showFullScreenEdit, showToast, isSelecting, selectionType, finalizeSelection]);
 
   // 편집 입력 모달 확인 핸들러
   const handleConfirmEditInput = useCallback(async () => {
@@ -1145,6 +1273,27 @@ const CollaborativeDocumentEditor = ({
     const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
 
     try {
+      // 기존 마커 수정 (id가 있으면)
+      if (pendingMarker.id) {
+        const editRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory', pendingMarker.id);
+
+        // newText만 업데이트
+        await setDoc(editRef, {
+          newText: editInputText,
+          lastModifiedAt: serverTimestamp()
+        }, { merge: true });
+
+        showToast?.('수정 내용이 업데이트되었습니다');
+
+        // 모달 닫기
+        setShowEditInputModal(false);
+        setPendingMarker(null);
+        setEditInputText('');
+
+        return;
+      }
+
+      // 새 마커 생성 (주석용)
       const editHistoryRef = collection(
         db,
         'chatRooms',
@@ -1242,53 +1391,39 @@ const CollaborativeDocumentEditor = ({
     }
   }, [pendingMarker, editInputText, chatRoomId, currentUserId, currentUserName, showFullScreenEdit, debouncedSave, showToast]);
 
-  // 편집 마커 클릭 핸들러 - 같은 텍스트에 대한 모든 편집 찾기
-  const handleEditMarkerClick = useCallback(async (clickedEditId) => {
+  // 편집 마커 클릭 핸들러 - 수정 모달 열기
+  const handleEditMarkerClick = useCallback(async (clickedEditId, markerElement) => {
     try {
-      // 1. 클릭한 편집의 텍스트 찾기
-      let clickedEdit = pendingEdits.find(e => e.id === clickedEditId);
+      // 편집 이력 가져오기
+      const editRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory', clickedEditId);
+      const editSnap = await getDoc(editRef);
 
-      if (!clickedEdit) {
-        const editRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory', clickedEditId);
-        const editSnap = await getDoc(editRef);
-        if (editSnap.exists()) {
-          clickedEdit = { id: editSnap.id, ...editSnap.data() };
-        }
+      if (!editSnap.exists()) {
+        showToast?.('편집 내역을 찾을 수 없습니다');
+        return;
       }
 
-      if (!clickedEdit) return;
+      const editData = editSnap.data();
+      const editType = editData.type;
 
-      // 2. 같은 텍스트(oldText 또는 text)를 가진 모든 편집 찾기
-      const targetText = clickedEdit.oldText || clickedEdit.text || '';
+      // 마커 텍스트 가져오기
+      const markerText = markerElement?.textContent || editData.oldText || '';
 
-      // Firestore에서 모든 pending 편집 가져오기
-      const editsRef = collection(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory');
-      const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
-
-      const relatedEdits = [];
-      editsSnap.forEach((doc) => {
-        const editData = { id: doc.id, ...doc.data() };
-        const editText = editData.oldText || editData.text || '';
-
-        // 같은 텍스트를 대상으로 한 편집만 포함
-        if (editText === targetText) {
-          relatedEdits.push(editData);
-        }
+      // 수정 모달 열기
+      setPendingMarker({
+        id: clickedEditId,
+        type: editType,
+        text: markerText,
+        editData: editData
       });
+      setEditInputText(editData.newText || '');
+      setShowEditInputModal(true);
 
-      // 3. 시간순 정렬 (최신순)
-      relatedEdits.sort((a, b) => {
-        const timeA = a.editedAt?.toMillis?.() || 0;
-        const timeB = b.editedAt?.toMillis?.() || 0;
-        return timeB - timeA;
-      });
-
-      setSelectedEdits(relatedEdits);
-      setShowEditModal(true);
     } catch (error) {
       console.error('편집 이력 로드 실패:', error);
+      showToast?.('편집 이력을 불러올 수 없습니다');
     }
-  }, [pendingEdits, chatRoomId]);
+  }, [chatRoomId, showToast]);
 
   // 취소선 적용 핸들러 (편집 권한자만)
   const handleApplyStrikethrough = useCallback(async () => {
@@ -2056,10 +2191,14 @@ const CollaborativeDocumentEditor = ({
           contentEditable={actualCanEdit}
           suppressContentEditableWarning
           onKeyDown={handleKeyDown}
+          onBeforeInput={(e) => {
+            // 모든 기본 입력 차단 (키보드 핸들러에서만 처리)
+            e.preventDefault();
+          }}
           onClick={(e) => {
             const editId = e.target.dataset.editId;
             if (editId) {
-              handleEditMarkerClick(editId);
+              handleEditMarkerClick(editId, e.target);
             }
           }}
           dangerouslySetInnerHTML={{ __html: content }}
@@ -2360,12 +2499,15 @@ const CollaborativeDocumentEditor = ({
                 ref={fullScreenContentRef}
                 contentEditable={actualCanEdit}
                 suppressContentEditableWarning
-                onInput={handleContentChange}
                 onKeyDown={handleKeyDown}
+                onBeforeInput={(e) => {
+                  // 모든 기본 입력 차단 (키보드 핸들러에서만 처리)
+                  e.preventDefault();
+                }}
                 onClick={(e) => {
                   const editId = e.target.dataset.editId;
                   if (editId) {
-                    handleEditMarkerClick(editId);
+                    handleEditMarkerClick(editId, e.target);
                   }
                 }}
                 dangerouslySetInnerHTML={{ __html: content }}
