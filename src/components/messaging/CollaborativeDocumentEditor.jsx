@@ -798,6 +798,28 @@ const CollaborativeDocumentEditor = ({
   const [selectionType, setSelectionType] = useState(null); // 'strikethrough' | 'highlight'
   const selectionStartRef = useRef(null); // 선택 시작 위치
   const currentSelectionRef = useRef(null); // 현재 선택 범위
+  const tempMarkerRef = useRef(null); // 임시 마커 (시각 효과용)
+
+  // 임시 마커 CSS 스타일 적용
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .temp-strikethrough {
+        text-decoration: line-through;
+        text-decoration-color: #ff5757;
+        text-decoration-thickness: 2px;
+        background: rgba(255, 87, 87, 0.1);
+      }
+      .temp-highlight {
+        background: rgba(255, 193, 7, 0.3);
+        border-bottom: 2px solid #ffc107;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   // 권한 확인 (1:1은 자동 편집 권한, 그룹은 권한 시스템 적용)
   useEffect(() => {
@@ -1049,11 +1071,29 @@ const CollaborativeDocumentEditor = ({
     if (!isSelecting || !currentSelectionRef.current || !selectionType) return;
 
     const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
-    const range = currentSelectionRef.current;
-    const selectedText = range.toString();
+
+    // 임시 마커가 있으면 그것의 텍스트를 사용
+    let selectedText = '';
+    let targetElement = null;
+
+    if (tempMarkerRef.current) {
+      selectedText = tempMarkerRef.current.textContent;
+      targetElement = tempMarkerRef.current;
+    } else {
+      selectedText = currentSelectionRef.current.toString();
+    }
 
     if (!selectedText.trim()) {
       // 선택된 텍스트가 없으면 취소
+      if (tempMarkerRef.current) {
+        const parent = tempMarkerRef.current.parentNode;
+        while (tempMarkerRef.current.firstChild) {
+          parent.insertBefore(tempMarkerRef.current.firstChild, tempMarkerRef.current);
+        }
+        parent.removeChild(tempMarkerRef.current);
+        tempMarkerRef.current = null;
+      }
+
       setIsSelecting(false);
       setSelectionType(null);
       selectionStartRef.current = null;
@@ -1084,18 +1124,26 @@ const CollaborativeDocumentEditor = ({
 
       const editDoc = await addDoc(editHistoryRef, editData);
 
-      // 마커 생성
-      const span = document.createElement('span');
-      span.dataset.editId = editDoc.id;
-      span.dataset.editType = selectionType;
-      span.className = selectionType;
-      span.textContent = selectedText;
+      // 임시 마커를 영구 마커로 교체
+      if (targetElement) {
+        // 임시 마커가 있으면 속성만 변경
+        targetElement.dataset.editId = editDoc.id;
+        targetElement.dataset.editType = selectionType;
+        targetElement.className = selectionType;
+        delete targetElement.dataset.tempMarker;
+      } else {
+        // 임시 마커가 없으면 새로 생성
+        const span = document.createElement('span');
+        span.dataset.editId = editDoc.id;
+        span.dataset.editType = selectionType;
+        span.className = selectionType;
+        span.textContent = selectedText;
 
-      // 선택 영역에 마커 삽입
-      try {
-        range.surroundContents(span);
-      } catch (e) {
-        console.warn('마커 적용 실패:', e);
+        try {
+          currentSelectionRef.current.surroundContents(span);
+        } catch (e) {
+          console.warn('마커 적용 실패:', e);
+        }
       }
 
       // 콘텐츠 저장
@@ -1108,6 +1156,7 @@ const CollaborativeDocumentEditor = ({
       setSelectionType(null);
       selectionStartRef.current = null;
       currentSelectionRef.current = null;
+      tempMarkerRef.current = null;
 
       // 선택 해제
       const selection = window.getSelection();
@@ -1156,14 +1205,49 @@ const CollaborativeDocumentEditor = ({
 
       // 왼쪽으로 한 글자 확장
       if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
+        // 기존 임시 마커 제거
+        if (tempMarkerRef.current) {
+          const parent = tempMarkerRef.current.parentNode;
+          while (tempMarkerRef.current.firstChild) {
+            parent.insertBefore(tempMarkerRef.current.firstChild, tempMarkerRef.current);
+          }
+          parent.removeChild(tempMarkerRef.current);
+          tempMarkerRef.current = null;
+        }
 
         // 왼쪽으로 확장
         selection.modify('extend', 'backward', 'character');
 
-        // 현재 선택 범위 저장
+        // 현재 선택 범위 저장 및 시각 효과 적용
         if (selection.rangeCount > 0) {
-          currentSelectionRef.current = selection.getRangeAt(0).cloneRange();
+          const range = selection.getRangeAt(0);
+          currentSelectionRef.current = range.cloneRange();
+
+          // 선택된 텍스트가 있으면 임시 마커 적용
+          const selectedText = range.toString();
+          if (selectedText) {
+            try {
+              // 임시 스팬 생성
+              const span = document.createElement('span');
+              span.className = 'temp-strikethrough';
+              span.dataset.tempMarker = 'true';
+
+              // 선택 영역을 span으로 감싸기
+              const newRange = range.cloneRange();
+              newRange.surroundContents(span);
+
+              tempMarkerRef.current = span;
+
+              // 선택 영역을 span 끝으로 이동
+              selection.removeAllRanges();
+              const restoreRange = document.createRange();
+              restoreRange.selectNodeContents(span);
+              restoreRange.collapse(false);
+              selection.addRange(restoreRange);
+            } catch (err) {
+              console.warn('임시 마커 적용 실패:', err);
+            }
+          }
         }
       }
 
@@ -1195,12 +1279,49 @@ const CollaborativeDocumentEditor = ({
 
       // 오른쪽으로 한 글자 확장
       if (selection.rangeCount > 0) {
+        // 기존 임시 마커 제거
+        if (tempMarkerRef.current) {
+          const parent = tempMarkerRef.current.parentNode;
+          while (tempMarkerRef.current.firstChild) {
+            parent.insertBefore(tempMarkerRef.current.firstChild, tempMarkerRef.current);
+          }
+          parent.removeChild(tempMarkerRef.current);
+          tempMarkerRef.current = null;
+        }
+
         // 오른쪽으로 확장
         selection.modify('extend', 'forward', 'character');
 
-        // 현재 선택 범위 저장
+        // 현재 선택 범위 저장 및 시각 효과 적용
         if (selection.rangeCount > 0) {
-          currentSelectionRef.current = selection.getRangeAt(0).cloneRange();
+          const range = selection.getRangeAt(0);
+          currentSelectionRef.current = range.cloneRange();
+
+          // 선택된 텍스트가 있으면 임시 마커 적용
+          const selectedText = range.toString();
+          if (selectedText) {
+            try {
+              // 임시 스팬 생성
+              const span = document.createElement('span');
+              span.className = 'temp-highlight';
+              span.dataset.tempMarker = 'true';
+
+              // 선택 영역을 span으로 감싸기
+              const newRange = range.cloneRange();
+              newRange.surroundContents(span);
+
+              tempMarkerRef.current = span;
+
+              // 선택 영역을 span 끝으로 이동
+              selection.removeAllRanges();
+              const restoreRange = document.createRange();
+              restoreRange.selectNodeContents(span);
+              restoreRange.collapse(false);
+              selection.addRange(restoreRange);
+            } catch (err) {
+              console.warn('임시 마커 적용 실패:', err);
+            }
+          }
         }
       }
 

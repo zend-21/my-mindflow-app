@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Plus, Settings, X } from 'lucide-react';
 import { subscribeToMessages, sendMessage, markDMAsRead } from '../../services/directMessageService';
+import { subscribeToGroupMessages, sendGroupMessage, markAllMessagesAsRead } from '../../services/groupChatService';
 import { playChatMessageSound, notificationSettings } from '../../utils/notificationSounds';
 import CollapsibleDocumentEditor from './CollapsibleDocumentEditor';
 import CollaborativeDocumentEditor from './CollaborativeDocumentEditor';
@@ -709,7 +710,10 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
     const timeoutId = setTimeout(() => {
       if (!isMounted) return;
 
-      unsubscribe = subscribeToMessages(chat.id, (newMessages) => {
+      // 채팅 타입에 따라 다른 구독 함수 사용
+      const subscribeFunc = chat.type === 'group' ? subscribeToGroupMessages : subscribeToMessages;
+
+      unsubscribe = subscribeFunc(chat.id, (newMessages) => {
         if (!isMounted) return;
 
         // 새 메시지가 추가되었고, 내가 보낸 메시지가 아니면 효과음 재생
@@ -732,8 +736,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
         }, 100);
       });
 
-      // 읽음 표시
-      markDMAsRead(chat.id);
+      // 읽음 표시 (채팅 타입에 따라 다른 함수 호출)
+      if (chat.type === 'group') {
+        markAllMessagesAsRead(chat.id, currentUserId);
+      } else {
+        markDMAsRead(chat.id);
+      }
     }, 50);
 
     return () => {
@@ -789,8 +797,13 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
     setSending(true);
 
     try {
-      // quota 최적화: roomData 전달하여 getDoc() 생략
-      await sendMessage(chat.id, textToSend, chat);
+      // 채팅 타입에 따라 다른 전송 함수 사용
+      if (chat.type === 'group') {
+        await sendGroupMessage(chat.id, currentUserId, textToSend);
+      } else {
+        // quota 최적화: roomData 전달하여 getDoc() 생략
+        await sendMessage(chat.id, textToSend, chat);
+      }
 
       // 스크롤을 맨 아래로
       setTimeout(() => {
@@ -1003,8 +1016,31 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
 
               // 상대방 ID 찾기
               const otherUserId = chat.participants?.find(id => id !== currentUserId);
-              // 상대방이 읽지 않은 메시지인지 확인 (내가 보낸 메시지만)
-              const isUnreadByOther = isMine && (chat.unreadCount?.[otherUserId] > 0);
+
+              // 읽음 여부 판단: lastAccessTime과 메시지 생성 시간 비교
+              let isUnreadByOther = false;
+              let unreadCount = 0;
+
+              if (isMine && chat.type !== 'group') {
+                // 1:1 채팅: 상대방의 lastAccessTime 확인
+                const otherLastAccess = chat.lastAccessTime?.[otherUserId];
+                const messageTime = message.createdAt?.toDate?.() || new Date(message.createdAt);
+
+                if (otherLastAccess) {
+                  const accessTime = otherLastAccess.toDate?.() || new Date(otherLastAccess);
+                  // 메시지 시간이 상대방의 마지막 접속 시간보다 이후면 읽지 않은 것
+                  isUnreadByOther = messageTime > accessTime;
+                } else {
+                  // lastAccessTime이 없으면 읽지 않은 것으로 간주
+                  isUnreadByOther = true;
+                }
+              } else if (isMine && chat.type === 'group') {
+                // 그룹 채팅: readBy 배열로 읽지 않은 사람 수 계산
+                const totalMembers = chat.members?.length || 0;
+                const readByCount = message.readBy?.length || 1; // readBy에 발신자 포함
+                unreadCount = totalMembers - readByCount;
+                isUnreadByOther = unreadCount > 0;
+              }
 
               const userRole = getUserRole(message.senderId);
 
@@ -1034,8 +1070,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
                       </MessageBubble>
                     </MessageContent>
                     <MessageMeta>
-                      {/* 내가 보낸 메시지 중 상대방이 읽지 않은 경우 표시 (시간 위에) */}
-                      {isUnreadByOther && <UnreadBadge>1</UnreadBadge>}
+                      {/* 내가 보낸 메시지 중 읽지 않은 사람이 있는 경우 표시 */}
+                      {isUnreadByOther && (
+                        <UnreadBadge>
+                          {chat.type === 'group' ? unreadCount : 1}
+                        </UnreadBadge>
+                      )}
                       <MessageTime>{formatMessageTime(message.createdAt)}</MessageTime>
                     </MessageMeta>
                   </MessageItem>

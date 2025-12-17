@@ -305,7 +305,8 @@ export const sendGroupMessage = async (groupId, senderId, content, type = 'text'
       createdAt: serverTimestamp(),
       reactions: {}, // 이모지 반응 (나중에 구현)
       isEdited: false,
-      isDeleted: false
+      isDeleted: false,
+      readBy: [senderId] // 읽은 사람 목록 (발신자는 자동으로 읽음 처리)
     };
 
     await addDoc(collection(db, 'groupChats', groupId, 'messages'), messageData);
@@ -353,7 +354,7 @@ export const subscribeToGroupMessages = (groupId, callback) => {
 };
 
 /**
- * 읽음 처리
+ * 읽음 처리 (unreadCount만 업데이트)
  * @param {string} groupId - 그룹 채팅방 ID
  * @param {string} userId - 사용자 UID
  */
@@ -367,6 +368,59 @@ export const markGroupAsRead = async (groupId, userId) => {
   } catch (error) {
     console.error('❌ 읽음 처리 실패:', error);
     throw error;
+  }
+};
+
+/**
+ * 개별 메시지 읽음 처리 (readBy 배열에 userId 추가)
+ * @param {string} groupId - 그룹 채팅방 ID
+ * @param {string} messageId - 메시지 ID
+ * @param {string} userId - 사용자 UID
+ */
+export const markMessageAsRead = async (groupId, messageId, userId) => {
+  try {
+    const messageRef = doc(db, 'groupChats', groupId, 'messages', messageId);
+    await updateDoc(messageRef, {
+      readBy: arrayUnion(userId)
+    });
+  } catch (error) {
+    console.error('❌ 메시지 읽음 처리 실패:', error);
+    // 에러 발생해도 무시 (중요하지 않은 기능)
+  }
+};
+
+/**
+ * 모든 읽지 않은 메시지를 읽음 처리 (채팅방 입장 시)
+ * @param {string} groupId - 그룹 채팅방 ID
+ * @param {string} userId - 사용자 UID
+ */
+export const markAllMessagesAsRead = async (groupId, userId) => {
+  try {
+    // unreadCount 초기화
+    await markGroupAsRead(groupId, userId);
+
+    // 읽지 않은 메시지 찾기
+    const messagesRef = collection(db, 'groupChats', groupId, 'messages');
+    const q = query(messagesRef, orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+
+    // readBy에 userId가 없는 메시지만 업데이트
+    const updatePromises = [];
+    snapshot.docs.forEach(docSnap => {
+      const data = docSnap.data();
+      if (!data.readBy || !data.readBy.includes(userId)) {
+        updatePromises.push(
+          updateDoc(doc(db, 'groupChats', groupId, 'messages', docSnap.id), {
+            readBy: arrayUnion(userId)
+          })
+        );
+      }
+    });
+
+    await Promise.all(updatePromises);
+    console.log('✅ 모든 메시지 읽음 처리 완료:', updatePromises.length);
+  } catch (error) {
+    console.error('❌ 모든 메시지 읽음 처리 실패:', error);
   }
 };
 
