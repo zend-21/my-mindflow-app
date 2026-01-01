@@ -218,6 +218,16 @@ service cloud.firestore {
           allow read, write: if isSignedIn();
         }
       }
+
+      // 문서별 편집 이력 컬렉션 (새 구조)
+      match /documents/{memoId} {
+        allow read, write: if isSignedIn();
+
+        // 편집 이력 서브컬렉션
+        match /editHistory/{editId} {
+          allow read, write: if isSignedIn();
+        }
+      }
     }
 
     // ========================================

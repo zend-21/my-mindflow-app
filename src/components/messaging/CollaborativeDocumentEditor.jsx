@@ -2,7 +2,7 @@
 // 드래그 선택 → 입력 → 자동 형광표시 → 매니저 컨펌 시스템
 import { useState, useEffect, useRef, useCallback } from 'react';
 import styled from 'styled-components';
-import { ChevronDown, ChevronUp, Save, X, Users, Lock, FolderOpen, Info, Strikethrough, Highlighter, MessageSquare, Maximize2, Eye, Download, Check, FileText, CheckCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Save, X, Users, Lock, FolderOpen, Info, Strikethrough, Highlighter, MessageSquare, Maximize2, Eye, Download, Check, FileText, CheckCircle, RotateCcw } from 'lucide-react';
 import {
   doc,
   setDoc,
@@ -760,6 +760,20 @@ const FinalApplyButton = styled(ToolbarButton)`
   }
 `;
 
+const ResetButton = styled(ToolbarButton)`
+  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
+  border: none;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+  }
+`;
+
 const CollaborativeDocumentEditor = ({
   chatRoomId,
   currentUserId,
@@ -927,7 +941,7 @@ const CollaborativeDocumentEditor = ({
 
       // 편집 이력 로드 (문서별로 저장된 이력 로드)
       if (memoId) {
-        const editsRef = collection(db, 'chatRooms', chatRoomId, 'sharedDocument', 'documents', memoId, 'editHistory');
+        const editsRef = collection(db, 'chatRooms', chatRoomId, 'documents', memoId, 'editHistory');
         const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
 
         const edits = [];
@@ -986,14 +1000,16 @@ const CollaborativeDocumentEditor = ({
       }
 
       // 새 문서의 편집 이력 로드
-      const editsRef = collection(db, 'chatRooms', chatRoomId, 'sharedDocument', 'documents', memo.id, 'editHistory');
+      const editsRef = collection(db, 'chatRooms', chatRoomId, 'documents', memo.id, 'editHistory');
       const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
 
       const edits = [];
       editsSnap.forEach((doc) => {
         edits.push({ id: doc.id, ...doc.data() });
       });
-      setPendingEdits(edits);
+
+      // 항상 새로운 배열로 설정 (이전 문서의 편집 이력이 남지 않도록)
+      setPendingEdits(edits.length > 0 ? edits : []);
 
       showToast?.('문서를 불러왔습니다');
       setShowLoadConfirmModal(false);
@@ -1044,11 +1060,16 @@ const CollaborativeDocumentEditor = ({
   };
 
   // 외부에서 메모를 선택했을 때 처리
+  const lastSelectedMemoIdRef = useRef(null);
+
   useEffect(() => {
-    if (selectedMemo) {
+    if (selectedMemo && selectedMemo.id !== lastSelectedMemoIdRef.current) {
+      lastSelectedMemoIdRef.current = selectedMemo.id;
       handleLoadDocument(selectedMemo);
     }
-  }, [selectedMemo, handleLoadDocument]);
+    // handleLoadDocument는 의존성에서 제외 (무한 루프 방지)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMemo]);
 
   // 문서별 편집 이력 컬렉션 참조 가져오기
   const getEditHistoryRef = useCallback((memoId) => {
@@ -1060,7 +1081,6 @@ const CollaborativeDocumentEditor = ({
       db,
       'chatRooms',
       chatRoomId,
-      'sharedDocument',
       'documents',
       memoId,
       'editHistory'
@@ -2279,6 +2299,73 @@ const CollaborativeDocumentEditor = ({
     }
   }, [actualIsManager, title, content, currentUserId, currentUserName, chatRoomId, showToast]);
 
+  // 전체 리셋 핸들러 - 모든 수정 마커를 제거하고 원본 텍스트로 복원
+  const handleResetAll = useCallback(async () => {
+    if (!currentDocId) {
+      showToast?.('문서 ID가 없습니다');
+      return;
+    }
+
+    if (!window.confirm('모든 수정 표시를 삭제하고 원본 상태로 되돌립니다. 계속하시겠습니까?')) {
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // 1. HTML에서 모든 마커 제거 (텍스트만 남김)
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = content;
+
+      // 모든 편집 마커 제거
+      const markers = tempDiv.querySelectorAll('[data-edit-id]');
+      markers.forEach(marker => {
+        const textNode = document.createTextNode(marker.textContent);
+        marker.parentNode.replaceChild(textNode, marker);
+      });
+
+      const cleanContent = tempDiv.innerHTML;
+
+      // 2. Firestore의 편집 이력 모두 삭제
+      const editHistoryRef = getEditHistoryRef(currentDocId);
+      if (editHistoryRef) {
+        const editsSnap = await getDocs(query(editHistoryRef, where('status', '==', 'pending')));
+        const deletePromises = [];
+        editsSnap.forEach((doc) => {
+          deletePromises.push(deleteDoc(doc.ref));
+        });
+        await Promise.all(deletePromises);
+      }
+
+      // 3. Firestore 문서 업데이트 (마커 제거된 내용으로)
+      const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+      await setDoc(docRef, {
+        title,
+        content: cleanContent,
+        lastEditedBy: currentUserId,
+        lastEditedByName: currentUserName,
+        lastEditedAt: serverTimestamp(),
+        version: (await getDoc(docRef)).data()?.version || 0 + 1
+      }, { merge: true });
+
+      // 4. UI 업데이트
+      setContent(cleanContent);
+      if (contentRef.current) {
+        contentRef.current.innerHTML = cleanContent;
+      }
+      if (fullScreenContentRef.current) {
+        fullScreenContentRef.current.innerHTML = cleanContent;
+      }
+      setPendingEdits([]);
+
+      showToast?.('모든 수정 표시가 삭제되었습니다');
+    } catch (error) {
+      console.error('전체 리셋 실패:', error);
+      showToast?.('리셋에 실패했습니다');
+    } finally {
+      setSaving(false);
+    }
+  }, [currentDocId, content, title, currentUserId, currentUserName, chatRoomId, showToast, getEditHistoryRef]);
+
   // 권한 타입 결정
   const permissionType = actualIsManager ? 'manager' : actualCanEdit ? 'editor' : 'viewer';
   const permissionLabel = actualIsManager ? '매니저' : actualCanEdit ? '편집자' : '읽기 전용';
@@ -2382,6 +2469,15 @@ const CollaborativeDocumentEditor = ({
                 <CheckCircle size={14} />
                 최종 적용
               </FinalApplyButton>
+
+              <ResetButton
+                onClick={handleResetAll}
+                disabled={saving || pendingEdits.length === 0}
+                title="모든 수정 표시 삭제"
+              >
+                <RotateCcw size={14} />
+                전체 리셋
+              </ResetButton>
             </>
           )}
 
