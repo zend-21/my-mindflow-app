@@ -902,11 +902,14 @@ const CollaborativeDocumentEditor = ({
       const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
       const docSnap = await getDoc(docRef);
 
+      let memoId = null;
+
       if (docSnap.exists()) {
         const data = docSnap.data();
         setTitle(data.title || '');
         setContent(data.content || '');
-        setCurrentDocId(data.originalMemoId || null); // 현재 문서 ID 저장
+        setCurrentDocId(data.originalMemoId || null);
+        memoId = data.originalMemoId;
 
         // contentEditable 영역 업데이트
         if (contentRef.current) {
@@ -922,15 +925,20 @@ const CollaborativeDocumentEditor = ({
         }
       }
 
-      // 편집 이력 로드 (pending 상태만)
-      const editsRef = collection(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory');
-      const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
+      // 편집 이력 로드 (문서별로 저장된 이력 로드)
+      if (memoId) {
+        const editsRef = collection(db, 'chatRooms', chatRoomId, 'sharedDocument', 'documents', memoId, 'editHistory');
+        const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
 
-      const edits = [];
-      editsSnap.forEach((doc) => {
-        edits.push({ id: doc.id, ...doc.data() });
-      });
-      setPendingEdits(edits);
+        const edits = [];
+        editsSnap.forEach((doc) => {
+          edits.push({ id: doc.id, ...doc.data() });
+        });
+        setPendingEdits(edits);
+      } else {
+        // 문서 ID가 없으면 편집 이력도 없음
+        setPendingEdits([]);
+      }
 
     } catch (error) {
       if (error.code !== 'permission-denied') {
@@ -943,13 +951,6 @@ const CollaborativeDocumentEditor = ({
   useEffect(() => {
     loadDocument();
   }, [loadDocument]);
-
-  // 외부에서 메모를 선택했을 때 처리
-  useEffect(() => {
-    if (selectedMemo) {
-      handleLoadDocument(selectedMemo);
-    }
-  }, [selectedMemo, handleLoadDocument]);
 
   // 문서 불러오기 버튼 클릭 시 실행될 핸들러
   const handleLoadClick = async () => {
@@ -984,8 +985,15 @@ const CollaborativeDocumentEditor = ({
         contentRef.current.innerHTML = memo.content || '';
       }
 
-      // 기존 편집 이력 초기화 (새 문서이므로)
-      setPendingEdits([]);
+      // 새 문서의 편집 이력 로드
+      const editsRef = collection(db, 'chatRooms', chatRoomId, 'sharedDocument', 'documents', memo.id, 'editHistory');
+      const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
+
+      const edits = [];
+      editsSnap.forEach((doc) => {
+        edits.push({ id: doc.id, ...doc.data() });
+      });
+      setPendingEdits(edits);
 
       showToast?.('문서를 불러왔습니다');
       setShowLoadConfirmModal(false);
@@ -1034,6 +1042,30 @@ const CollaborativeDocumentEditor = ({
     setShowLoadConfirmModal(false);
     setPendingLoadMemo(null);
   };
+
+  // 외부에서 메모를 선택했을 때 처리
+  useEffect(() => {
+    if (selectedMemo) {
+      handleLoadDocument(selectedMemo);
+    }
+  }, [selectedMemo, handleLoadDocument]);
+
+  // 문서별 편집 이력 컬렉션 참조 가져오기
+  const getEditHistoryRef = useCallback((memoId) => {
+    if (!memoId) {
+      console.warn('메모 ID가 없어 편집 이력을 저장할 수 없습니다');
+      return null;
+    }
+    return collection(
+      db,
+      'chatRooms',
+      chatRoomId,
+      'sharedDocument',
+      'documents',
+      memoId,
+      'editHistory'
+    );
+  }, [chatRoomId]);
 
   // 디바운스 저장 (500ms)
   const debouncedSave = useCallback((newContent) => {
@@ -1104,15 +1136,12 @@ const CollaborativeDocumentEditor = ({
 
         // 변경 사항이 있으면 형광펜 표시
         if (oldText !== newText) {
-          // Firestore에 편집 이력 저장
-          const editHistoryRef = collection(
-            db,
-            'chatRooms',
-            chatRoomId,
-            'sharedDocument',
-            'currentDoc',
-            'editHistory'
-          );
+          // Firestore에 편집 이력 저장 (문서별로)
+          const editHistoryRef = getEditHistoryRef(currentDocId);
+          if (!editHistoryRef) {
+            console.warn('문서 ID가 없어 편집 이력을 저장할 수 없습니다');
+            return;
+          }
 
           const editDoc = await addDoc(editHistoryRef, {
             editedBy: currentUserId,
@@ -1188,16 +1217,12 @@ const CollaborativeDocumentEditor = ({
     }
 
     try {
-      const editHistoryRef = collection(
-        db,
-        'chatRooms',
-        chatRoomId,
-        'sharedDocument',
-        'currentDoc',
-        'editHistory'
-      );
-
-      // Firestore에 편집 이력 저장
+      // Firestore에 편집 이력 저장 (문서별로)
+      const editHistoryRef = getEditHistoryRef(currentDocId);
+      if (!editHistoryRef) {
+        showToast?.('문서 ID가 없어 편집 이력을 저장할 수 없습니다');
+        return;
+      }
       const editData = {
         editedBy: currentUserId,
         editedByName: currentUserName,
@@ -1500,17 +1525,13 @@ const CollaborativeDocumentEditor = ({
         return;
       }
 
-      // 새 마커 생성 (주석용)
-      const editHistoryRef = collection(
-        db,
-        'chatRooms',
-        chatRoomId,
-        'sharedDocument',
-        'currentDoc',
-        'editHistory'
-      );
-
-      // Firestore에 편집 이력 저장
+      // 새 마커 생성 (주석용) - 문서별로 저장
+      const editHistoryRef = getEditHistoryRef(currentDocId);
+      if (!editHistoryRef) {
+        showToast?.('문서 ID가 없어 편집 이력을 저장할 수 없습니다');
+        setShowEditInputModal(false);
+        return;
+      }
       const editData = {
         editedBy: currentUserId,
         editedByName: currentUserName,
@@ -1656,14 +1677,11 @@ const CollaborativeDocumentEditor = ({
 
     try {
       // Firestore에 취소선 편집 이력 저장
-      const editHistoryRef = collection(
-        db,
-        'chatRooms',
-        chatRoomId,
-        'sharedDocument',
-        'currentDoc',
-        'editHistory'
-      );
+      const editHistoryRef = getEditHistoryRef(currentDocId);
+      if (!editHistoryRef) {
+        showToast?.('문서 ID가 없어 편집 이력을 저장할 수 없습니다');
+        return;
+      }
 
       const editDoc = await addDoc(editHistoryRef, {
         editedBy: currentUserId,
@@ -1730,14 +1748,11 @@ const CollaborativeDocumentEditor = ({
 
     try {
       // Firestore에 형광펜 편집 이력 저장
-      const editHistoryRef = collection(
-        db,
-        'chatRooms',
-        chatRoomId,
-        'sharedDocument',
-        'currentDoc',
-        'editHistory'
-      );
+      const editHistoryRef = getEditHistoryRef(currentDocId);
+      if (!editHistoryRef) {
+        showToast?.('문서 ID가 없어 편집 이력을 저장할 수 없습니다');
+        return;
+      }
 
       const editDoc = await addDoc(editHistoryRef, {
         editedBy: currentUserId,
@@ -1818,14 +1833,12 @@ const CollaborativeDocumentEditor = ({
 
     try {
       // Firestore에 주석 편집 이력 저장
-      const editHistoryRef = collection(
-        db,
-        'chatRooms',
-        chatRoomId,
-        'sharedDocument',
-        'currentDoc',
-        'editHistory'
-      );
+      const editHistoryRef = getEditHistoryRef(currentDocId);
+      if (!editHistoryRef) {
+        showToast?.('문서 ID가 없어 편집 이력을 저장할 수 없습니다');
+        setShowCommentModal(false);
+        return;
+      }
 
       const editDoc = await addDoc(editHistoryRef, {
         editedBy: currentUserId,
@@ -2167,8 +2180,13 @@ const CollaborativeDocumentEditor = ({
     setSaving(true);
 
     try {
-      // 1. 모든 pending 편집 이력 가져오기
-      const editsRef = collection(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory');
+      // 1. 모든 pending 편집 이력 가져오기 (문서별로)
+      const editsRef = getEditHistoryRef(currentDocId);
+      if (!editsRef) {
+        showToast?.('문서 ID가 없어 최종 적용할 수 없습니다');
+        setSaving(false);
+        return;
+      }
       const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
 
       const editHistoryMap = new Map();
@@ -2398,10 +2416,6 @@ const CollaborativeDocumentEditor = ({
           contentEditable={actualCanEdit}
           suppressContentEditableWarning
           onKeyDown={handleKeyDown}
-          onBeforeInput={(e) => {
-            // 모든 기본 입력 차단 (키보드 핸들러에서만 처리)
-            e.preventDefault();
-          }}
           onClick={(e) => {
             const editId = e.target.dataset.editId;
             if (editId) {
@@ -2677,17 +2691,27 @@ const CollaborativeDocumentEditor = ({
               </div>
 
               <div style={{
-                background: 'rgba(255, 193, 7, 0.1)',
-                border: '1px solid rgba(255, 193, 7, 0.3)',
+                background: 'rgba(74, 144, 226, 0.1)',
+                border: '1px solid rgba(74, 144, 226, 0.3)',
                 borderRadius: '8px',
-                padding: '12px',
+                padding: '16px',
                 marginBottom: '16px',
                 fontSize: '13px',
-                lineHeight: '1.5',
+                lineHeight: '1.8',
                 color: '#e0e0e0'
               }}>
-                현재 문서는 그대로 유지되며, 새로운 문서를 불러옵니다.<br/>
-                기존 문서의 수정 내용도 보존됩니다.
+                <div style={{ fontWeight: '600', marginBottom: '8px', color: '#4a90e2' }}>
+                  📌 수정 내용은 어떻게 되나요?
+                </div>
+                <div style={{ marginBottom: '6px' }}>
+                  ✅ 현재 문서의 수정 대기 내용은 <strong>자동으로 저장</strong>됩니다
+                </div>
+                <div style={{ marginBottom: '6px' }}>
+                  ✅ 나중에 이 문서를 다시 열면 <strong>수정 표시가 그대로</strong> 보입니다
+                </div>
+                <div>
+                  ✅ 새로운 문서는 <strong>깨끗한 상태</strong>로 시작됩니다
+                </div>
               </div>
 
               <ModalActions>
@@ -2764,10 +2788,6 @@ const CollaborativeDocumentEditor = ({
                 contentEditable={actualCanEdit}
                 suppressContentEditableWarning
                 onKeyDown={handleKeyDown}
-                onBeforeInput={(e) => {
-                  // 모든 기본 입력 차단 (키보드 핸들러에서만 처리)
-                  e.preventDefault();
-                }}
                 onClick={(e) => {
                   const editId = e.target.dataset.editId;
                   if (editId) {
