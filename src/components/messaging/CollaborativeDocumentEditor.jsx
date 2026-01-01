@@ -805,6 +805,7 @@ const CollaborativeDocumentEditor = ({
   const [showLoadConfirmModal, setShowLoadConfirmModal] = useState(false); // 문서 불러오기 확인 모달
   const [pendingLoadMemo, setPendingLoadMemo] = useState(null); // 불러오려는 메모 정보
   const [currentDocId, setCurrentDocId] = useState(null); // 현재 열린 문서 ID
+  const [showResetConfirmModal, setShowResetConfirmModal] = useState(false); // 전체 리셋 확인 모달
 
   const contentRef = useRef(null);
   const fullScreenContentRef = useRef(null);
@@ -2300,16 +2301,18 @@ const CollaborativeDocumentEditor = ({
   }, [actualIsManager, title, content, currentUserId, currentUserName, chatRoomId, showToast]);
 
   // 전체 리셋 핸들러 - 모든 수정 마커를 제거하고 원본 텍스트로 복원
-  const handleResetAll = useCallback(async () => {
+  const handleResetAll = useCallback(() => {
     if (!currentDocId) {
       showToast?.('문서 ID가 없습니다');
       return;
     }
 
-    if (!window.confirm('모든 수정 표시를 삭제하고 원본 상태로 되돌립니다. 계속하시겠습니까?')) {
-      return;
-    }
+    // 확인 모달 표시
+    setShowResetConfirmModal(true);
+  }, [currentDocId, showToast]);
 
+  // 전체 리셋 확정 실행
+  const performResetAll = useCallback(async () => {
     setSaving(true);
     try {
       // 1. HTML에서 모든 마커 제거 (텍스트만 남김)
@@ -2363,6 +2366,7 @@ const CollaborativeDocumentEditor = ({
       showToast?.('리셋에 실패했습니다');
     } finally {
       setSaving(false);
+      setShowResetConfirmModal(false);
     }
   }, [currentDocId, content, title, currentUserId, currentUserName, chatRoomId, showToast, getEditHistoryRef]);
 
@@ -2506,12 +2510,11 @@ const CollaborativeDocumentEditor = ({
           )}
         </Toolbar>
 
-        {/* contentEditable 영역 - 편집 권한 있으면 편집 가능 */}
+        {/* contentEditable 영역 - 미리보기에서는 읽기 전용 */}
         <ContentEditableArea
           ref={contentRef}
-          contentEditable={actualCanEdit}
+          contentEditable={false}
           suppressContentEditableWarning
-          onKeyDown={handleKeyDown}
           onClick={(e) => {
             const editId = e.target.dataset.editId;
             if (editId) {
@@ -2819,6 +2822,73 @@ const CollaborativeDocumentEditor = ({
                   <X size={18} />
                   취소
                 </RejectButton>
+              </ModalActions>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* 전체 리셋 확인 모달 */}
+      {showResetConfirmModal && (
+        <Modal onClick={() => setShowResetConfirmModal(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <ModalTitle>전체 리셋 확인</ModalTitle>
+              <IconButton onClick={() => setShowResetConfirmModal(false)}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+
+            <ModalBody>
+              <div style={{ marginBottom: '16px', color: '#ff5757' }}>
+                ⚠️ 모든 수정 표시를 삭제하고 원본 상태로 되돌립니다.
+              </div>
+
+              <div style={{ marginBottom: '16px', lineHeight: '1.6' }}>
+                <div style={{ marginBottom: '8px', color: '#888', fontSize: '13px' }}>
+                  • 현재 문서: <strong>{title || '(제목 없음)'}</strong>
+                </div>
+                <div style={{ color: '#888', fontSize: '13px' }}>
+                  • 삭제될 수정 표시: <strong style={{ color: '#ff5757' }}>{pendingEdits.length}개</strong>
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(255, 87, 87, 0.1)',
+                border: '1px solid rgba(255, 87, 87, 0.3)',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '16px',
+                fontSize: '13px',
+                lineHeight: '1.8',
+                color: '#e0e0e0'
+              }}>
+                <div style={{ fontWeight: '600', marginBottom: '8px', color: '#ff5757' }}>
+                  ⚠️ 주의사항
+                </div>
+                <div style={{ marginBottom: '6px' }}>
+                  • 모든 취소선, 형광펜, 주석 표시가 <strong>완전히 삭제</strong>됩니다
+                </div>
+                <div style={{ marginBottom: '6px' }}>
+                  • 삭제된 내용은 <strong>복구할 수 없습니다</strong>
+                </div>
+                <div>
+                  • 원본 텍스트만 남은 깨끗한 상태가 됩니다
+                </div>
+              </div>
+
+              <ModalActions>
+                <RejectButton onClick={() => setShowResetConfirmModal(false)}>
+                  <X size={18} />
+                  취소
+                </RejectButton>
+                <ConfirmButton
+                  onClick={performResetAll}
+                  style={{ background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)' }}
+                >
+                  <RotateCcw size={18} />
+                  전체 리셋 실행
+                </ConfirmButton>
               </ModalActions>
             </ModalBody>
           </ModalContent>
