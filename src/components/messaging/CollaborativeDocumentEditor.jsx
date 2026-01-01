@@ -569,6 +569,10 @@ const FullScreenEditArea = styled.div`
   line-height: 1.8;
   overflow-y: auto;
   cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
 
   &:focus {
     outline: none;
@@ -812,6 +816,7 @@ const CollaborativeDocumentEditor = ({
   const fullScreenContentRef = useRef(null);
   const saveTimeoutRef = useRef(null);
   const savedRangeRef = useRef(null); // 선택 영역 저장용
+  const programmaticChangeRef = useRef(false); // 프로그래밍 방식 변경 플래그
 
   // 키보드 선택 모드 상태
   const [isSelecting, setIsSelecting] = useState(false);
@@ -1072,6 +1077,39 @@ const CollaborativeDocumentEditor = ({
     // handleLoadDocument는 의존성에서 제외 (무한 루프 방지)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMemo]);
+
+  // 실시간 편집 이력 감시
+  useEffect(() => {
+    if (!currentDocId || !chatRoomId) {
+      setPendingEdits([]);
+      return;
+    }
+
+    const editHistoryRef = collection(
+      db,
+      'chatRooms',
+      chatRoomId,
+      'documents',
+      currentDocId,
+      'editHistory'
+    );
+
+    const q = query(editHistoryRef, where('status', '==', 'pending'));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const edits = [];
+      snapshot.forEach((doc) => {
+        edits.push({ id: doc.id, ...doc.data() });
+      });
+      setPendingEdits(edits);
+    }, (error) => {
+      if (error.code !== 'permission-denied') {
+        console.error('편집 이력 실시간 감시 오류:', error);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [currentDocId, chatRoomId]);
 
   // 문서별 편집 이력 컬렉션 참조 가져오기
   const getEditHistoryRef = useCallback((memoId) => {
@@ -1543,6 +1581,7 @@ const CollaborativeDocumentEditor = ({
         setShowEditInputModal(false);
         setPendingMarker(null);
         setEditInputText('');
+        setEditReasonText('');
 
         return;
       }
@@ -1562,76 +1601,68 @@ const CollaborativeDocumentEditor = ({
         status: 'pending'
       };
 
-      if (pendingMarker.type === 'comment') {
+      if (pendingMarker.type === 'strikethrough') {
+        // 취소선: 원본 텍스트 + 삭제 이유
+        editData.oldText = pendingMarker.text;
+        editData.reason = editReasonText || ''; // 삭제 이유
+      } else if (pendingMarker.type === 'highlight') {
+        // 형광펜: 원본 텍스트 + 대체 텍스트 + 설명
+        editData.oldText = pendingMarker.text;
+        editData.newText = editInputText; // 대체 텍스트
+        editData.description = editReasonText || ''; // 설명
+      } else if (pendingMarker.type === 'comment') {
+        // 주석: 주석 내용만
         editData.text = editInputText; // 주석 내용
-      } else {
-        editData.oldText = pendingMarker.text; // 원본 텍스트
-        editData.newText = editInputText; // 수정할 텍스트
       }
 
       const editDoc = await addDoc(editHistoryRef, editData);
 
-      // 마커 생성
-      const span = document.createElement('span');
-      span.dataset.editId = editDoc.id;
-      span.dataset.editType = pendingMarker.type;
+      // 현재 HTML 가져오기
+      let currentHTML = activeRef.current.innerHTML;
+
+      // 선택된 텍스트
+      const selectedText = pendingMarker.text;
+
+      // 마커 HTML 생성
+      let markerHTML = '';
+      let newHTML = '';
 
       if (pendingMarker.type === 'strikethrough') {
-        span.className = 'strikethrough';
-        span.textContent = pendingMarker.text;
+        markerHTML = `<span class="strikethrough" data-edit-id="${editDoc.id}" data-edit-type="strikethrough">${selectedText}</span>`;
+        // 첫 번째로 나타나는 선택된 텍스트를 마커로 교체
+        newHTML = currentHTML.replace(selectedText, markerHTML);
       } else if (pendingMarker.type === 'highlight') {
-        span.className = 'highlight';
-        span.textContent = pendingMarker.text;
+        markerHTML = `<span class="highlight" data-edit-id="${editDoc.id}" data-edit-type="highlight">${selectedText}</span>`;
+        // 첫 번째로 나타나는 선택된 텍스트를 마커로 교체
+        newHTML = currentHTML.replace(selectedText, markerHTML);
       } else if (pendingMarker.type === 'comment') {
-        span.className = 'comment';
-        span.textContent = '[주석]';
+        markerHTML = `<span class="comment" data-edit-id="${editDoc.id}" data-edit-type="comment">[주석]</span>`;
+        // 주석: 선택된 텍스트 뒤에 [주석] 아이콘 추가
+        newHTML = currentHTML.replace(selectedText, selectedText + markerHTML);
       }
 
-      // 선택 영역에 마커 삽입
-      const range = savedRangeRef.current;
-      if (range) {
-        const selection = window.getSelection();
-        selection.removeAllRanges();
-        selection.addRange(range);
-
-        if (pendingMarker.type === 'comment') {
-          // 주석은 커서 위치에 삽입
-          range.insertNode(span);
-
-          // 주석 마커 다음으로 커서 이동
-          const newRange = document.createRange();
-          newRange.setStartAfter(span);
-          newRange.collapse(true);
-          selection.removeAllRanges();
-          selection.addRange(newRange);
-        } else {
-          // 취소선/형광펜은 선택 영역을 감싸기
-          try {
-            range.surroundContents(span);
-
-            // 마커 다음으로 커서 이동
-            const newRange = document.createRange();
-            newRange.setStartAfter(span);
-            newRange.collapse(true);
-            selection.removeAllRanges();
-            selection.addRange(newRange);
-          } catch (e) {
-            console.warn('마커 적용 실패:', e);
-            showToast?.('마커를 적용할 수 없습니다');
-            return;
-          }
-        }
+      // HTML이 변경되었는지 확인
+      if (newHTML === currentHTML) {
+        console.error('선택된 텍스트를 찾을 수 없습니다:', selectedText);
+        showToast?.('선택된 텍스트를 찾을 수 없습니다');
+        return;
       }
 
-      // 콘텐츠 저장 (현재 활성 ref의 내용만 저장)
-      const newContent = activeRef.current.innerHTML;
-      setContent(newContent);
-      debouncedSave(newContent);
+      // 프로그래밍 방식 변경 플래그 설정
+      programmaticChangeRef.current = true;
+
+      // DOM 업데이트
+      activeRef.current.innerHTML = newHTML;
+
+      // 콘텐츠 state 업데이트
+      setContent(newHTML);
+      debouncedSave(newHTML);
 
       // 모달 닫기
       setShowEditInputModal(false);
       setPendingMarker(null);
       setEditInputText('');
+      setEditReasonText('');
       savedRangeRef.current = null;
 
       showToast?.('편집 표시를 추가했습니다');
@@ -1639,7 +1670,7 @@ const CollaborativeDocumentEditor = ({
       console.error('편집 저장 실패:', error);
       showToast?.('편집 저장에 실패했습니다');
     }
-  }, [pendingMarker, editInputText, chatRoomId, currentUserId, currentUserName, showFullScreenEdit, debouncedSave, showToast]);
+  }, [pendingMarker, editInputText, editReasonText, chatRoomId, currentUserId, currentUserName, showFullScreenEdit, debouncedSave, showToast, currentDocId, getEditHistoryRef]);
 
   // 편집 마커 클릭 핸들러 - 수정 모달 열기
   const handleEditMarkerClick = useCallback(async (clickedEditId, markerElement) => {
@@ -1767,10 +1798,18 @@ const CollaborativeDocumentEditor = ({
       return;
     }
 
-    // 주석 입력 모달 표시
-    setSelectedCommentRange({ range: range.cloneRange(), text: selectedText });
-    setShowCommentModal(true);
-  }, [actualCanEdit, showToast, showFullScreenEdit]);
+    // 선택 범위 저장
+    savedRangeRef.current = range.cloneRange();
+
+    // 입력 모달 표시 (주석 - 주석 내용 입력)
+    setPendingMarker({
+      type: 'comment',
+      text: selectedText,
+      range: savedRangeRef.current
+    });
+    setEditInputText('');
+    setShowEditInputModal(true);
+  }, [actualCanEdit, showFullScreenEdit, showToast]);
 
   // 주석 저장 핸들러
   const handleSaveComment = useCallback(async () => {
@@ -2442,8 +2481,37 @@ const CollaborativeDocumentEditor = ({
         {/* contentEditable 영역 - 미리보기에서는 읽기 전용 */}
         <ContentEditableArea
           ref={contentRef}
-          contentEditable={false}
+          contentEditable={true}
           suppressContentEditableWarning
+          onInput={(e) => {
+            // 프로그래밍 방식 변경은 허용
+            if (programmaticChangeRef.current) {
+              programmaticChangeRef.current = false;
+              return;
+            }
+            // 사용자 입력은 방지
+            e.preventDefault();
+            if (contentRef.current) {
+              contentRef.current.innerHTML = content;
+            }
+          }}
+          onKeyDown={(e) => {
+            // 텍스트 수정 키는 모두 막기 (선택 키는 허용)
+            const allowedKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'];
+            const isSelectionKey = e.shiftKey || e.ctrlKey || e.metaKey;
+
+            if (!allowedKeys.includes(e.key) && !isSelectionKey) {
+              e.preventDefault();
+            }
+          }}
+          onPaste={(e) => {
+            // 붙여넣기 방지
+            e.preventDefault();
+          }}
+          onCut={(e) => {
+            // 잘라내기 방지
+            e.preventDefault();
+          }}
           onClick={(e) => {
             const editId = e.target.dataset.editId;
             if (editId) {
@@ -2498,24 +2566,71 @@ const CollaborativeDocumentEditor = ({
                         }
                       </InfoRow>
                     )}
-                    {edit.comment && (
-                      <InfoRow>
-                        <strong>주석:</strong> {edit.comment}
-                      </InfoRow>
-                    )}
                   </EditInfo>
 
-                  <TextComparison>
-                    <ComparisonBox $type="old">
-                      <ComparisonLabel $type="old">수정 전</ComparisonLabel>
-                      <ComparisonText>{edit.oldText || edit.text || '(없음)'}</ComparisonText>
-                    </ComparisonBox>
+                  {/* 취소선: 원본 텍스트 + 삭제 이유 */}
+                  {edit.type === 'strikethrough' && (
+                    <>
+                      <TextComparison>
+                        <ComparisonBox $type="old">
+                          <ComparisonLabel $type="old">삭제할 텍스트</ComparisonLabel>
+                          <ComparisonText>{edit.oldText || '(없음)'}</ComparisonText>
+                        </ComparisonBox>
+                      </TextComparison>
+                      {edit.reason && (
+                        <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(255, 193, 7, 0.1)', borderRadius: '8px', borderLeft: '3px solid #ffc107' }}>
+                          <div style={{ fontSize: '12px', color: '#ffc107', marginBottom: '4px', fontWeight: '600' }}>삭제 이유</div>
+                          <div style={{ color: '#e0e0e0', fontSize: '14px' }}>{edit.reason}</div>
+                        </div>
+                      )}
+                    </>
+                  )}
 
-                    <ComparisonBox $type="new">
-                      <ComparisonLabel $type="new">수정 후</ComparisonLabel>
-                      <ComparisonText>{edit.newText || edit.text}</ComparisonText>
-                    </ComparisonBox>
-                  </TextComparison>
+                  {/* 형광펜: 원본 텍스트 → 대체 텍스트 + 설명 */}
+                  {edit.type === 'highlight' && (
+                    <>
+                      <TextComparison>
+                        <ComparisonBox $type="old">
+                          <ComparisonLabel $type="old">수정 전</ComparisonLabel>
+                          <ComparisonText>{edit.oldText || '(없음)'}</ComparisonText>
+                        </ComparisonBox>
+
+                        <ComparisonBox $type="new">
+                          <ComparisonLabel $type="new">수정 후</ComparisonLabel>
+                          <ComparisonText>{edit.newText || '(없음)'}</ComparisonText>
+                        </ComparisonBox>
+                      </TextComparison>
+                      {edit.description && (
+                        <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(76, 175, 80, 0.1)', borderRadius: '8px', borderLeft: '3px solid #4caf50' }}>
+                          <div style={{ fontSize: '12px', color: '#4caf50', marginBottom: '4px', fontWeight: '600' }}>설명</div>
+                          <div style={{ color: '#e0e0e0', fontSize: '14px' }}>{edit.description}</div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* 주석: 주석 내용만 */}
+                  {edit.type === 'comment' && (
+                    <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(33, 150, 243, 0.1)', borderRadius: '8px', borderLeft: '3px solid #2196f3' }}>
+                      <div style={{ fontSize: '12px', color: '#2196f3', marginBottom: '4px', fontWeight: '600' }}>주석 내용</div>
+                      <div style={{ color: '#e0e0e0', fontSize: '14px' }}>{edit.text || '(없음)'}</div>
+                    </div>
+                  )}
+
+                  {/* 기타 타입 (하위 호환성) */}
+                  {!edit.type && (
+                    <TextComparison>
+                      <ComparisonBox $type="old">
+                        <ComparisonLabel $type="old">수정 전</ComparisonLabel>
+                        <ComparisonText>{edit.oldText || edit.text || '(없음)'}</ComparisonText>
+                      </ComparisonBox>
+
+                      <ComparisonBox $type="new">
+                        <ComparisonLabel $type="new">수정 후</ComparisonLabel>
+                        <ComparisonText>{edit.newText || edit.text}</ComparisonText>
+                      </ComparisonBox>
+                    </TextComparison>
+                  )}
 
                   {actualIsManager && (
                     <div style={{ marginTop: '12px' }}>
@@ -2616,6 +2731,7 @@ const CollaborativeDocumentEditor = ({
           setShowEditInputModal(false);
           setPendingMarker(null);
           setEditInputText('');
+          setEditReasonText('');
         }}>
           <ModalContent onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
@@ -2628,6 +2744,7 @@ const CollaborativeDocumentEditor = ({
                 setShowEditInputModal(false);
                 setPendingMarker(null);
                 setEditInputText('');
+                setEditReasonText('');
               }}>
                 <X size={20} />
               </IconButton>
@@ -2642,34 +2759,114 @@ const CollaborativeDocumentEditor = ({
                 </EditInfo>
               )}
 
-              <div style={{ marginTop: '16px' }}>
-                <label style={{ display: 'block', marginBottom: '8px', color: '#e0e0e0', fontSize: '14px', fontWeight: '600' }}>
-                  {pendingMarker.type === 'comment' ? '주석 내용' : '수정할 내용 (비어있으면 삭제)'}
-                </label>
-                <textarea
-                  value={editInputText}
-                  onChange={(e) => setEditInputText(e.target.value)}
-                  placeholder={
-                    pendingMarker.type === 'comment'
-                      ? '주석 내용을 입력하세요...'
-                      : '수정할 내용을 입력하세요 (비워두면 삭제)'
-                  }
-                  style={{
-                    width: '100%',
-                    minHeight: '100px',
-                    background: 'rgba(0, 0, 0, 0.3)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: '8px',
-                    padding: '12px',
-                    color: '#e0e0e0',
-                    fontSize: '14px',
-                    lineHeight: '1.6',
-                    resize: 'vertical',
-                    fontFamily: 'inherit'
-                  }}
-                  autoFocus
-                />
-              </div>
+              {/* 취소선 - 삭제 이유만 입력 */}
+              {pendingMarker.type === 'strikethrough' && (
+                <div style={{ marginTop: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', color: '#e0e0e0', fontSize: '14px', fontWeight: '600' }}>
+                    삭제 이유
+                  </label>
+                  <textarea
+                    value={editReasonText}
+                    onChange={(e) => setEditReasonText(e.target.value)}
+                    placeholder="삭제하는 이유를 입력하세요..."
+                    style={{
+                      width: '100%',
+                      minHeight: '100px',
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      color: '#e0e0e0',
+                      fontSize: '14px',
+                      lineHeight: '1.6',
+                      resize: 'vertical',
+                      fontFamily: 'inherit'
+                    }}
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              {/* 형광펜 - 대체 텍스트 + 설명 입력 */}
+              {pendingMarker.type === 'highlight' && (
+                <>
+                  <div style={{ marginTop: '16px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', color: '#e0e0e0', fontSize: '14px', fontWeight: '600' }}>
+                      대체 텍스트 <span style={{ color: '#ff9800' }}>*</span>
+                    </label>
+                    <textarea
+                      value={editInputText}
+                      onChange={(e) => setEditInputText(e.target.value)}
+                      placeholder="바꿀 텍스트를 입력하세요..."
+                      style={{
+                        width: '100%',
+                        minHeight: '80px',
+                        background: 'rgba(0, 0, 0, 0.3)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        color: '#e0e0e0',
+                        fontSize: '14px',
+                        lineHeight: '1.6',
+                        resize: 'vertical',
+                        fontFamily: 'inherit'
+                      }}
+                      autoFocus
+                    />
+                  </div>
+                  <div style={{ marginTop: '12px' }}>
+                    <label style={{ display: 'block', marginBottom: '8px', color: '#e0e0e0', fontSize: '14px', fontWeight: '600' }}>
+                      설명 (선택)
+                    </label>
+                    <textarea
+                      value={editReasonText}
+                      onChange={(e) => setEditReasonText(e.target.value)}
+                      placeholder="수정 이유나 설명을 입력하세요..."
+                      style={{
+                        width: '100%',
+                        minHeight: '60px',
+                        background: 'rgba(0, 0, 0, 0.3)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        color: '#e0e0e0',
+                        fontSize: '14px',
+                        lineHeight: '1.6',
+                        resize: 'vertical',
+                        fontFamily: 'inherit'
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* 주석 - 주석 내용만 입력 */}
+              {pendingMarker.type === 'comment' && (
+                <div style={{ marginTop: '16px' }}>
+                  <label style={{ display: 'block', marginBottom: '8px', color: '#e0e0e0', fontSize: '14px', fontWeight: '600' }}>
+                    주석 내용
+                  </label>
+                  <textarea
+                    value={editInputText}
+                    onChange={(e) => setEditInputText(e.target.value)}
+                    placeholder="주석 내용을 입력하세요..."
+                    style={{
+                      width: '100%',
+                      minHeight: '100px',
+                      background: 'rgba(0, 0, 0, 0.3)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      padding: '12px',
+                      color: '#e0e0e0',
+                      fontSize: '14px',
+                      lineHeight: '1.6',
+                      resize: 'vertical',
+                      fontFamily: 'inherit'
+                    }}
+                    autoFocus
+                  />
+                </div>
+              )}
 
               <ModalActions>
                 <ConfirmButton onClick={handleConfirmEditInput}>
@@ -2680,6 +2877,7 @@ const CollaborativeDocumentEditor = ({
                   setShowEditInputModal(false);
                   setPendingMarker(null);
                   setEditInputText('');
+                  setEditReasonText('');
                 }}>
                   <X size={18} />
                   취소
@@ -2880,9 +3078,37 @@ const CollaborativeDocumentEditor = ({
             <FullScreenContent>
               <FullScreenEditArea
                 ref={fullScreenContentRef}
-                contentEditable={actualCanEdit}
+                contentEditable={true}
                 suppressContentEditableWarning
-                onKeyDown={handleKeyDown}
+                onInput={(e) => {
+                  // 프로그래밍 방식 변경은 허용
+                  if (programmaticChangeRef.current) {
+                    programmaticChangeRef.current = false;
+                    return;
+                  }
+                  // 사용자 입력은 방지
+                  e.preventDefault();
+                  if (fullScreenContentRef.current) {
+                    fullScreenContentRef.current.innerHTML = content;
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // 텍스트 수정 키는 모두 막기 (선택 키는 허용)
+                  const allowedKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'];
+                  const isSelectionKey = e.shiftKey || e.ctrlKey || e.metaKey;
+
+                  if (!allowedKeys.includes(e.key) && !isSelectionKey) {
+                    e.preventDefault();
+                  }
+                }}
+                onPaste={(e) => {
+                  // 붙여넣기 방지
+                  e.preventDefault();
+                }}
+                onCut={(e) => {
+                  // 잘라내기 방지
+                  e.preventDefault();
+                }}
                 onClick={(e) => {
                   const editId = e.target.dataset.editId;
                   if (editId) {
