@@ -1674,9 +1674,14 @@ const CollaborativeDocumentEditor = ({
 
   // 편집 마커 클릭 핸들러 - 수정 모달 열기
   const handleEditMarkerClick = useCallback(async (clickedEditId, markerElement) => {
+    if (!currentDocId) {
+      showToast?.('문서 ID가 없습니다');
+      return;
+    }
+
     try {
-      // 편집 이력 가져오기
-      const editRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory', clickedEditId);
+      // 올바른 경로로 편집 이력 가져오기
+      const editRef = doc(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', clickedEditId);
       const editSnap = await getDoc(editRef);
 
       if (!editSnap.exists()) {
@@ -1685,26 +1690,16 @@ const CollaborativeDocumentEditor = ({
       }
 
       const editData = editSnap.data();
-      const editType = editData.type;
 
-      // 마커 텍스트 가져오기
-      const markerText = markerElement?.textContent || editData.oldText || '';
-
-      // 수정 모달 열기
-      setPendingMarker({
-        id: clickedEditId,
-        type: editType,
-        text: markerText,
-        editData: editData
-      });
-      setEditInputText(editData.newText || '');
-      setShowEditInputModal(true);
+      // 편집 데이터를 배열에 담아서 조회 모달 표시
+      setSelectedEdits([{ id: clickedEditId, ...editData }]);
+      setShowEditModal(true);
 
     } catch (error) {
       console.error('편집 이력 로드 실패:', error);
       showToast?.('편집 이력을 불러올 수 없습니다');
     }
-  }, [chatRoomId, showToast]);
+  }, [chatRoomId, currentDocId, showToast]);
 
   // 취소선 적용 핸들러 - 즉시 입력창 표시
   const handleApplyStrikethrough = useCallback(() => {
