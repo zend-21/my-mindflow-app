@@ -800,7 +800,8 @@ const CollaborativeDocumentEditor = ({
   const [selectedCommentRange, setSelectedCommentRange] = useState(null);
   const [showFullScreenEdit, setShowFullScreenEdit] = useState(false);
   const [showEditInputModal, setShowEditInputModal] = useState(false); // 수정 내용 입력 모달
-  const [editInputText, setEditInputText] = useState(''); // 수정할 텍스트
+  const [editInputText, setEditInputText] = useState(''); // 수정할 텍스트 (형광펜: 대체 텍스트)
+  const [editReasonText, setEditReasonText] = useState(''); // 설명/이유 (취소선: 삭제 이유, 형광펜: 설명)
   const [pendingMarker, setPendingMarker] = useState(null); // 대기 중인 마커 정보
   const [showLoadConfirmModal, setShowLoadConfirmModal] = useState(false); // 문서 불러오기 확인 모달
   const [pendingLoadMemo, setPendingLoadMemo] = useState(null); // 불러오려는 메모 정보
@@ -1674,8 +1675,8 @@ const CollaborativeDocumentEditor = ({
     }
   }, [chatRoomId, showToast]);
 
-  // 취소선 적용 핸들러 (편집 권한자만)
-  const handleApplyStrikethrough = useCallback(async () => {
+  // 취소선 적용 핸들러 - 즉시 입력창 표시
+  const handleApplyStrikethrough = useCallback(() => {
     if (!actualCanEdit) {
       showToast?.('편집 권한이 없습니다');
       return;
@@ -1696,57 +1697,21 @@ const CollaborativeDocumentEditor = ({
       return;
     }
 
-    try {
-      // Firestore에 취소선 편집 이력 저장
-      const editHistoryRef = getEditHistoryRef(currentDocId);
-      if (!editHistoryRef) {
-        showToast?.('문서 ID가 없어 편집 이력을 저장할 수 없습니다');
-        return;
-      }
+    // 선택 범위 저장
+    savedRangeRef.current = range.cloneRange();
 
-      const editDoc = await addDoc(editHistoryRef, {
-        editedBy: currentUserId,
-        editedByName: currentUserName,
-        editedAt: serverTimestamp(),
-        type: 'strikethrough', // 취소선 타입
-        text: selectedText,
-        status: 'pending'
-      });
+    // 입력 모달 표시 (취소선 - 삭제 이유 입력)
+    setPendingMarker({
+      type: 'strikethrough',
+      text: selectedText,
+      range: savedRangeRef.current
+    });
+    setEditInputText('');
+    setShowEditInputModal(true);
+  }, [actualCanEdit, showFullScreenEdit, showToast]);
 
-      // 취소선 표시
-      const span = document.createElement('span');
-      span.className = 'strikethrough';
-      span.dataset.editId = editDoc.id;
-      span.dataset.editType = 'strikethrough';
-
-      try {
-        range.surroundContents(span);
-        selection.removeAllRanges();
-        showToast?.('삭제 표시를 추가했습니다');
-
-        // 콘텐츠 저장
-        const newContent = activeRef.current.innerHTML;
-        setContent(newContent);
-        debouncedSave(newContent);
-
-        // 양쪽 ref 동기화
-        if (showFullScreenEdit && contentRef.current) {
-          contentRef.current.innerHTML = newContent;
-        } else if (!showFullScreenEdit && fullScreenContentRef.current) {
-          fullScreenContentRef.current.innerHTML = newContent;
-        }
-      } catch (e) {
-        console.warn('취소선 표시 실패:', e);
-        showToast?.('취소선을 적용할 수 없습니다');
-      }
-    } catch (error) {
-      console.error('취소선 저장 실패:', error);
-      showToast?.('취소선 저장에 실패했습니다');
-    }
-  }, [actualCanEdit, chatRoomId, currentUserId, currentUserName, showToast, debouncedSave, showFullScreenEdit]);
-
-  // 형광펜 적용 핸들러 (편집 권한자만)
-  const handleApplyHighlighter = useCallback(async () => {
+  // 형광펜 적용 핸들러 - 즉시 입력창 표시
+  const handleApplyHighlighter = useCallback(() => {
     if (!actualCanEdit) {
       showToast?.('편집 권한이 없습니다');
       return;
@@ -1767,54 +1732,18 @@ const CollaborativeDocumentEditor = ({
       return;
     }
 
-    try {
-      // Firestore에 형광펜 편집 이력 저장
-      const editHistoryRef = getEditHistoryRef(currentDocId);
-      if (!editHistoryRef) {
-        showToast?.('문서 ID가 없어 편집 이력을 저장할 수 없습니다');
-        return;
-      }
+    // 선택 범위 저장
+    savedRangeRef.current = range.cloneRange();
 
-      const editDoc = await addDoc(editHistoryRef, {
-        editedBy: currentUserId,
-        editedByName: currentUserName,
-        editedAt: serverTimestamp(),
-        type: 'highlight', // 형광펜 타입
-        text: selectedText,
-        status: 'pending'
-      });
-
-      // 형광펜 표시
-      const span = document.createElement('span');
-      span.className = 'highlight';
-      span.dataset.editId = editDoc.id;
-      span.dataset.editType = 'highlight';
-
-      try {
-        range.surroundContents(span);
-        selection.removeAllRanges();
-        showToast?.('형광펜을 적용했습니다');
-
-        // 콘텐츠 저장
-        const newContent = activeRef.current.innerHTML;
-        setContent(newContent);
-        debouncedSave(newContent);
-
-        // 양쪽 ref 동기화
-        if (showFullScreenEdit && contentRef.current) {
-          contentRef.current.innerHTML = newContent;
-        } else if (!showFullScreenEdit && fullScreenContentRef.current) {
-          fullScreenContentRef.current.innerHTML = newContent;
-        }
-      } catch (e) {
-        console.warn('형광펜 표시 실패:', e);
-        showToast?.('형광펜을 적용할 수 없습니다');
-      }
-    } catch (error) {
-      console.error('형광펜 저장 실패:', error);
-      showToast?.('형광펜 저장에 실패했습니다');
-    }
-  }, [actualCanEdit, chatRoomId, currentUserId, currentUserName, showToast, debouncedSave, showFullScreenEdit]);
+    // 입력 모달 표시 (형광펜 - 대체 텍스트 + 설명 입력)
+    setPendingMarker({
+      type: 'highlight',
+      text: selectedText,
+      range: savedRangeRef.current
+    });
+    setEditInputText('');
+    setShowEditInputModal(true);
+  }, [actualCanEdit, showFullScreenEdit, showToast]);
 
   // 주석 적용 핸들러 (편집 권한자만)
   const handleApplyComment = useCallback(() => {
