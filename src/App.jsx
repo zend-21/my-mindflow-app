@@ -2465,13 +2465,23 @@ function App() {
 
             // 3. 토큰 Revoke (API 호출)
             if (accessToken) {
-                await fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-type': 'application/x-www-form-urlencoded'
+                try {
+                    const response = await fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-type': 'application/x-www-form-urlencoded'
+                        }
+                    });
+
+                    if (response.ok) {
+                        console.log('🔑 Google OAuth 토큰 revoke 완료');
+                    } else {
+                        console.warn('⚠️ 토큰 revoke 실패 (무시 가능):', response.status);
                     }
-                });
-                console.log('🔑 Google OAuth 토큰 revoke 완료');
+                } catch (revokeError) {
+                    // 네트워크 에러 등으로 revoke 실패 시 경고만 표시하고 계속 진행
+                    console.warn('⚠️ 토큰 revoke 중 오류 (무시 가능):', revokeError.message);
+                }
             }
         } catch (error) {
             console.error('Google OAuth 로그아웃 오류:', error);
