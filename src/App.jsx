@@ -946,13 +946,9 @@ function App() {
         setIsCalendarConfirmOpen(true);
     };
 
-    const showToast = (message, duration = 1000) => {
+    const showToast = (message) => {
         console.log('🔔 showToast 호출됨:', message);
         setToastMessage(message);
-        setTimeout(() => {
-            console.log('🔔 Toast 숨김');
-            setToastMessage(null);
-        }, duration);
     };
     
     const handleDataExport = async () => {
@@ -2951,7 +2947,7 @@ function App() {
             )}
 
             {/* 모달(Modal)들은 Screen 컴포넌트 바깥에 두어 전체 화면을 덮도록 합니다. */}
-            <Toast message={toastMessage} />
+            <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
 
             {/* 복원 확인 모달 */}
             {isRestoreConfirmOpen && (

@@ -938,6 +938,26 @@ const CollaborativeDocumentEditor = ({
     }
   }, [pendingEdits]);
 
+  // 사용자의 6자리 고유 ID 가져오기
+  const getUserWorkspaceId = async (userId) => {
+    try {
+      const workspaceId = `workspace_${userId}`;
+      const workspaceRef = doc(db, 'workspaces', workspaceId);
+      const workspaceDoc = await getDoc(workspaceRef);
+
+      if (workspaceDoc.exists()) {
+        const wsCode = workspaceDoc.data().workspaceCode;
+        // "WS-Y3T1ZM"에서 "Y3T1ZM"만 추출
+        const idOnly = (wsCode?.split('-')[1] || wsCode || '').toUpperCase();
+        return idOnly;
+      }
+      return null;
+    } catch (error) {
+      console.error('워크스페이스 ID 조회 실패:', error);
+      return null;
+    }
+  };
+
   // 문서 및 편집 이력 로드 (일회성 읽기)
   const loadDocument = useCallback(async () => {
     if (!chatRoomId) return;
@@ -1193,8 +1213,15 @@ const CollaborativeDocumentEditor = ({
   }, []);
 
   // 닉네임 클릭 시 사용자 ID 표시
-  const handleNicknameClick = useCallback((userId, nickname) => {
-    showToast?.(`${nickname}\n고유 ID: ${userId}`);
+  const handleNicknameClick = useCallback(async (userId, nickname) => {
+    // 6자리 고유 ID 가져오기
+    const workspaceId = await getUserWorkspaceId(userId);
+
+    if (workspaceId) {
+      showToast?.(`${nickname} (ID: ${workspaceId})`);
+    } else {
+      showToast?.(`${nickname} (ID 조회 실패)`);
+    }
   }, [showToast]);
 
   // 선택 이벤트 리스너 등록
