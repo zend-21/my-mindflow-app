@@ -2898,7 +2898,6 @@ const CollaborativeDocumentEditor = ({
                       resize: 'vertical',
                       fontFamily: 'inherit'
                     }}
-                    autoFocus
                   />
                 </div>
               )}
@@ -2918,7 +2917,7 @@ const CollaborativeDocumentEditor = ({
                         width: '100%',
                         minHeight: '80px',
                         background: 'rgba(0, 0, 0, 0.3)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 0.1)',
                         borderRadius: '8px',
                         padding: '12px',
                         color: '#e0e0e0',
@@ -2927,7 +2926,6 @@ const CollaborativeDocumentEditor = ({
                         resize: 'vertical',
                         fontFamily: 'inherit'
                       }}
-                      autoFocus
                     />
                   </div>
                   <div style={{ marginTop: '12px' }}>
@@ -2979,7 +2977,6 @@ const CollaborativeDocumentEditor = ({
                       resize: 'vertical',
                       fontFamily: 'inherit'
                     }}
-                    autoFocus
                   />
                 </div>
               )}
