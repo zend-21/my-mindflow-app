@@ -769,7 +769,8 @@ const CollaborativeDocumentEditor = ({
   chatType, // 1:1 vs 그룹 구분
   showToast,
   onClose,
-  onLoadFromShared
+  onLoadFromShared,
+  selectedMemo // 외부에서 선택한 메모 (불러오기 요청)
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [title, setTitle] = useState('');
@@ -787,6 +788,9 @@ const CollaborativeDocumentEditor = ({
   const [showEditInputModal, setShowEditInputModal] = useState(false); // 수정 내용 입력 모달
   const [editInputText, setEditInputText] = useState(''); // 수정할 텍스트
   const [pendingMarker, setPendingMarker] = useState(null); // 대기 중인 마커 정보
+  const [showLoadConfirmModal, setShowLoadConfirmModal] = useState(false); // 문서 불러오기 확인 모달
+  const [pendingLoadMemo, setPendingLoadMemo] = useState(null); // 불러오려는 메모 정보
+  const [currentDocId, setCurrentDocId] = useState(null); // 현재 열린 문서 ID
 
   const contentRef = useRef(null);
   const fullScreenContentRef = useRef(null);
@@ -902,6 +906,7 @@ const CollaborativeDocumentEditor = ({
         const data = docSnap.data();
         setTitle(data.title || '');
         setContent(data.content || '');
+        setCurrentDocId(data.originalMemoId || null); // 현재 문서 ID 저장
 
         // contentEditable 영역 업데이트
         if (contentRef.current) {
@@ -911,6 +916,7 @@ const CollaborativeDocumentEditor = ({
         // 문서가 없으면 빈 상태로 초기화
         setTitle('');
         setContent('');
+        setCurrentDocId(null);
         if (contentRef.current) {
           contentRef.current.innerHTML = '';
         }
@@ -938,15 +944,95 @@ const CollaborativeDocumentEditor = ({
     loadDocument();
   }, [loadDocument]);
 
+  // 외부에서 메모를 선택했을 때 처리
+  useEffect(() => {
+    if (selectedMemo) {
+      handleLoadDocument(selectedMemo);
+    }
+  }, [selectedMemo, handleLoadDocument]);
+
   // 문서 불러오기 버튼 클릭 시 실행될 핸들러
   const handleLoadClick = async () => {
     if (onLoadFromShared) {
+      // 공유 폴더 메모 선택 모달 열기
       await onLoadFromShared();
-      // Firestore 저장 완료 후 문서 재로드 (약간의 지연)
-      setTimeout(() => {
-        loadDocument();
-      }, 200);
     }
+  };
+
+  // 실제 문서 로드 수행
+  const performLoadDocument = useCallback(async (memo) => {
+    try {
+      // Firestore의 currentDoc에 저장
+      const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+      await setDoc(docRef, {
+        title: memo.title || '제목 없음',
+        content: memo.content || '',
+        originalMemoId: memo.id,
+        lastEditedBy: currentUserId,
+        lastEditedByName: currentUserName,
+        lastEditedAt: serverTimestamp(),
+        version: 1
+      });
+
+      // 로컬 상태 업데이트
+      setTitle(memo.title || '제목 없음');
+      setContent(memo.content || '');
+      setCurrentDocId(memo.id);
+
+      // contentEditable 영역 업데이트
+      if (contentRef.current) {
+        contentRef.current.innerHTML = memo.content || '';
+      }
+
+      // 기존 편집 이력 초기화 (새 문서이므로)
+      setPendingEdits([]);
+
+      showToast?.('문서를 불러왔습니다');
+      setShowLoadConfirmModal(false);
+      setPendingLoadMemo(null);
+    } catch (error) {
+      console.error('문서 불러오기 실패:', error);
+      showToast?.('문서 불러오기에 실패했습니다');
+    }
+  }, [chatRoomId, currentUserId, currentUserName, showToast]);
+
+  // 실제 문서 불러오기 처리 (ChatRoom에서 호출)
+  const handleLoadDocument = useCallback(async (memo) => {
+    if (!memo) return;
+
+    // 동일한 문서를 다시 불러오는 경우 - 아무 작업 없이 그대로 유지
+    if (currentDocId && currentDocId === memo.id) {
+      showToast?.('이미 열려있는 문서입니다');
+      return;
+    }
+
+    // 기존 문서가 있고 (제목이나 내용이 있고), 수정 대기 사항이 있는 경우
+    const hasExistingDocument = title.trim() || content.trim();
+    const hasUnconfirmedEdits = pendingEdits.length > 0;
+
+    if (hasExistingDocument && hasUnconfirmedEdits) {
+      // 확인 모달 표시
+      setPendingLoadMemo(memo);
+      setShowLoadConfirmModal(true);
+    } else {
+      // 바로 불러오기
+      await performLoadDocument(memo);
+    }
+  }, [currentDocId, title, content, pendingEdits, showToast, performLoadDocument]);
+
+  // 기존 문서 보존하고 새 문서 열기
+  const handleKeepAndLoad = async () => {
+    if (!pendingLoadMemo) return;
+
+    // 기존 문서는 이미 Firestore에 저장되어 있음
+    // 새 문서를 불러오기
+    await performLoadDocument(pendingLoadMemo);
+  };
+
+  // 확인 모달 닫기
+  const handleCancelLoad = () => {
+    setShowLoadConfirmModal(false);
+    setPendingLoadMemo(null);
   };
 
   // 디바운스 저장 (500ms)
@@ -2553,6 +2639,63 @@ const CollaborativeDocumentEditor = ({
                   setPendingMarker(null);
                   setEditInputText('');
                 }}>
+                  <X size={18} />
+                  취소
+                </RejectButton>
+              </ModalActions>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* 문서 불러오기 확인 모달 */}
+      {showLoadConfirmModal && pendingLoadMemo && (
+        <Modal onClick={handleCancelLoad}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <ModalTitle>문서 불러오기 확인</ModalTitle>
+              <IconButton onClick={handleCancelLoad}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+
+            <ModalBody>
+              <div style={{ marginBottom: '16px', color: '#ffc107' }}>
+                ⚠️ 현재 열린 문서에 수정 대기 중인 내용이 있습니다.
+              </div>
+
+              <div style={{ marginBottom: '16px', lineHeight: '1.6' }}>
+                <div style={{ marginBottom: '8px' }}>
+                  <strong>현재 문서:</strong> {title || '(제목 없음)'}
+                </div>
+                <div style={{ marginBottom: '8px' }}>
+                  <strong>불러올 문서:</strong> {pendingLoadMemo.title || '(제목 없음)'}
+                </div>
+                <div style={{ color: '#888', fontSize: '13px' }}>
+                  • 수정 대기 중인 내용: {pendingEdits.length}개
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(255, 193, 7, 0.1)',
+                border: '1px solid rgba(255, 193, 7, 0.3)',
+                borderRadius: '8px',
+                padding: '12px',
+                marginBottom: '16px',
+                fontSize: '13px',
+                lineHeight: '1.5',
+                color: '#e0e0e0'
+              }}>
+                현재 문서는 그대로 유지되며, 새로운 문서를 불러옵니다.<br/>
+                기존 문서의 수정 내용도 보존됩니다.
+              </div>
+
+              <ModalActions>
+                <ConfirmButton onClick={handleKeepAndLoad}>
+                  <Check size={18} />
+                  기존 문서 유지하고 새 문서 열기
+                </ConfirmButton>
+                <RejectButton onClick={handleCancelLoad}>
                   <X size={18} />
                   취소
                 </RejectButton>
