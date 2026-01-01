@@ -18,6 +18,7 @@ import {
   where
 } from 'firebase/firestore';
 import { db } from '../../firebase/config';
+import { getUserNickname } from '../../services/nicknameService';
 
 // 스타일 컴포넌트들 (기존과 유사하지만 contentEditable용으로 수정)
 const EditorContainer = styled.div`
@@ -811,6 +812,7 @@ const CollaborativeDocumentEditor = ({
   const [pendingLoadMemo, setPendingLoadMemo] = useState(null); // 불러오려는 메모 정보
   const [currentDocId, setCurrentDocId] = useState(null); // 현재 열린 문서 ID
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false); // 전체 리셋 확인 모달
+  const [editNicknames, setEditNicknames] = useState({}); // 편집 이력의 닉네임 { userId: nickname }
 
   const contentRef = useRef(null);
   const fullScreenContentRef = useRef(null);
@@ -914,6 +916,27 @@ const CollaborativeDocumentEditor = ({
       isMounted = false;
     };
   }, [chatRoomId, currentUserId, isManager, canEdit, chatType]);
+
+  // 편집 이력의 닉네임 실시간 가져오기
+  useEffect(() => {
+    const fetchNicknames = async () => {
+      const userIds = [...new Set(pendingEdits.map(edit => edit.editedBy))];
+      const nicknameMap = {};
+
+      for (const userId of userIds) {
+        if (userId) {
+          const nickname = await getUserNickname(userId);
+          nicknameMap[userId] = nickname || '익명';
+        }
+      }
+
+      setEditNicknames(nicknameMap);
+    };
+
+    if (pendingEdits.length > 0) {
+      fetchNicknames();
+    }
+  }, [pendingEdits]);
 
   // 문서 및 편집 이력 로드 (일회성 읽기)
   const loadDocument = useCallback(async () => {
@@ -1169,6 +1192,11 @@ const CollaborativeDocumentEditor = ({
     }
   }, []);
 
+  // 닉네임 클릭 시 사용자 ID 표시
+  const handleNicknameClick = useCallback((userId, nickname) => {
+    showToast?.(`${nickname}\n고유 ID: ${userId}`);
+  }, [showToast]);
+
   // 선택 이벤트 리스너 등록
   useEffect(() => {
     document.addEventListener('selectionchange', handleSelectionChange);
@@ -1205,7 +1233,6 @@ const CollaborativeDocumentEditor = ({
 
           const editDoc = await addDoc(editHistoryRef, {
             editedBy: currentUserId,
-            editedByName: currentUserName,
             editedAt: serverTimestamp(),
             oldText: oldText,
             newText: newText,
@@ -1285,7 +1312,6 @@ const CollaborativeDocumentEditor = ({
       }
       const editData = {
         editedBy: currentUserId,
-        editedByName: currentUserName,
         editedAt: serverTimestamp(),
         type: selectionType,
         oldText: selectedText,
@@ -1567,13 +1593,23 @@ const CollaborativeDocumentEditor = ({
     try {
       // 기존 마커 수정 (id가 있으면)
       if (pendingMarker.id) {
-        const editRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory', pendingMarker.id);
+        const editRef = doc(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', pendingMarker.id);
 
-        // newText만 업데이트
-        await setDoc(editRef, {
-          newText: editInputText,
+        // 타입별로 다른 필드 업데이트
+        const updateData = {
           lastModifiedAt: serverTimestamp()
-        }, { merge: true });
+        };
+
+        if (pendingMarker.type === 'strikethrough') {
+          updateData.reason = editReasonText || '';
+        } else if (pendingMarker.type === 'highlight') {
+          updateData.newText = editInputText;
+          updateData.description = editReasonText || '';
+        } else if (pendingMarker.type === 'comment') {
+          updateData.text = editInputText;
+        }
+
+        await setDoc(editRef, updateData, { merge: true });
 
         showToast?.('수정 내용이 업데이트되었습니다');
 
@@ -1595,7 +1631,6 @@ const CollaborativeDocumentEditor = ({
       }
       const editData = {
         editedBy: currentUserId,
-        editedByName: currentUserName,
         editedAt: serverTimestamp(),
         type: pendingMarker.type,
         status: 'pending'
@@ -1674,6 +1709,14 @@ const CollaborativeDocumentEditor = ({
 
   // 편집 마커 클릭 핸들러 - 수정 모달 열기
   const handleEditMarkerClick = useCallback(async (clickedEditId, markerElement) => {
+    // 모바일에서 자판이 뜨는 것을 방지
+    if (contentRef.current) {
+      contentRef.current.blur();
+    }
+    if (fullScreenContentRef.current) {
+      fullScreenContentRef.current.blur();
+    }
+
     if (!currentDocId) {
       showToast?.('문서 ID가 없습니다');
       return;
@@ -1691,15 +1734,44 @@ const CollaborativeDocumentEditor = ({
 
       const editData = editSnap.data();
 
-      // 편집 데이터를 배열에 담아서 조회 모달 표시
-      setSelectedEdits([{ id: clickedEditId, ...editData }]);
-      setShowEditModal(true);
+      // 편집창에서 편집 권한이 있으면 수정 가능한 입력 모달 표시
+      if (showFullScreenEdit && actualCanEdit) {
+        // 마커 텍스트 가져오기
+        const markerText = markerElement?.textContent || editData.oldText || '';
+
+        // 수정 가능한 입력 모달 표시
+        setPendingMarker({
+          id: clickedEditId,
+          type: editData.type,
+          text: markerText,
+          editData: editData
+        });
+
+        // 기존 데이터 불러오기
+        if (editData.type === 'strikethrough') {
+          setEditReasonText(editData.reason || '');
+        } else if (editData.type === 'highlight') {
+          setEditInputText(editData.newText || '');
+          setEditReasonText(editData.description || '');
+        } else if (editData.type === 'comment') {
+          setEditInputText(editData.text || '');
+        }
+
+        setShowEditInputModal(true);
+      } else {
+        // 미리보기 또는 권한 없으면 조회 전용 모달 표시
+        setSelectedEdits([{ id: clickedEditId, ...editData }]);
+        setShowEditModal(true);
+      }
+
+      // 포커스 제거하여 키보드 숨김
+      document.activeElement?.blur();
 
     } catch (error) {
       console.error('편집 이력 로드 실패:', error);
       showToast?.('편집 이력을 불러올 수 없습니다');
     }
-  }, [chatRoomId, currentDocId, showToast]);
+  }, [chatRoomId, currentDocId, showToast, showFullScreenEdit, actualCanEdit]);
 
   // 취소선 적용 핸들러 - 즉시 입력창 표시
   const handleApplyStrikethrough = useCallback(() => {
@@ -1826,7 +1898,6 @@ const CollaborativeDocumentEditor = ({
 
       const editDoc = await addDoc(editHistoryRef, {
         editedBy: currentUserId,
-        editedByName: currentUserName,
         editedAt: serverTimestamp(),
         type: 'comment', // 주석 타입
         text: selectedCommentRange.text,
@@ -2007,7 +2078,7 @@ const CollaborativeDocumentEditor = ({
 
       const newMemo = {
         title: tempTitle,
-        content: content, // HTML 그대로 저장
+        content: content, // HTML 그대로 저장 (마커 포함)
         contentType: 'html', // HTML 타입 표시
         folder: 'shared',
         userId: currentUserId,
@@ -2015,19 +2086,53 @@ const CollaborativeDocumentEditor = ({
         updatedAt: serverTimestamp(),
         tags: ['임시저장', '대화방편집중'],
         temporarySave: true,
-        chatRoomId: chatRoomId
+        chatRoomId: chatRoomId,
+        // 편집 이력 정보 저장
+        hasPendingEdits: pendingEdits.length > 0,
+        pendingEditsCount: pendingEdits.length
       };
 
-      await addDoc(memosRef, newMemo);
+      const memoDoc = await addDoc(memosRef, newMemo);
 
-      showToast?.(`"${tempTitle}"이(가) 임시저장되었습니다`);
+      // 편집 이력도 함께 복사 (currentDocId가 있고 편집 이력이 있는 경우)
+      if (currentDocId && pendingEdits.length > 0) {
+        // 원본 편집 이력 경로
+        const sourceEditHistoryRef = collection(
+          db,
+          'chatRooms',
+          chatRoomId,
+          'documents',
+          currentDocId,
+          'editHistory'
+        );
+
+        // 대상 편집 이력 경로 (새로 저장된 메모)
+        const targetEditHistoryRef = collection(
+          db,
+          'chatRooms',
+          chatRoomId,
+          'documents',
+          memoDoc.id,
+          'editHistory'
+        );
+
+        // 모든 pending 편집 이력 복사
+        const editsSnap = await getDocs(query(sourceEditHistoryRef, where('status', '==', 'pending')));
+        const copyPromises = [];
+        editsSnap.forEach((editDoc) => {
+          copyPromises.push(addDoc(targetEditHistoryRef, editDoc.data()));
+        });
+        await Promise.all(copyPromises);
+      }
+
+      showToast?.(`"${tempTitle}"이(가) 임시저장되었습니다 (${pendingEdits.length}개 수정 대기)`);
     } catch (error) {
       console.error('임시저장 실패:', error);
       showToast?.('임시저장에 실패했습니다');
     } finally {
       setSaving(false);
     }
-  }, [actualIsManager, title, content, currentUserId, chatRoomId, showToast]);
+  }, [actualIsManager, title, content, currentUserId, chatRoomId, currentDocId, pendingEdits, showToast]);
 
   // 중간 적용 핸들러 - 현재 상태 그대로 저장 (모든 마커 유지)
   const handlePartialApply = useCallback(async () => {
@@ -2067,9 +2172,14 @@ const CollaborativeDocumentEditor = ({
       return;
     }
 
+    if (!currentDocId) {
+      showToast?.('문서 ID가 없습니다');
+      return;
+    }
+
     try {
-      // 1. 편집 이력 가져오기
-      const editRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc', 'editHistory', editId);
+      // 1. 편집 이력 가져오기 (올바른 경로)
+      const editRef = doc(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', editId);
       const editSnap = await getDoc(editRef);
 
       if (!editSnap.exists()) {
@@ -2152,7 +2262,7 @@ const CollaborativeDocumentEditor = ({
       console.error('편집 승인 실패:', error);
       showToast?.('편집 승인에 실패했습니다');
     }
-  }, [actualIsManager, content, chatRoomId, title, currentUserId, currentUserName, selectedEdits, showToast]);
+  }, [actualIsManager, content, chatRoomId, currentDocId, title, currentUserId, currentUserName, selectedEdits, showToast]);
 
   // 최종 적용 핸들러 - 모든 마커 처리 (편집 이력 기반)
   const handleFinalApply = useCallback(async () => {
@@ -2547,7 +2657,18 @@ const CollaborativeDocumentEditor = ({
                 <div key={edit.id} style={{ marginBottom: index < selectedEdits.length - 1 ? '20px' : '0' }}>
                   <EditInfo>
                     <InfoRow>
-                      <strong>수정자:</strong> {edit.editedByName}
+                      <strong>수정자:</strong>{' '}
+                      <span
+                        onClick={() => handleNicknameClick(edit.editedBy, editNicknames[edit.editedBy] || '익명')}
+                        style={{
+                          cursor: 'pointer',
+                          color: '#4a90e2',
+                          textDecoration: 'underline',
+                          fontWeight: '600'
+                        }}
+                      >
+                        {editNicknames[edit.editedBy] || '익명'}
+                      </span>
                     </InfoRow>
                     <InfoRow>
                       <strong>수정 시각:</strong> {edit.editedAt?.toDate?.().toLocaleString('ko-KR')}
