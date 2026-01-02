@@ -238,13 +238,18 @@ const EditorContent = styled.div`
 
 const Toolbar = styled.div`
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   padding: 8px 12px;
   background: rgba(255, 255, 255, 0.03);
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const ToolbarRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
   flex-wrap: wrap;
 `;
 
@@ -294,7 +299,11 @@ const LoadButton = styled(ToolbarButton)`
   color: #4a90e2;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  min-width: 36px;
+  padding: 8px;
+  font-size: 16px;
 
   &:hover:not(:disabled) {
     background: rgba(74, 144, 226, 0.25);
@@ -777,7 +786,11 @@ const EditButton = styled(ToolbarButton)`
   color: #4a90e2;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  min-width: 36px;
+  padding: 8px;
+  font-size: 16px;
 
   &:hover:not(:disabled) {
     background: rgba(74, 144, 226, 0.25);
@@ -917,6 +930,7 @@ const CollaborativeDocumentEditor = ({
   const [selectedMarkerDetail, setSelectedMarkerDetail] = useState(null); // 선택된 마커 정보
   const [showUserIdModal, setShowUserIdModal] = useState(false); // 사용자 ID 복사 모달
   const [selectedUserId, setSelectedUserId] = useState(''); // 선택된 사용자 ID
+  const [showApproveAllModal, setShowApproveAllModal] = useState(false); // 전체 승인 확인 모달
 
   const contentRef = useRef(null);
   const fullScreenContentRef = useRef(null);
@@ -1134,29 +1148,48 @@ const CollaborativeDocumentEditor = ({
   // 실제 문서 로드 수행
   const performLoadDocument = useCallback(async (memo) => {
     try {
-      // Firestore의 currentDoc에 저장
       const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+
+      // 1. 먼저 currentDoc에 이 메모의 편집 중인 버전이 있는지 확인
+      const currentDocSnap = await getDoc(docRef);
+      let contentToLoad = memo.content || '';
+      let titleToLoad = memo.title || '제목 없음';
+
+      if (currentDocSnap.exists()) {
+        const currentDocData = currentDocSnap.data();
+        // 같은 문서 ID이고 편집 중인 내용이 있으면 그것을 사용
+        if (currentDocData.originalMemoId === memo.id && currentDocData.content) {
+          contentToLoad = currentDocData.content;
+          titleToLoad = currentDocData.title || titleToLoad;
+          console.log('✅ 편집 중이던 문서 복원:', memo.id);
+        }
+      }
+
+      // 2. Firestore의 currentDoc에 저장
       await setDoc(docRef, {
-        title: memo.title || '제목 없음',
-        content: memo.content || '',
+        title: titleToLoad,
+        content: contentToLoad,
         originalMemoId: memo.id,
         lastEditedBy: currentUserId,
         lastEditedByName: currentUserName,
         lastEditedAt: serverTimestamp(),
-        version: 1
+        version: currentDocSnap.exists() ? (currentDocSnap.data().version || 0) + 1 : 1
       });
 
-      // 로컬 상태 업데이트
-      setTitle(memo.title || '제목 없음');
-      setContent(memo.content || '');
+      // 3. 로컬 상태 업데이트
+      setTitle(titleToLoad);
+      setContent(contentToLoad);
       setCurrentDocId(memo.id);
 
-      // contentEditable 영역 업데이트
+      // 4. contentEditable 영역 업데이트
       if (contentRef.current) {
-        contentRef.current.innerHTML = memo.content || '';
+        contentRef.current.innerHTML = contentToLoad;
+      }
+      if (fullScreenContentRef.current) {
+        fullScreenContentRef.current.innerHTML = contentToLoad;
       }
 
-      // 새 문서의 편집 이력 로드
+      // 5. 새 문서의 편집 이력 로드
       const editsRef = collection(db, 'chatRooms', chatRoomId, 'documents', memo.id, 'editHistory');
       const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
 
@@ -2389,20 +2422,25 @@ const CollaborativeDocumentEditor = ({
     }
   }, [actualIsManager, content, chatRoomId, currentDocId, title, currentUserId, currentUserName, selectedEdits, showToast]);
 
-  // 최종 적용 핸들러 - 모든 마커 처리 (편집 이력 기반)
-  const handleFinalApply = useCallback(async () => {
+  // 전체 승인 버튼 클릭 - 확인 모달 표시
+  const handleFinalApply = useCallback(() => {
     if (!actualIsManager) {
-      showToast?.('매니저만 최종 적용할 수 있습니다');
+      showToast?.('매니저만 전체 승인할 수 있습니다');
       return;
     }
+    setShowApproveAllModal(true);
+  }, [actualIsManager, showToast]);
 
+  // 전체 승인 실행 - 모든 마커 처리 (편집 이력 기반)
+  const performApproveAll = useCallback(async () => {
     setSaving(true);
+    setShowApproveAllModal(false);
 
     try {
       // 1. 모든 pending 편집 이력 가져오기 (문서별로)
       const editsRef = getEditHistoryRef(currentDocId);
       if (!editsRef) {
-        showToast?.('문서 ID가 없어 최종 적용할 수 없습니다');
+        showToast?.('문서 ID가 없어 전체 승인할 수 없습니다');
         setSaving(false);
         return;
       }
@@ -2459,7 +2497,7 @@ const CollaborativeDocumentEditor = ({
 
       const finalContent = tempDiv.innerHTML;
 
-      // Firestore에 최종 적용된 내용 저장
+      // Firestore에 전체 승인된 내용 저장
       const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
       await setDoc(docRef, {
         title,
@@ -2467,7 +2505,7 @@ const CollaborativeDocumentEditor = ({
         lastEditedBy: currentUserId,
         lastEditedByName: currentUserName,
         lastEditedAt: serverTimestamp(),
-        finalApplied: true, // 최종 적용 표시
+        finalApplied: true, // 전체 승인 표시
         partialApplied: false,
         version: (await getDoc(docRef)).data()?.version || 0 + 1
       }, { merge: true });
@@ -2489,14 +2527,14 @@ const CollaborativeDocumentEditor = ({
       }
       setPendingEdits([]);
 
-      showToast?.('모든 수정사항이 최종 적용되었습니다');
+      showToast?.('모든 수정 제안이 승인되었습니다');
     } catch (error) {
-      console.error('최종 적용 실패:', error);
-      showToast?.('최종 적용에 실패했습니다');
+      console.error('전체 승인 실패:', error);
+      showToast?.('전체 승인에 실패했습니다');
     } finally {
       setSaving(false);
     }
-  }, [actualIsManager, title, content, currentUserId, currentUserName, chatRoomId, showToast]);
+  }, [title, content, currentUserId, currentUserName, chatRoomId, showToast, currentDocId, getEditHistoryRef]);
 
   // 전체 리셋 핸들러 - 모든 수정 마커를 제거하고 원본 텍스트로 복원
   const handleResetAll = useCallback(() => {
@@ -2757,78 +2795,67 @@ const CollaborativeDocumentEditor = ({
       <EditorContent $collapsed={collapsed}>
         {/* 도구 모음 */}
         <Toolbar>
-          {onLoadFromShared && actualIsManager && (
-            <LoadButton onClick={handleLoadClick} title="공유 폴더에서 불러오기">
-              <FolderOpen size={14} />
-              불러오기
-            </LoadButton>
-          )}
+          {/* 첫 번째 줄: 불러오기(아이콘만), 편집(아이콘만), 전체승인, 전체리셋 */}
+          <ToolbarRow>
+            {onLoadFromShared && actualIsManager && (
+              <LoadButton onClick={handleLoadClick} title="공유 폴더에서 불러오기">
+                📂
+              </LoadButton>
+            )}
 
-          {actualCanEdit ? (
-            <EditButton onClick={() => setShowFullScreenEdit(true)} title="큰 화면에서 편집하기">
-              <Maximize2 size={14} />
-              편집
-            </EditButton>
-          ) : (
-            <EditButton onClick={() => setShowFullScreenEdit(true)} title="큰 화면에서 보기">
-              <Eye size={14} />
-              크게보기
-            </EditButton>
-          )}
+            {actualCanEdit ? (
+              <EditButton onClick={() => setShowFullScreenEdit(true)} title="큰 화면에서 편집하기">
+                ✏️
+              </EditButton>
+            ) : (
+              <EditButton onClick={() => setShowFullScreenEdit(true)} title="큰 화면에서 보기">
+                👁️
+              </EditButton>
+            )}
 
-          {actualIsManager && (
-            <>
+            {actualIsManager && (
+              <>
+                <FinalApplyButton
+                  onClick={handleFinalApply}
+                  disabled={saving || !title.trim() || pendingEdits.length === 0}
+                  title="전체 승인 (모든 수정 제안 승인)"
+                >
+                  <CheckCircle size={14} />
+                  전체승인
+                </FinalApplyButton>
+
+                <ResetButton
+                  onClick={handleResetAll}
+                  disabled={saving || pendingEdits.length === 0}
+                  title="모든 수정 표시 삭제"
+                >
+                  <RotateCcw size={14} />
+                  전체리셋
+                </ResetButton>
+              </>
+            )}
+
+            {!actualIsManager && (
               <SaveButton
-                onClick={handleTemporarySave}
+                onClick={handleDownloadToShared}
                 disabled={saving || !title.trim()}
-                title="임시저장 (HTML 마커 유지)"
+                title="공유 폴더에 다운로드"
               >
-                <FileText size={14} />
-                {saving ? '저장 중...' : '임시저장'}
+                <Download size={14} />
+                {saving ? '다운로드 중...' : '다운로드'}
               </SaveButton>
+            )}
 
-              <PartialApplyButton
-                onClick={handlePartialApply}
-                disabled={saving || !title.trim()}
-                title="중간 적용 (현재 상태 저장)"
-              >
-                <Save size={14} />
-                중간 적용
-              </PartialApplyButton>
+            {!actualCanEdit && (
+              <span style={{ color: '#888', fontSize: '12px' }}>
+                • 읽기 전용 모드
+              </span>
+            )}
+          </ToolbarRow>
 
-              <FinalApplyButton
-                onClick={handleFinalApply}
-                disabled={saving || !title.trim() || pendingEdits.length === 0}
-                title="최종 적용 (모든 마커 처리)"
-              >
-                <CheckCircle size={14} />
-                최종 적용
-              </FinalApplyButton>
-
-              <ResetButton
-                onClick={handleResetAll}
-                disabled={saving || pendingEdits.length === 0}
-                title="모든 수정 표시 삭제"
-              >
-                <RotateCcw size={14} />
-                전체 리셋
-              </ResetButton>
-            </>
-          )}
-
-          {!actualIsManager && (
-            <SaveButton
-              onClick={handleDownloadToShared}
-              disabled={saving || !title.trim()}
-              title="공유 폴더에 다운로드"
-            >
-              <Download size={14} />
-              {saving ? '다운로드 중...' : '다운로드'}
-            </SaveButton>
-          )}
-
+          {/* 두 번째 줄: 수정 대기중 표시, 위치찾기 */}
           {pendingEdits.length > 0 && (
-            <>
+            <ToolbarRow>
               <PendingEditsCount title="대기 중인 수정 사항">
                 <Info size={14} />
                 {pendingEdits.length}개 수정 대기중
@@ -2859,13 +2886,7 @@ const CollaborativeDocumentEditor = ({
                   <ChevronRight size={14} />
                 </EditNavigationButton>
               </EditNavigationGroup>
-            </>
-          )}
-
-          {!actualCanEdit && (
-            <span style={{ color: '#888', fontSize: '12px' }}>
-              • 읽기 전용 모드
-            </span>
+            </ToolbarRow>
           )}
         </Toolbar>
 
@@ -3360,6 +3381,87 @@ const CollaborativeDocumentEditor = ({
         </Modal>
       )}
 
+      {/* 전체 승인 확인 모달 */}
+      {showApproveAllModal && (
+        <Modal onClick={() => setShowApproveAllModal(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <ModalTitle>✨ 전체 승인 확인</ModalTitle>
+              <IconButton onClick={() => setShowApproveAllModal(false)}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+
+            <ModalBody>
+              <div style={{
+                marginBottom: '20px',
+                fontSize: '15px',
+                lineHeight: '1.8',
+                color: '#e0e0e0'
+              }}>
+                현재 <strong style={{ color: '#4a90e2' }}>{pendingEdits.length}개의 수정 제안</strong>을 모두 승인하시겠습니까?
+              </div>
+
+              <div style={{
+                background: 'rgba(74, 144, 226, 0.1)',
+                border: '1px solid rgba(74, 144, 226, 0.3)',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '16px',
+                fontSize: '13px',
+                lineHeight: '1.8',
+                color: '#e0e0e0'
+              }}>
+                <div style={{ fontWeight: '600', marginBottom: '12px', color: '#4a90e2', fontSize: '14px' }}>
+                  📋 승인 시 처리 내용
+                </div>
+                <div style={{ marginBottom: '6px' }}>
+                  • <strong>취소선</strong>: 대체 텍스트로 교체하거나 삭제됩니다
+                </div>
+                <div style={{ marginBottom: '6px' }}>
+                  • <strong>형광펜</strong>: 대체 텍스트로 교체하거나 마커만 제거됩니다
+                </div>
+                <div>
+                  • 모든 수정 제안이 문서에 <strong>확정 반영</strong>됩니다
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(255, 193, 7, 0.1)',
+                border: '1px solid rgba(255, 193, 7, 0.3)',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '16px',
+                fontSize: '13px',
+                lineHeight: '1.8',
+                color: '#e0e0e0'
+              }}>
+                <div style={{ fontWeight: '600', marginBottom: '8px', color: '#ffc107' }}>
+                  ⚠️ 주의
+                </div>
+                <div style={{ marginBottom: '6px' }}>
+                  • 이 작업은 <strong style={{ color: '#ffc107' }}>되돌릴 수 없습니다</strong>
+                </div>
+                <div>
+                  • 개별 검토가 필요한 경우 마커를 클릭하여 하나씩 승인하세요
+                </div>
+              </div>
+
+              <ModalActions>
+                <RejectButton onClick={() => setShowApproveAllModal(false)}>
+                  <X size={18} />
+                  취소
+                </RejectButton>
+                <ConfirmButton onClick={performApproveAll}>
+                  <CheckCircle size={18} />
+                  실행
+                </ConfirmButton>
+              </ModalActions>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
       {/* 전체 리셋 확인 모달 */}
       {showResetConfirmModal && (
         <Modal onClick={() => setShowResetConfirmModal(false)}>
@@ -3419,7 +3521,7 @@ const CollaborativeDocumentEditor = ({
                   style={{ background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)' }}
                 >
                   <RotateCcw size={18} />
-                  전체 리셋 실행
+                  실행
                 </ConfirmButton>
               </ModalActions>
             </ModalBody>
