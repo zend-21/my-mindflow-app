@@ -20,6 +20,73 @@ import {
 import { db } from '../../firebase/config';
 import { getUserNickname } from '../../services/nicknameService';
 
+// ===== Range 관련 유틸리티 함수들 (컴포넌트 외부) =====
+// 컨테이너 기준 절대 오프셋 계산
+function getAbsoluteOffset(container, node, offset) {
+  let absoluteOffset = 0;
+  const walker = document.createTreeWalker(
+    container,
+    NodeFilter.SHOW_TEXT,
+    null
+  );
+
+  let currentNode;
+  while ((currentNode = walker.nextNode())) {
+    if (currentNode === node) {
+      return absoluteOffset + offset;
+    }
+    absoluteOffset += currentNode.nodeValue.length;
+  }
+
+  return absoluteOffset;
+}
+
+// 절대 오프셋에서 노드와 오프셋 찾기
+function getNodeAndOffset(container, absoluteOffset) {
+  const walker = document.createTreeWalker(
+    container,
+    NodeFilter.SHOW_TEXT,
+    null
+  );
+
+  let currentOffset = 0;
+  let currentNode;
+
+  while ((currentNode = walker.nextNode())) {
+    const nodeLength = currentNode.nodeValue.length;
+    if (currentOffset + nodeLength >= absoluteOffset) {
+      return {
+        node: currentNode,
+        offset: absoluteOffset - currentOffset
+      };
+    }
+    currentOffset += nodeLength;
+  }
+
+  return null;
+}
+
+// Range를 절대 오프셋으로 변환
+function rangeToAbsoluteOffset(range, container) {
+  const startOffset = getAbsoluteOffset(container, range.startContainer, range.startOffset);
+  const endOffset = getAbsoluteOffset(container, range.endContainer, range.endOffset);
+  return { startOffset, endOffset };
+}
+
+// 절대 오프셋을 Range로 복원
+function absoluteOffsetToRange(container, startOffset, endOffset) {
+  const range = document.createRange();
+  const startPoint = getNodeAndOffset(container, startOffset);
+  const endPoint = getNodeAndOffset(container, endOffset);
+
+  if (startPoint && endPoint) {
+    range.setStart(startPoint.node, startPoint.offset);
+    range.setEnd(endPoint.node, endPoint.offset);
+  }
+
+  return range;
+}
+
 // 스타일 컴포넌트들 (기존과 유사하지만 contentEditable용으로 수정)
 const EditorContainer = styled.div`
   position: relative;
@@ -262,7 +329,7 @@ const ContentEditableArea = styled.div`
     border-bottom: 2px solid #ffc107;
     cursor: pointer;
     position: relative;
-    padding: 2px 20px 2px 4px;
+    padding: 2px 4px;
     border-radius: 3px;
     transition: all 0.2s;
 
@@ -270,26 +337,6 @@ const ContentEditableArea = styled.div`
       background: linear-gradient(180deg, rgba(255, 235, 59, 0.5), rgba(255, 193, 7, 0.5));
     }
 
-    /* 편집 권한이 있을 때만 X 버튼 표시 */
-    &[data-can-edit="true"]:hover::after {
-      content: '✕';
-      position: absolute;
-      right: 4px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 12px;
-      font-weight: bold;
-      color: #f57c00;
-      background: rgba(255, 255, 255, 0.9);
-      width: 16px;
-      height: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 3px;
-      cursor: pointer;
-      z-index: 10;
-    }
   }
 
   /* 컨펌된 수정 (형광펜 제거) */
@@ -305,7 +352,7 @@ const ContentEditableArea = styled.div`
     text-decoration-color: #ff5757;
     text-decoration-thickness: 2px;
     background: rgba(255, 87, 87, 0.1);
-    padding: 2px 20px 2px 4px;
+    padding: 2px 4px;
     border-radius: 3px;
     cursor: pointer;
     position: relative;
@@ -315,27 +362,6 @@ const ContentEditableArea = styled.div`
     &:hover {
       background: rgba(255, 87, 87, 0.2);
       opacity: 1;
-    }
-
-    /* 편집 권한이 있을 때만 X 버튼 표시 */
-    &[data-can-edit="true"]:hover::after {
-      content: '✕';
-      position: absolute;
-      right: 4px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 12px;
-      font-weight: bold;
-      color: #ff5757;
-      background: rgba(255, 255, 255, 0.9);
-      width: 16px;
-      height: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 3px;
-      cursor: pointer;
-      z-index: 10;
     }
   }
 
@@ -665,7 +691,7 @@ const FullScreenEditArea = styled.div`
     text-decoration-color: #ff5757;
     text-decoration-thickness: 2px;
     background: rgba(255, 87, 87, 0.1);
-    padding: 2px 20px 2px 4px;
+    padding: 2px 4px;
     border-radius: 3px;
     cursor: pointer;
     position: relative;
@@ -676,27 +702,6 @@ const FullScreenEditArea = styled.div`
       background: rgba(255, 87, 87, 0.2);
       opacity: 1;
     }
-
-    /* 편집 권한이 있을 때만 X 버튼 표시 */
-    &[data-can-edit="true"]:hover::after {
-      content: '✕';
-      position: absolute;
-      right: 4px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 12px;
-      font-weight: bold;
-      color: #ff5757;
-      background: rgba(255, 255, 255, 0.9);
-      width: 16px;
-      height: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 3px;
-      cursor: pointer;
-      z-index: 10;
-    }
   }
 
   /* 형광펜 스타일 */
@@ -705,7 +710,7 @@ const FullScreenEditArea = styled.div`
     border-bottom: 2px solid #ffc107;
     cursor: pointer;
     position: relative;
-    padding: 2px 20px 2px 4px;
+    padding: 2px 4px;
     border-radius: 3px;
     transition: all 0.2s;
 
@@ -713,26 +718,6 @@ const FullScreenEditArea = styled.div`
       background: linear-gradient(180deg, rgba(255, 235, 59, 0.5), rgba(255, 193, 7, 0.5));
     }
 
-    /* 편집 권한이 있을 때만 X 버튼 표시 */
-    &[data-can-edit="true"]:hover::after {
-      content: '✕';
-      position: absolute;
-      right: 4px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 12px;
-      font-weight: bold;
-      color: #f57c00;
-      background: rgba(255, 255, 255, 0.9);
-      width: 16px;
-      height: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 3px;
-      cursor: pointer;
-      z-index: 10;
-    }
   }
 
   .highlight-confirmed {
@@ -928,6 +913,10 @@ const CollaborativeDocumentEditor = ({
   const [currentDocId, setCurrentDocId] = useState(null); // 현재 열린 문서 ID
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false); // 전체 리셋 확인 모달
   const [editNicknames, setEditNicknames] = useState({}); // 편집 이력의 닉네임 { userId: nickname }
+  const [showMarkerDetailModal, setShowMarkerDetailModal] = useState(false); // 마커 상세 정보 모달
+  const [selectedMarkerDetail, setSelectedMarkerDetail] = useState(null); // 선택된 마커 정보
+  const [showUserIdModal, setShowUserIdModal] = useState(false); // 사용자 ID 복사 모달
+  const [selectedUserId, setSelectedUserId] = useState(''); // 선택된 사용자 ID
 
   const contentRef = useRef(null);
   const fullScreenContentRef = useRef(null);
@@ -1851,9 +1840,28 @@ const CollaborativeDocumentEditor = ({
       // 프로그래밍 방식 변경 플래그 설정
       programmaticChangeRef.current = true;
 
-      // 취소선/형광펜: Range를 사용하여 마커 삽입
-      if (pendingMarker.range) {
-        const range = pendingMarker.range;
+      // 취소선/형광펜: 절대 오프셋에서 Range 복원하여 마커 삽입
+      if (pendingMarker.absoluteOffsets && pendingMarker.containerRef) {
+        const container = pendingMarker.containerRef.current;
+        const { startOffset, endOffset } = pendingMarker.absoluteOffsets;
+
+        // 절대 오프셋에서 Range 복원
+        const range = absoluteOffsetToRange(container, startOffset, endOffset);
+
+        // 디버깅: 마커 적용 시 range 정보 출력
+        console.log('🎯 마커 적용 시도:', {
+          type: pendingMarker.type,
+          absoluteOffsets: pendingMarker.absoluteOffsets,
+          startContainer: range.startContainer,
+          startOffset: range.startOffset,
+          endContainer: range.endContainer,
+          endOffset: range.endOffset,
+          text: pendingMarker.text,
+          textLength: pendingMarker.text.length,
+          rangeText: range.toString(),
+          rangeTextLength: range.toString().length
+        });
+
         const markerSpan = document.createElement('span');
 
         if (pendingMarker.type === 'strikethrough') {
@@ -1875,7 +1883,7 @@ const CollaborativeDocumentEditor = ({
           range.surroundContents(markerSpan);
           console.log(`✅ ${pendingMarker.type} 마커 삽입 완료`);
         } catch (error) {
-          console.error('마커 삽입 실패:', error);
+          console.error('❌ 마커 삽입 실패:', error);
           showToast?.('마커 삽입에 실패했습니다');
           return;
         }
@@ -1898,7 +1906,7 @@ const CollaborativeDocumentEditor = ({
       console.error('편집 저장 실패:', error);
       showToast?.('편집 저장에 실패했습니다');
     }
-  }, [pendingMarker, editInputText, editReasonText, chatRoomId, currentUserId, currentUserName, showFullScreenEdit, debouncedSave, showToast, currentDocId, getEditHistoryRef]);
+  }, [pendingMarker, editInputText, editReasonText, chatRoomId, currentUserId, currentUserName, showFullScreenEdit, debouncedSave, showToast, currentDocId, getEditHistoryRef, actualCanEdit]);
 
   // 편집 마커 클릭 핸들러 - 수정 모달 열기
   const handleEditMarkerClick = useCallback(async (clickedEditId, markerElement) => {
@@ -1988,14 +1996,26 @@ const CollaborativeDocumentEditor = ({
       return;
     }
 
-    // 선택 범위 저장
-    savedRangeRef.current = range.cloneRange();
+    // 선택 범위를 절대 오프셋으로 저장 (DOM 변경에 안전)
+    const absoluteOffsets = rangeToAbsoluteOffset(range, activeRef.current);
+
+    // 디버깅: range 정보 출력
+    console.log('🔍 취소선 range 저장:', {
+      startContainer: range.startContainer,
+      startOffset: range.startOffset,
+      endContainer: range.endContainer,
+      endOffset: range.endOffset,
+      text: selectedText,
+      length: selectedText.length,
+      absoluteOffsets: absoluteOffsets
+    });
 
     // 입력 모달 표시 (취소선 - 삭제 이유 입력)
     setPendingMarker({
       type: 'strikethrough',
       text: selectedText,
-      range: savedRangeRef.current
+      absoluteOffsets: absoluteOffsets,
+      containerRef: activeRef
     });
     setEditInputText('');
     setShowEditInputModal(true);
@@ -2023,14 +2043,26 @@ const CollaborativeDocumentEditor = ({
       return;
     }
 
-    // 선택 범위 저장
-    savedRangeRef.current = range.cloneRange();
+    // 선택 범위를 절대 오프셋으로 저장 (DOM 변경에 안전)
+    const absoluteOffsets = rangeToAbsoluteOffset(range, activeRef.current);
+
+    // 디버깅: range 정보 출력
+    console.log('🔍 형광펜 range 저장:', {
+      startContainer: range.startContainer,
+      startOffset: range.startOffset,
+      endContainer: range.endContainer,
+      endOffset: range.endOffset,
+      text: selectedText,
+      length: selectedText.length,
+      absoluteOffsets: absoluteOffsets
+    });
 
     // 입력 모달 표시 (형광펜 - 대체 텍스트 + 설명 입력)
     setPendingMarker({
       type: 'highlight',
       text: selectedText,
-      range: savedRangeRef.current
+      absoluteOffsets: absoluteOffsets,
+      containerRef: activeRef
     });
     setEditInputText('');
     setShowEditInputModal(true);
@@ -2597,11 +2629,9 @@ const CollaborativeDocumentEditor = ({
     }
   }, [actualCanEdit, currentDocId, content, currentUserId, currentUserName, chatRoomId, showToast, getEditHistoryRef]);
 
-  // 마커 클릭 이벤트 핸들러 (X 버튼 영역 클릭 시 취소)
+  // 마커 클릭 이벤트 핸들러 (상세 정보 모달 표시)
   useEffect(() => {
-    const handleMarkerClick = (e) => {
-      if (!actualCanEdit) return;
-
+    const handleMarkerClick = async (e) => {
       const target = e.target;
 
       // 마커 요소인지 확인
@@ -2609,16 +2639,42 @@ const CollaborativeDocumentEditor = ({
         const editId = target.dataset.editId;
         if (!editId) return;
 
-        // X 버튼 영역 클릭 판정 (오른쪽 20px 영역)
-        const rect = target.getBoundingClientRect();
-        const clickX = e.clientX - rect.left;
-        const width = rect.width;
+        e.preventDefault();
+        e.stopPropagation();
 
-        // 오른쪽 20px 영역 클릭 시 취소
-        if (clickX > width - 20) {
-          e.preventDefault();
-          e.stopPropagation();
-          handleCancelEdit(editId);
+        // Firestore에서 편집 정보 가져오기
+        try {
+          const editRef = doc(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', editId);
+          const editSnap = await getDoc(editRef);
+
+          if (editSnap.exists()) {
+            const editData = editSnap.data();
+
+            // 제안자의 WS 코드 조회
+            let wsCode = null;
+            if (editData.editedBy) {
+              try {
+                const workspaceId = `workspace_${editData.editedBy}`;
+                const workspaceRef = doc(db, 'workspaces', workspaceId);
+                const workspaceSnap = await getDoc(workspaceRef);
+                if (workspaceSnap.exists()) {
+                  wsCode = workspaceSnap.data().workspaceCode;
+                }
+              } catch (wsError) {
+                console.error('WS 코드 조회 실패:', wsError);
+              }
+            }
+
+            setSelectedMarkerDetail({
+              id: editId,
+              ...editData,
+              wsCode: wsCode, // WS 코드 추가
+              markerType: target.classList.contains('strikethrough') ? 'strikethrough' : 'highlight'
+            });
+            setShowMarkerDetailModal(true);
+          }
+        } catch (error) {
+          console.error('마커 정보 로드 실패:', error);
         }
       }
     };
@@ -2643,7 +2699,7 @@ const CollaborativeDocumentEditor = ({
         fullScreenEl.removeEventListener('click', handleMarkerClick);
       }
     };
-  }, [actualCanEdit, handleCancelEdit]);
+  }, [chatRoomId, currentDocId]);
 
   // 권한 타입 결정
   const permissionType = actualIsManager ? 'manager' : actualCanEdit ? 'editor' : 'viewer';
@@ -3364,6 +3420,169 @@ const CollaborativeDocumentEditor = ({
                 >
                   <RotateCcw size={18} />
                   전체 리셋 실행
+                </ConfirmButton>
+              </ModalActions>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* 마커 상세 정보 모달 */}
+      {showMarkerDetailModal && selectedMarkerDetail && (
+        <Modal onClick={() => {
+          setShowMarkerDetailModal(false);
+          setSelectedMarkerDetail(null);
+        }}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <ModalTitle>
+                {selectedMarkerDetail.markerType === 'strikethrough' ? '✏️ 취소선 수정 제안' : '💡 형광펜 수정 제안'}
+              </ModalTitle>
+              <IconButton onClick={() => {
+                setShowMarkerDetailModal(false);
+                setSelectedMarkerDetail(null);
+              }}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+
+            <ModalBody>
+              <EditInfo>
+                <InfoRow>
+                  <strong>제안자:</strong>{' '}
+                  <span
+                    onClick={() => {
+                      if (selectedMarkerDetail.wsCode) {
+                        setSelectedUserId(selectedMarkerDetail.wsCode);
+                        setShowUserIdModal(true);
+                      }
+                    }}
+                    style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                    title="클릭하여 사용자 ID 확인"
+                  >
+                    {editNicknames[selectedMarkerDetail.editedBy] || '알 수 없음'}
+                  </span>
+                </InfoRow>
+                <InfoRow>
+                  <strong>제안 시각:</strong>{' '}
+                  {selectedMarkerDetail.editedAt?.toDate
+                    ? selectedMarkerDetail.editedAt.toDate().toLocaleString('ko-KR')
+                    : '알 수 없음'}
+                </InfoRow>
+                <InfoRow>
+                  <strong>
+                    {selectedMarkerDetail.markerType === 'strikethrough'
+                      ? '원본 텍스트(삭제할 텍스트):'
+                      : '원본 텍스트:'}
+                  </strong>{' '}
+                  {selectedMarkerDetail.oldText || '(없음)'}
+                </InfoRow>
+
+                {selectedMarkerDetail.markerType === 'strikethrough' && (
+                  <InfoRow>
+                    <strong>삭제 이유:</strong> {selectedMarkerDetail.reason || '(이유 없음)'}
+                  </InfoRow>
+                )}
+
+                {selectedMarkerDetail.markerType === 'highlight' && (
+                  <>
+                    <InfoRow>
+                      <strong>대체 텍스트:</strong> {selectedMarkerDetail.newText || '(공란)'}
+                    </InfoRow>
+                    {selectedMarkerDetail.description && (
+                      <InfoRow>
+                        <strong>설명:</strong> {selectedMarkerDetail.description}
+                      </InfoRow>
+                    )}
+                  </>
+                )}
+              </EditInfo>
+
+              {actualCanEdit && (
+                <ModalActions>
+                  <RejectButton onClick={async () => {
+                    // 거부 - 마커만 제거
+                    try {
+                      await handleCancelEdit(selectedMarkerDetail.id);
+                      setShowMarkerDetailModal(false);
+                      setSelectedMarkerDetail(null);
+                      showToast?.('수정 제안을 거부했습니다');
+                    } catch (error) {
+                      console.error('거부 실패:', error);
+                      showToast?.('거부에 실패했습니다');
+                    }
+                  }}>
+                    <X size={18} />
+                    거부
+                  </RejectButton>
+                  <ConfirmButton onClick={async () => {
+                    // 승인 - 편집 내역에서 승인 처리
+                    try {
+                      setSelectedEdits([selectedMarkerDetail.id]);
+                      setShowMarkerDetailModal(false);
+                      setSelectedMarkerDetail(null);
+                      setShowEditModal(true);
+                    } catch (error) {
+                      console.error('승인 실패:', error);
+                      showToast?.('승인에 실패했습니다');
+                    }
+                  }}>
+                    <Check size={18} />
+                    승인
+                  </ConfirmButton>
+                </ModalActions>
+              )}
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* 사용자 ID 복사 모달 */}
+      {showUserIdModal && selectedUserId && (
+        <Modal onClick={() => setShowUserIdModal(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <ModalHeader>
+              <ModalTitle>사용자 고유 ID</ModalTitle>
+              <IconButton onClick={() => setShowUserIdModal(false)}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+
+            <ModalBody>
+              <div style={{
+                background: 'rgba(0, 0, 0, 0.3)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '16px',
+                textAlign: 'center'
+              }}>
+                <div style={{
+                  fontSize: '13px',
+                  color: '#888',
+                  marginBottom: '8px'
+                }}>
+                  6자리 고유 ID
+                </div>
+                <div style={{
+                  fontSize: '24px',
+                  fontWeight: 'bold',
+                  color: '#4a90e2',
+                  fontFamily: 'monospace',
+                  letterSpacing: '2px'
+                }}>
+                  {(selectedUserId.split('-')[1] || selectedUserId.slice(0, 6)).toUpperCase()}
+                </div>
+              </div>
+
+              <ModalActions>
+                <ConfirmButton onClick={() => {
+                  const shortId = (selectedUserId.split('-')[1] || selectedUserId.slice(0, 6)).toUpperCase();
+                  navigator.clipboard.writeText(shortId);
+                  showToast?.(`ID 복사됨: ${shortId}`);
+                  setShowUserIdModal(false);
+                }}>
+                  복사
                 </ConfirmButton>
               </ModalActions>
             </ModalBody>
