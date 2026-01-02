@@ -1,7 +1,7 @@
 // Toast 컴포넌트
 import styled, { keyframes } from 'styled-components';
 import { X, Copy, Check } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 // 애니메이션
 const fadeIn = keyframes`
@@ -9,13 +9,18 @@ const fadeIn = keyframes`
   to { opacity: 1; }
 `;
 
+const fadeOut = keyframes`
+  from { opacity: 1; }
+  to { opacity: 0; }
+`;
+
 const slideUp = keyframes`
   from { transform: translateY(20px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 `;
 
-// 스타일 컴포넌트
-const ToastOverlay = styled.div`
+// 모달 오버레이 (ID 복사용)
+const ModalOverlay = styled.div`
   position: fixed;
   top: 0;
   left: 0;
@@ -29,7 +34,23 @@ const ToastOverlay = styled.div`
   animation: ${fadeIn} 0.2s ease-out;
 `;
 
-const ToastBox = styled.div`
+// 간단한 토스트 오버레이 (일반 알림용)
+const SimpleToastOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 500000;
+  pointer-events: none;
+  animation: ${props => props.$closing ? fadeOut : fadeIn} 0.2s ease-out;
+`;
+
+// 모달 박스 (ID 복사용)
+const ModalBox = styled.div`
   background: rgba(30, 30, 30, 0.98);
   color: white;
   padding: 24px;
@@ -43,6 +64,22 @@ const ToastBox = styled.div`
   max-width: 400px;
   z-index: 500001;
   border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+// 간단한 토스트 박스 (일반 알림용)
+const SimpleToastBox = styled.div`
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 16px 24px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  animation: ${slideUp} 0.3s cubic-bezier(0.2, 0, 0, 1);
+  text-align: center;
+  min-width: 200px;
+  max-width: 400px;
+  pointer-events: auto;
 `;
 
 const ToastHeader = styled.div`
@@ -123,19 +160,35 @@ const CopyButton = styled.button`
  */
 const Toast = ({ message, onClose }) => {
   const [copied, setCopied] = useState(false);
-
-  if (!message) return null;
+  const [closing, setClosing] = useState(false);
 
   // "대화명 (ID: WXWF7U)" 형식에서 ID 추출
   const extractId = (msg) => {
+    if (!msg || typeof msg !== 'string') return null;
     const match = msg.match(/\(ID:\s*([^)]+)\)/);
     return match ? match[1].trim() : null;
   };
 
+  const id = extractId(message);
+
+  // ID가 없으면 자동으로 사라지는 토스트
+  useEffect(() => {
+    if (!message || id) return; // ID가 있으면 자동 닫기 안 함
+
+    const timer = setTimeout(() => {
+      setClosing(true);
+      setTimeout(() => {
+        if (onClose) onClose();
+      }, 200); // 페이드아웃 애니메이션 후 닫기
+    }, 2000); // 2초 후 사라짐
+
+    return () => clearTimeout(timer);
+  }, [message, id, onClose]);
+
   const handleCopy = () => {
-    const id = extractId(message);
-    if (id) {
-      navigator.clipboard.writeText(id);
+    const userId = extractId(message);
+    if (userId) {
+      navigator.clipboard.writeText(userId);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -147,30 +200,38 @@ const Toast = ({ message, onClose }) => {
     }
   };
 
-  const id = extractId(message);
+  if (!message) return null;
 
-  return (
-    <ToastOverlay onClick={handleClose}>
-      <ToastBox onClick={(e) => e.stopPropagation()}>
-        <ToastHeader>
-          <ToastTitle>사용자 정보</ToastTitle>
-          <CloseButton onClick={handleClose}>
-            <X size={20} />
-          </CloseButton>
-        </ToastHeader>
+  // ID가 있으면 모달 형식 (수동 닫기)
+  if (id) {
+    return (
+      <ModalOverlay onClick={handleClose}>
+        <ModalBox onClick={(e) => e.stopPropagation()}>
+          <ToastHeader>
+            <ToastTitle>사용자 정보</ToastTitle>
+            <CloseButton onClick={handleClose}>
+              <X size={20} />
+            </CloseButton>
+          </ToastHeader>
 
-        <ToastMessage>{message}</ToastMessage>
+          <ToastMessage>{message}</ToastMessage>
 
-        {id && (
           <ButtonGroup>
             <CopyButton onClick={handleCopy} disabled={copied}>
               {copied ? <Check size={16} /> : <Copy size={16} />}
               {copied ? '복사됨!' : 'ID 복사'}
             </CopyButton>
           </ButtonGroup>
-        )}
-      </ToastBox>
-    </ToastOverlay>
+        </ModalBox>
+      </ModalOverlay>
+    );
+  }
+
+  // ID가 없으면 간단한 토스트 (자동 사라짐)
+  return (
+    <SimpleToastOverlay $closing={closing}>
+      <SimpleToastBox>{message}</SimpleToastBox>
+    </SimpleToastOverlay>
   );
 };
 

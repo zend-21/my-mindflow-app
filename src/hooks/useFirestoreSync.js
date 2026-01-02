@@ -223,18 +223,12 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
               if (firestoreTime > effectiveSyncedTime) {
                 // Firestore가 더 최신 → 다른 기기에서 수정됨
-                console.warn(`⚠️ 다른 기기에서 수정 감지: ${firestoreMemo.id}`);
-                console.warn(`  → Firestore 우선 (${new Date(firestoreTime).toLocaleString()} > ${new Date(effectiveSyncedTime).toLocaleString()})`);
+                console.log(`📥 메모 ${firestoreMemo.id}: Firestore 우선`);
                 return firestoreMemo;
               } else {
                 // 로컬이 더 최신 또는 저장 실패 → 로컬 우선
-                console.warn(`⚠️ 로컬 변경 감지: ${firestoreMemo.id}`);
-                console.warn(`  → 로컬 우선 (${new Date(localTime).toLocaleString()}) - 재저장 시도`);
-
-                // 재저장 시도 (할당량 초과 시 자동으로 실패하고 다음에 재시도)
-                saveMemoToFirestore(userId, localMemo).catch(err => {
-                  console.error('재저장 실패:', err);
-                });
+                // ⚠️ 재저장은 사용자가 직접 수정할 때만 수행 (무한 루프 방지)
+                console.log(`📝 메모 ${firestoreMemo.id}: 로컬 우선`);
                 return localMemo;
               }
             }
@@ -250,14 +244,12 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
             if (!lastSaved) {
               // 한 번도 저장 안 됨 → 진짜 새 메모
-              console.log(`🆕 새 메모 발견: ${localMemo.id} - 업로드 시도`);
+              // ⚠️ 재저장은 사용자가 직접 수정할 때만 수행 (무한 루프 방지)
+              console.log(`🆕 새 메모 발견: ${localMemo.id}`);
               mergedMemos.push(localMemo);
-              saveMemoToFirestore(userId, localMemo).catch(err => {
-                console.error('새 메모 업로드 실패:', err);
-              });
             } else {
               // 저장 기록 있는데 Firestore에 없음 → 다른 기기에서 삭제됨
-              console.warn(`🗑️ 다른 기기에서 삭제됨: ${localMemo.id}`);
+              console.log(`🗑️ 메모 ${localMemo.id}: 다른 기기에서 삭제됨`);
               localStorage.removeItem(`firestore_saved_memo_${localMemo.id}`);
               // mergedMemos에 추가 안 함 (삭제 반영)
             }
@@ -287,14 +279,12 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
               if (firestoreTime > effectiveSyncedTime) {
                 // Firestore가 더 최신 → 다른 기기에서 수정됨
-                console.warn(`⚠️ 폴더 다른 기기에서 수정: ${firestoreFolder.id}`);
+                console.log(`📥 폴더 ${firestoreFolder.id}: Firestore 우선`);
                 return firestoreFolder;
               } else {
                 // 로컬이 더 최신 또는 저장 실패
-                console.warn(`⚠️ 폴더 로컬 변경 감지: ${firestoreFolder.id}`);
-                saveFolderToFirestore(userId, localFolder).catch(err => {
-                  console.error('폴더 재저장 실패:', err);
-                });
+                // ⚠️ 재저장은 사용자가 직접 수정할 때만 수행 (무한 루프 방지)
+                console.log(`📝 폴더 ${firestoreFolder.id}: 로컬 우선`);
                 return localFolder;
               }
             }
@@ -307,12 +297,12 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
           localOnlyFolders.forEach(localFolder => {
             const lastSaved = localStorage.getItem(`firestore_saved_folder_${localFolder.id}`);
             if (!lastSaved) {
+              // 한 번도 저장 안 됨 → 진짜 새 폴더
+              // ⚠️ 재저장은 사용자가 직접 수정할 때만 수행 (무한 루프 방지)
+              console.log(`🆕 새 폴더 발견: ${localFolder.id}`);
               mergedFolders.push(localFolder);
-              saveFolderToFirestore(userId, localFolder).catch(err => {
-                console.error('새 폴더 업로드 실패:', err);
-              });
             } else {
-              console.warn(`🗑️ 폴더 다른 기기에서 삭제됨: ${localFolder.id}`);
+              console.log(`🗑️ 폴더 ${localFolder.id}: 다른 기기에서 삭제됨`);
               localStorage.removeItem(`firestore_saved_folder_${localFolder.id}`);
             }
           });
@@ -337,11 +327,11 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
               const effectiveSyncedTime = lastSaved ? lastSyncedTime : localTime;
 
               if (firestoreTime > effectiveSyncedTime) {
-                console.warn(`⚠️ 휴지통 아이템 ${firestoreItem.id} 다른 기기에서 수정 - Firestore 우선`);
+                console.log(`📥 휴지통 ${firestoreItem.id}: Firestore 우선`);
                 return firestoreItem;
               } else {
-                console.warn(`⚠️ 휴지통 아이템 ${firestoreItem.id} 로컬 변경 감지 - 로컬 우선`);
-                saveTrashItemToFirestore(userId, localItem).catch(() => {});
+                // ⚠️ 재저장은 사용자가 직접 수정할 때만 수행 (무한 루프 방지)
+                console.log(`📝 휴지통 ${firestoreItem.id}: 로컬 우선`);
                 return localItem;
               }
             }
@@ -352,8 +342,8 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
             !data.trash?.find(t => t.id === localItem.id)
           );
           localOnlyTrash.forEach(item => {
+            // ⚠️ 재저장은 사용자가 직접 수정할 때만 수행 (무한 루프 방지)
             mergedTrash.push(item);
-            saveTrashItemToFirestore(userId, item).catch(() => {});
           });
 
           // 📅 캘린더 병합 (날짜별 타임스탬프 비교 - 메모와 동일한 방식)
@@ -371,8 +361,8 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
             if (!firestoreSchedule && localSchedule) {
               // Firestore에만 없음 → 로컬이 새로 생성
+              // ⚠️ 재저장은 사용자가 직접 수정할 때만 수행 (무한 루프 방지)
               mergedCalendar[dateKey] = localSchedule;
-              saveCalendarDateToFirestore(userId, dateKey, localSchedule).catch(() => {});
             } else if (firestoreSchedule && !localSchedule) {
               // 로컬에만 없음 → Firestore 우선
               mergedCalendar[dateKey] = firestoreSchedule;
@@ -398,14 +388,12 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
                 const effectiveSyncedTime = lastSaved ? lastSyncedTime : localTime;
 
                 if (firestoreTime > effectiveSyncedTime) {
-                  console.warn(`⚠️ 캘린더 ${dateKey} 다른 기기에서 수정 - Firestore 우선`);
-                  console.warn(`  → Firestore 우선 (${new Date(firestoreTime).toLocaleString()} > ${new Date(effectiveSyncedTime).toLocaleString()})`);
+                  console.log(`📥 캘린더 ${dateKey}: Firestore 우선`);
                   mergedCalendar[dateKey] = firestoreSchedule;
                 } else {
-                  console.warn(`⚠️ 캘린더 ${dateKey} 로컬 변경 감지 - 로컬 우선, 재저장 시도`);
-                  console.warn(`  → 로컬 우선 (${new Date(localTime).toLocaleString()})`);
+                  // ⚠️ 재저장은 사용자가 직접 수정할 때만 수행 (무한 루프 방지)
+                  console.log(`📝 캘린더 ${dateKey}: 로컬 우선`);
                   mergedCalendar[dateKey] = localSchedule;
-                  saveCalendarDateToFirestore(userId, dateKey, localSchedule).catch(() => {});
                 }
               }
             }
@@ -431,11 +419,11 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
               const effectiveSyncedTime = lastSaved ? lastSyncedTime : localTime;
 
               if (firestoreTime > effectiveSyncedTime) {
-                console.warn(`⚠️ 활동 ${firestoreActivity.id} 다른 기기에서 수정 - Firestore 우선`);
+                console.log(`📥 활동 ${firestoreActivity.id}: Firestore 우선`);
                 return firestoreActivity;
               } else {
-                console.warn(`⚠️ 활동 ${firestoreActivity.id} 로컬 변경 감지 - 로컬 우선`);
-                saveActivityToFirestore(userId, localActivity).catch(() => {});
+                // ⚠️ 재저장은 사용자가 직접 수정할 때만 수행 (무한 루프 방지)
+                console.log(`📝 활동 ${firestoreActivity.id}: 로컬 우선`);
                 return localActivity;
               }
             }
@@ -446,8 +434,8 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
             !data.activities?.find(a => a.id === localActivity.id)
           );
           localOnlyActivities.forEach(activity => {
+            // ⚠️ 재저장은 사용자가 직접 수정할 때만 수행 (무한 루프 방지)
             mergedActivities.push(activity);
-            saveActivityToFirestore(userId, activity).catch(() => {});
           });
 
           // 📝 매크로 병합 (플래그만 사용, 타임스탬프 없음)
@@ -455,8 +443,8 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
           const mergedMacros = useLocalMacros ? localMacros : (data.macros || []);
 
           if (useLocalMacros) {
-            console.warn('⚠️ 매크로 미저장 변경 감지 - 로컬 우선, 재저장 시도');
-            saveMacroToFirestore(userId, localMacros).catch(() => {});
+            // ⚠️ 재저장은 사용자가 직접 수정할 때만 수행 (무한 루프 방지)
+            console.log('📝 매크로: 로컬 우선');
           }
 
           // ⚙️ 설정 병합 (타임스탬프 비교 - 메모와 동일한 방식)
@@ -479,10 +467,10 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
               const effectiveSyncedTime = lastSaved ? lastSyncedTime : localTime;
 
               if (firestoreTime > effectiveSyncedTime) {
-                console.warn('⚠️ 설정 다른 기기에서 수정 - Firestore 우선');
+                console.log('📥 설정: Firestore 우선');
                 mergedSettings = data.settings;
               } else {
-                console.warn('⚠️ 설정 로컬 변경 감지 - 로컬 우선, 재저장 시도');
+                console.log('📝 설정: 로컬 우선, Firestore 저장 시도');
                 mergedSettings = settings;
                 saveSettingsToFirestore(userId, settings).catch(() => {});
               }

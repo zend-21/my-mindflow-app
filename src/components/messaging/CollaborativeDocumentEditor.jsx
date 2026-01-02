@@ -2,7 +2,7 @@
 // 드래그 선택 → 입력 → 자동 형광표시 → 매니저 컨펌 시스템
 import { useState, useEffect, useRef, useCallback } from 'react';
 import styled from 'styled-components';
-import { ChevronDown, ChevronUp, Save, X, Users, Lock, FolderOpen, Info, Strikethrough, Highlighter, MessageSquare, Maximize2, Eye, Download, Check, FileText, CheckCircle, RotateCcw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Save, X, Users, Lock, FolderOpen, Info, Strikethrough, Highlighter, Maximize2, Eye, Download, Check, FileText, CheckCircle, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import {
   doc,
   setDoc,
@@ -262,12 +262,33 @@ const ContentEditableArea = styled.div`
     border-bottom: 2px solid #ffc107;
     cursor: pointer;
     position: relative;
-    padding: 2px 4px;
+    padding: 2px 20px 2px 4px;
     border-radius: 3px;
     transition: all 0.2s;
 
     &:hover {
       background: linear-gradient(180deg, rgba(255, 235, 59, 0.5), rgba(255, 193, 7, 0.5));
+    }
+
+    /* 편집 권한이 있을 때만 X 버튼 표시 */
+    &[data-can-edit="true"]:hover::after {
+      content: '✕';
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      font-weight: bold;
+      color: #f57c00;
+      background: rgba(255, 255, 255, 0.9);
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      cursor: pointer;
+      z-index: 10;
     }
   }
 
@@ -284,7 +305,7 @@ const ContentEditableArea = styled.div`
     text-decoration-color: #ff5757;
     text-decoration-thickness: 2px;
     background: rgba(255, 87, 87, 0.1);
-    padding: 2px 4px;
+    padding: 2px 20px 2px 4px;
     border-radius: 3px;
     cursor: pointer;
     position: relative;
@@ -295,27 +316,47 @@ const ContentEditableArea = styled.div`
       background: rgba(255, 87, 87, 0.2);
       opacity: 1;
     }
+
+    /* 편집 권한이 있을 때만 X 버튼 표시 */
+    &[data-can-edit="true"]:hover::after {
+      content: '✕';
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      font-weight: bold;
+      color: #ff5757;
+      background: rgba(255, 255, 255, 0.9);
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      cursor: pointer;
+      z-index: 10;
+    }
   }
 
   /* 주석 표시 스타일 */
   .comment {
-    background: rgba(139, 92, 246, 0.15);
-    border-bottom: 2px dotted #8b5cf6;
-    padding: 2px 4px;
-    border-radius: 3px;
+    display: inline-block;
+    background: rgba(139, 92, 246, 0.2);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    padding: 2px 6px;
+    border-radius: 4px;
     cursor: pointer;
-    position: relative;
+    font-size: 16px;
+    line-height: 1;
     transition: all 0.2s;
+    vertical-align: middle;
+    margin: 0 2px;
 
     &:hover {
-      background: rgba(139, 92, 246, 0.25);
-    }
-
-    &::after {
-      content: '💬';
-      font-size: 10px;
-      margin-left: 2px;
-      vertical-align: super;
+      background: rgba(139, 92, 246, 0.35);
+      border-color: rgba(139, 92, 246, 0.6);
+      transform: scale(1.1);
     }
   }
 
@@ -358,6 +399,38 @@ const PendingEditsCount = styled.div`
   &:hover {
     background: rgba(255, 193, 7, 0.25);
   }
+`;
+
+const EditNavigationButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  background: rgba(255, 193, 7, 0.15);
+  border: 1px solid rgba(255, 193, 7, 0.3);
+  border-radius: 6px;
+  color: #ffc107;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover {
+    background: rgba(255, 193, 7, 0.25);
+    border-color: rgba(255, 193, 7, 0.5);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+`;
+
+const EditNavigationGroup = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 4px;
 `;
 
 // 수정 이력 모달 (전체 화면 편집 모달보다 위에 표시)
@@ -592,7 +665,7 @@ const FullScreenEditArea = styled.div`
     text-decoration-color: #ff5757;
     text-decoration-thickness: 2px;
     background: rgba(255, 87, 87, 0.1);
-    padding: 2px 4px;
+    padding: 2px 20px 2px 4px;
     border-radius: 3px;
     cursor: pointer;
     position: relative;
@@ -603,6 +676,27 @@ const FullScreenEditArea = styled.div`
       background: rgba(255, 87, 87, 0.2);
       opacity: 1;
     }
+
+    /* 편집 권한이 있을 때만 X 버튼 표시 */
+    &[data-can-edit="true"]:hover::after {
+      content: '✕';
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      font-weight: bold;
+      color: #ff5757;
+      background: rgba(255, 255, 255, 0.9);
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      cursor: pointer;
+      z-index: 10;
+    }
   }
 
   /* 형광펜 스타일 */
@@ -611,12 +705,33 @@ const FullScreenEditArea = styled.div`
     border-bottom: 2px solid #ffc107;
     cursor: pointer;
     position: relative;
-    padding: 2px 4px;
+    padding: 2px 20px 2px 4px;
     border-radius: 3px;
     transition: all 0.2s;
 
     &:hover {
       background: linear-gradient(180deg, rgba(255, 235, 59, 0.5), rgba(255, 193, 7, 0.5));
+    }
+
+    /* 편집 권한이 있을 때만 X 버튼 표시 */
+    &[data-can-edit="true"]:hover::after {
+      content: '✕';
+      position: absolute;
+      right: 4px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      font-weight: bold;
+      color: #f57c00;
+      background: rgba(255, 255, 255, 0.9);
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      cursor: pointer;
+      z-index: 10;
     }
   }
 
@@ -826,6 +941,9 @@ const CollaborativeDocumentEditor = ({
   const selectionStartRef = useRef(null); // 선택 시작 위치
   const currentSelectionRef = useRef(null); // 현재 선택 범위
   const tempMarkerRef = useRef(null); // 임시 마커 (시각 효과용)
+
+  // 수정 영역 네비게이션 상태
+  const [currentEditIndex, setCurrentEditIndex] = useState(0);
 
   // 임시 마커 CSS 스타일 적용
   useEffect(() => {
@@ -1111,6 +1229,61 @@ const CollaborativeDocumentEditor = ({
 
   // 외부에서 메모를 선택했을 때 처리
   const lastSelectedMemoIdRef = useRef(null);
+
+  // 수정 영역으로 이동하는 함수
+  const scrollToEdit = useCallback((index) => {
+    if (pendingEdits.length === 0) return;
+
+    const editId = pendingEdits[index]?.id;
+    if (!editId) return;
+
+    // 편집 마커 찾기
+    const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
+    if (!activeRef.current) return;
+
+    const marker = activeRef.current.querySelector(`[data-edit-id="${editId}"]`);
+    if (marker) {
+      // 부드럽게 스크롤
+      marker.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      // 임시로 하이라이트 효과
+      marker.style.transition = 'all 0.3s';
+      marker.style.transform = 'scale(1.1)';
+      marker.style.boxShadow = '0 0 10px rgba(255, 193, 7, 0.8)';
+
+      setTimeout(() => {
+        marker.style.transform = 'scale(1)';
+        marker.style.boxShadow = 'none';
+      }, 500);
+    }
+  }, [pendingEdits, showFullScreenEdit]);
+
+  // 다음 수정 영역으로 이동
+  const handleNextEdit = useCallback(() => {
+    if (pendingEdits.length === 0) return;
+
+    const nextIndex = (currentEditIndex + 1) % pendingEdits.length;
+    setCurrentEditIndex(nextIndex);
+    scrollToEdit(nextIndex);
+  }, [currentEditIndex, pendingEdits.length, scrollToEdit]);
+
+  // 이전 수정 영역으로 이동
+  const handlePrevEdit = useCallback(() => {
+    if (pendingEdits.length === 0) return;
+
+    const prevIndex = currentEditIndex === 0 ? pendingEdits.length - 1 : currentEditIndex - 1;
+    setCurrentEditIndex(prevIndex);
+    scrollToEdit(prevIndex);
+  }, [currentEditIndex, pendingEdits.length, scrollToEdit]);
+
+  // pendingEdits 변경 시 인덱스 초기화
+  useEffect(() => {
+    if (pendingEdits.length === 0) {
+      setCurrentEditIndex(0);
+    } else if (currentEditIndex >= pendingEdits.length) {
+      setCurrentEditIndex(pendingEdits.length - 1);
+    }
+  }, [pendingEdits.length, currentEditIndex]);
 
   useEffect(() => {
     if (selectedMemo && selectedMemo.id !== lastSelectedMemoIdRef.current) {
@@ -1630,10 +1803,8 @@ const CollaborativeDocumentEditor = ({
         if (pendingMarker.type === 'strikethrough') {
           updateData.reason = editReasonText || '';
         } else if (pendingMarker.type === 'highlight') {
-          updateData.newText = editInputText;
+          updateData.newText = editInputText.trim() || pendingMarker.editData.oldText;
           updateData.description = editReasonText || '';
-        } else if (pendingMarker.type === 'comment') {
-          updateData.text = editInputText;
         }
 
         await setDoc(editRef, updateData, { merge: true });
@@ -1669,56 +1840,51 @@ const CollaborativeDocumentEditor = ({
         editData.reason = editReasonText || ''; // 삭제 이유
       } else if (pendingMarker.type === 'highlight') {
         // 형광펜: 원본 텍스트 + 대체 텍스트 + 설명
+        // 대체 텍스트가 비어있으면 주석 기능으로 활용
         editData.oldText = pendingMarker.text;
-        editData.newText = editInputText; // 대체 텍스트
+        editData.newText = editInputText.trim() || pendingMarker.text; // 대체 텍스트 (비어있으면 원본 유지)
         editData.description = editReasonText || ''; // 설명
-      } else if (pendingMarker.type === 'comment') {
-        // 주석: 주석 내용만
-        editData.text = editInputText; // 주석 내용
       }
 
       const editDoc = await addDoc(editHistoryRef, editData);
 
-      // 현재 HTML 가져오기
-      let currentHTML = activeRef.current.innerHTML;
-
-      // 선택된 텍스트
-      const selectedText = pendingMarker.text;
-
-      // 마커 HTML 생성
-      let markerHTML = '';
-      let newHTML = '';
-
-      if (pendingMarker.type === 'strikethrough') {
-        markerHTML = `<span class="strikethrough" data-edit-id="${editDoc.id}" data-edit-type="strikethrough">${selectedText}</span>`;
-        // 첫 번째로 나타나는 선택된 텍스트를 마커로 교체
-        newHTML = currentHTML.replace(selectedText, markerHTML);
-      } else if (pendingMarker.type === 'highlight') {
-        markerHTML = `<span class="highlight" data-edit-id="${editDoc.id}" data-edit-type="highlight">${selectedText}</span>`;
-        // 첫 번째로 나타나는 선택된 텍스트를 마커로 교체
-        newHTML = currentHTML.replace(selectedText, markerHTML);
-      } else if (pendingMarker.type === 'comment') {
-        markerHTML = `<span class="comment" data-edit-id="${editDoc.id}" data-edit-type="comment">[주석]</span>`;
-        // 주석: 선택된 텍스트 뒤에 [주석] 아이콘 추가
-        newHTML = currentHTML.replace(selectedText, selectedText + markerHTML);
-      }
-
-      // HTML이 변경되었는지 확인
-      if (newHTML === currentHTML) {
-        console.error('선택된 텍스트를 찾을 수 없습니다:', selectedText);
-        showToast?.('선택된 텍스트를 찾을 수 없습니다');
-        return;
-      }
-
       // 프로그래밍 방식 변경 플래그 설정
       programmaticChangeRef.current = true;
 
-      // DOM 업데이트
-      activeRef.current.innerHTML = newHTML;
+      // 취소선/형광펜: Range를 사용하여 마커 삽입
+      if (pendingMarker.range) {
+        const range = pendingMarker.range;
+        const markerSpan = document.createElement('span');
+
+        if (pendingMarker.type === 'strikethrough') {
+          markerSpan.className = 'strikethrough';
+          markerSpan.dataset.editId = editDoc.id;
+          markerSpan.dataset.editType = 'strikethrough';
+          markerSpan.dataset.canEdit = actualCanEdit ? 'true' : 'false';
+          markerSpan.textContent = pendingMarker.text;
+        } else if (pendingMarker.type === 'highlight') {
+          markerSpan.className = 'highlight';
+          markerSpan.dataset.editId = editDoc.id;
+          markerSpan.dataset.editType = 'highlight';
+          markerSpan.dataset.canEdit = actualCanEdit ? 'true' : 'false';
+          // 대체 텍스트가 비어있으면 원본 텍스트 유지 (주석 기능)
+          markerSpan.textContent = editInputText.trim() || pendingMarker.text;
+        }
+
+        try {
+          range.surroundContents(markerSpan);
+          console.log(`✅ ${pendingMarker.type} 마커 삽입 완료`);
+        } catch (error) {
+          console.error('마커 삽입 실패:', error);
+          showToast?.('마커 삽입에 실패했습니다');
+          return;
+        }
+      }
 
       // 콘텐츠 state 업데이트
-      setContent(newHTML);
-      debouncedSave(newHTML);
+      const finalHTML = activeRef.current.innerHTML;
+      setContent(finalHTML);
+      debouncedSave(finalHTML);
 
       // 모달 닫기
       setShowEditInputModal(false);
@@ -1869,106 +2035,6 @@ const CollaborativeDocumentEditor = ({
     setEditInputText('');
     setShowEditInputModal(true);
   }, [actualCanEdit, showFullScreenEdit, showToast]);
-
-  // 주석 적용 핸들러 (편집 권한자만)
-  const handleApplyComment = useCallback(() => {
-    if (!actualCanEdit) {
-      showToast?.('편집 권한이 없습니다');
-      return;
-    }
-
-    const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
-    const selection = window.getSelection();
-    if (!selection || selection.isCollapsed || !selection.rangeCount) {
-      showToast?.('텍스트를 선택해주세요');
-      return;
-    }
-
-    const range = selection.getRangeAt(0);
-    const selectedText = range.toString();
-
-    if (!selectedText.trim() || !activeRef.current?.contains(range.commonAncestorContainer)) {
-      showToast?.('유효한 텍스트를 선택해주세요');
-      return;
-    }
-
-    // 선택 범위 저장
-    savedRangeRef.current = range.cloneRange();
-
-    // 입력 모달 표시 (주석 - 주석 내용 입력)
-    setPendingMarker({
-      type: 'comment',
-      text: selectedText,
-      range: savedRangeRef.current
-    });
-    setEditInputText('');
-    setShowEditInputModal(true);
-  }, [actualCanEdit, showFullScreenEdit, showToast]);
-
-  // 주석 저장 핸들러
-  const handleSaveComment = useCallback(async () => {
-    if (!selectedCommentRange || !commentText.trim()) {
-      showToast?.('주석 내용을 입력해주세요');
-      return;
-    }
-
-    const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
-
-    try {
-      // Firestore에 주석 편집 이력 저장
-      const editHistoryRef = getEditHistoryRef(currentDocId);
-      if (!editHistoryRef) {
-        showToast?.('문서 ID가 없어 편집 이력을 저장할 수 없습니다');
-        setShowCommentModal(false);
-        return;
-      }
-
-      const editDoc = await addDoc(editHistoryRef, {
-        editedBy: currentUserId,
-        editedAt: serverTimestamp(),
-        type: 'comment', // 주석 타입
-        text: selectedCommentRange.text,
-        comment: commentText, // 주석 내용
-        status: 'pending'
-      });
-
-      // 주석 표시
-      const span = document.createElement('span');
-      span.className = 'comment';
-      span.dataset.editId = editDoc.id;
-      span.dataset.editType = 'comment';
-      span.dataset.comment = commentText;
-
-      try {
-        selectedCommentRange.range.surroundContents(span);
-        window.getSelection()?.removeAllRanges();
-        showToast?.('주석을 추가했습니다');
-
-        // 콘텐츠 저장
-        const newContent = activeRef.current.innerHTML;
-        setContent(newContent);
-        debouncedSave(newContent);
-
-        // 양쪽 ref 동기화
-        if (showFullScreenEdit && contentRef.current) {
-          contentRef.current.innerHTML = newContent;
-        } else if (!showFullScreenEdit && fullScreenContentRef.current) {
-          fullScreenContentRef.current.innerHTML = newContent;
-        }
-
-        // 모달 닫기 및 초기화
-        setShowCommentModal(false);
-        setCommentText('');
-        setSelectedCommentRange(null);
-      } catch (e) {
-        console.warn('주석 표시 실패:', e);
-        showToast?.('주석을 적용할 수 없습니다');
-      }
-    } catch (error) {
-      console.error('주석 저장 실패:', error);
-      showToast?.('주석 저장에 실패했습니다');
-    }
-  }, [selectedCommentRange, commentText, chatRoomId, currentUserId, currentUserName, showToast, debouncedSave, showFullScreenEdit]);
 
   // 저장 핸들러 - 공유 폴더에 수정본 저장 (매니저만 가능)
   const handleSaveToShared = useCallback(async () => {
@@ -2470,6 +2536,115 @@ const CollaborativeDocumentEditor = ({
     }
   }, [currentDocId, content, title, currentUserId, currentUserName, chatRoomId, showToast, getEditHistoryRef]);
 
+  // 개별 수정 취소 핸들러
+  const handleCancelEdit = useCallback(async (editId) => {
+    if (!actualCanEdit) {
+      showToast?.('편집 권한이 없습니다');
+      return;
+    }
+
+    if (!currentDocId) {
+      showToast?.('문서 ID가 없습니다');
+      return;
+    }
+
+    try {
+      // 1. HTML에서 해당 마커 제거
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = content;
+
+      const marker = tempDiv.querySelector(`[data-edit-id="${editId}"]`);
+      if (marker) {
+        // 마커를 텍스트로 교체
+        const textNode = document.createTextNode(marker.textContent);
+        marker.parentNode.replaceChild(textNode, marker);
+      }
+
+      const updatedContent = tempDiv.innerHTML;
+
+      // 2. Firestore의 편집 이력 삭제
+      const editHistoryRef = getEditHistoryRef(currentDocId);
+      if (editHistoryRef) {
+        const editDocRef = doc(editHistoryRef, editId);
+        await deleteDoc(editDocRef);
+      }
+
+      // 3. Firestore 문서 업데이트
+      const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+      await setDoc(docRef, {
+        content: updatedContent,
+        lastEditedBy: currentUserId,
+        lastEditedByName: currentUserName,
+        lastEditedAt: serverTimestamp(),
+      }, { merge: true });
+
+      // 4. UI 업데이트
+      setContent(updatedContent);
+      if (contentRef.current) {
+        contentRef.current.innerHTML = updatedContent;
+      }
+      if (fullScreenContentRef.current) {
+        fullScreenContentRef.current.innerHTML = updatedContent;
+      }
+
+      // 5. 수정 내역 모달 닫기 (모달이 열려있던 경우)
+      setShowEditModal(false);
+
+      showToast?.('수정 표시가 취소되었습니다');
+    } catch (error) {
+      console.error('수정 취소 실패:', error);
+      showToast?.('수정 취소에 실패했습니다');
+    }
+  }, [actualCanEdit, currentDocId, content, currentUserId, currentUserName, chatRoomId, showToast, getEditHistoryRef]);
+
+  // 마커 클릭 이벤트 핸들러 (X 버튼 영역 클릭 시 취소)
+  useEffect(() => {
+    const handleMarkerClick = (e) => {
+      if (!actualCanEdit) return;
+
+      const target = e.target;
+
+      // 마커 요소인지 확인
+      if (target.classList.contains('strikethrough') || target.classList.contains('highlight')) {
+        const editId = target.dataset.editId;
+        if (!editId) return;
+
+        // X 버튼 영역 클릭 판정 (오른쪽 20px 영역)
+        const rect = target.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const width = rect.width;
+
+        // 오른쪽 20px 영역 클릭 시 취소
+        if (clickX > width - 20) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleCancelEdit(editId);
+        }
+      }
+    };
+
+    // 일반 편집 영역
+    const contentEl = contentRef.current;
+    if (contentEl) {
+      contentEl.addEventListener('click', handleMarkerClick);
+    }
+
+    // 전체화면 편집 영역
+    const fullScreenEl = fullScreenContentRef.current;
+    if (fullScreenEl) {
+      fullScreenEl.addEventListener('click', handleMarkerClick);
+    }
+
+    return () => {
+      if (contentEl) {
+        contentEl.removeEventListener('click', handleMarkerClick);
+      }
+      if (fullScreenEl) {
+        fullScreenEl.removeEventListener('click', handleMarkerClick);
+      }
+    };
+  }, [actualCanEdit, handleCancelEdit]);
+
   // 권한 타입 결정
   const permissionType = actualIsManager ? 'manager' : actualCanEdit ? 'editor' : 'viewer';
   const permissionLabel = actualIsManager ? '매니저' : actualCanEdit ? '편집자' : '읽기 전용';
@@ -2597,10 +2772,38 @@ const CollaborativeDocumentEditor = ({
           )}
 
           {pendingEdits.length > 0 && (
-            <PendingEditsCount title="대기 중인 수정 사항">
-              <Info size={14} />
-              {pendingEdits.length}개 수정 대기중
-            </PendingEditsCount>
+            <>
+              <PendingEditsCount title="대기 중인 수정 사항">
+                <Info size={14} />
+                {pendingEdits.length}개 수정 대기중
+              </PendingEditsCount>
+
+              <EditNavigationGroup>
+                <EditNavigationButton
+                  onClick={handlePrevEdit}
+                  disabled={pendingEdits.length === 0}
+                  title="이전 수정 영역"
+                >
+                  <ChevronLeft size={14} />
+                </EditNavigationButton>
+
+                <EditNavigationButton
+                  style={{ minWidth: '40px' }}
+                  disabled
+                  title={`${currentEditIndex + 1} / ${pendingEdits.length}`}
+                >
+                  {currentEditIndex + 1}/{pendingEdits.length}
+                </EditNavigationButton>
+
+                <EditNavigationButton
+                  onClick={handleNextEdit}
+                  disabled={pendingEdits.length === 0}
+                  title="다음 수정 영역"
+                >
+                  <ChevronRight size={14} />
+                </EditNavigationButton>
+              </EditNavigationGroup>
+            </>
           )}
 
           {!actualCanEdit && (
@@ -2775,14 +2978,20 @@ const CollaborativeDocumentEditor = ({
                     </TextComparison>
                   )}
 
-                  {actualIsManager && (
-                    <div style={{ marginTop: '12px' }}>
+                  <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
+                    {actualIsManager && (
                       <ConfirmButton onClick={() => handleApproveEdit(edit.id)}>
                         <Check size={18} />
                         이 편집 승인
                       </ConfirmButton>
-                    </div>
-                  )}
+                    )}
+                    {actualCanEdit && (
+                      <RejectButton onClick={() => handleCancelEdit(edit.id)}>
+                        <X size={18} />
+                        이 편집 취소
+                      </RejectButton>
+                    )}
+                  </div>
 
                   {index < selectedEdits.length - 1 && (
                     <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.1)', margin: '16px 0' }} />
@@ -2894,7 +3103,7 @@ const CollaborativeDocumentEditor = ({
             </ModalHeader>
 
             <ModalBody>
-              {pendingMarker.text && (
+              {pendingMarker.text && pendingMarker.type !== 'comment' && (
                 <EditInfo>
                   <InfoRow>
                     <strong>원본 텍스트:</strong> {pendingMarker.text}
@@ -2934,12 +3143,12 @@ const CollaborativeDocumentEditor = ({
                 <>
                   <div style={{ marginTop: '16px' }}>
                     <label style={{ display: 'block', marginBottom: '8px', color: '#e0e0e0', fontSize: '14px', fontWeight: '600' }}>
-                      대체 텍스트 <span style={{ color: '#ff9800' }}>*</span>
+                      대체 텍스트 (선택사항)
                     </label>
                     <textarea
                       value={editInputText}
                       onChange={(e) => setEditInputText(e.target.value)}
-                      placeholder="바꿀 텍스트를 입력하세요..."
+                      placeholder="변경할 텍스트를 입력하세요. 아니면 공란으로 두고 하단 설명란에 주석을 넣어 주석용으로 활용할 수 있습니다."
                       style={{
                         width: '100%',
                         minHeight: '80px',
@@ -3200,16 +3409,39 @@ const CollaborativeDocumentEditor = ({
                   형광펜
                 </ToolbarButton>
 
-                <ToolbarButton onClick={handleApplyComment} title="선택한 텍스트에 주석 추가">
-                  <MessageSquare size={16} />
-                  주석
-                </ToolbarButton>
-
                 {pendingEdits.length > 0 && (
-                  <PendingEditsCount title="대기 중인 수정 사항">
-                    <Info size={16} />
-                    {pendingEdits.length}개 수정 대기중
-                  </PendingEditsCount>
+                  <>
+                    <PendingEditsCount title="대기 중인 수정 사항">
+                      <Info size={16} />
+                      {pendingEdits.length}개 수정 대기중
+                    </PendingEditsCount>
+
+                    <EditNavigationGroup>
+                      <EditNavigationButton
+                        onClick={handlePrevEdit}
+                        disabled={pendingEdits.length === 0}
+                        title="이전 수정 영역"
+                      >
+                        <ChevronLeft size={14} />
+                      </EditNavigationButton>
+
+                      <EditNavigationButton
+                        style={{ minWidth: '40px' }}
+                        disabled
+                        title={`${currentEditIndex + 1} / ${pendingEdits.length}`}
+                      >
+                        {currentEditIndex + 1}/{pendingEdits.length}
+                      </EditNavigationButton>
+
+                      <EditNavigationButton
+                        onClick={handleNextEdit}
+                        disabled={pendingEdits.length === 0}
+                        title="다음 수정 영역"
+                      >
+                        <ChevronRight size={14} />
+                      </EditNavigationButton>
+                    </EditNavigationGroup>
+                  </>
                 )}
               </FullScreenToolbar>
             )}
