@@ -935,12 +935,14 @@ const CollaborativeDocumentEditor = ({
   const savedRangeRef = useRef(null); // 선택 영역 저장용
   const programmaticChangeRef = useRef(false); // 프로그래밍 방식 변경 플래그
 
-  // 키보드 선택 모드 상태
+  // 키보드 선택 모드 상태 (모바일 친화적 한 글자씩 선택)
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionType, setSelectionType] = useState(null); // 'strikethrough' | 'highlight'
   const selectionStartRef = useRef(null); // 선택 시작 위치
   const currentSelectionRef = useRef(null); // 현재 선택 범위
   const tempMarkerRef = useRef(null); // 임시 마커 (시각 효과용)
+  const [tempMarkerDirection, setTempMarkerDirection] = useState(null); // 'backward' | 'forward'
+  const [tempMarkerLength, setTempMarkerLength] = useState(0); // 선택된 글자 수
 
   // 수정 영역 네비게이션 상태
   const [currentEditIndex, setCurrentEditIndex] = useState(0);
@@ -1790,6 +1792,39 @@ const CollaborativeDocumentEditor = ({
 
     const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
 
+    // 모바일 친화적 선택 모드에서 빈 필드로 확정한 경우
+    if (pendingMarker.isEmpty && !editInputText.trim() && !editReasonText.trim()) {
+      if (pendingMarker.type === 'strikethrough') {
+        // 취소선 + 빈 필드 = 텍스트 삭제
+        try {
+          if (pendingMarker.range) {
+            pendingMarker.range.deleteContents();
+
+            // 콘텐츠 state 업데이트
+            const finalHTML = activeRef.current.innerHTML;
+            setContent(finalHTML);
+            debouncedSave(finalHTML);
+
+            showToast?.('텍스트가 삭제되었습니다');
+          }
+        } catch (error) {
+          console.error('텍스트 삭제 실패:', error);
+          showToast?.('텍스트 삭제에 실패했습니다');
+        }
+      } else if (pendingMarker.type === 'highlight') {
+        // 형광펜 + 빈 필드 = 변동 없음
+        showToast?.('변동 사항이 없습니다');
+      }
+
+      // 모달 닫기
+      setShowEditInputModal(false);
+      setPendingMarker(null);
+      setEditInputText('');
+      setEditReasonText('');
+      savedRangeRef.current = null;
+      return;
+    }
+
     try {
       // 기존 마커 수정 (id가 있으면)
       if (pendingMarker.id) {
@@ -1965,6 +2000,212 @@ const CollaborativeDocumentEditor = ({
       showToast?.('편집 이력을 불러올 수 없습니다');
     }
   }, [chatRoomId, currentDocId, showToast, showFullScreenEdit, actualCanEdit]);
+
+  // 모바일 친화적 한 글자씩 선택 확장 함수
+  const expandTempMarkerByOneChar = useCallback((direction, type) => {
+    const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
+    if (!activeRef.current) return;
+
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    // 선택이 시작되지 않았으면 현재 커서 위치에서 시작
+    if (!isSelecting) {
+      if (selection.rangeCount === 0) return;
+
+      const range = selection.getRangeAt(0);
+      selectionStartRef.current = range.cloneRange();
+      currentSelectionRef.current = range.cloneRange();
+
+      setIsSelecting(true);
+      setSelectionType(type);
+      setTempMarkerDirection(direction);
+      setTempMarkerLength(0);
+      return;
+    }
+
+    // 방향이 바뀌면 리셋
+    if (tempMarkerDirection && tempMarkerDirection !== direction) {
+      resetTempMarker();
+      return;
+    }
+
+    // 현재 선택 범위 가져오기
+    let range = currentSelectionRef.current;
+    if (!range) {
+      if (selection.rangeCount === 0) return;
+      range = selection.getRangeAt(0);
+      currentSelectionRef.current = range.cloneRange();
+    }
+
+    try {
+      // 한 글자씩 확장
+      if (direction === 'backward') {
+        // 백스페이스: 왼쪽으로 한 글자 확장
+        const startContainer = range.startContainer;
+        const startOffset = range.startOffset;
+
+        if (startOffset > 0) {
+          // 같은 텍스트 노드 내에서 한 글자 뒤로
+          range.setStart(startContainer, startOffset - 1);
+        } else {
+          // 이전 텍스트 노드로 이동
+          const walker = document.createTreeWalker(
+            activeRef.current,
+            NodeFilter.SHOW_TEXT,
+            null
+          );
+          walker.currentNode = startContainer;
+          const prevNode = walker.previousNode();
+          if (prevNode && prevNode.nodeValue) {
+            range.setStart(prevNode, prevNode.nodeValue.length - 1);
+          } else {
+            return; // 더 이상 확장 불가
+          }
+        }
+      } else {
+        // 스페이스: 오른쪽으로 한 글자 확장
+        const endContainer = range.endContainer;
+        const endOffset = range.endOffset;
+
+        if (endContainer.nodeType === Node.TEXT_NODE && endOffset < endContainer.nodeValue.length) {
+          // 같은 텍스트 노드 내에서 한 글자 앞으로
+          range.setEnd(endContainer, endOffset + 1);
+        } else {
+          // 다음 텍스트 노드로 이동
+          const walker = document.createTreeWalker(
+            activeRef.current,
+            NodeFilter.SHOW_TEXT,
+            null
+          );
+          walker.currentNode = endContainer;
+          const nextNode = walker.nextNode();
+          if (nextNode) {
+            range.setEnd(nextNode, 1);
+          } else {
+            return; // 더 이상 확장 불가
+          }
+        }
+      }
+
+      // 선택 범위 업데이트
+      currentSelectionRef.current = range.cloneRange();
+
+      // 시각적 효과 적용
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      // 임시 마커 시각화 (span으로 감싸기)
+      const selectedText = range.toString();
+      if (selectedText) {
+        const span = document.createElement('span');
+        span.className = type === 'strikethrough' ? 'temp-strikethrough' : 'temp-highlight';
+        span.setAttribute('data-temp-marker', 'true');
+
+        try {
+          range.surroundContents(span);
+          tempMarkerRef.current = span;
+          setTempMarkerLength(prev => prev + 1);
+        } catch (e) {
+          console.warn('임시 마커 적용 실패 (복잡한 구조):', e);
+        }
+      }
+
+    } catch (error) {
+      console.error('선택 확장 실패:', error);
+    }
+  }, [isSelecting, tempMarkerDirection, showFullScreenEdit]);
+
+  // 임시 마커 리셋
+  const resetTempMarker = useCallback(() => {
+    // 임시 마커 제거
+    if (tempMarkerRef.current) {
+      const parent = tempMarkerRef.current.parentNode;
+      if (parent) {
+        while (tempMarkerRef.current.firstChild) {
+          parent.insertBefore(tempMarkerRef.current.firstChild, tempMarkerRef.current);
+        }
+        parent.removeChild(tempMarkerRef.current);
+      }
+      tempMarkerRef.current = null;
+    }
+
+    // 모든 임시 마커 제거
+    const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
+    if (activeRef.current) {
+      const tempMarkers = activeRef.current.querySelectorAll('[data-temp-marker="true"]');
+      tempMarkers.forEach(marker => {
+        const parent = marker.parentNode;
+        if (parent) {
+          while (marker.firstChild) {
+            parent.insertBefore(marker.firstChild, marker);
+          }
+          parent.removeChild(marker);
+        }
+      });
+    }
+
+    // 상태 리셋
+    setIsSelecting(false);
+    setSelectionType(null);
+    setTempMarkerDirection(null);
+    setTempMarkerLength(0);
+    selectionStartRef.current = null;
+    currentSelectionRef.current = null;
+
+    // 선택 해제
+    const selection = window.getSelection();
+    if (selection) {
+      selection.removeAllRanges();
+    }
+  }, [showFullScreenEdit]);
+
+  // 임시 마커 확정 (탭하여 모달 열기)
+  const confirmTempMarker = useCallback(() => {
+    if (!isSelecting || !currentSelectionRef.current) return;
+
+    const range = currentSelectionRef.current;
+    const selectedText = range.toString();
+
+    if (!selectedText.trim()) {
+      resetTempMarker();
+      return;
+    }
+
+    // 선택 범위 저장
+    savedRangeRef.current = range.cloneRange();
+
+    // 임시 마커를 제거하고 입력 모달 표시
+    if (tempMarkerRef.current) {
+      const parent = tempMarkerRef.current.parentNode;
+      if (parent) {
+        while (tempMarkerRef.current.firstChild) {
+          parent.insertBefore(tempMarkerRef.current.firstChild, tempMarkerRef.current);
+        }
+        parent.removeChild(tempMarkerRef.current);
+      }
+      tempMarkerRef.current = null;
+    }
+
+    // 입력 모달 표시 (빈 필드로 시작)
+    setPendingMarker({
+      type: selectionType,
+      text: selectedText,
+      range: savedRangeRef.current,
+      isEmpty: true // 빈 필드로 시작함을 표시
+    });
+    setEditInputText('');
+    setEditReasonText('');
+    setShowEditInputModal(true);
+
+    // 상태 리셋
+    setIsSelecting(false);
+    setSelectionType(null);
+    setTempMarkerDirection(null);
+    setTempMarkerLength(0);
+    selectionStartRef.current = null;
+    currentSelectionRef.current = null;
+  }, [isSelecting, selectionType, resetTempMarker]);
 
   // 취소선 적용 핸들러 - 즉시 입력창 표시
   const handleApplyStrikethrough = useCallback(() => {
@@ -2831,6 +3072,25 @@ const CollaborativeDocumentEditor = ({
             }
           }}
           onKeyDown={(e) => {
+            // 모바일 친화적 키보드 선택 기능
+            if (e.key === 'Backspace') {
+              e.preventDefault();
+              expandTempMarkerByOneChar('backward', 'strikethrough');
+              return;
+            }
+
+            if (e.key === ' ') {
+              e.preventDefault();
+              expandTempMarkerByOneChar('forward', 'highlight');
+              return;
+            }
+
+            if (e.key === 'Escape' && isSelecting) {
+              e.preventDefault();
+              resetTempMarker();
+              return;
+            }
+
             // 텍스트 수정 키는 모두 막기 (선택 키는 허용)
             const allowedKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'];
             const isSelectionKey = e.shiftKey || e.ctrlKey || e.metaKey;
@@ -2848,6 +3108,12 @@ const CollaborativeDocumentEditor = ({
             e.preventDefault();
           }}
           onClick={(e) => {
+            // 임시 마커 클릭 시 확정
+            if (isSelecting && e.target.dataset.tempMarker === 'true') {
+              confirmTempMarker();
+              return;
+            }
+
             const editId = e.target.dataset.editId;
             if (editId) {
               handleEditMarkerClick(editId, e.target);
@@ -3465,6 +3731,25 @@ const CollaborativeDocumentEditor = ({
                   }
                 }}
                 onKeyDown={(e) => {
+                  // 모바일 친화적 키보드 선택 기능
+                  if (e.key === 'Backspace') {
+                    e.preventDefault();
+                    expandTempMarkerByOneChar('backward', 'strikethrough');
+                    return;
+                  }
+
+                  if (e.key === ' ') {
+                    e.preventDefault();
+                    expandTempMarkerByOneChar('forward', 'highlight');
+                    return;
+                  }
+
+                  if (e.key === 'Escape' && isSelecting) {
+                    e.preventDefault();
+                    resetTempMarker();
+                    return;
+                  }
+
                   // 텍스트 수정 키는 모두 막기 (선택 키는 허용)
                   const allowedKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'];
                   const isSelectionKey = e.shiftKey || e.ctrlKey || e.metaKey;
@@ -3482,6 +3767,12 @@ const CollaborativeDocumentEditor = ({
                   e.preventDefault();
                 }}
                 onClick={(e) => {
+                  // 임시 마커 클릭 시 확정
+                  if (isSelecting && e.target.dataset.tempMarker === 'true') {
+                    confirmTempMarker();
+                    return;
+                  }
+
                   const editId = e.target.dataset.editId;
                   if (editId) {
                     handleEditMarkerClick(editId, e.target);
