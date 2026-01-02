@@ -705,6 +705,21 @@ const ShareBadge = styled.div`
     }
 `;
 
+const FrozenBadge = styled.div`
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: rgba(74, 144, 226, 0.2);
+    border: 1px solid #4a90e2;
+    color: #4a90e2;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: default;
+    font-weight: 600;
+`;
+
 const ImportantBadge = styled.div`
     padding: 6px 10px;
     border-radius: 6px;
@@ -813,7 +828,8 @@ const MemoDetailModal = ({
     onUpdateMemoFolder,
     showToast,
     onNavigate, // 다른 메모로 이동 시 호출되는 콜백
-    folderSyncContext // 폴더 동기화 컨텍스트
+    folderSyncContext, // 폴더 동기화 컨텍스트
+    isFrozen = false // 프리즈된 문서 여부
 }) => {
     const [editedContent, setEditedContent] = useState('');
     const [isImportant, setIsImportant] = useState(false);
@@ -1041,6 +1057,11 @@ const MemoDetailModal = ({
 
         if (lastTap && (now - lastTap < DOUBLE_TAP_DELAY)) {
             // 더블탭 감지됨
+            if (isFrozen) {
+                showToast?.('❄️ 대화방에서 편집 중인 문서는 읽기 전용입니다');
+                setLastTap(0);
+                return;
+            }
             setIsEditMode(true);
             setLastTap(0); // 다음 더블탭을 위해 리셋
         } else {
@@ -1311,6 +1332,11 @@ const MemoDetailModal = ({
                                     <CloseButton onClick={handleCancelClick}>
                                         <span className="material-icons">close</span>
                                     </CloseButton>
+                                    {isFrozen && (
+                                        <FrozenBadge>
+                                            ❄️ 작업중
+                                        </FrozenBadge>
+                                    )}
                                     {isImportant && (
                                         <ImportantBadge $isImportant={isImportant}>
                                             <span className="material-icons">star</span>
@@ -1326,7 +1352,13 @@ const MemoDetailModal = ({
                                     <ReadModeButton onClick={handleCopyContent}>
                                         <span className="material-icons">content_copy</span>
                                     </ReadModeButton>
-                                    <ReadModeButton onClick={() => setIsEditMode(true)}>
+                                    <ReadModeButton onClick={() => {
+                                        if (isFrozen) {
+                                            showToast?.('❄️ 대화방에서 편집 중인 문서는 읽기 전용입니다');
+                                            return;
+                                        }
+                                        setIsEditMode(true);
+                                    }}>
                                         <span className="material-icons">edit</span>
                                     </ReadModeButton>
                                 </ReadModeRightButtons>
@@ -1371,6 +1403,10 @@ const MemoDetailModal = ({
                                     if (window.getSelection && window.getSelection().toString().length > 0) {
                                         return;
                                     }
+                                    if (isFrozen) {
+                                        showToast?.('❄️ 대화방에서 편집 중인 문서는 읽기 전용입니다');
+                                        return;
+                                    }
                                     setIsEditMode(true);
                                 }}
                                 onTouchEnd={(e) => {
@@ -1385,6 +1421,11 @@ const MemoDetailModal = ({
                                     if (now - lastTap < DOUBLE_TAP_DELAY) {
                                         // 더블탭 감지됨 - 편집 모드로 전환
                                         e.preventDefault();
+                                        if (isFrozen) {
+                                            showToast?.('❄️ 대화방에서 편집 중인 문서는 읽기 전용입니다');
+                                            setLastTap(0);
+                                            return;
+                                        }
                                         setIsEditMode(true);
                                         setLastTap(0); // 리셋
                                     } else {

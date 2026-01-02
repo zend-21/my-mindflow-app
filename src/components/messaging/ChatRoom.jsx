@@ -1144,6 +1144,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
           onSelectMemo={handleSelectSharedMemo}
           showToast={showToast}
           allMemos={memos}
+          chatRoomId={roomId}
         />
       )}
 

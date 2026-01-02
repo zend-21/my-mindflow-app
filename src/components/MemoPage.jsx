@@ -1469,7 +1469,8 @@ const MemoPage = ({
     onRequestShareSelectedMemos,
     onRequestUnshareSelectedMemos,
     folderSyncContext,
-    onActiveFolderChange // 활성 폴더 변경 콜백 추가
+    onActiveFolderChange, // 활성 폴더 변경 콜백 추가
+    frozenMemoIds = new Set() // 프리즈된 메모 ID 목록
 }) => {
     const [layoutView, setLayoutView] = useLocalStorage('memoLayoutView', 'list');
     const [sortOrder, setSortOrder] = React.useState('date'); // 'date' 또는 'importance'

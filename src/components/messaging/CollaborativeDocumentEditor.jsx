@@ -2,7 +2,7 @@
 // 드래그 선택 → 입력 → 자동 형광표시 → 매니저 컨펌 시스템
 import { useState, useEffect, useRef, useCallback } from 'react';
 import styled from 'styled-components';
-import { ChevronDown, ChevronUp, Save, X, Users, Lock, FolderOpen, Info, Strikethrough, Highlighter, Maximize2, Eye, Download, Check, FileText, CheckCircle, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronUp, Save, X, Users, Lock, FolderOpen, Info, Strikethrough, Highlighter, Maximize2, Eye, Download, Check, FileText, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, UserCog, HelpCircle } from 'lucide-react';
 import {
   doc,
   setDoc,
@@ -137,6 +137,7 @@ const DocumentIcon = styled.div`
 
 const TitleInput = styled.input`
   flex: 1;
+  max-width: 300px;
   background: transparent;
   border: none;
   color: #ffffff;
@@ -145,6 +146,9 @@ const TitleInput = styled.input`
   padding: 4px 8px;
   border-radius: 6px;
   transition: background 0.2s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 
   &:hover {
     background: rgba(255, 255, 255, 0.05);
@@ -626,6 +630,7 @@ const FullScreenTitle = styled.div`
 
 const FullScreenTitleInput = styled.input`
   flex: 1;
+  max-width: 400px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #ffffff;
@@ -634,6 +639,9 @@ const FullScreenTitleInput = styled.input`
   padding: 8px 16px;
   border-radius: 8px;
   transition: all 0.2s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 
   &:hover {
     background: rgba(255, 255, 255, 0.08);
@@ -913,6 +921,7 @@ const CollaborativeDocumentEditor = ({
   const [showEditModal, setShowEditModal] = useState(false);
   const [actualCanEdit, setActualCanEdit] = useState(canEdit); // 실시간 권한
   const [actualIsManager, setActualIsManager] = useState(isManager); // 실시간 매니저 여부
+  const [actualIsSubManager, setActualIsSubManager] = useState(false); // 실시간 부방장 여부
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [selectedCommentRange, setSelectedCommentRange] = useState(null);
@@ -931,12 +940,18 @@ const CollaborativeDocumentEditor = ({
   const [showUserIdModal, setShowUserIdModal] = useState(false); // 사용자 ID 복사 모달
   const [selectedUserId, setSelectedUserId] = useState(''); // 선택된 사용자 ID
   const [showApproveAllModal, setShowApproveAllModal] = useState(false); // 전체 승인 확인 모달
+  const [showPermissionModal, setShowPermissionModal] = useState(false); // 권한 관리 모달
+  const [participants, setParticipants] = useState([]); // 대화방 참여자 목록
+  const [isOneOnOneChat, setIsOneOnOneChat] = useState(false); // 1:1 대화방 여부
+  const [invitePermission, setInvitePermission] = useState('managers_and_submanagers'); // 초대 권한 설정
+  const [showPermissionGuideModal, setShowPermissionGuideModal] = useState(false); // 권한 안내 모달
 
   const contentRef = useRef(null);
   const fullScreenContentRef = useRef(null);
   const saveTimeoutRef = useRef(null);
   const savedRangeRef = useRef(null); // 선택 영역 저장용
   const programmaticChangeRef = useRef(false); // 프로그래밍 방식 변경 플래그
+  const documentCache = useRef(new Map()); // 문서별 편집 내용 캐시 Map<memoId, {title, content}>
 
   // 키보드 선택 모드 상태
   const [isSelecting, setIsSelecting] = useState(false);
@@ -1013,16 +1028,36 @@ const CollaborativeDocumentEditor = ({
     // 권한 문서 읽기 (실시간 리스너 대신 일회성)
     const loadPermissions = async () => {
       try {
-        const permRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'permissions');
-        const permSnap = await getDoc(permRef);
+        // 대화방 문서에서 권한 확인
+        const roomRef = doc(db, 'chatRooms', chatRoomId);
+        const roomSnap = await getDoc(roomRef);
 
-        if (isMounted && permSnap.exists()) {
-          const permissions = permSnap.data();
-          const isActualManager = permissions.manager === currentUserId;
-          const isEditor = permissions.editors?.includes(currentUserId) || false;
+        if (isMounted && roomSnap.exists()) {
+          const roomData = roomSnap.data();
 
-          setActualIsManager(isActualManager);
-          setActualCanEdit(isActualManager || isEditor);
+          // 1:1 대화방인지 확인 (type 필드로 판단, 참여자 수가 아님!)
+          const isOneOnOne = roomData.type !== 'group' && !roomData.isGroupChat;
+          setIsOneOnOneChat(isOneOnOne);
+
+          if (isOneOnOne) {
+            // 1:1 대화방: 양쪽 모두 방장 권한 부여 (계급 표시는 안 함)
+            setActualIsManager(true);
+            setActualIsSubManager(false);
+            setActualCanEdit(true);
+          } else {
+            // 단체방: 기존 4단계 권한 시스템
+            const isActualManager = roomData.managers?.includes(currentUserId) || false;
+            const isActualSubManager = roomData.subManagers?.includes(currentUserId) || false;
+            const isEditor = roomData.editors?.includes(currentUserId) || false;
+
+            setActualIsManager(isActualManager);
+            setActualIsSubManager(isActualSubManager);
+            setActualCanEdit(isActualManager || isActualSubManager || isEditor);
+
+            // 초대 권한 설정 로드
+            const invitePerm = roomData.invitePermission || 'managers_and_submanagers';
+            setInvitePermission(invitePerm);
+          }
         }
       } catch (error) {
         if (error.code !== 'permission-denied') {
@@ -1137,6 +1172,142 @@ const CollaborativeDocumentEditor = ({
     loadDocument();
   }, [loadDocument]);
 
+  // 참여자 목록 로드
+  const loadParticipants = useCallback(async () => {
+    if (!chatRoomId) return;
+
+    try {
+      const roomRef = doc(db, 'chatRooms', chatRoomId);
+      const roomSnap = await getDoc(roomRef);
+
+      if (roomSnap.exists()) {
+        const roomData = roomSnap.data();
+        const participantIds = roomData.participants || [];
+
+        // 각 참여자의 정보 가져오기
+        const participantList = await Promise.all(
+          participantIds.map(async (userId) => {
+            try {
+              // 닉네임 가져오기
+              const nickname = await getNickname(userId);
+
+              // 권한 정보 확인
+              const isManager = roomData.managers?.includes(userId) || false;
+              const isSubManager = roomData.subManagers?.includes(userId) || false;
+              const isEditor = roomData.editors?.includes(userId) || false;
+
+              return {
+                userId,
+                nickname,
+                isManager,
+                isSubManager,
+                isEditor,
+                isViewer: !isManager && !isSubManager && !isEditor
+              };
+            } catch (error) {
+              console.error('참여자 정보 로드 실패:', userId, error);
+              return {
+                userId,
+                nickname: '알 수 없음',
+                isManager: false,
+                isSubManager: false,
+                isEditor: false,
+                isViewer: true
+              };
+            }
+          })
+        );
+
+        setParticipants(participantList);
+      }
+    } catch (error) {
+      console.error('참여자 목록 로드 실패:', error);
+    }
+  }, [chatRoomId]);
+
+  // 권한 변경 함수
+  const handlePermissionChange = useCallback(async (userId, newRole) => {
+    // 방장이 아니고 부방장도 아니면 권한 없음
+    if (!actualIsManager && !actualIsSubManager) return;
+    if (!chatRoomId) return;
+
+    // 부방장은 편집자/뷰어만 변경 가능
+    if (actualIsSubManager && !actualIsManager) {
+      if (newRole !== 'editor' && newRole !== 'viewer') {
+        showToast?.('부방장은 편집자 권한만 관리할 수 있습니다');
+        return;
+      }
+    }
+
+    try {
+      const roomRef = doc(db, 'chatRooms', chatRoomId);
+      const roomSnap = await getDoc(roomRef);
+
+      if (!roomSnap.exists()) {
+        showToast?.('대화방 정보를 찾을 수 없습니다');
+        return;
+      }
+
+      const roomData = roomSnap.data();
+      let managers = roomData.managers || [];
+      let subManagers = roomData.subManagers || [];
+      let editors = roomData.editors || [];
+
+      // 기존 권한 제거
+      managers = managers.filter(id => id !== userId);
+      subManagers = subManagers.filter(id => id !== userId);
+      editors = editors.filter(id => id !== userId);
+
+      // 새 권한 추가
+      if (newRole === 'manager') {
+        managers.push(userId);
+      } else if (newRole === 'submanager') {
+        subManagers.push(userId);
+      } else if (newRole === 'editor') {
+        editors.push(userId);
+      }
+      // viewer는 별도 배열 없이 managers, subManagers, editors에 없으면 자동으로 viewer
+
+      // Firestore 업데이트
+      await setDoc(roomRef, {
+        managers,
+        subManagers,
+        editors
+      }, { merge: true });
+
+      // 참여자 목록 새로고침
+      await loadParticipants();
+
+      showToast?.('권한이 변경되었습니다');
+    } catch (error) {
+      console.error('권한 변경 실패:', error);
+      showToast?.('권한 변경에 실패했습니다');
+    }
+  }, [actualIsManager, actualIsSubManager, chatRoomId, showToast, loadParticipants]);
+
+  // 초대 권한 설정 변경 (방장만 가능)
+  const handleInvitePermissionChange = useCallback(async (newPermission) => {
+    if (!actualIsManager) {
+      showToast?.('방장만 초대 권한을 변경할 수 있습니다');
+      return;
+    }
+
+    if (!chatRoomId) return;
+
+    try {
+      const roomRef = doc(db, 'chatRooms', chatRoomId);
+      await setDoc(roomRef, {
+        invitePermission: newPermission
+      }, { merge: true });
+
+      setInvitePermission(newPermission);
+      showToast?.('초대 권한 설정이 변경되었습니다');
+    } catch (error) {
+      console.error('초대 권한 변경 실패:', error);
+      showToast?.('초대 권한 변경에 실패했습니다');
+    }
+  }, [actualIsManager, chatRoomId, showToast]);
+
   // 문서 불러오기 버튼 클릭 시 실행될 핸들러
   const handleLoadClick = async () => {
     if (onLoadFromShared) {
@@ -1148,33 +1319,39 @@ const CollaborativeDocumentEditor = ({
   // 실제 문서 로드 수행
   const performLoadDocument = useCallback(async (memo) => {
     try {
-      const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+      const currentDocRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
 
-      // 1. 먼저 currentDoc에 이 메모의 편집 중인 버전이 있는지 확인
-      const currentDocSnap = await getDoc(docRef);
+      // 1. 로컬 캐시에서 편집 중인 버전 확인 (우선순위 1)
       let contentToLoad = memo.content || '';
       let titleToLoad = memo.title || '제목 없음';
 
-      if (currentDocSnap.exists()) {
-        const currentDocData = currentDocSnap.data();
-        // 같은 문서 ID이고 편집 중인 내용이 있으면 그것을 사용
-        if (currentDocData.originalMemoId === memo.id && currentDocData.content) {
-          contentToLoad = currentDocData.content;
-          titleToLoad = currentDocData.title || titleToLoad;
-          console.log('✅ 편집 중이던 문서 복원:', memo.id);
+      if (documentCache.current.has(memo.id)) {
+        const cached = documentCache.current.get(memo.id);
+        contentToLoad = cached.content;
+        titleToLoad = cached.title;
+        console.log('✅ 캐시에서 편집 중이던 문서 복원:', memo.id);
+      } else {
+        // 2. currentDoc에서 편집 중인 버전 확인 (우선순위 2)
+        const currentDocSnap = await getDoc(currentDocRef);
+        if (currentDocSnap.exists()) {
+          const currentDocData = currentDocSnap.data();
+          if (currentDocData.originalMemoId === memo.id && currentDocData.content) {
+            contentToLoad = currentDocData.content;
+            titleToLoad = currentDocData.title || titleToLoad;
+            console.log('✅ Firestore에서 편집 중이던 문서 복원:', memo.id);
+          }
         }
       }
 
-      // 2. Firestore의 currentDoc에 저장
-      await setDoc(docRef, {
+      // 2. currentDoc 업데이트
+      await setDoc(currentDocRef, {
         title: titleToLoad,
         content: contentToLoad,
         originalMemoId: memo.id,
         lastEditedBy: currentUserId,
         lastEditedByName: currentUserName,
-        lastEditedAt: serverTimestamp(),
-        version: currentDocSnap.exists() ? (currentDocSnap.data().version || 0) + 1 : 1
-      });
+        lastEditedAt: serverTimestamp()
+      }, { merge: true });
 
       // 3. 로컬 상태 업데이트
       setTitle(titleToLoad);
@@ -1365,28 +1542,49 @@ const CollaborativeDocumentEditor = ({
     );
   }, [chatRoomId]);
 
-  // 디바운스 저장 (500ms)
-  const debouncedSave = useCallback((newContent) => {
+  // 디바운스 저장 (500ms) - 로컬 캐시 + Firestore 저장
+  const debouncedSave = useCallback((newContent, newTitle) => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
 
     saveTimeoutRef.current = setTimeout(async () => {
+      if (!currentDocId) {
+        console.warn('문서 ID가 없어 임시 저장할 수 없습니다');
+        return;
+      }
+
+      const titleToSave = newTitle !== undefined ? newTitle : title;
+
       try {
-        const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
-        await setDoc(docRef, {
-          title,
+        // 1. 로컬 캐시에 저장 (즉시)
+        documentCache.current.set(currentDocId, {
+          title: titleToSave,
+          content: newContent
+        });
+        console.log('💾 로컬 캐시 저장 완료:', currentDocId);
+
+        // 2. Firestore currentDoc에도 저장
+        const currentDocRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+        await setDoc(currentDocRef, {
+          title: titleToSave,
           content: newContent,
+          originalMemoId: currentDocId,
           lastEditedBy: currentUserId,
           lastEditedByName: currentUserName,
-          lastEditedAt: serverTimestamp(),
-          version: (await getDoc(docRef)).data()?.version || 0 + 1
+          lastEditedAt: serverTimestamp()
         }, { merge: true });
       } catch (error) {
-        console.error('문서 저장 실패:', error);
+        console.error('임시 저장 실패:', error);
       }
     }, 500);
-  }, [chatRoomId, title, currentUserId, currentUserName]);
+  }, [chatRoomId, title, currentUserId, currentUserName, currentDocId]);
+
+  // 제목 변경 핸들러 (자동 저장 포함)
+  const handleTitleChange = useCallback((newTitle) => {
+    setTitle(newTitle);
+    debouncedSave(content, newTitle);
+  }, [content, debouncedSave]);
 
   // 텍스트 선택 추적
   const [lastSelection, setLastSelection] = useState(null);
@@ -2212,8 +2410,8 @@ const CollaborativeDocumentEditor = ({
 
   // 임시저장 핸들러 - HTML 그대로 저장하며 [임시] 태그 추가
   const handleTemporarySave = useCallback(async () => {
-    if (!actualIsManager) {
-      showToast?.('매니저만 임시저장할 수 있습니다');
+    if (!actualIsManager && !actualIsSubManager) {
+      showToast?.('방장 또는 부방장만 임시저장할 수 있습니다');
       return;
     }
 
@@ -2290,12 +2488,12 @@ const CollaborativeDocumentEditor = ({
     } finally {
       setSaving(false);
     }
-  }, [actualIsManager, title, content, currentUserId, chatRoomId, currentDocId, pendingEdits, showToast]);
+  }, [actualIsManager, actualIsSubManager, title, content, currentUserId, chatRoomId, currentDocId, pendingEdits, showToast]);
 
   // 중간 적용 핸들러 - 현재 상태 그대로 저장 (모든 마커 유지)
   const handlePartialApply = useCallback(async () => {
-    if (!actualIsManager) {
-      showToast?.('매니저만 중간 적용할 수 있습니다');
+    if (!actualIsManager && !actualIsSubManager) {
+      showToast?.('방장 또는 부방장만 중간 적용할 수 있습니다');
       return;
     }
 
@@ -2321,7 +2519,7 @@ const CollaborativeDocumentEditor = ({
     } finally {
       setSaving(false);
     }
-  }, [actualIsManager, title, content, currentUserId, currentUserName, chatRoomId, showToast]);
+  }, [actualIsManager, actualIsSubManager, title, content, currentUserId, currentUserName, chatRoomId, showToast]);
 
   // 개별 편집 승인 핸들러 (매니저만)
   const handleApproveEdit = useCallback(async (editId) => {
@@ -2331,13 +2529,15 @@ const CollaborativeDocumentEditor = ({
     }
 
     if (!currentDocId) {
+      console.error('문서 ID가 없습니다. currentDocId:', currentDocId);
       showToast?.('문서 ID가 없습니다');
       return;
     }
 
     try {
-      // 1. 편집 이력 가져오기 (올바른 경로)
-      const editRef = doc(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', editId);
+      // 1. 편집 이력 가져오기
+      const editHistoryRef = getEditHistoryRef(editId);
+      const editRef = editHistoryRef;
       const editSnap = await getDoc(editRef);
 
       if (!editSnap.exists()) {
@@ -2405,7 +2605,16 @@ const CollaborativeDocumentEditor = ({
         // 5. 편집 이력 삭제
         await deleteDoc(editRef);
 
-        // 6. UI 업데이트
+        // 6. 캐시 업데이트
+        if (currentDocId) {
+          documentCache.current.set(currentDocId, {
+            title: title,
+            content: newContent
+          });
+          console.log('💾 개별 승인 후 캐시 업데이트:', currentDocId);
+        }
+
+        // 7. UI 업데이트
         setPendingEdits(prev => prev.filter(e => e.id !== editId));
         setSelectedEdits(prev => prev.filter(e => e.id !== editId));
 
@@ -2414,13 +2623,18 @@ const CollaborativeDocumentEditor = ({
           setShowEditModal(false);
         }
 
+        // 성공 알림 - 한 번만
         showToast?.('편집이 승인되었습니다');
+      } else {
+        // 마커를 찾지 못한 경우
+        console.warn('마커를 찾을 수 없습니다:', editId);
+        showToast?.('해당 편집을 찾을 수 없습니다');
       }
     } catch (error) {
       console.error('편집 승인 실패:', error);
       showToast?.('편집 승인에 실패했습니다');
     }
-  }, [actualIsManager, content, chatRoomId, currentDocId, title, currentUserId, currentUserName, selectedEdits, showToast]);
+  }, [actualIsManager, content, chatRoomId, currentDocId, title, currentUserId, currentUserName, selectedEdits, showToast, getEditHistoryRef]);
 
   // 전체 승인 버튼 클릭 - 확인 모달 표시
   const handleFinalApply = useCallback(() => {
@@ -2527,6 +2741,12 @@ const CollaborativeDocumentEditor = ({
       }
       setPendingEdits([]);
 
+      // 캐시에서 해당 문서 제거 (승인된 내용은 원본 메모에 반영되므로)
+      if (currentDocId && documentCache.current.has(currentDocId)) {
+        documentCache.current.delete(currentDocId);
+        console.log('🗑️ 전체 승인 완료 - 캐시에서 문서 제거:', currentDocId);
+      }
+
       showToast?.('모든 수정 제안이 승인되었습니다');
     } catch (error) {
       console.error('전체 승인 실패:', error);
@@ -2586,7 +2806,16 @@ const CollaborativeDocumentEditor = ({
         version: (await getDoc(docRef)).data()?.version || 0 + 1
       }, { merge: true });
 
-      // 4. UI 업데이트
+      // 4. 캐시 업데이트
+      if (currentDocId) {
+        documentCache.current.set(currentDocId, {
+          title: title,
+          content: cleanContent
+        });
+        console.log('💾 전체 리셋 후 캐시 업데이트:', currentDocId);
+      }
+
+      // 5. UI 업데이트
       setContent(cleanContent);
       if (contentRef.current) {
         contentRef.current.innerHTML = cleanContent;
@@ -2648,7 +2877,16 @@ const CollaborativeDocumentEditor = ({
         lastEditedAt: serverTimestamp(),
       }, { merge: true });
 
-      // 4. UI 업데이트
+      // 4. 캐시 업데이트
+      if (currentDocId) {
+        documentCache.current.set(currentDocId, {
+          title: title,
+          content: updatedContent
+        });
+        console.log('💾 개별 취소 후 캐시 업데이트:', currentDocId);
+      }
+
+      // 5. UI 업데이트
       setContent(updatedContent);
       if (contentRef.current) {
         contentRef.current.innerHTML = updatedContent;
@@ -2657,10 +2895,11 @@ const CollaborativeDocumentEditor = ({
         fullScreenContentRef.current.innerHTML = updatedContent;
       }
 
-      // 5. 수정 내역 모달 닫기 (모달이 열려있던 경우)
+      // 6. 수정 내역 모달 닫기 (모달이 열려있던 경우)
       setShowEditModal(false);
 
-      showToast?.('수정 표시가 취소되었습니다');
+      // 성공 알림 제거 - 호출하는 쪽에서 처리
+      // showToast?.('수정 표시가 취소되었습니다');
     } catch (error) {
       console.error('수정 취소 실패:', error);
       showToast?.('수정 취소에 실패했습니다');
@@ -2759,7 +2998,7 @@ const CollaborativeDocumentEditor = ({
           ) : (
             <TitleInput
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => handleTitleChange(e.target.value)}
               placeholder="문서 제목을 입력하세요"
               onClick={(e) => e.stopPropagation()}
               disabled={!actualCanEdit}
@@ -2768,11 +3007,6 @@ const CollaborativeDocumentEditor = ({
         </HeaderLeft>
 
         <HeaderRight onClick={(e) => e.stopPropagation()}>
-          <PermissionBadge $type={permissionType}>
-            <PermissionIcon size={14} />
-            {permissionLabel}
-          </PermissionBadge>
-
           {onClose && (
             <IconButton onClick={onClose} title="닫기">
               <X size={18} />
@@ -2796,8 +3030,8 @@ const CollaborativeDocumentEditor = ({
         {/* 도구 모음 */}
         <Toolbar>
           {/* 첫 번째 줄: 불러오기(아이콘만), 편집(아이콘만), 전체승인, 전체리셋 */}
-          <ToolbarRow>
-            {onLoadFromShared && actualIsManager && (
+          <ToolbarRow key="toolbar-row-1">
+            {onLoadFromShared && (actualIsManager || actualIsSubManager) && (
               <LoadButton onClick={handleLoadClick} title="공유 폴더에서 불러오기">
                 📂
               </LoadButton>
@@ -2835,7 +3069,7 @@ const CollaborativeDocumentEditor = ({
               </>
             )}
 
-            {!actualIsManager && (
+            {!actualIsManager && !actualIsSubManager && (
               <SaveButton
                 onClick={handleDownloadToShared}
                 disabled={saving || !title.trim()}
@@ -2853,39 +3087,77 @@ const CollaborativeDocumentEditor = ({
             )}
           </ToolbarRow>
 
-          {/* 두 번째 줄: 수정 대기중 표시, 위치찾기 */}
-          {pendingEdits.length > 0 && (
-            <ToolbarRow>
-              <PendingEditsCount title="대기 중인 수정 사항">
-                <Info size={14} />
-                {pendingEdits.length}개 수정 대기중
-              </PendingEditsCount>
+          {/* 두 번째 줄: 수정 대기중 표시, 위치찾기, 권한 관리 */}
+          {(pendingEdits.length > 0 || actualIsManager || actualIsSubManager) && (
+            <ToolbarRow key="toolbar-row-2">
+              {pendingEdits.length > 0 ? (
+                <>
+                  <PendingEditsCount title="대기 중인 수정 사항">
+                    <Info size={14} />
+                    {pendingEdits.length}개 수정 대기중
+                  </PendingEditsCount>
 
-              <EditNavigationGroup>
-                <EditNavigationButton
-                  onClick={handlePrevEdit}
-                  disabled={pendingEdits.length === 0}
-                  title="이전 수정 영역"
-                >
-                  <ChevronLeft size={14} />
-                </EditNavigationButton>
+                  <EditNavigationGroup>
+                    <EditNavigationButton
+                      onClick={handlePrevEdit}
+                      disabled={pendingEdits.length === 0}
+                      title="이전 수정 영역"
+                    >
+                      <ChevronLeft size={14} />
+                    </EditNavigationButton>
 
-                <EditNavigationButton
-                  style={{ minWidth: '40px' }}
-                  disabled
-                  title={`${currentEditIndex + 1} / ${pendingEdits.length}`}
-                >
-                  {currentEditIndex + 1}/{pendingEdits.length}
-                </EditNavigationButton>
+                    <EditNavigationButton
+                      style={{ minWidth: '40px' }}
+                      disabled
+                      title={`${currentEditIndex + 1} / ${pendingEdits.length}`}
+                    >
+                      {currentEditIndex + 1}/{pendingEdits.length}
+                    </EditNavigationButton>
 
-                <EditNavigationButton
-                  onClick={handleNextEdit}
-                  disabled={pendingEdits.length === 0}
-                  title="다음 수정 영역"
-                >
-                  <ChevronRight size={14} />
-                </EditNavigationButton>
-              </EditNavigationGroup>
+                    <EditNavigationButton
+                      onClick={handleNextEdit}
+                      disabled={pendingEdits.length === 0}
+                      title="다음 수정 영역"
+                    >
+                      <ChevronRight size={14} />
+                    </EditNavigationButton>
+
+                    {(actualIsManager || actualIsSubManager) && !isOneOnOneChat && (
+                      <EditNavigationButton
+                        onClick={() => {
+                          setShowPermissionModal(true);
+                          loadParticipants();
+                        }}
+                        title="권한 관리"
+                        style={{
+                          background: 'rgba(74, 144, 226, 0.15)',
+                          borderColor: 'rgba(74, 144, 226, 0.3)',
+                          color: '#4a90e2'
+                        }}
+                      >
+                        <UserCog size={14} />
+                      </EditNavigationButton>
+                    )}
+                  </EditNavigationGroup>
+                </>
+              ) : (actualIsManager || actualIsSubManager) && !isOneOnOneChat ? (
+                <EditNavigationGroup>
+                  <EditNavigationButton
+                    onClick={() => {
+                      setShowPermissionModal(true);
+                      loadParticipants();
+                    }}
+                    title="권한 관리"
+                    style={{
+                      background: 'rgba(74, 144, 226, 0.15)',
+                      borderColor: 'rgba(74, 144, 226, 0.3)',
+                      color: '#4a90e2'
+                    }}
+                  >
+                    <UserCog size={14} />
+                  </EditNavigationButton>
+                </EditNavigationGroup>
+              ) : null}
             </ToolbarRow>
           )}
         </Toolbar>
@@ -3063,7 +3335,14 @@ const CollaborativeDocumentEditor = ({
                       </ConfirmButton>
                     )}
                     {actualCanEdit && (
-                      <RejectButton onClick={() => handleCancelEdit(edit.id)}>
+                      <RejectButton onClick={async () => {
+                        try {
+                          await handleCancelEdit(edit.id);
+                          showToast?.('수정 표시가 취소되었습니다');
+                        } catch (error) {
+                          console.error('취소 실패:', error);
+                        }
+                      }}>
                         <X size={18} />
                         이 편집 취소
                       </RejectButton>
@@ -3529,6 +3808,235 @@ const CollaborativeDocumentEditor = ({
         </Modal>
       )}
 
+      {/* 권한 관리 모달 */}
+      {showPermissionModal && (
+        <Modal onClick={() => setShowPermissionModal(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <ModalHeader>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ModalTitle>
+                  <Users size={18} color="#4a90e2" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                  권한 관리
+                </ModalTitle>
+                <IconButton
+                  onClick={() => setShowPermissionGuideModal(true)}
+                  title="권한 안내"
+                  style={{
+                    padding: '4px',
+                    background: 'rgba(74, 144, 226, 0.15)',
+                    borderRadius: '50%'
+                  }}
+                >
+                  <HelpCircle size={16} color="#4a90e2" />
+                </IconButton>
+              </div>
+              <IconButton onClick={() => {
+                setShowPermissionModal(false);
+              }}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+
+            <ModalBody>
+              <div style={{ marginBottom: '16px', fontSize: '13px', color: '#888' }}>
+                참여자의 권한을 관리할 수 있습니다
+              </div>
+
+              {participants.length === 0 ? (
+                <div style={{ padding: '40px 20px', textAlign: 'center', color: '#666' }}>
+                  참여자 정보를 불러오는 중...
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {participants.map((participant) => (
+                    <div
+                      key={participant.userId}
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        padding: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}
+                    >
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#e0e0e0', marginBottom: '4px' }}>
+                          {participant.isManager && '👑 '}
+                          {participant.isSubManager && '🎖️ '}
+                          {participant.isEditor && '✏️ '}
+                          {participant.isViewer && '👁️ '}
+                          {participant.nickname}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#888' }}>
+                          {participant.isManager && '방장'}
+                          {participant.isSubManager && '부방장'}
+                          {participant.isEditor && '편집자'}
+                          {participant.isViewer && '뷰어'}
+                        </div>
+                      </div>
+
+                      {participant.userId !== currentUserId && (
+                        <select
+                          value={
+                            participant.isManager ? 'manager' :
+                            participant.isSubManager ? 'submanager' :
+                            participant.isEditor ? 'editor' : 'viewer'
+                          }
+                          onChange={(e) => handlePermissionChange(participant.userId, e.target.value)}
+                          style={{
+                            background: 'rgba(255, 255, 255, 0.05)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '6px',
+                            color: '#e0e0e0',
+                            padding: '6px 12px',
+                            fontSize: '12px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <option value="manager" disabled={actualIsSubManager && !actualIsManager}>👑 방장</option>
+                          <option value="submanager" disabled={actualIsSubManager && !actualIsManager}>🎖️ 부방장</option>
+                          <option value="editor">✏️ 편집자</option>
+                          <option value="viewer">👁️ 뷰어</option>
+                        </select>
+                      )}
+
+                      {participant.userId === currentUserId && (
+                        <div style={{ fontSize: '11px', color: '#4a90e2', fontWeight: '600' }}>
+                          나
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* 초대 권한 설정 (방장만) */}
+              {actualIsManager && (
+                <div style={{
+                  marginTop: '16px',
+                  background: 'rgba(255, 255, 255, 0.03)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '8px',
+                  padding: '12px'
+                }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#e0e0e0', marginBottom: '8px' }}>
+                    ⚙️ 방 설정
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>
+                    초대 권한: 누가 새로운 사람을 초대할 수 있나요?
+                  </div>
+                  <select
+                    value={invitePermission}
+                    onChange={(e) => handleInvitePermissionChange(e.target.value)}
+                    style={{
+                      width: '100%',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '6px',
+                      color: '#e0e0e0',
+                      padding: '8px 12px',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="managers_only">👑 방장만</option>
+                    <option value="managers_and_submanagers">👑🎖️ 방장 + 부방장</option>
+                    <option value="editors_allowed">✏️ 편집자 이상</option>
+                    <option value="everyone">👥 모든 참여자</option>
+                  </select>
+                </div>
+              )}
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* 권한 안내 모달 */}
+      {showPermissionGuideModal && (
+        <Modal onClick={() => setShowPermissionGuideModal(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+            <ModalHeader>
+              <ModalTitle>ℹ️ 권한 안내</ModalTitle>
+              <IconButton onClick={() => setShowPermissionGuideModal(false)}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+
+            <ModalBody>
+              <div style={{
+                background: 'rgba(74, 144, 226, 0.1)',
+                border: '1px solid rgba(74, 144, 226, 0.3)',
+                borderRadius: '8px',
+                padding: '16px',
+                fontSize: '13px',
+                lineHeight: '1.8',
+                color: '#e0e0e0'
+              }}>
+                <div style={{ fontWeight: '600', marginBottom: '12px', color: '#4a90e2', fontSize: '14px' }}>
+                  단체방 권한 체계
+                </div>
+                <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <span style={{ fontSize: '18px', flexShrink: 0 }}>👑</span>
+                  <div>
+                    <strong>방장</strong>
+                    <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>
+                      편집 + 승인/거부 + 모든 권한 관리
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <span style={{ fontSize: '18px', flexShrink: 0 }}>🎖️</span>
+                  <div>
+                    <strong>부방장</strong>
+                    <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>
+                      편집 + 수정 제안 + 편집자 관리
+                    </div>
+                  </div>
+                </div>
+                <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <span style={{ fontSize: '18px', flexShrink: 0 }}>✏️</span>
+                  <div>
+                    <strong>편집자</strong>
+                    <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>
+                      편집 + 수정 제안
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                  <span style={{ fontSize: '18px', flexShrink: 0 }}>👁️</span>
+                  <div>
+                    <strong>뷰어</strong>
+                    <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>
+                      읽기 전용 + 채팅
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                marginTop: '16px',
+                background: 'rgba(255, 255, 255, 0.03)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '8px',
+                padding: '12px',
+                fontSize: '12px',
+                color: '#aaa',
+                lineHeight: '1.6'
+              }}>
+                <div style={{ marginBottom: '6px' }}>
+                  💡 <strong style={{ color: '#e0e0e0' }}>1:1 대화방</strong>에서는 참여자 모두 최고 권한(방장 권한)을 가지게 됩니다.
+                </div>
+                <div>
+                  권한 관리 기능은 단체방에서만 사용할 수 있습니다.
+                </div>
+              </div>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
       {/* 마커 상세 정보 모달 */}
       {showMarkerDetailModal && selectedMarkerDetail && (
         <Modal onClick={() => {
@@ -3702,14 +4210,10 @@ const CollaborativeDocumentEditor = ({
                 <DocumentIcon>📄</DocumentIcon>
                 <FullScreenTitleInput
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => handleTitleChange(e.target.value)}
                   placeholder="문서 제목을 입력하세요"
                   disabled={!actualCanEdit}
                 />
-                <PermissionBadge $type={permissionType}>
-                  <PermissionIcon size={16} />
-                  {permissionLabel}
-                </PermissionBadge>
               </FullScreenTitle>
 
               <IconButton onClick={() => setShowFullScreenEdit(false)} title="닫기">

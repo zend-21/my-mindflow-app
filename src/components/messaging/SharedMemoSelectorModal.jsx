@@ -1,7 +1,9 @@
 // 📄 공유 폴더 메모 선택 모달
 import { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
-import { X, Search, FileText, Calendar, Folder } from 'lucide-react';
+import { X, Search, FileText, Calendar, Folder, Snowflake, Lock } from 'lucide-react';
+import { db } from '../../firebase/config';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -142,18 +144,47 @@ const MemoItem = styled.div`
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   padding: 16px;
-  cursor: pointer;
+  cursor: ${props => props.$frozen ? 'not-allowed' : 'pointer'};
   transition: all 0.2s;
   display: flex;
   flex-direction: column;
   gap: 8px;
   height: fit-content;
+  opacity: ${props => props.$frozen ? '0.6' : '1'};
+  filter: ${props => props.$frozen ? 'grayscale(0.3)' : 'none'};
 
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: #4a90e2;
-    transform: translateY(-2px);
+    background: ${props => props.$frozen ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.08)'};
+    border-color: ${props => props.$frozen ? 'rgba(255, 255, 255, 0.1)' : '#4a90e2'};
+    transform: ${props => props.$frozen ? 'none' : 'translateY(-2px)'};
   }
+
+  &:active {
+    transform: ${props => props.$frozen ? 'none' : 'scale(0.98)'};
+  }
+`;
+
+const FrozenBadge = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(74, 144, 226, 0.2);
+  border: 1px solid #4a90e2;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #4a90e2;
+  width: fit-content;
+`;
+
+const FrozenNote = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #888;
+  margin-top: 4px;
 `;
 
 const MemoTitle = styled.h3`
@@ -221,14 +252,124 @@ const LoadingState = styled.div`
   font-size: 14px;
 `;
 
-const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos }) => {
+const Modal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100002;
+  backdrop-filter: blur(4px);
+`;
+
+const WarningModalContent = styled.div`
+  background: linear-gradient(180deg, #2a2d35, #1f2128);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 400px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const WarningHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #4a90e2;
+`;
+
+const WarningBody = styled.div`
+  color: #e0e0e0;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 20px;
+`;
+
+const WarningInfo = styled.div`
+  background: rgba(74, 144, 226, 0.1);
+  border: 1px solid rgba(74, 144, 226, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 16px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e0e0e0;
+`;
+
+const WarningButton = styled.button`
+  width: 100%;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 44px;
+
+  &:active {
+    transform: scale(0.98);
+    background: #3a7bc8;
+  }
+`;
+
+const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, chatRoomId }) => {
   const [filteredMemos, setFilteredMemos] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [frozenMemos, setFrozenMemos] = useState(new Set()); // 프리즈된 문서 ID 목록
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [selectedFrozenMemo, setSelectedFrozenMemo] = useState(null);
 
   // allMemos에서 folderId === 'shared'인 메모만 필터링 (useMemo로 메모이제이션)
   const sharedMemos = useMemo(() => {
     return allMemos?.filter(memo => memo.folderId === 'shared') || [];
   }, [allMemos]);
+
+  // 프리즈된 문서 체크 (Firestore에서 편집 이력이 있는 문서)
+  useEffect(() => {
+    if (!chatRoomId || !sharedMemos.length) return;
+
+    const checkFrozenDocuments = async () => {
+      const frozenSet = new Set();
+
+      // 모든 공유 메모에 대해 편집 이력 확인
+      for (const memo of sharedMemos) {
+        try {
+          const editHistoryRef = collection(
+            db,
+            'chatRooms',
+            chatRoomId,
+            'documents',
+            memo.id,
+            'editHistory'
+          );
+          const q = query(editHistoryRef, where('status', '==', 'pending'));
+          const snapshot = await getDocs(q);
+
+          if (!snapshot.empty) {
+            frozenSet.add(memo.id);
+          }
+        } catch (error) {
+          // 편집 이력이 없는 경우 무시
+          console.log('편집 이력 체크 중 오류 (정상):', error);
+        }
+      }
+
+      setFrozenMemos(frozenSet);
+    };
+
+    checkFrozenDocuments();
+  }, [chatRoomId, sharedMemos]);
 
   useEffect(() => {
     if (!searchQuery) {
@@ -244,6 +385,13 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos })
   }, [searchQuery, sharedMemos]);
 
   const handleSelectMemo = (memo) => {
+    // 프리즈된 문서인 경우 경고 모달 표시
+    if (frozenMemos.has(memo.id)) {
+      setSelectedFrozenMemo(memo);
+      setShowWarningModal(true);
+      return;
+    }
+
     onSelectMemo(memo);
     onClose();
   };
@@ -313,19 +461,60 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos })
               </EmptyDescription>
             </EmptyState>
           ) : (
-            filteredMemos.map(memo => (
-              <MemoItem key={memo.id} onClick={() => handleSelectMemo(memo)}>
-                <MemoTitle>{getDisplayTitle(memo)}</MemoTitle>
-                {memo.content && (
-                  <MemoPreview>{memo.content}</MemoPreview>
-                )}
-                <MemoDate>
-                  {formatDate(memo.updatedAt || memo.createdAt)}
-                </MemoDate>
-              </MemoItem>
-            ))
+            filteredMemos.map(memo => {
+              const isFrozen = frozenMemos.has(memo.id);
+              return (
+                <MemoItem
+                  key={memo.id}
+                  onClick={() => handleSelectMemo(memo)}
+                  $frozen={isFrozen}
+                >
+                  {isFrozen && (
+                    <FrozenBadge>
+                      <Snowflake size={12} />
+                      작업중
+                    </FrozenBadge>
+                  )}
+                  <MemoTitle>{getDisplayTitle(memo)}</MemoTitle>
+                  {memo.content && (
+                    <MemoPreview>{memo.content}</MemoPreview>
+                  )}
+                  {isFrozen && (
+                    <FrozenNote>
+                      <Lock size={10} />
+                      대화방에서 편집 중
+                    </FrozenNote>
+                  )}
+                  <MemoDate>
+                    {formatDate(memo.updatedAt || memo.createdAt)}
+                  </MemoDate>
+                </MemoItem>
+              );
+            })
           )}
         </MemoList>
+
+        {/* 프리즈된 문서 경고 모달 */}
+        {showWarningModal && selectedFrozenMemo && (
+          <Modal onClick={() => setShowWarningModal(false)}>
+            <WarningModalContent onClick={(e) => e.stopPropagation()}>
+              <WarningHeader>
+                <Snowflake size={20} />
+                동결된 문서
+              </WarningHeader>
+              <WarningBody>
+                이 문서는 대화방에서 편집 작업이 진행 중입니다.
+              </WarningBody>
+              <WarningInfo>
+                작업이 완료될 때까지<br />
+                <strong>열기·수정·삭제·이동</strong>이 제한됩니다.
+              </WarningInfo>
+              <WarningButton onClick={() => setShowWarningModal(false)}>
+                확인
+              </WarningButton>
+            </WarningModalContent>
+          </Modal>
+        )}
       </ModalContainer>
     </ModalOverlay>
   );
