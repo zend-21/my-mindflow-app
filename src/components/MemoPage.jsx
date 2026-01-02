@@ -8,6 +8,7 @@ import { useMemoFolders } from '../hooks/useMemoFolders';
 import { exportData, importData } from '../utils/dataManager';
 import Header from './Header';
 import { BsCheckCircleFill, BsCircle } from 'react-icons/bs';
+import { Snowflake } from 'lucide-react';
 
 // 애니메이션 keyframes
 const fadeIn = keyframes`
@@ -650,6 +651,20 @@ const ShareBadge = styled.span`
     align-items: center;
     justify-content: center;
 `;
+
+// 프리즈 뱃지 (파란색 얼음 결정)
+const FrozenBadge = styled.span`
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: rgba(74, 144, 226, 0.2);
+    border: 1px solid #4a90e2;
+    color: #4a90e2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+`;
+
 const EmptyMessage = styled.p`
     color: #b0b0b0;
     text-align: center;
@@ -1442,6 +1457,78 @@ const Tab = styled.button`
     }
 `;
 
+// 프리즈 경고 모달
+const FrozenWarningOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100001;
+    backdrop-filter: blur(4px);
+`;
+
+const FrozenWarningContent = styled.div`
+    background: linear-gradient(180deg, #2a2d35, #1f2128);
+    border-radius: 16px;
+    width: 90%;
+    max-width: 400px;
+    padding: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const FrozenWarningHeader = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #4a90e2;
+`;
+
+const FrozenWarningBody = styled.div`
+    color: #e0e0e0;
+    font-size: 14px;
+    line-height: 1.6;
+    margin-bottom: 20px;
+`;
+
+const FrozenWarningInfo = styled.div`
+    background: rgba(74, 144, 226, 0.1);
+    border: 1px solid rgba(74, 144, 226, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 16px 0;
+    font-size: 13px;
+    line-height: 1.6;
+    color: #e0e0e0;
+`;
+
+const FrozenWarningButton = styled.button`
+    width: 100%;
+    background: #4a90e2;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-height: 44px;
+
+    &:active {
+        transform: scale(0.98);
+        background: #3a7bc8;
+    }
+`;
+
 // --- (모든 스타일 끝) ---
 
 // 아이콘 선택 옵션
@@ -1469,14 +1556,22 @@ const MemoPage = ({
     onRequestShareSelectedMemos,
     onRequestUnshareSelectedMemos,
     folderSyncContext,
-    onActiveFolderChange, // 활성 폴더 변경 콜백 추가
-    frozenMemoIds = new Set() // 프리즈된 메모 ID 목록
+    onActiveFolderChange // 활성 폴더 변경 콜백 추가
 }) => {
     const [layoutView, setLayoutView] = useLocalStorage('memoLayoutView', 'list');
     const [sortOrder, setSortOrder] = React.useState('date'); // 'date' 또는 'importance'
     const [sortDirection, setSortDirection] = React.useState('desc'); // 'asc' 또는 'desc'
     const longPressTimer = useRef(null);
     const PRESS_DURATION = 500;
+
+    // 🔍 디버깅: 공유폴더 메모의 hasPendingEdits 필드 확인
+    useEffect(() => {
+        const sharedMemos = memos.filter(m => m.folderId === 'shared');
+        console.log('📋 MemoPage - 공유폴더 메모 개수:', sharedMemos.length);
+        sharedMemos.forEach(memo => {
+            console.log(`  - ${memo.id}: hasPendingEdits =`, memo.hasPendingEdits);
+        });
+    }, [memos]);
 
     // HTML에서 순수 텍스트만 추출하는 함수
     const stripHtmlTags = (html) => {
@@ -1522,6 +1617,9 @@ const MemoPage = ({
 
     // 미분류로 이동 확인 모달
     const [moveToUncategorizedConfirm, setMoveToUncategorizedConfirm] = useState(null); // null | { count: number }
+
+    // 프리즈 문서 경고 모달
+    const [showFrozenWarning, setShowFrozenWarning] = useState(false);
 
     // 활성 폴더 변경 시 App.jsx로 알림
     useEffect(() => {
@@ -1669,6 +1767,13 @@ const MemoPage = ({
     // 폴더 선택 모달 열기 (미분류 문서를 폴더로 이동)
     const handleOpenMoveToFolderModal = () => {
         if (selectedCount === 0) return;
+
+        // 선택된 메모 중 프리즈된 문서가 있으면 차단
+        if (hasFrozenMemoInSelection()) {
+            setShowFrozenWarning(true);
+            return;
+        }
+
         setShowMoveToFolderModal(true);
     };
 
@@ -1702,9 +1807,7 @@ const MemoPage = ({
         // 공유 폴더를 선택한 경우
         if (moveConfirmModal.targetFolder.id === 'shared') {
             // 공유 폴더로 이동 시 기존 공유 로직 사용
-            if (onRequestShareSelectedMemos) {
-                onRequestShareSelectedMemos();
-            }
+            handleRequestShareSelectedMemos();
         } else {
             // 사용자 정의 폴더로 이동
             onUpdateMemoFolderBatch(selectedMemoIdsArray, targetFolderId);
@@ -1718,6 +1821,13 @@ const MemoPage = ({
     // 미분류로 이동 확인 모달 열기
     const handleRequestMoveToUncategorized = () => {
         if (selectedCount === 0) return;
+
+        // 선택된 메모 중 프리즈된 문서가 있으면 차단
+        if (hasFrozenMemoInSelection()) {
+            setShowFrozenWarning(true);
+            return;
+        }
+
         setMoveToUncategorizedConfirm({ count: selectedCount });
     };
 
@@ -1770,8 +1880,53 @@ const MemoPage = ({
         }, PRESS_DURATION);
     };
     
+    // 선택된 메모 중 프리즈된 문서 확인
+    const hasFrozenMemoInSelection = () => {
+        const selectedMemos = memos.filter(memo => selectedMemoIds.has(memo.id));
+        return selectedMemos.some(memo => memo.hasPendingEdits === true);
+    };
+
+    // 선택된 메모 삭제 요청 (프리즈 체크 포함)
+    const handleRequestDeleteSelectedMemos = () => {
+        if (hasFrozenMemoInSelection()) {
+            setShowFrozenWarning(true);
+            return;
+        }
+        onRequestDeleteSelectedMemos();
+    };
+
+    // 선택된 메모 공유 요청 (프리즈 체크 포함)
+    const handleRequestShareSelectedMemos = () => {
+        if (hasFrozenMemoInSelection()) {
+            setShowFrozenWarning(true);
+            return;
+        }
+        onRequestShareSelectedMemos();
+    };
+
+    // 선택된 메모 공유 해제 요청 (프리즈 체크 포함)
+    const handleRequestUnshareSelectedMemos = () => {
+        if (hasFrozenMemoInSelection()) {
+            setShowFrozenWarning(true);
+            return;
+        }
+        if (onRequestUnshareSelectedMemos) {
+            onRequestUnshareSelectedMemos();
+        }
+    };
+
     const handleDeleteClick = (e, id) => {
         e.stopPropagation();
+
+        // 프리즈된 문서이고 공유 폴더에 있는 경우 차단
+        const memo = memos.find(m => m.id === id);
+        const isInSharedFolder = activeFolder === 'shared' || memo?.folderId === 'shared';
+
+        if (memo?.hasPendingEdits && isInSharedFolder) {
+            setShowFrozenWarning(true);
+            return;
+        }
+
         onDeleteMemoRequest(id);
     };
 
@@ -1888,7 +2043,7 @@ const MemoPage = ({
                             <>
                                 <ActionButton
                                     $type="stealth"
-                                    onClick={onRequestUnshareSelectedMemos}
+                                    onClick={handleRequestUnshareSelectedMemos}
                                     disabled={selectedCount === 0}
                                 >
                                     공유 해제
@@ -1907,7 +2062,7 @@ const MemoPage = ({
                                 </ActionButton>
                                 <ActionButton
                                     $type="delete"
-                                    onClick={onRequestDeleteSelectedMemos}
+                                    onClick={handleRequestDeleteSelectedMemos}
                                     disabled={selectedCount === 0}
                                 >
                                     삭제
@@ -1960,7 +2115,7 @@ const MemoPage = ({
                                 </ActionButton>
                                 <ActionButton
                                     $type="delete"
-                                    onClick={onRequestDeleteSelectedMemos}
+                                    onClick={handleRequestDeleteSelectedMemos}
                                     disabled={selectedCount === 0}
                                 >
                                     삭제
@@ -2267,6 +2422,17 @@ const MemoPage = ({
                                 key={memo.id}
                                 onClick={(e) => {
                                     e.stopPropagation();
+
+                                    // 프리즈된 문서이고 공유 폴더에 있는 경우
+                                    const isInSharedFolder = activeFolder === 'shared' || memo.folderId === 'shared';
+                                    const isMemoFrozen = memo.hasPendingEdits === true;
+
+                                    if (isMemoFrozen && isInSharedFolder && !isSelectionMode) {
+                                        // 프리즈 경고 모달 표시
+                                        setShowFrozenWarning(true);
+                                        return;
+                                    }
+
                                     if(isSelectionMode) {
                                         onToggleMemoSelection(memo.id);
                                     } else {
@@ -2307,7 +2473,7 @@ const MemoPage = ({
                                     {isSelected ? <StyledCheckIcon /> : <BsCircle />}
                                 </CheckboxContainer>
 
-                                {/* 뱃지 컨테이너: NEW → 중요도 → 스텔스 → 공유 순서로 자동 정렬 */}
+                                {/* 뱃지 컨테이너: NEW → 중요도 → 스텔스 → 공유 → 프리즈 순서로 자동 정렬 */}
                                 <BadgeContainer>
                                     {isNew && <NewBadge>NEW</NewBadge>}
                                     {memo.isImportant && (
@@ -2338,6 +2504,12 @@ const MemoPage = ({
                                                 <path d="M18 16.08C17.24 16.08 16.56 16.38 16.04 16.85L8.91 12.7C8.96 12.47 9 12.24 9 12C9 11.76 8.96 11.53 8.91 11.3L15.96 7.19C16.5 7.69 17.21 8 18 8C19.66 8 21 6.66 21 5C21 3.34 19.66 2 18 2C16.34 2 15 3.34 15 5C15 5.24 15.04 5.47 15.09 5.7L8.04 9.81C7.5 9.31 6.79 9 6 9C4.34 9 3 10.34 3 12C3 13.66 4.34 15 6 15C6.79 15 7.5 14.69 8.04 14.19L15.16 18.35C15.11 18.56 15.08 18.78 15.08 19C15.08 20.61 16.39 21.92 18 21.92C19.61 21.92 20.92 20.61 20.92 19C20.92 17.39 19.61 16.08 18 16.08Z" fill="currentColor"/>
                                             </svg>
                                         </ShareBadge>
+                                    )}
+                                    {/* 프리즈 뱃지: 대화방에서 편집 중인 문서 */}
+                                    {memo.hasPendingEdits && (activeFolder === 'shared' || memo.folderId === 'shared') && (
+                                        <FrozenBadge title="대화방에서 편집 중">
+                                            <Snowflake size={14} />
+                                        </FrozenBadge>
                                     )}
                                 </BadgeContainer>
                                 <MemoHeader $layoutView={layoutView}>
@@ -2572,6 +2744,28 @@ const MemoPage = ({
                         </FolderModalButtons>
                     </FolderModalBox>
                 </FolderModalOverlay>,
+                document.getElementById('modal-root')
+            )}
+
+            {/* 프리즈된 문서 경고 모달 */}
+            {showFrozenWarning && ReactDOM.createPortal(
+                <FrozenWarningOverlay onClick={() => setShowFrozenWarning(false)}>
+                    <FrozenWarningContent onClick={(e) => e.stopPropagation()}>
+                        <FrozenWarningHeader>
+                            <Snowflake size={24} color="#4a90e2" />
+                            <div>편집 중인 문서</div>
+                        </FrozenWarningHeader>
+                        <FrozenWarningBody>
+                            이 문서는 대화방에서 편집 작업이 진행 중입니다.
+                        </FrozenWarningBody>
+                        <FrozenWarningInfo>
+                            편집, 이동, 삭제 작업은 대화방에서 편집이 완료된 후 가능합니다.
+                        </FrozenWarningInfo>
+                        <FrozenWarningButton onClick={() => setShowFrozenWarning(false)}>
+                            확인
+                        </FrozenWarningButton>
+                    </FrozenWarningContent>
+                </FrozenWarningOverlay>,
                 document.getElementById('modal-root')
             )}
         </MemoContainer>

@@ -910,7 +910,8 @@ const CollaborativeDocumentEditor = ({
   showToast,
   onClose,
   onLoadFromShared,
-  selectedMemo // 외부에서 선택한 메모 (불러오기 요청)
+  selectedMemo, // 외부에서 선택한 메모 (불러오기 요청)
+  onUpdateMemoPendingFlag // App.jsx에서 메모 state 업데이트
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [title, setTitle] = useState('');
@@ -1111,6 +1112,38 @@ const CollaborativeDocumentEditor = ({
     } catch (error) {
       console.error('워크스페이스 ID 조회 실패:', error);
       return null;
+    }
+  };
+
+  // 메모 문서의 hasPendingEdits 플래그 업데이트
+  const updateMemoPendingFlag = async (memoId, hasPending) => {
+    if (!memoId || !currentUserId) return;
+
+    try {
+      const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', memoId);
+
+      // 먼저 문서가 존재하는지 확인
+      const memoSnap = await getDoc(memoRef);
+      if (!memoSnap.exists()) {
+        console.error(`❌ 메모 문서가 존재하지 않음: ${memoId}`);
+        return;
+      }
+
+      await updateDoc(memoRef, {
+        hasPendingEdits: hasPending
+      });
+
+      // 저장 후 다시 읽어서 확인
+      const updatedSnap = await getDoc(memoRef);
+      const actualValue = updatedSnap.data()?.hasPendingEdits;
+      console.log(`✏️ 메모 ${memoId} pending 플래그 업데이트:`, hasPending, '/ 실제 저장된 값:', actualValue);
+
+      // ⭐ App.jsx의 메모 state도 즉시 업데이트 (새로고침 없이 배지 표시)
+      if (onUpdateMemoPendingFlag) {
+        onUpdateMemoPendingFlag(memoId, hasPending);
+      }
+    } catch (error) {
+      console.error('메모 pending 플래그 업데이트 실패:', error);
     }
   };
 
@@ -1325,11 +1358,17 @@ const CollaborativeDocumentEditor = ({
       let contentToLoad = memo.content || '';
       let titleToLoad = memo.title || '제목 없음';
 
+      console.log('📄 문서 불러오기 시작 - ID:', memo.id);
+      console.log('📄 원본 memo.content 길이:', memo.content?.length || 0);
+      console.log('📄 원본 컨텐츠에 마커 포함?', memo.content?.includes('data-edit-id') || false);
+
       if (documentCache.current.has(memo.id)) {
         const cached = documentCache.current.get(memo.id);
         contentToLoad = cached.content;
         titleToLoad = cached.title;
         console.log('✅ 캐시에서 편집 중이던 문서 복원:', memo.id);
+        console.log('📄 캐시 컨텐츠 길이:', contentToLoad.length);
+        console.log('📄 캐시 컨텐츠에 마커 포함?', contentToLoad.includes('data-edit-id'));
       } else {
         // 2. currentDoc에서 편집 중인 버전 확인 (우선순위 2)
         const currentDocSnap = await getDoc(currentDocRef);
@@ -1339,7 +1378,13 @@ const CollaborativeDocumentEditor = ({
             contentToLoad = currentDocData.content;
             titleToLoad = currentDocData.title || titleToLoad;
             console.log('✅ Firestore에서 편집 중이던 문서 복원:', memo.id);
+            console.log('📄 Firestore 컨텐츠 길이:', contentToLoad.length);
+            console.log('📄 Firestore 컨텐츠에 마커 포함?', contentToLoad.includes('data-edit-id'));
+          } else {
+            console.log('⚠️ currentDoc에 해당 문서 없음, 원본 사용');
           }
+        } else {
+          console.log('⚠️ currentDoc 자체가 없음, 원본 사용');
         }
       }
 
@@ -1374,6 +1419,11 @@ const CollaborativeDocumentEditor = ({
       editsSnap.forEach((doc) => {
         edits.push({ id: doc.id, ...doc.data() });
       });
+
+      console.log('📝 로드된 편집 이력 개수:', edits.length);
+      if (edits.length > 0) {
+        console.log('📝 편집 이력 상세:', edits);
+      }
 
       // 항상 새로운 배열로 설정 (이전 문서의 편집 이력이 남지 않도록)
       setPendingEdits(edits.length > 0 ? edits : []);
@@ -1659,6 +1709,9 @@ const CollaborativeDocumentEditor = ({
             status: 'pending'
           });
 
+          // 메모 문서에 pending 플래그 설정
+          await updateMemoPendingFlag(currentDocId, true);
+
           // 선택 영역을 형광펜으로 표시
           if (range) {
             const span = document.createElement('span');
@@ -1740,6 +1793,9 @@ const CollaborativeDocumentEditor = ({
       };
 
       const editDoc = await addDoc(editHistoryRef, editData);
+
+      // 메모 문서에 pending 플래그 설정
+      await updateMemoPendingFlag(currentDocId, true);
 
       // 임시 마커를 영구 마커로 교체
       if (targetElement) {
@@ -2067,6 +2123,9 @@ const CollaborativeDocumentEditor = ({
       }
 
       const editDoc = await addDoc(editHistoryRef, editData);
+
+      // 메모 문서에 pending 플래그 설정
+      await updateMemoPendingFlag(currentDocId, true);
 
       // 프로그래밍 방식 변경 플래그 설정
       programmaticChangeRef.current = true;
@@ -2615,7 +2674,14 @@ const CollaborativeDocumentEditor = ({
         }
 
         // 7. UI 업데이트
-        setPendingEdits(prev => prev.filter(e => e.id !== editId));
+        setPendingEdits(prev => {
+          const updated = prev.filter(e => e.id !== editId);
+          // 더 이상 pending 편집이 없으면 플래그 제거
+          if (updated.length === 0) {
+            updateMemoPendingFlag(currentDocId, false);
+          }
+          return updated;
+        });
         setSelectedEdits(prev => prev.filter(e => e.id !== editId));
 
         // 모든 편집이 승인되었으면 모달 닫기

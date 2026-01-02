@@ -20,7 +20,6 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import useAlarmManager from './hooks/useAlarmManager';
 import { getRandomStealthPhrase } from './utils/stealthPhrases';
-import { checkFrozenDocuments } from './utils/frozenDocumentUtils';
 // 하위 컴포넌트들
 import Header from './components/Header.jsx';
 import StatsGrid from './components/StatsGrid.jsx';
@@ -813,8 +812,7 @@ function App() {
     const [memoOpenSource, setMemoOpenSource] = useState(null);
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedMemoIds, setSelectedMemoIds] = useState(new Set());
-    const [frozenMemoIds, setFrozenMemoIds] = useState(new Set()); // 프리즈된 메모 ID 목록
-    
+
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [memoToDelete, setMemoToDelete] = useState(null);
     const [isCalendarConfirmOpen, setIsCalendarConfirmOpen] = useState(false);
@@ -826,35 +824,6 @@ function App() {
 
     // 알람 매니저 훅 사용
     const { toastAlarms, dismissToast } = useAlarmManager(calendarSchedules);
-
-    // 프리즈된 메모 체크 (공유 폴더 메모만)
-    useEffect(() => {
-        if (!userId || !isAuthenticated || !memos.length) {
-            console.log('⏭️ 프리즈 체크 스킵 - userId:', userId, 'isAuthenticated:', isAuthenticated, 'memos.length:', memos.length);
-            return;
-        }
-
-        const checkFrozen = async () => {
-            // 공유 폴더 메모만 추출
-            const sharedMemoIds = memos
-                .filter(memo => memo.folderId === 'shared')
-                .map(memo => memo.id);
-
-            console.log('📋 공유 폴더 메모:', sharedMemoIds.length, '개');
-
-            if (sharedMemoIds.length === 0) {
-                setFrozenMemoIds(new Set());
-                return;
-            }
-
-            // 프리즈 상태 체크
-            const frozenSet = await checkFrozenDocuments(sharedMemoIds, userId);
-            console.log('🎯 App.jsx - 프리즈 상태 업데이트:', frozenSet.size, '개');
-            setFrozenMemoIds(frozenSet);
-        };
-
-        checkFrozen();
-    }, [memos, userId, isAuthenticated]);
 
     // 앱 시작 시 일정 데이터 정리 (text가 없으면 createdAt/updatedAt 제거)
     useEffect(() => {
@@ -1291,6 +1260,19 @@ function App() {
             })
         );
         quietSync(); // 변경사항 동기화
+    };
+
+    // 메모의 hasPendingEdits 플래그 업데이트 (채팅방에서 호출)
+    const handleUpdateMemoPendingFlag = (memoId, hasPending) => {
+        syncMemos(
+            memos.map(memo => {
+                if (memo.id === memoId) {
+                    return { ...memo, hasPendingEdits: hasPending };
+                }
+                return memo;
+            })
+        );
+        // Firestore 동기화는 자동으로 됨 (useFirestoreSync의 디바운싱)
     };
 
     // 메모 폴더 복원 (공유 해제 시)
@@ -2902,7 +2884,6 @@ function App() {
                                 onRequestShareSelectedMemos={requestShareSelectedMemos}
                                 onRequestUnshareSelectedMemos={requestUnshareSelectedMemos}
                                 onActiveFolderChange={handleActiveFolderChange}
-                                frozenMemoIds={frozenMemoIds}
                             />
                         }
                         {activeTab === 'todo' && <div>할 일 페이지</div>}
@@ -2916,7 +2897,7 @@ function App() {
                                 setShowHeader={setShowHeader}
                             />
                         )}
-                        {activeTab === 'chat' && <MessagingHub showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} />}
+                        {activeTab === 'chat' && <MessagingHub showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={handleUpdateMemoPendingFlag} />}
                     </ContentArea>
 
                     <FloatingButton onClick={handleOpenNewMemoFromFAB} activeTab={activeTab} />
@@ -3064,7 +3045,6 @@ function App() {
                 showToast={showToast}
                 onNavigate={(nextMemo) => setSelectedMemo(nextMemo)}
                 folderSyncContext={{ folders, syncFolder, deleteFolder }}
-                isFrozen={selectedMemo && frozenMemoIds.has(selectedMemo.id)}
             />
             
             {isDeleteModalOpen && (

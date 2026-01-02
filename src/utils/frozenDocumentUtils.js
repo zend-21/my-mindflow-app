@@ -1,6 +1,6 @@
 // 프리즈된 문서 체크 유틸리티
 import { db } from '../firebase/config';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, collectionGroup, query, where, getDocs } from 'firebase/firestore';
 
 /**
  * 특정 메모가 어느 대화방에서든 편집 중인지 확인
@@ -59,40 +59,29 @@ export const checkFrozenDocuments = async (memoIds, userId) => {
   try {
     console.log('🔍 프리즈 체크 시작 - 메모 개수:', memoIds.length);
 
-    // 사용자가 참여 중인 모든 대화방 조회
-    const chatRoomsRef = collection(db, 'chatRooms');
-    const chatRoomsSnapshot = await getDocs(chatRoomsRef);
+    // collectionGroup으로 모든 대화방의 editHistory를 한 번에 검색
+    // status가 'pending'인 편집 이력만 조회
+    const editHistoryQuery = query(
+      collectionGroup(db, 'editHistory'),
+      where('status', '==', 'pending')
+    );
 
-    console.log('🔍 전체 대화방 개수:', chatRoomsSnapshot.docs.length);
+    const snapshot = await getDocs(editHistoryQuery);
 
-    // 각 메모에 대해 모든 대화방 확인
-    for (const memoId of memoIds) {
-      for (const chatRoomDoc of chatRoomsSnapshot.docs) {
-        const chatRoomId = chatRoomDoc.id;
+    console.log('📊 전체 pending 편집 개수:', snapshot.docs.length);
 
-        try {
-          const editHistoryRef = collection(
-            db,
-            'chatRooms',
-            chatRoomId,
-            'documents',
-            memoId,
-            'editHistory'
-          );
-          const q = query(editHistoryRef, where('status', '==', 'pending'));
-          const snapshot = await getDocs(q);
+    // pending 편집 이력의 문서 경로에서 memoId 추출
+    snapshot.docs.forEach(doc => {
+      // 경로: chatRooms/{chatRoomId}/documents/{memoId}/editHistory/{editId}
+      const pathParts = doc.ref.path.split('/');
+      const memoId = pathParts[3]; // documents 다음의 memoId
 
-          if (!snapshot.empty) {
-            console.log('❄️ 프리즈된 문서 발견:', memoId, 'in room:', chatRoomId, '편집 개수:', snapshot.docs.length);
-            frozenSet.add(memoId);
-            break; // 이미 프리즈 확인되면 다른 대화방 체크 불필요
-          }
-        } catch (error) {
-          // 편집 이력이 없는 경우 무시
-          continue;
-        }
+      // 공유 폴더 메모 목록에 있는 경우만 프리즈 처리
+      if (memoIds.includes(memoId)) {
+        console.log('❄️ 프리즈된 문서 발견:', memoId, '편집 ID:', doc.id);
+        frozenSet.add(memoId);
       }
-    }
+    });
 
     console.log('✅ 프리즈 체크 완료 - 프리즈된 문서:', Array.from(frozenSet));
   } catch (error) {

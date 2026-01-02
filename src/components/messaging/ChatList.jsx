@@ -299,7 +299,7 @@ const EmptyDescription = styled.div`
   line-height: 1.5;
 `;
 
-const ChatList = ({ showToast, memos, requirePhoneAuth }) => {
+const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [chatRooms, setChatRooms] = useState([]);
   const [groupChats, setGroupChats] = useState([]);
@@ -710,6 +710,7 @@ const ChatList = ({ showToast, memos, requirePhoneAuth }) => {
           onClose={() => setSelectedChat(null)}
           showToast={showToast}
           memos={memos}
+          onUpdateMemoPendingFlag={onUpdateMemoPendingFlag}
         />
       )}
     </Container>

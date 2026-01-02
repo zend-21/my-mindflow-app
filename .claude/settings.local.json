@@ -31,7 +31,8 @@
       "Bash(vercel inspect:*)",
       "Bash(firebase init:*)",
       "Bash(python fix_aquarius_fortune.py:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(firebase firestore:indexes:*)"
     ],
     "deny": [],
     "ask": []

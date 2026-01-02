@@ -538,7 +538,7 @@ const EmptyDescription = styled.div`
   line-height: 1.5;
 `;
 
-const ChatRoom = ({ chat, onClose, showToast, memos }) => {
+const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
@@ -975,6 +975,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
             }}
             onLoadFromShared={handleLoadFromShared}
             selectedMemo={selectedMemoToLoad}
+            onUpdateMemoPendingFlag={onUpdateMemoPendingFlag}
           />
         </div>
       )}
@@ -1144,7 +1145,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos }) => {
           onSelectMemo={handleSelectSharedMemo}
           showToast={showToast}
           allMemos={memos}
-          chatRoomId={roomId}
+          chatRoomId={chat.id}
         />
       )}
 
