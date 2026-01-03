@@ -1,11 +1,10 @@
 // 👥 친구 탭 - 친구 관리 (카카오톡 스타일)
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Search, UserPlus, MessageCircle, UserMinus, Shield, ChevronRight, Settings, TestTube } from 'lucide-react';
+import { Search, UserPlus, MessageCircle, UserMinus, Shield, ChevronRight } from 'lucide-react';
 import { getMyFriends } from '../../services/friendService';
-import { checkVerificationStatus } from '../../services/verificationService';
+import { checkVerificationStatus, checkVerificationStatusBatch } from '../../services/verificationService';
 import { createOrGetDMRoom } from '../../services/directMessageService';
-import { addTestFriend, removeAllTestFriends } from '../../services/testFriendService';
 import VerificationModal from './VerificationModal';
 import ChatRoom from './ChatRoom';
 import AddFriendModal from './AddFriendModal';
@@ -371,19 +370,22 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
     try {
       const userId = localStorage.getItem('firebaseUserId');
 
-      // Firestore에서 최신 닉네임 가져오기
-      let nickname = '나';
-      try {
-        const { getUserNickname } = await import('../../services/nicknameService');
-        const firestoreNickname = await getUserNickname(userId);
-        if (firestoreNickname) {
-          nickname = firestoreNickname;
-        } else {
-          nickname = localStorage.getItem('userNickname') || '나';
+      // ⚡ 최적화: localStorage 우선, Firestore는 fallback
+      let nickname = localStorage.getItem('userNickname') || '나';
+
+      // localStorage에 닉네임이 없는 경우에만 Firestore 조회
+      if (nickname === '나') {
+        try {
+          const { getUserNickname } = await import('../../services/nicknameService');
+          const firestoreNickname = await getUserNickname(userId);
+          if (firestoreNickname) {
+            nickname = firestoreNickname;
+            // localStorage에 캐싱
+            localStorage.setItem('userNickname', firestoreNickname);
+          }
+        } catch (error) {
+          console.error('닉네임 로드 실패:', error);
         }
-      } catch (error) {
-        console.error('닉네임 로드 실패:', error);
-        nickname = localStorage.getItem('userNickname') || '나';
       }
 
       // 본인인증 상태 확인
@@ -404,16 +406,15 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
       const userId = localStorage.getItem('firebaseUserId');
       const friendsList = await getMyFriends(userId);
 
-      // 각 친구의 인증 상태 확인
-      const friendsWithVerification = await Promise.all(
-        friendsList.map(async (friend) => {
-          const verificationStatus = await checkVerificationStatus(friend.friendId);
-          return {
-            ...friend,
-            verified: verificationStatus.verified
-          };
-        })
-      );
+      // ⚡ 배치로 모든 친구의 인증 상태 확인 (N개 개별 조회 → 1회 배치 조회)
+      const friendIds = friendsList.map(f => f.friendId);
+      const verificationMap = await checkVerificationStatusBatch(friendIds);
+
+      // 인증 상태를 친구 정보에 병합
+      const friendsWithVerification = friendsList.map(friend => ({
+        ...friend,
+        verified: verificationMap.get(friend.friendId)?.verified || false
+      }));
 
       setFriends(friendsWithVerification);
       setLoading(false);
@@ -478,46 +479,6 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
     }
   };
 
-  const handleAddTestFriends = async () => {
-    try {
-      const userId = localStorage.getItem('firebaseUserId');
-      showToast?.('테스트 친구를 추가하는 중...');
-
-      const result = await addTestFriend(userId);
-
-      if (result.success) {
-        showToast?.(result.message);
-        // 친구 목록 새로고침
-        await loadFriends();
-      } else {
-        showToast?.(result.message);
-      }
-    } catch (error) {
-      console.error('테스트 친구 추가 오류:', error);
-      showToast?.('테스트 친구 추가에 실패했습니다');
-    }
-  };
-
-  const handleRemoveTestFriends = async () => {
-    try {
-      const userId = localStorage.getItem('firebaseUserId');
-      showToast?.('테스트 친구를 삭제하는 중...');
-
-      const result = await removeAllTestFriends(userId);
-
-      if (result.success) {
-        showToast?.(result.message);
-        // 친구 목록 새로고침
-        await loadFriends();
-      } else {
-        showToast?.(result.message);
-      }
-    } catch (error) {
-      console.error('테스트 친구 삭제 오류:', error);
-      showToast?.('테스트 친구 삭제에 실패했습니다');
-    }
-  };
-
   // 아바타 색상 생성
   const getAvatarColor = (userId) => {
     const colors = [
@@ -556,14 +517,8 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </SearchInputWrapper>
-        <IconButton onClick={handleAddTestFriends} title="테스트 친구 추가" style={{ color: '#4a90e2' }}>
-          <TestTube size={20} />
-        </IconButton>
         <IconButton onClick={handleAddFriend} title="친구 추가">
           <UserPlus size={20} />
-        </IconButton>
-        <IconButton title="설정">
-          <Settings size={20} />
         </IconButton>
       </HeaderSection>
 
@@ -643,7 +598,7 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
                     {friend.friendName || '익명'}
                   </FriendName>
                   <FriendStatus>
-                    {friend.friendWorkspaceCode?.toLowerCase() || '-'}
+                    {friend.friendWorkspaceCode?.replace('WS-', '') || '-'}
                     {friend.verified && ' • 인증됨'}
                   </FriendStatus>
                 </FriendInfo>
@@ -672,9 +627,10 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
         <VerificationModal
           onClose={() => setShowVerificationModal(false)}
           onVerified={() => {
+            // ⚡ 최적화: 불필요한 재로드 제거
+            // 본인 인증 완료 시 상태만 업데이트 (Firestore 조회 불필요)
             setIsVerified(true);
-            loadMyProfile();
-            loadFriends(); // 친구 목록도 새로고침
+            setShowVerificationModal(false);
           }}
           showToast={showToast}
         />

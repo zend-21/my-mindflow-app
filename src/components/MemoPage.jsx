@@ -1564,15 +1564,6 @@ const MemoPage = ({
     const longPressTimer = useRef(null);
     const PRESS_DURATION = 500;
 
-    // 🔍 디버깅: 공유폴더 메모의 hasPendingEdits 필드 확인
-    useEffect(() => {
-        const sharedMemos = memos.filter(m => m.folderId === 'shared');
-        console.log('📋 MemoPage - 공유폴더 메모 개수:', sharedMemos.length);
-        sharedMemos.forEach(memo => {
-            console.log(`  - ${memo.id}: hasPendingEdits =`, memo.hasPendingEdits);
-        });
-    }, [memos]);
-
     // HTML에서 순수 텍스트만 추출하는 함수
     const stripHtmlTags = (html) => {
         if (!html) return '';

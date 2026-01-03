@@ -1156,9 +1156,11 @@ export const saveUserProfile = async (userData, userId = null, saveToFirestore =
         }
     } else {
         // 게스트: localStorage만 사용 (당일만 유효)
+        const today = new Date();
+        const savedDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         const dataWithDate = {
             ...userData,
-            savedDate: new Date().toLocaleDateString('ko-KR')
+            savedDate: savedDate
         };
         localStorage.setItem('fortuneUserProfile_guest', JSON.stringify(dataWithDate));
     }
@@ -1204,10 +1206,11 @@ export const getUserProfile = async (userId = null, fetchFromFirestore = null) =
         if (!saved) return null;
 
         const savedData = JSON.parse(saved);
-        const today = new Date().toLocaleDateString('ko-KR');
+        const today = new Date();
+        const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
         // 저장된 날짜가 오늘과 같으면 반환
-        if (savedData.savedDate === today) {
+        if (savedData.savedDate === todayStr) {
             // savedDate 필드 제거 후 반환
             const { savedDate, ...userData } = savedData;
             return userData;

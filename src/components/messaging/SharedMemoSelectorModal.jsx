@@ -108,11 +108,13 @@ const SearchInput = styled.input`
 const MemoList = styled.div`
   flex: 1;
   overflow-y: auto;
-  padding: 16px 24px;
+  padding: 16px 24px 24px 24px;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  align-content: start;
+  grid-auto-rows: minmax(min-content, max-content);
+  column-gap: 12px;
+  row-gap: 12px;
+  align-content: flex-start;
 
   @media (max-width: 768px) {
     grid-template-columns: 1fr;
@@ -148,6 +150,9 @@ const MemoItem = styled.div`
   flex-direction: column;
   gap: 8px;
   height: fit-content;
+  min-width: 0;
+  overflow: hidden;
+  margin-bottom: 0;
 
   &:hover {
     background: rgba(255, 255, 255, 0.08);
@@ -171,7 +176,8 @@ const MemoTitle = styled.h3`
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
-  word-break: break-all;
+  word-break: break-word;
+  overflow-wrap: break-word;
 `;
 
 const MemoPreview = styled.p`

@@ -4,8 +4,9 @@ import styled from 'styled-components';
 import { subscribeToMyDMRooms } from '../../services/directMessageService';
 import { subscribeToMyGroupChats } from '../../services/groupChatService';
 import { playNewMessageNotification, notificationSettings } from '../../utils/notificationSounds';
-import { Search, Plus, Pin, Users } from 'lucide-react';
+import { Search, Plus, Pin, Users, Key } from 'lucide-react';
 import CreateGroupModal from './CreateGroupModal';
+import JoinGroupModal from './JoinGroupModal';
 import ChatRoom from './ChatRoom';
 
 // 컨테이너
@@ -305,6 +306,7 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
   const [groupChats, setGroupChats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+  const [showJoinGroupModal, setShowJoinGroupModal] = useState(false);
   const [selectedChat, setSelectedChat] = useState(null);
 
   // 이전 읽지 않은 메시지 개수 추적 (알림음 재생 여부 판단)
@@ -504,8 +506,11 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
             <NewChatButton onClick={handleNewChat} title="새 대화">
               <Plus size={18} />
             </NewChatButton>
-            <NewGroupButton onClick={handleNewGroup} title="그룹 만들기">
+            <NewGroupButton onClick={handleNewGroup} title="단체방 만들기">
               <Users size={18} />
+            </NewGroupButton>
+            <NewGroupButton onClick={() => setShowJoinGroupModal(true)} title="초대 코드로 참여">
+              <Key size={18} />
             </NewGroupButton>
           </ActionButtons>
         </SearchBar>
@@ -699,6 +704,14 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
       {showCreateGroupModal && (
         <CreateGroupModal
           onClose={() => setShowCreateGroupModal(false)}
+          showToast={showToast}
+        />
+      )}
+
+      {/* 초대 코드 참여 모달 */}
+      {showJoinGroupModal && (
+        <JoinGroupModal
+          onClose={() => setShowJoinGroupModal(false)}
           showToast={showToast}
         />
       )}

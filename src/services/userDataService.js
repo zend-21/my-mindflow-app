@@ -43,6 +43,29 @@ const convertTimestampsToMillis = (data) => {
 };
 
 /**
+ * 객체에서 undefined 값 제거 (Firestore는 undefined를 허용하지 않음)
+ * @param {Object} obj - 정리할 객체
+ * @returns {Object} undefined 값이 제거된 객체
+ */
+const removeUndefinedValues = (obj) => {
+  if (!obj || typeof obj !== 'object') return obj;
+
+  const cleaned = {};
+  Object.keys(obj).forEach(key => {
+    const value = obj[key];
+    if (value !== undefined) {
+      // 중첩된 객체도 재귀적으로 처리
+      if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+        cleaned[key] = removeUndefinedValues(value);
+      } else {
+        cleaned[key] = value;
+      }
+    }
+  });
+  return cleaned;
+};
+
+/**
  * 🔐 사용자 데이터 구조 (개별 문서 저장 - 산업 표준 방식)
  * mindflowUsers/{userId}/memos/{memoId}
  * mindflowUsers/{userId}/folders/{folderId}
@@ -442,30 +465,6 @@ export const fetchCalendarFromFirestore = async (userId) => {
 /**
  * Firestore에 특정 날짜의 일정 저장
  */
-// 재귀적으로 undefined/null 값 제거하는 헬퍼 함수
-const removeUndefinedValues = (obj) => {
-  if (obj === null || obj === undefined) {
-    return null;
-  }
-
-  if (Array.isArray(obj)) {
-    return obj.map(item => removeUndefinedValues(item)).filter(item => item !== null && item !== undefined);
-  }
-
-  if (typeof obj === 'object') {
-    const cleaned = {};
-    Object.keys(obj).forEach(key => {
-      const value = removeUndefinedValues(obj[key]);
-      if (value !== null && value !== undefined) {
-        cleaned[key] = value;
-      }
-    });
-    return cleaned;
-  }
-
-  return obj;
-};
-
 export const saveCalendarDateToFirestore = async (userId, dateKey, schedule) => {
   try {
     console.log('🔍 [saveCalendarDateToFirestore] 저장 시작:', dateKey);
@@ -744,10 +743,8 @@ export const saveFortuneProfileToFirestore = async (userId, fortuneProfile) => {
       createdAt: fortuneProfile.createdAt || serverTimestamp()
     };
 
-    // undefined 값 제거
-    const sanitizedData = Object.fromEntries(
-      Object.entries(dataToSave).map(([key, value]) => [key, value === undefined ? null : value])
-    );
+    // undefined 값 제거 (중첩 객체 포함)
+    const sanitizedData = removeUndefinedValues(dataToSave);
 
     await setDoc(docRef, sanitizedData, { merge: true });
     console.log('✅ 운세 프로필 Firestore 저장 완료');
@@ -1564,7 +1561,9 @@ export const saveTrashToFirestore = async (userId, trash) => {
   trash.forEach(item => {
     if (item.id) {
       const docRef = doc(db, 'mindflowUsers', userId, 'trash', item.id);
-      batch.set(docRef, { ...item, updatedAt: serverTimestamp() });
+      // undefined 값 제거 후 저장
+      const cleanedItem = removeUndefinedValues({ ...item, updatedAt: serverTimestamp() });
+      batch.set(docRef, cleanedItem);
     }
   });
   await batch.commit();

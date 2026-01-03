@@ -1,6 +1,6 @@
 // 본인인증 서비스
 import { db } from '../firebase/config';
-import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, collection, query, where, serverTimestamp } from 'firebase/firestore';
 
 /**
  * 본인인증 상태 확인
@@ -31,6 +31,83 @@ export const checkVerificationStatus = async (userId) => {
     } catch (error) {
         console.error('본인인증 상태 확인 오류:', error);
         return { verified: false, verifiedAt: null, method: null };
+    }
+};
+
+/**
+ * ⚡ 여러 사용자의 본인인증 상태 배치 확인 (Firestore 최적화)
+ * @param {string[]} userIds - 사용자 ID 배열
+ * @returns {Promise<Map<string, {verified: boolean, verifiedAt: Date|null, method: string|null}>>}
+ */
+export const checkVerificationStatusBatch = async (userIds) => {
+    const resultMap = new Map();
+
+    // 빈 배열이면 빈 Map 반환
+    if (!userIds || userIds.length === 0) {
+        return resultMap;
+    }
+
+    // 유효한 userId만 필터링
+    const validUserIds = userIds.filter(id => id);
+
+    if (validUserIds.length === 0) {
+        return resultMap;
+    }
+
+    try {
+        // ⚡ Firestore에서는 'in' 쿼리가 최대 10개까지만 지원
+        // 10개씩 나누어서 배치 처리
+        const batchSize = 10;
+        const batches = [];
+
+        for (let i = 0; i < validUserIds.length; i += batchSize) {
+            batches.push(validUserIds.slice(i, i + batchSize));
+        }
+
+        // 각 배치별로 쿼리 실행
+        for (const batch of batches) {
+            const verificationsRef = collection(db, 'verifications');
+            const q = query(verificationsRef, where('__name__', 'in', batch));
+            const snapshot = await getDocs(q);
+
+            snapshot.docs.forEach(doc => {
+                const data = doc.data();
+                resultMap.set(doc.id, {
+                    verified: data.verified || false,
+                    verifiedAt: data.verifiedAt,
+                    method: data.method || null,
+                    name: data.name || null,
+                    birthYear: data.birthYear || null
+                });
+            });
+        }
+
+        // 조회되지 않은 userId는 기본값 설정
+        validUserIds.forEach(userId => {
+            if (!resultMap.has(userId)) {
+                resultMap.set(userId, {
+                    verified: false,
+                    verifiedAt: null,
+                    method: null
+                });
+            }
+        });
+
+        console.log(`✅ 배치 인증 상태 조회 완료: ${validUserIds.length}개 (${batches.length}개 배치)`);
+        return resultMap;
+    } catch (error) {
+        console.error('배치 본인인증 상태 확인 오류:', error);
+
+        // 에러 발생 시 모든 userId에 대해 기본값 반환
+        validUserIds.forEach(userId => {
+            resultMap.set(userId, {
+                verified: false,
+                verifiedAt: null,
+                method: null
+            });
+        });
+
+        return resultMap;
     }
 };
 

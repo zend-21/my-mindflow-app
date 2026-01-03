@@ -177,6 +177,31 @@ const RoleBadge = styled.span`
   font-weight: 600;
 `;
 
+const StatusBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: ${props => {
+    if (props.$status === 'pending') return 'rgba(255, 193, 7, 0.15)';
+    if (props.$status === 'rejected') return 'rgba(255, 87, 87, 0.15)';
+    return 'transparent';
+  }};
+  border-radius: 6px;
+  color: ${props => {
+    if (props.$status === 'pending') return '#ffc107';
+    if (props.$status === 'rejected') return '#ff5757';
+    return '#888';
+  }};
+  font-size: 11px;
+  font-weight: 600;
+`;
+
+const StrikethroughName = styled.span`
+  text-decoration: ${props => props.$rejected ? 'line-through' : 'none'};
+  opacity: ${props => props.$rejected ? 0.6 : 1};
+`;
+
 const ActionButton = styled.button`
   background: ${props => props.$variant === 'danger'
     ? 'rgba(255, 87, 87, 0.15)'
@@ -274,7 +299,8 @@ const PermissionManagementModal = ({
             memberList.push({
               userId: memberId,
               displayName: memberInfo?.displayName || '익명',
-              email: memberInfo?.email || ''
+              email: memberInfo?.email || '',
+              status: memberInfo?.status || 'active' // 멤버 상태 추가
             });
           });
         } else {
@@ -486,12 +512,18 @@ const PermissionManagementModal = ({
                         {member.displayName.charAt(0).toUpperCase()}
                       </MemberAvatar>
                       <MemberDetails>
-                        <MemberName>{member.displayName}</MemberName>
+                        <MemberName>
+                          <StrikethroughName $rejected={member.status === 'rejected'}>
+                            {member.displayName}
+                          </StrikethroughName>
+                        </MemberName>
                         <MemberRole>
                           <RoleBadge $type="manager">
                             <Crown size={12} />
                             매니저
                           </RoleBadge>
+                          {member.status === 'pending' && <StatusBadge $status="pending">초대됨</StatusBadge>}
+                          {member.status === 'rejected' && <StatusBadge $status="rejected">거부됨</StatusBadge>}
                           {member.userId === currentUserId && ' (나)'}
                         </MemberRole>
                       </MemberDetails>
@@ -517,12 +549,18 @@ const PermissionManagementModal = ({
                           {member.displayName.charAt(0).toUpperCase()}
                         </MemberAvatar>
                         <MemberDetails>
-                          <MemberName>{member.displayName}</MemberName>
+                          <MemberName>
+                            <StrikethroughName $rejected={member.status === 'rejected'}>
+                              {member.displayName}
+                            </StrikethroughName>
+                          </MemberName>
                           <MemberRole>
                             <RoleBadge $type="editor">
                               <Check size={12} />
                               편집자
                             </RoleBadge>
+                            {member.status === 'pending' && <StatusBadge $status="pending">초대됨</StatusBadge>}
+                            {member.status === 'rejected' && <StatusBadge $status="rejected">거부됨</StatusBadge>}
                             {member.userId === currentUserId && ' (나)'}
                           </MemberRole>
                         </MemberDetails>
@@ -564,9 +602,15 @@ const PermissionManagementModal = ({
                           {member.displayName.charAt(0).toUpperCase()}
                         </MemberAvatar>
                         <MemberDetails>
-                          <MemberName>{member.displayName}</MemberName>
+                          <MemberName>
+                            <StrikethroughName $rejected={member.status === 'rejected'}>
+                              {member.displayName}
+                            </StrikethroughName>
+                          </MemberName>
                           <MemberRole>
                             <RoleBadge>읽기 전용</RoleBadge>
+                            {member.status === 'pending' && <StatusBadge $status="pending">초대됨</StatusBadge>}
+                            {member.status === 'rejected' && <StatusBadge $status="rejected">거부됨</StatusBadge>}
                             {member.userId === currentUserId && ' (나)'}
                           </MemberRole>
                         </MemberDetails>

@@ -20,6 +20,10 @@ import {
 import { db } from '../../firebase/config';
 import { getUserNickname } from '../../services/nicknameService';
 
+// ===== 전역 문서 캐시 (컴포넌트 인스턴스 간 공유) =====
+// 컴포넌트가 언마운트되어도 캐시가 유지되도록 전역으로 관리
+const globalDocumentCache = new Map();
+
 // ===== Range 관련 유틸리티 함수들 (컴포넌트 외부) =====
 // 컨테이너 기준 절대 오프셋 계산
 function getAbsoluteOffset(container, node, offset) {
@@ -805,6 +809,23 @@ const EditButton = styled(ToolbarButton)`
   }
 `;
 
+const ClearButton = styled(ToolbarButton)`
+  background: rgba(156, 39, 176, 0.15);
+  border: 1px solid rgba(156, 39, 176, 0.3);
+  color: #9c27b0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 36px;
+  padding: 8px;
+  font-size: 16px;
+
+  &:hover:not(:disabled) {
+    background: rgba(156, 39, 176, 0.25);
+  }
+`;
+
 const ModalActions = styled.div`
   display: flex;
   gap: 12px;
@@ -935,6 +956,7 @@ const CollaborativeDocumentEditor = ({
   const [pendingLoadMemo, setPendingLoadMemo] = useState(null); // 불러오려는 메모 정보
   const [currentDocId, setCurrentDocId] = useState(null); // 현재 열린 문서 ID
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false); // 전체 리셋 확인 모달
+  const [showClearConfirmModal, setShowClearConfirmModal] = useState(false); // 문서 비우기 확인 모달
   const [editNicknames, setEditNicknames] = useState({}); // 편집 이력의 닉네임 { userId: nickname }
   const [showMarkerDetailModal, setShowMarkerDetailModal] = useState(false); // 마커 상세 정보 모달
   const [selectedMarkerDetail, setSelectedMarkerDetail] = useState(null); // 선택된 마커 정보
@@ -946,13 +968,19 @@ const CollaborativeDocumentEditor = ({
   const [isOneOnOneChat, setIsOneOnOneChat] = useState(false); // 1:1 대화방 여부
   const [invitePermission, setInvitePermission] = useState('managers_and_submanagers'); // 초대 권한 설정
   const [showPermissionGuideModal, setShowPermissionGuideModal] = useState(false); // 권한 안내 모달
+  const [documentOwner, setDocumentOwner] = useState(null); // 문서 소유자 정보 { userId, nickname, wsCode }
+  const [showOwnerModal, setShowOwnerModal] = useState(false); // 문서 소유자 ID 모달
+  const [showRejectConfirmModal, setShowRejectConfirmModal] = useState(false); // 거부 확인 모달
+  const [showApproveConfirmModal, setShowApproveConfirmModal] = useState(false); // 승인 확인 모달
+  const [pendingAction, setPendingAction] = useState(null); // 대기 중인 작업 정보
+  const [showTempDocLoadWarningModal, setShowTempDocLoadWarningModal] = useState(false); // 임시 문서 불러오기 경고 모달
 
   const contentRef = useRef(null);
   const fullScreenContentRef = useRef(null);
   const saveTimeoutRef = useRef(null);
   const savedRangeRef = useRef(null); // 선택 영역 저장용
   const programmaticChangeRef = useRef(false); // 프로그래밍 방식 변경 플래그
-  const documentCache = useRef(new Map()); // 문서별 편집 내용 캐시 Map<memoId, {title, content}>
+  // documentCache는 이제 전역 변수 globalDocumentCache 사용 (컴포넌트 언마운트 시에도 유지)
 
   // 키보드 선택 모드 상태
   const [isSelecting, setIsSelecting] = useState(false);
@@ -1119,6 +1147,11 @@ const CollaborativeDocumentEditor = ({
   const updateMemoPendingFlag = async (memoId, hasPending) => {
     if (!memoId || !currentUserId) return;
 
+    // 임시 문서는 스킵 (아직 Firestore에 저장되지 않음)
+    if (memoId.startsWith('temp_')) {
+      return;
+    }
+
     try {
       const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', memoId);
 
@@ -1168,11 +1201,40 @@ const CollaborativeDocumentEditor = ({
         if (contentRef.current) {
           contentRef.current.innerHTML = data.content || '';
         }
+
+        // 문서 소유자 정보 설정 (실제 내용이 있을 때만)
+        const hasActualContent = (data.content && data.content.trim()) || data.originalMemoId;
+        if (currentUserId && hasActualContent) {
+          try {
+            const ownerNickname = await getUserNickname(currentUserId);
+            const workspaceId = `workspace_${currentUserId}`;
+            const workspaceRef = doc(db, 'workspaces', workspaceId);
+            const workspaceSnap = await getDoc(workspaceRef);
+            const wsCode = workspaceSnap.exists() ? workspaceSnap.data().workspaceCode : null;
+
+            setDocumentOwner({
+              userId: currentUserId,
+              nickname: ownerNickname || currentUserName || '알 수 없음',
+              wsCode: wsCode
+            });
+          } catch (error) {
+            console.error('문서 소유자 정보 조회 실패:', error);
+            setDocumentOwner({
+              userId: currentUserId,
+              nickname: currentUserName || '알 수 없음',
+              wsCode: null
+            });
+          }
+        } else {
+          // 내용이 없으면 소유자 정보도 없음
+          setDocumentOwner(null);
+        }
       } else {
         // 문서가 없으면 빈 상태로 초기화
         setTitle('');
         setContent('');
         setCurrentDocId(null);
+        setDocumentOwner(null);
         if (contentRef.current) {
           contentRef.current.innerHTML = '';
         }
@@ -1198,7 +1260,7 @@ const CollaborativeDocumentEditor = ({
         console.error('문서 로드 오류:', error);
       }
     }
-  }, [chatRoomId]);
+  }, [chatRoomId, currentUserId, currentUserName]);
 
   // 초기 로드
   useEffect(() => {
@@ -1343,34 +1405,129 @@ const CollaborativeDocumentEditor = ({
 
   // 문서 불러오기 버튼 클릭 시 실행될 핸들러
   const handleLoadClick = async () => {
+    // 임시 문서가 있으면 경고 모달 표시
+    if (currentDocId && currentDocId.startsWith('temp_') && content && content.trim()) {
+      setShowTempDocLoadWarningModal(true);
+      return;
+    }
+
     if (onLoadFromShared) {
       // 공유 폴더 메모 선택 모달 열기
       await onLoadFromShared();
     }
   };
 
+  // 임시 문서 경고 무시하고 불러오기 진행
+  const proceedLoadFromShared = async () => {
+    setShowTempDocLoadWarningModal(false);
+    if (onLoadFromShared) {
+      await onLoadFromShared();
+    }
+  };
+
+  // 🔧 마커 재생성 함수 - editHistory를 기반으로 HTML에 마커 복원
+  const reconstructMarkersFromEditHistory = useCallback((htmlContent, edits) => {
+    if (!edits || edits.length === 0) return htmlContent;
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+
+    // editHistory를 순회하며 마커 재생성
+    edits.forEach(edit => {
+      const { id, type, oldText } = edit;
+
+      // oldText와 일치하는 텍스트 노드를 찾아서 마커로 감싸기
+      const walker = document.createTreeWalker(
+        tempDiv,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+      );
+
+      const textNodes = [];
+      let node;
+      while (node = walker.nextNode()) {
+        textNodes.push(node);
+      }
+
+      for (const textNode of textNodes) {
+        const text = textNode.textContent;
+        if (text && text.includes(oldText)) {
+          const parent = textNode.parentNode;
+
+          // 이미 마커로 감싸져 있는지 확인
+          if (parent.dataset && parent.dataset.editId) {
+            continue;
+          }
+
+          const index = text.indexOf(oldText);
+          if (index !== -1) {
+            // 텍스트를 3부분으로 분할: 이전 | 마커 대상 | 이후
+            const before = text.substring(0, index);
+            const match = text.substring(index, index + oldText.length);
+            const after = text.substring(index + oldText.length);
+
+            const fragment = document.createDocumentFragment();
+
+            if (before) {
+              fragment.appendChild(document.createTextNode(before));
+            }
+
+            // 마커 span 생성
+            const markerSpan = document.createElement('span');
+            markerSpan.dataset.editId = id;
+            markerSpan.dataset.editType = type || 'highlight';
+            markerSpan.className = type || 'highlight';
+            markerSpan.textContent = match;
+            fragment.appendChild(markerSpan);
+
+            if (after) {
+              fragment.appendChild(document.createTextNode(after));
+            }
+
+            parent.replaceChild(fragment, textNode);
+            break; // 각 edit는 한 번만 적용
+          }
+        }
+      }
+    });
+
+    return tempDiv.innerHTML;
+  }, []);
+
   // 실제 문서 로드 수행
   const performLoadDocument = useCallback(async (memo) => {
     try {
       const currentDocRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
 
-      // 1. 로컬 캐시에서 편집 중인 버전 확인 (우선순위 1)
+      // 1. 편집 이력 먼저 로드 (마커 재생성을 위해)
+      const editsRef = collection(db, 'chatRooms', chatRoomId, 'documents', memo.id, 'editHistory');
+      const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
+
+      const edits = [];
+      editsSnap.forEach((doc) => {
+        edits.push({ id: doc.id, ...doc.data() });
+      });
+
+      console.log('📝 편집 이력 먼저 로드 - 개수:', edits.length);
+
+      // 2. 로컬 캐시에서 편집 중인 버전 확인 (우선순위 1)
       let contentToLoad = memo.content || '';
-      let titleToLoad = memo.title || '제목 없음';
+      let titleToLoad = extractTitleFromContent(memo.content || '');
 
       console.log('📄 문서 불러오기 시작 - ID:', memo.id);
       console.log('📄 원본 memo.content 길이:', memo.content?.length || 0);
       console.log('📄 원본 컨텐츠에 마커 포함?', memo.content?.includes('data-edit-id') || false);
 
-      if (documentCache.current.has(memo.id)) {
-        const cached = documentCache.current.get(memo.id);
+      if (globalDocumentCache.has(memo.id)) {
+        const cached = globalDocumentCache.get(memo.id);
         contentToLoad = cached.content;
         titleToLoad = cached.title;
         console.log('✅ 캐시에서 편집 중이던 문서 복원:', memo.id);
         console.log('📄 캐시 컨텐츠 길이:', contentToLoad.length);
         console.log('📄 캐시 컨텐츠에 마커 포함?', contentToLoad.includes('data-edit-id'));
       } else {
-        // 2. currentDoc에서 편집 중인 버전 확인 (우선순위 2)
+        // 3. currentDoc에서 편집 중인 버전 확인 (우선순위 2)
         const currentDocSnap = await getDoc(currentDocRef);
         if (currentDocSnap.exists()) {
           const currentDocData = currentDocSnap.data();
@@ -1388,7 +1545,22 @@ const CollaborativeDocumentEditor = ({
         }
       }
 
-      // 2. currentDoc 업데이트
+      // 4. ⭐ 마커 재생성: editHistory가 있는데 HTML에 마커가 없으면 재생성
+      if (edits.length > 0 && !contentToLoad.includes('data-edit-id')) {
+        console.log('🔧 마커 정보가 손실됨 - editHistory 기반으로 마커 재생성 시작');
+        contentToLoad = reconstructMarkersFromEditHistory(contentToLoad, edits);
+        console.log('✅ 마커 재생성 완료');
+        console.log('📄 재생성 후 컨텐츠에 마커 포함?', contentToLoad.includes('data-edit-id'));
+
+        // 재생성된 content를 캐시에 저장
+        globalDocumentCache.set(memo.id, {
+          title: titleToLoad,
+          content: contentToLoad
+        });
+        console.log('💾 재생성된 마커를 캐시에 저장:', memo.id);
+      }
+
+      // 5. currentDoc 업데이트
       await setDoc(currentDocRef, {
         title: titleToLoad,
         content: contentToLoad,
@@ -1398,12 +1570,12 @@ const CollaborativeDocumentEditor = ({
         lastEditedAt: serverTimestamp()
       }, { merge: true });
 
-      // 3. 로컬 상태 업데이트
+      // 6. 로컬 상태 업데이트
       setTitle(titleToLoad);
       setContent(contentToLoad);
       setCurrentDocId(memo.id);
 
-      // 4. contentEditable 영역 업데이트
+      // 7. contentEditable 영역 업데이트
       if (contentRef.current) {
         contentRef.current.innerHTML = contentToLoad;
       }
@@ -1411,22 +1583,35 @@ const CollaborativeDocumentEditor = ({
         fullScreenContentRef.current.innerHTML = contentToLoad;
       }
 
-      // 5. 새 문서의 편집 이력 로드
-      const editsRef = collection(db, 'chatRooms', chatRoomId, 'documents', memo.id, 'editHistory');
-      const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
-
-      const edits = [];
-      editsSnap.forEach((doc) => {
-        edits.push({ id: doc.id, ...doc.data() });
-      });
-
-      console.log('📝 로드된 편집 이력 개수:', edits.length);
-      if (edits.length > 0) {
-        console.log('📝 편집 이력 상세:', edits);
-      }
-
-      // 항상 새로운 배열로 설정 (이전 문서의 편집 이력이 남지 않도록)
+      // 8. pendingEdits 업데이트
       setPendingEdits(edits.length > 0 ? edits : []);
+
+      // 9. 문서 소유자 정보 가져오기 (현재 로그인한 사용자)
+      try {
+        // 닉네임 조회
+        const ownerNickname = await getUserNickname(currentUserId);
+
+        // 6자리 고유 ID 조회
+        const workspaceId = `workspace_${currentUserId}`;
+        const workspaceRef = doc(db, 'workspaces', workspaceId);
+        const workspaceSnap = await getDoc(workspaceRef);
+        const wsCode = workspaceSnap.exists() ? workspaceSnap.data().workspaceCode : null;
+
+        console.log('✅ 문서 소유자 정보:', { userId: currentUserId, nickname: ownerNickname, wsCode });
+
+        setDocumentOwner({
+          userId: currentUserId,
+          nickname: ownerNickname || currentUserName || '알 수 없음',
+          wsCode: wsCode
+        });
+      } catch (error) {
+        console.error('문서 소유자 정보 조회 실패:', error);
+        setDocumentOwner({
+          userId: currentUserId,
+          nickname: currentUserName || '알 수 없음',
+          wsCode: null
+        });
+      }
 
       showToast?.('문서를 불러왔습니다');
       setShowLoadConfirmModal(false);
@@ -1435,14 +1620,16 @@ const CollaborativeDocumentEditor = ({
       console.error('문서 불러오기 실패:', error);
       showToast?.('문서 불러오기에 실패했습니다');
     }
-  }, [chatRoomId, currentUserId, currentUserName, showToast]);
+  }, [chatRoomId, currentUserId, currentUserName, showToast, reconstructMarkersFromEditHistory]);
 
   // 실제 문서 불러오기 처리 (ChatRoom에서 호출)
   const handleLoadDocument = useCallback(async (memo) => {
     if (!memo) return;
 
-    // 동일한 문서를 다시 불러오는 경우 - 아무 작업 없이 그대로 유지
-    if (currentDocId && currentDocId === memo.id) {
+    // 동일한 문서를 다시 불러오는 경우 체크
+    // 단, currentDocId가 null이 아니고, 내용이 실제로 있을 때만 차단
+    const hasContent = (content && content.trim()) || (title && title.trim());
+    if (currentDocId && currentDocId === memo.id && hasContent) {
       showToast?.('이미 열려있는 문서입니다');
       return;
     }
@@ -1592,6 +1779,38 @@ const CollaborativeDocumentEditor = ({
     );
   }, [chatRoomId]);
 
+  // 🔧 content에서 첫 문단 추출하여 제목으로 설정
+  const extractTitleFromContent = useCallback((htmlContent) => {
+    if (!htmlContent || htmlContent.trim() === '') {
+      return '제목 없음';
+    }
+
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+
+    // 첫 번째 텍스트 노드 또는 첫 줄 추출
+    const textContent = tempDiv.textContent || tempDiv.innerText || '';
+    const lines = textContent.split('\n').filter(line => line.trim());
+
+    if (lines.length === 0) {
+      return '제목 없음';
+    }
+
+    // 첫 줄을 제목으로 사용 (최대 50자)
+    const firstLine = lines[0].trim();
+    return firstLine.length > 50 ? firstLine.substring(0, 50) + '...' : firstLine;
+  }, []);
+
+  // 🔧 content 변경 시 자동으로 제목 업데이트
+  useEffect(() => {
+    if (content) {
+      const newTitle = extractTitleFromContent(content);
+      setTitle(newTitle);
+    } else {
+      setTitle('제목 없음');
+    }
+  }, [content, extractTitleFromContent]);
+
   // 디바운스 저장 (500ms) - 로컬 캐시 + Firestore 저장
   const debouncedSave = useCallback((newContent, newTitle) => {
     if (saveTimeoutRef.current) {
@@ -1608,7 +1827,7 @@ const CollaborativeDocumentEditor = ({
 
       try {
         // 1. 로컬 캐시에 저장 (즉시)
-        documentCache.current.set(currentDocId, {
+        globalDocumentCache.set(currentDocId, {
           title: titleToSave,
           content: newContent
         });
@@ -1630,11 +1849,12 @@ const CollaborativeDocumentEditor = ({
     }, 500);
   }, [chatRoomId, title, currentUserId, currentUserName, currentDocId]);
 
-  // 제목 변경 핸들러 (자동 저장 포함)
+  // 제목 변경 핸들러 (더 이상 사용하지 않음 - 자동 생성)
   const handleTitleChange = useCallback((newTitle) => {
-    setTitle(newTitle);
-    debouncedSave(content, newTitle);
-  }, [content, debouncedSave]);
+    // 제목은 자동 생성되므로 이 함수는 사용하지 않음
+    // setTitle(newTitle);
+    // debouncedSave(content, newTitle);
+  }, []);
 
   // 텍스트 선택 추적
   const [lastSelection, setLastSelection] = useState(null);
@@ -2135,8 +2355,46 @@ const CollaborativeDocumentEditor = ({
         const container = pendingMarker.containerRef.current;
         const { startOffset, endOffset } = pendingMarker.absoluteOffsets;
 
+        // 컨테이너가 유효한지 확인
+        if (!container || !container.isConnected) {
+          console.error('❌ 컨테이너가 유효하지 않습니다');
+          showToast?.('마커 삽입에 실패했습니다');
+          return;
+        }
+
         // 절대 오프셋에서 Range 복원
         const range = absoluteOffsetToRange(container, startOffset, endOffset);
+
+        // Range 검증: startContainer와 endContainer가 유효한 노드인지 확인
+        if (!range.startContainer || !range.endContainer) {
+          console.error('❌ Range의 컨테이너가 유효하지 않습니다');
+          showToast?.('마커 삽입에 실패했습니다');
+          return;
+        }
+
+        // Range가 document나 body를 직접 참조하는 경우 에러
+        if (range.startContainer === document || range.startContainer === document.body ||
+            range.endContainer === document || range.endContainer === document.body) {
+          console.error('❌ Range가 document/body를 참조하고 있습니다');
+          showToast?.('마커를 삽입할 수 없습니다. 텍스트를 다시 선택해주세요');
+          return;
+        }
+
+        // Range가 contentEditable 영역 내에 있는지 확인
+        let node = range.startContainer;
+        let isInContainer = false;
+        while (node) {
+          if (node === container) {
+            isInContainer = true;
+            break;
+          }
+          node = node.parentNode;
+        }
+        if (!isInContainer) {
+          console.error('❌ Range가 contentEditable 영역 밖에 있습니다');
+          showToast?.('마커를 삽입할 수 없습니다. 텍스트를 다시 선택해주세요');
+          return;
+        }
 
         // 디버깅: 마커 적용 시 range 정보 출력
         console.log('🎯 마커 적용 시도:', {
@@ -2165,17 +2423,28 @@ const CollaborativeDocumentEditor = ({
           markerSpan.dataset.editId = editDoc.id;
           markerSpan.dataset.editType = 'highlight';
           markerSpan.dataset.canEdit = actualCanEdit ? 'true' : 'false';
-          // 대체 텍스트가 비어있으면 원본 텍스트 유지 (주석 기능)
-          markerSpan.textContent = editInputText.trim() || pendingMarker.text;
+          // 승인 전까지는 원본 텍스트 표시
+          markerSpan.textContent = pendingMarker.text;
         }
 
         try {
           range.surroundContents(markerSpan);
           console.log(`✅ ${pendingMarker.type} 마커 삽입 완료`);
         } catch (error) {
-          console.error('❌ 마커 삽입 실패:', error);
-          showToast?.('마커 삽입에 실패했습니다');
-          return;
+          console.warn('⚠️ surroundContents 실패, 대체 방법 사용:', error.message);
+          // surroundContents 실패 시 대체 방법 사용
+          try {
+            // 선택된 내용을 텍스트로 추출하여 새로운 텍스트 노드 생성
+            const selectedText = range.toString();
+            markerSpan.textContent = selectedText;
+            range.deleteContents();
+            range.insertNode(markerSpan);
+            console.log(`✅ ${pendingMarker.type} 마커 삽입 완료 (대체 방법)`);
+          } catch (fallbackError) {
+            console.error('❌ 마커 삽입 완전 실패:', fallbackError);
+            showToast?.('마커 삽입에 실패했습니다');
+            return;
+          }
         }
       }
 
@@ -2197,6 +2466,111 @@ const CollaborativeDocumentEditor = ({
       showToast?.('편집 저장에 실패했습니다');
     }
   }, [pendingMarker, editInputText, editReasonText, chatRoomId, currentUserId, currentUserName, showFullScreenEdit, debouncedSave, showToast, currentDocId, getEditHistoryRef, actualCanEdit]);
+
+  // 전체화면 편집창 닫기 핸들러
+  const handleCloseFullScreenEdit = useCallback(() => {
+    // 편집창 닫기 전에 content 동기화
+    if (fullScreenContentRef.current) {
+      const currentContent = fullScreenContentRef.current.innerHTML;
+      setContent(currentContent);
+      // 미리보기 영역에도 반영
+      if (contentRef.current) {
+        contentRef.current.innerHTML = currentContent;
+      }
+    }
+    setShowFullScreenEdit(false);
+  }, []);
+
+  // 임시 문서 저장 핸들러
+  const handleSaveTempDocument = useCallback(async () => {
+    if (!currentUserId || !content || !content.trim()) {
+      showToast?.('저장할 내용이 없습니다');
+      return;
+    }
+
+    if (!currentDocId || !currentDocId.startsWith('temp_')) {
+      showToast?.('임시 문서가 아닙니다');
+      return;
+    }
+
+    try {
+      // 1. 새 메모 ID 생성
+      const newMemoId = `m${Date.now()}`;
+
+      // 2. 공유 폴더에 메모 저장
+      const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', newMemoId);
+
+      // 3. 문서 제목 생성 (첫 줄바꿈 전까지의 텍스트 추출)
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = content;
+
+      // HTML을 순회하면서 첫 번째 줄바꿈 전까지의 텍스트만 추출
+      let titleText = '';
+      const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_ALL);
+      let node;
+
+      while ((node = walker.nextNode())) {
+        // 줄바꿈 요소를 만나면 중단 (br, div, p 등)
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const tagName = node.nodeName.toLowerCase();
+          if (tagName === 'br' || tagName === 'div' || tagName === 'p') {
+            // 이미 텍스트가 있으면 중단, 없으면 계속 (첫 번째 요소일 수 있음)
+            if (titleText.trim()) break;
+          }
+        }
+        // 텍스트 노드면 추가
+        if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+          titleText += node.textContent;
+          // \n을 만나면 그 전까지만 사용
+          if (titleText.includes('\n')) {
+            titleText = titleText.split('\n')[0];
+            break;
+          }
+        }
+      }
+
+      const documentTitle = (titleText.trim() || '제목 없음').substring(0, 50); // 최대 50자
+
+      // 4. 메모 데이터 저장
+      await setDoc(memoRef, {
+        id: newMemoId,
+        title: documentTitle,
+        content: content,
+        category: '공유',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        isShared: true,
+        sharedWith: [], // 초기에는 비어있음
+        color: '#4a90e2'
+      });
+
+      // 5. 현재 문서 ID를 임시에서 영구로 변경
+      setCurrentDocId(newMemoId);
+      setTitle(documentTitle);
+
+      // 6. 문서 소유자 정보 설정
+      try {
+        const ownerNickname = await getUserNickname(currentUserId);
+        const workspaceId = `workspace_${currentUserId}`;
+        const workspaceRef = doc(db, 'workspaces', workspaceId);
+        const workspaceSnap = await getDoc(workspaceRef);
+        const wsCode = workspaceSnap.exists() ? workspaceSnap.data().workspaceCode : null;
+
+        setDocumentOwner({
+          userId: currentUserId,
+          nickname: ownerNickname || currentUserName || '알 수 없음',
+          wsCode: wsCode
+        });
+      } catch (error) {
+        console.error('문서 소유자 정보 조회 실패:', error);
+      }
+
+      showToast?.('문서가 공유 폴더에 저장되었습니다');
+    } catch (error) {
+      console.error('임시 문서 저장 실패:', error);
+      showToast?.('문서 저장에 실패했습니다');
+    }
+  }, [currentUserId, content, currentDocId, showToast, currentUserName]);
 
   // 편집 마커 클릭 핸들러 - 수정 모달 열기
   const handleEditMarkerClick = useCallback(async (clickedEditId, markerElement) => {
@@ -2595,8 +2969,12 @@ const CollaborativeDocumentEditor = ({
 
     try {
       // 1. 편집 이력 가져오기
-      const editHistoryRef = getEditHistoryRef(editId);
-      const editRef = editHistoryRef;
+      const editHistoryRef = getEditHistoryRef(currentDocId);
+      if (!editHistoryRef) {
+        showToast?.('편집 이력을 찾을 수 없습니다');
+        return;
+      }
+      const editRef = doc(editHistoryRef, editId);
       const editSnap = await getDoc(editRef);
 
       if (!editSnap.exists()) {
@@ -2666,7 +3044,7 @@ const CollaborativeDocumentEditor = ({
 
         // 6. 캐시 업데이트
         if (currentDocId) {
-          documentCache.current.set(currentDocId, {
+          globalDocumentCache.set(currentDocId, {
             title: title,
             content: newContent
           });
@@ -2808,9 +3186,15 @@ const CollaborativeDocumentEditor = ({
       setPendingEdits([]);
 
       // 캐시에서 해당 문서 제거 (승인된 내용은 원본 메모에 반영되므로)
-      if (currentDocId && documentCache.current.has(currentDocId)) {
-        documentCache.current.delete(currentDocId);
+      if (currentDocId && globalDocumentCache.has(currentDocId)) {
+        globalDocumentCache.delete(currentDocId);
         console.log('🗑️ 전체 승인 완료 - 캐시에서 문서 제거:', currentDocId);
+      }
+
+      // ⭐ 원본 메모의 hasPendingEdits 플래그를 false로 업데이트 (얼음 결정 배지 제거)
+      if (currentDocId && onUpdateMemoPendingFlag) {
+        onUpdateMemoPendingFlag(currentDocId, false);
+        console.log('✅ 원본 메모의 hasPendingEdits 플래그 업데이트:', currentDocId, false);
       }
 
       showToast?.('모든 수정 제안이 승인되었습니다');
@@ -2820,7 +3204,7 @@ const CollaborativeDocumentEditor = ({
     } finally {
       setSaving(false);
     }
-  }, [title, content, currentUserId, currentUserName, chatRoomId, showToast, currentDocId, getEditHistoryRef]);
+  }, [title, content, currentUserId, currentUserName, chatRoomId, showToast, currentDocId, getEditHistoryRef, onUpdateMemoPendingFlag]);
 
   // 전체 리셋 핸들러 - 모든 수정 마커를 제거하고 원본 텍스트로 복원
   const handleResetAll = useCallback(() => {
@@ -2874,7 +3258,7 @@ const CollaborativeDocumentEditor = ({
 
       // 4. 캐시 업데이트
       if (currentDocId) {
-        documentCache.current.set(currentDocId, {
+        globalDocumentCache.set(currentDocId, {
           title: title,
           content: cleanContent
         });
@@ -2891,6 +3275,12 @@ const CollaborativeDocumentEditor = ({
       }
       setPendingEdits([]);
 
+      // ⭐ 원본 메모의 hasPendingEdits 플래그를 false로 업데이트 (얼음 결정 배지 제거)
+      if (currentDocId && onUpdateMemoPendingFlag) {
+        onUpdateMemoPendingFlag(currentDocId, false);
+        console.log('✅ 원본 메모의 hasPendingEdits 플래그 업데이트:', currentDocId, false);
+      }
+
       showToast?.('모든 수정 표시가 삭제되었습니다');
     } catch (error) {
       console.error('전체 리셋 실패:', error);
@@ -2899,7 +3289,7 @@ const CollaborativeDocumentEditor = ({
       setSaving(false);
       setShowResetConfirmModal(false);
     }
-  }, [currentDocId, content, title, currentUserId, currentUserName, chatRoomId, showToast, getEditHistoryRef]);
+  }, [currentDocId, content, title, currentUserId, currentUserName, chatRoomId, showToast, getEditHistoryRef, onUpdateMemoPendingFlag]);
 
   // 개별 수정 취소 핸들러
   const handleCancelEdit = useCallback(async (editId) => {
@@ -2945,7 +3335,7 @@ const CollaborativeDocumentEditor = ({
 
       // 4. 캐시 업데이트
       if (currentDocId) {
-        documentCache.current.set(currentDocId, {
+        globalDocumentCache.set(currentDocId, {
           title: title,
           content: updatedContent
         });
@@ -2971,6 +3361,63 @@ const CollaborativeDocumentEditor = ({
       showToast?.('수정 취소에 실패했습니다');
     }
   }, [actualCanEdit, currentDocId, content, currentUserId, currentUserName, chatRoomId, showToast, getEditHistoryRef]);
+
+  // 문서 비우기 핸들러
+  const handleClearDocument = useCallback(() => {
+    if (!actualCanEdit) {
+      showToast?.('편집 권한이 없습니다');
+      return;
+    }
+
+    // 비우기 확인 모달 표시
+    setShowClearConfirmModal(true);
+  }, [actualCanEdit, showToast]);
+
+  // 문서 비우기 확정 실행
+  const performClearDocument = useCallback(async () => {
+    const docIdToClose = currentDocId;
+
+    // contentRef 비우기
+    if (contentRef.current) {
+      contentRef.current.innerHTML = '';
+    }
+    if (fullScreenContentRef.current) {
+      fullScreenContentRef.current.innerHTML = '';
+    }
+
+    // 상태 업데이트
+    setContent('');
+    setTitle('');
+    setPendingEdits([]);
+    setCurrentDocId(null);
+    setDocumentOwner(null); // 문서 소유자 정보 초기화
+
+    // Firestore의 currentDoc 비우기
+    try {
+      const currentDocRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+      await setDoc(currentDocRef, {
+        title: '',
+        content: '',
+        originalMemoId: null,
+        lastEditedBy: currentUserId,
+        lastEditedByName: currentUserName,
+        lastEditedAt: serverTimestamp()
+      });
+      console.log('✅ Firestore currentDoc 비우기 완료');
+    } catch (error) {
+      console.error('❌ Firestore currentDoc 비우기 실패:', error);
+    }
+
+    // 캐시에서도 제거 (수정 대기중이었다면 마커 정보가 유지되도록 하지 않음)
+    // 비우기는 완전히 새로 시작하는 것이므로 캐시도 삭제
+    if (docIdToClose) {
+      globalDocumentCache.delete(docIdToClose);
+      console.log('🗑️ 캐시에서 문서 삭제:', docIdToClose);
+    }
+
+    setShowClearConfirmModal(false);
+    showToast?.('문서가 비워졌습니다');
+  }, [currentDocId, chatRoomId, currentUserId, currentUserName, showToast]);
 
   // 마커 클릭 이벤트 핸들러 (상세 정보 모달 표시)
   useEffect(() => {
@@ -3055,19 +3502,43 @@ const CollaborativeDocumentEditor = ({
       <EditorHeader onClick={() => !collapsed && setCollapsed(false)}>
         <HeaderLeft>
           <DocumentIcon>📄</DocumentIcon>
-          {collapsed ? (
+          {!content && !title && isOneOnOneChat ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                // 임시 문서 ID 생성
+                const tempDocId = `temp_${Date.now()}`;
+                setCurrentDocId(tempDocId);
+                setShowFullScreenEdit(true);
+                // 편집창이 열린 후 포커스
+                setTimeout(() => {
+                  if (fullScreenContentRef.current) {
+                    fullScreenContentRef.current.focus();
+                  }
+                }, 100);
+              }}
+              style={{
+                flex: 1,
+                maxWidth: '300px',
+                background: 'transparent',
+                border: 'none',
+                color: '#4a90e2',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                textAlign: 'left',
+                padding: '4px 8px'
+              }}
+            >
+              + 새 문서 작성
+            </button>
+          ) : !content && !title ? null : (
             <TitleInput
               value={title}
               disabled
+              readOnly
               onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <TitleInput
-              value={title}
-              onChange={(e) => handleTitleChange(e.target.value)}
-              placeholder="문서 제목을 입력하세요"
-              onClick={(e) => e.stopPropagation()}
-              disabled={!actualCanEdit}
+              style={{ cursor: 'default' }}
             />
           )}
         </HeaderLeft>
@@ -3093,6 +3564,72 @@ const CollaborativeDocumentEditor = ({
 
       {/* 콘텐츠 */}
       <EditorContent $collapsed={collapsed}>
+        {/* 문서 소유자 정보 또는 임시 문서 표시 */}
+        {currentDocId && currentDocId.startsWith('temp_') && content && content.trim() ? (
+          <div
+            style={{
+              padding: '8px 16px',
+              background: 'rgba(255, 193, 7, 0.1)',
+              borderBottom: '1px solid rgba(255, 193, 7, 0.3)',
+              fontSize: '12px',
+              color: '#ffc107',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between'
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <FileText size={14} />
+              새 문서(임시 문서)
+            </div>
+            <button
+              onClick={async (e) => {
+                e.stopPropagation();
+                await handleSaveTempDocument();
+              }}
+              style={{
+                background: 'linear-gradient(135deg, #4a90e2, #357abd)',
+                color: 'white',
+                border: 'none',
+                padding: '6px 12px',
+                borderRadius: '6px',
+                fontSize: '11px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                transition: 'transform 0.2s'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              title="문서 저장"
+            >
+              <Save size={14} />
+              저장
+            </button>
+          </div>
+        ) : documentOwner && currentDocId && !currentDocId.startsWith('temp_') ? (
+          <div
+            onClick={() => setShowOwnerModal(true)}
+            style={{
+              padding: '8px 16px',
+              background: 'rgba(74, 144, 226, 0.1)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              fontSize: '12px',
+              color: '#4a90e2',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            title="클릭하여 고유 ID 확인"
+          >
+            <Users size={14} />
+            문서 소유자: {documentOwner.nickname}{documentOwner.userId === currentUserId ? ' (나)' : ''}
+          </div>
+        ) : null}
+
         {/* 도구 모음 */}
         <Toolbar>
           {/* 첫 번째 줄: 불러오기(아이콘만), 편집(아이콘만), 전체승인, 전체리셋 */}
@@ -3105,12 +3642,18 @@ const CollaborativeDocumentEditor = ({
 
             {actualCanEdit ? (
               <EditButton onClick={() => setShowFullScreenEdit(true)} title="큰 화면에서 편집하기">
-                ✏️
+                📝
               </EditButton>
             ) : (
               <EditButton onClick={() => setShowFullScreenEdit(true)} title="큰 화면에서 보기">
-                👁️
+                📝
               </EditButton>
+            )}
+
+            {actualCanEdit && (
+              <ClearButton onClick={handleClearDocument} title="문서 비우기">
+                🧹
+              </ClearButton>
             )}
 
             {actualIsManager && (
@@ -3120,7 +3663,6 @@ const CollaborativeDocumentEditor = ({
                   disabled={saving || !title.trim() || pendingEdits.length === 0}
                   title="전체 승인 (모든 수정 제안 승인)"
                 >
-                  <CheckCircle size={14} />
                   전체승인
                 </FinalApplyButton>
 
@@ -3129,7 +3671,6 @@ const CollaborativeDocumentEditor = ({
                   disabled={saving || pendingEdits.length === 0}
                   title="모든 수정 표시 삭제"
                 >
-                  <RotateCcw size={14} />
                   전체리셋
                 </ResetButton>
               </>
@@ -3874,6 +4415,357 @@ const CollaborativeDocumentEditor = ({
         </Modal>
       )}
 
+      {/* 문서 비우기 확인 모달 */}
+      {showClearConfirmModal && (
+        <Modal onClick={() => setShowClearConfirmModal(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <ModalTitle>문서 비우기</ModalTitle>
+              <IconButton onClick={() => setShowClearConfirmModal(false)}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+
+            <ModalBody>
+              {currentDocId && currentDocId.startsWith('temp_') ? (
+                <>
+                  {/* 임시 문서인 경우 */}
+                  <div style={{ marginBottom: '16px', lineHeight: '1.6' }}>
+                    <div style={{ marginBottom: '12px', color: '#e0e0e0' }}>
+                      저장하지 않은 임시 문서를 비우시겠습니까?
+                    </div>
+                  </div>
+
+                  <div style={{
+                    background: 'rgba(255, 87, 87, 0.1)',
+                    border: '1px solid rgba(255, 87, 87, 0.3)',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    marginBottom: '16px',
+                    fontSize: '13px',
+                    lineHeight: '1.8',
+                    color: '#e0e0e0'
+                  }}>
+                    <div style={{ fontWeight: '600', marginBottom: '8px', color: '#ff5757' }}>
+                      ⚠️ 경고
+                    </div>
+                    <div style={{ marginBottom: '6px', paddingLeft: '1em', textIndent: '-1em' }}>
+                      • 임시 문서이므로 작업한 내용이 완전히 사라집니다
+                    </div>
+                    <div style={{ marginBottom: '6px', paddingLeft: '1em', textIndent: '-1em' }}>
+                      • <strong style={{ color: '#ff5757' }}>복구할 수 없습니다</strong>
+                    </div>
+                    <div style={{ paddingLeft: '1em', textIndent: '-1em' }}>
+                      • 문서를 비우기 전에 이 임시 문서를 저장하면 공유 폴더에 저장되며 수정 작업 그대로 보존되어 다음에 작업을 이어갈 수 있습니다
+                    </div>
+                  </div>
+                </>
+              ) : pendingEdits.length > 0 ? (
+                <>
+                  {/* 수정 대기중인 문서인 경우 */}
+                  <div style={{ marginBottom: '16px', lineHeight: '1.6' }}>
+                    <div style={{ marginBottom: '12px', color: '#e0e0e0' }}>
+                      수정 대기중인 문서는 수정 정보가 자동 저장되어 다음에 불러오기를 할 때 수정 정보를 그대로 불러옵니다.
+                    </div>
+                  </div>
+
+                  <div style={{
+                    background: 'rgba(74, 144, 226, 0.1)',
+                    border: '1px solid rgba(74, 144, 226, 0.3)',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    marginBottom: '16px',
+                    fontSize: '13px',
+                    lineHeight: '1.8',
+                    color: '#e0e0e0'
+                  }}>
+                    <div style={{ fontWeight: '600', marginBottom: '8px', color: '#4a90e2' }}>
+                      ℹ️ 안내
+                    </div>
+                    <div style={{ marginBottom: '6px' }}>
+                      • 현재 문서: <strong>{title || '(제목 없음)'}</strong>
+                    </div>
+                    <div style={{ marginBottom: '6px' }}>
+                      • 수정 대기 중: <strong style={{ color: '#4a90e2' }}>{pendingEdits.length}개</strong>
+                    </div>
+                    <div>
+                      • 수정 정보는 자동 저장되며, 다음에 이 문서를 불러올 때 그대로 표시됩니다
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* 원본 문서이거나 수정 대기가 없는 경우 */}
+                  <div style={{ marginBottom: '16px', color: '#e0e0e0' }}>
+                    현재 문서를 닫고 문서창을 비울까요?
+                  </div>
+
+                  <div style={{
+                    background: 'rgba(255, 193, 7, 0.1)',
+                    border: '1px solid rgba(255, 193, 7, 0.3)',
+                    borderRadius: '8px',
+                    padding: '16px',
+                    marginBottom: '16px',
+                    fontSize: '13px',
+                    lineHeight: '1.8',
+                    color: '#e0e0e0'
+                  }}>
+                    <div style={{ fontWeight: '600', marginBottom: '8px', color: '#ffc107' }}>
+                      ℹ️ 안내
+                    </div>
+                    <div style={{ marginBottom: '6px' }}>
+                      • 현재 문서: <strong>{title || '(제목 없음)'}</strong>
+                    </div>
+                    <div>
+                      • 문서창이 비워지며, 필요 시 다시 불러올 수 있습니다
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <ModalActions>
+                <RejectButton onClick={() => setShowClearConfirmModal(false)}>
+                  <X size={18} />
+                  취소
+                </RejectButton>
+                <ConfirmButton
+                  onClick={performClearDocument}
+                  style={{ background: 'linear-gradient(135deg, #9c27b0, #7b1fa2)' }}
+                >
+                  🧹
+                  비우기
+                </ConfirmButton>
+              </ModalActions>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* 임시 문서 불러오기 경고 모달 */}
+      {showTempDocLoadWarningModal && (
+        <Modal onClick={() => setShowTempDocLoadWarningModal(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <ModalTitle>문서 불러오기</ModalTitle>
+              <IconButton onClick={() => setShowTempDocLoadWarningModal(false)}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+
+            <ModalBody>
+              <div style={{ marginBottom: '16px', lineHeight: '1.6' }}>
+                <div style={{ marginBottom: '12px', color: '#e0e0e0' }}>
+                  저장하지 않은 임시 문서가 있습니다. 다른 문서를 불러오시겠습니까?
+                </div>
+              </div>
+
+              <div style={{
+                background: 'rgba(255, 87, 87, 0.1)',
+                border: '1px solid rgba(255, 87, 87, 0.3)',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '16px',
+                fontSize: '13px',
+                lineHeight: '1.8',
+                color: '#e0e0e0'
+              }}>
+                <div style={{ fontWeight: '600', marginBottom: '8px', color: '#ff5757' }}>
+                  ⚠️ 경고
+                </div>
+                <div style={{ marginBottom: '6px', paddingLeft: '1em', textIndent: '-1em' }}>
+                  • 임시 문서이므로 작업한 내용이 완전히 사라집니다
+                </div>
+                <div style={{ marginBottom: '6px', paddingLeft: '1em', textIndent: '-1em' }}>
+                  • <strong style={{ color: '#ff5757' }}>복구할 수 없습니다</strong>
+                </div>
+                <div style={{ paddingLeft: '1em', textIndent: '-1em' }}>
+                  • 문서를 불러오기 전에 이 임시 문서를 저장하면 공유 폴더에 저장되며 수정 작업 그대로 보존되어 다음에 작업을 이어갈 수 있습니다
+                </div>
+              </div>
+
+              <ModalActions>
+                <RejectButton onClick={() => setShowTempDocLoadWarningModal(false)}>
+                  <X size={18} />
+                  취소
+                </RejectButton>
+                <ConfirmButton
+                  onClick={proceedLoadFromShared}
+                  style={{ background: 'linear-gradient(135deg, #4a90e2, #357abd)' }}
+                >
+                  <FolderOpen size={18} />
+                  불러오기
+                </ConfirmButton>
+              </ModalActions>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* 문서 소유자 ID 모달 */}
+      {showOwnerModal && documentOwner && (
+        <Modal onClick={() => setShowOwnerModal(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <ModalHeader>
+              <ModalTitle>
+                <Users size={18} color="#4a90e2" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                문서 소유자 정보
+              </ModalTitle>
+              <IconButton onClick={() => setShowOwnerModal(false)}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+
+            <ModalBody>
+              <div style={{ marginBottom: '20px' }}>
+                <div style={{ marginBottom: '12px', color: '#e0e0e0' }}>
+                  <strong>닉네임:</strong> {documentOwner.nickname}
+                </div>
+                {documentOwner.wsCode ? (
+                  <div style={{ marginBottom: '12px', color: '#e0e0e0' }}>
+                    <strong>고유 ID:</strong>
+                    <div style={{
+                      marginTop: '8px',
+                      padding: '12px',
+                      background: 'rgba(74, 144, 226, 0.1)',
+                      border: '1px solid rgba(74, 144, 226, 0.3)',
+                      borderRadius: '6px',
+                      fontFamily: 'monospace',
+                      fontSize: '18px',
+                      fontWeight: 'bold',
+                      letterSpacing: '2px',
+                      textAlign: 'center',
+                      color: '#4a90e2'
+                    }}>
+                      {documentOwner.wsCode.replace('WS-', '')}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ color: '#999' }}>고유 ID를 찾을 수 없습니다</div>
+                )}
+              </div>
+
+              <ModalActions>
+                <RejectButton onClick={() => setShowOwnerModal(false)}>
+                  <X size={18} />
+                  닫기
+                </RejectButton>
+                {documentOwner.wsCode && (
+                  <ConfirmButton
+                    onClick={() => {
+                      navigator.clipboard.writeText(documentOwner.wsCode.replace('WS-', ''));
+                      showToast?.('고유 ID가 복사되었습니다');
+                      setShowOwnerModal(false);
+                    }}
+                    style={{ background: 'linear-gradient(135deg, #4a90e2, #357abd)' }}
+                  >
+                    📋
+                    ID 복사
+                  </ConfirmButton>
+                )}
+              </ModalActions>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* 거부 확인 모달 */}
+      {showRejectConfirmModal && (
+        <Modal onClick={() => setShowRejectConfirmModal(false)} style={{ zIndex: 500000 }}>
+          <ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <ModalHeader>
+              <ModalTitle>
+                <X size={18} color="#ff5757" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                수정 제안 거부
+              </ModalTitle>
+              <IconButton onClick={() => setShowRejectConfirmModal(false)}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+
+            <ModalBody>
+              <div style={{ marginBottom: '12px', color: '#e0e0e0', lineHeight: '1.6' }}>
+                수정 제안을 거부하고 원본을 유지하겠습니까?
+              </div>
+              <div style={{ marginBottom: '20px', color: '#ff5757', fontSize: '13px' }}>
+                ⚠️ 이 작업은 되돌릴 수 없습니다
+              </div>
+
+              <ModalActions>
+                <RejectButton onClick={() => setShowRejectConfirmModal(false)}>
+                  취소
+                </RejectButton>
+                <ConfirmButton
+                  onClick={async () => {
+                    try {
+                      await handleCancelEdit(pendingAction.editId);
+                    } catch (error) {
+                      console.error('거부 실패:', error);
+                    } finally {
+                      setShowRejectConfirmModal(false);
+                      setShowMarkerDetailModal(false);
+                      setSelectedMarkerDetail(null);
+                      setPendingAction(null);
+                    }
+                  }}
+                  style={{ background: 'linear-gradient(135deg, #ff5757, #cc4545)' }}
+                >
+                  거부
+                </ConfirmButton>
+              </ModalActions>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {/* 승인 확인 모달 */}
+      {showApproveConfirmModal && (
+        <Modal onClick={() => setShowApproveConfirmModal(false)} style={{ zIndex: 500000 }}>
+          <ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <ModalHeader>
+              <ModalTitle>
+                <Check size={18} color="#4a90e2" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                수정 승인
+              </ModalTitle>
+              <IconButton onClick={() => setShowApproveConfirmModal(false)}>
+                <X size={20} />
+              </IconButton>
+            </ModalHeader>
+
+            <ModalBody>
+              <div style={{ marginBottom: '12px', color: '#e0e0e0', lineHeight: '1.6' }}>
+                수정을 받아들여 문구를 수정하시겠습니까?
+              </div>
+              <div style={{ marginBottom: '20px', color: '#ff5757', fontSize: '13px' }}>
+                ⚠️ 이 작업은 되돌릴 수 없습니다
+              </div>
+
+              <ModalActions>
+                <RejectButton onClick={() => setShowApproveConfirmModal(false)}>
+                  취소
+                </RejectButton>
+                <ConfirmButton
+                  onClick={async () => {
+                    try {
+                      await handleApproveEdit(pendingAction.editId);
+                    } catch (error) {
+                      console.error('승인 실패:', error);
+                    } finally {
+                      setShowApproveConfirmModal(false);
+                      setShowMarkerDetailModal(false);
+                      setSelectedMarkerDetail(null);
+                      setPendingAction(null);
+                    }
+                  }}
+                  style={{ background: 'linear-gradient(135deg, #4a90e2, #357abd)' }}
+                >
+                  승인
+                </ConfirmButton>
+              </ModalActions>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+
       {/* 권한 관리 모달 */}
       {showPermissionModal && (
         <Modal onClick={() => setShowPermissionModal(false)}>
@@ -4176,32 +5068,24 @@ const CollaborativeDocumentEditor = ({
 
               {actualCanEdit && (
                 <ModalActions>
-                  <RejectButton onClick={async () => {
-                    // 거부 - 마커만 제거
-                    try {
-                      await handleCancelEdit(selectedMarkerDetail.id);
-                      setShowMarkerDetailModal(false);
-                      setSelectedMarkerDetail(null);
-                      showToast?.('수정 제안을 거부했습니다');
-                    } catch (error) {
-                      console.error('거부 실패:', error);
-                      showToast?.('거부에 실패했습니다');
-                    }
+                  <RejectButton onClick={() => {
+                    // 거부 확인 모달 표시
+                    setPendingAction({
+                      type: 'reject',
+                      editId: selectedMarkerDetail.id
+                    });
+                    setShowRejectConfirmModal(true);
                   }}>
                     <X size={18} />
                     거부
                   </RejectButton>
-                  <ConfirmButton onClick={async () => {
-                    // 승인 - 편집 내역에서 승인 처리
-                    try {
-                      setSelectedEdits([selectedMarkerDetail.id]);
-                      setShowMarkerDetailModal(false);
-                      setSelectedMarkerDetail(null);
-                      setShowEditModal(true);
-                    } catch (error) {
-                      console.error('승인 실패:', error);
-                      showToast?.('승인에 실패했습니다');
-                    }
+                  <ConfirmButton onClick={() => {
+                    // 승인 확인 모달 표시
+                    setPendingAction({
+                      type: 'approve',
+                      editId: selectedMarkerDetail.id
+                    });
+                    setShowApproveConfirmModal(true);
                   }}>
                     <Check size={18} />
                     승인
@@ -4268,7 +5152,7 @@ const CollaborativeDocumentEditor = ({
 
       {/* 전체 화면 편집 모달 */}
       {showFullScreenEdit && (
-        <FullScreenModal onClick={() => setShowFullScreenEdit(false)}>
+        <FullScreenModal onClick={handleCloseFullScreenEdit}>
           <FullScreenEditorContainer onClick={(e) => e.stopPropagation()}>
             {/* 헤더 */}
             <FullScreenHeader>
@@ -4276,32 +5160,74 @@ const CollaborativeDocumentEditor = ({
                 <DocumentIcon>📄</DocumentIcon>
                 <FullScreenTitleInput
                   value={title}
-                  onChange={(e) => handleTitleChange(e.target.value)}
-                  placeholder="문서 제목을 입력하세요"
-                  disabled={!actualCanEdit}
+                  disabled
+                  readOnly
+                  style={{ cursor: 'default' }}
                 />
               </FullScreenTitle>
 
-              <IconButton onClick={() => setShowFullScreenEdit(false)} title="닫기">
+              <IconButton onClick={handleCloseFullScreenEdit} title="닫기" style={{ position: 'relative', right: '-15px' }}>
                 <X size={24} />
               </IconButton>
             </FullScreenHeader>
 
-            {/* 툴바 - 편집 권한자에게만 표시 */}
+            {/* 문서 소유자 정보 또는 임시 문서 표시 */}
+            {currentDocId && currentDocId.startsWith('temp_') && content && content.trim() ? (
+              <div
+                style={{
+                  padding: '8px 16px',
+                  background: 'rgba(255, 193, 7, 0.1)',
+                  borderBottom: '1px solid rgba(255, 193, 7, 0.3)',
+                  fontSize: '11px',
+                  color: '#ffc107',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <FileText size={12} />
+                새 문서(임시 문서)
+              </div>
+            ) : documentOwner && currentDocId && !currentDocId.startsWith('temp_') ? (
+              <div
+                onClick={() => setShowOwnerModal(true)}
+                style={{
+                  padding: '8px 16px',
+                  background: 'rgba(74, 144, 226, 0.1)',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                  fontSize: '11px',
+                  color: '#4a90e2',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                title="클릭하여 고유 ID 확인"
+              >
+                <Users size={12} />
+                문서 소유자: {documentOwner.nickname}{documentOwner.userId === currentUserId ? ' (나)' : ''}
+              </div>
+            ) : null}
+
+            {/* 툴바 - 2줄 레이아웃 */}
             {actualCanEdit && (
-              <FullScreenToolbar>
-                <ToolbarButton onClick={handleApplyStrikethrough} title="선택한 텍스트에 취소선 적용">
-                  <Strikethrough size={16} />
-                  취소선
-                </ToolbarButton>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {/* 첫 번째 줄: 취소선, 형광펜 */}
+                <FullScreenToolbar style={{ borderBottom: 'none', paddingBottom: '7px' }}>
+                  <ToolbarButton onClick={handleApplyStrikethrough} title="선택한 텍스트에 취소선 적용">
+                    <Strikethrough size={16} />
+                    취소선
+                  </ToolbarButton>
 
-                <ToolbarButton onClick={handleApplyHighlighter} title="선택한 텍스트에 형광펜 적용">
-                  <Highlighter size={16} />
-                  형광펜
-                </ToolbarButton>
+                  <ToolbarButton onClick={handleApplyHighlighter} title="선택한 텍스트에 형광펜 적용">
+                    <Highlighter size={16} />
+                    형광펜
+                  </ToolbarButton>
+                </FullScreenToolbar>
 
+                {/* 두 번째 줄: 수정 대기중, 위치 찾기 */}
                 {pendingEdits.length > 0 && (
-                  <>
+                  <FullScreenToolbar style={{ paddingTop: '7px' }}>
                     <PendingEditsCount title="대기 중인 수정 사항">
                       <Info size={16} />
                       {pendingEdits.length}개 수정 대기중
@@ -4332,9 +5258,9 @@ const CollaborativeDocumentEditor = ({
                         <ChevronRight size={14} />
                       </EditNavigationButton>
                     </EditNavigationGroup>
-                  </>
+                  </FullScreenToolbar>
                 )}
-              </FullScreenToolbar>
+              </div>
             )}
 
             {/* 편집 영역 */}
@@ -4349,14 +5275,24 @@ const CollaborativeDocumentEditor = ({
                     programmaticChangeRef.current = false;
                     return;
                   }
-                  // 사용자 입력은 방지
+                  // 편집 권한이 있으면 입력 허용
+                  if (actualCanEdit) {
+                    const newContent = e.currentTarget.innerHTML;
+                    // setContent 호출하지 않고 debouncedSave만 호출 (입력 뒤섞임 방지)
+                    debouncedSave(newContent);
+                    return;
+                  }
+                  // 권한 없으면 입력 방지
                   e.preventDefault();
                   if (fullScreenContentRef.current) {
                     fullScreenContentRef.current.innerHTML = content;
                   }
                 }}
                 onKeyDown={(e) => {
-                  // 텍스트 수정 키는 모두 막기 (선택 키는 허용)
+                  // 편집 권한이 있으면 모든 키 허용
+                  if (actualCanEdit) return;
+
+                  // 권한 없으면 텍스트 수정 키는 막기 (선택 키는 허용)
                   const allowedKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'];
                   const isSelectionKey = e.shiftKey || e.ctrlKey || e.metaKey;
 
@@ -4365,11 +5301,15 @@ const CollaborativeDocumentEditor = ({
                   }
                 }}
                 onPaste={(e) => {
-                  // 붙여넣기 방지
+                  // 편집 권한이 있으면 붙여넣기 허용
+                  if (actualCanEdit) return;
+                  // 권한 없으면 붙여넣기 방지
                   e.preventDefault();
                 }}
                 onCut={(e) => {
-                  // 잘라내기 방지
+                  // 편집 권한이 있으면 잘라내기 허용
+                  if (actualCanEdit) return;
+                  // 권한 없으면 잘라내기 방지
                   e.preventDefault();
                 }}
                 onClick={(e) => {

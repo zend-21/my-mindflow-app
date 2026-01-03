@@ -32,7 +32,8 @@
       "Bash(firebase init:*)",
       "Bash(python fix_aquarius_fortune.py:*)",
       "Bash(git config:*)",
-      "Bash(firebase firestore:indexes:*)"
+      "Bash(firebase firestore:indexes:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []

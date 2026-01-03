@@ -332,7 +332,12 @@ const CreateGroupModal = ({ onClose, showToast }) => {
     // 친구 목록 불러오기
     const loadFriends = async () => {
       try {
-        const friendList = await getMyFriends();
+        const currentUserId = localStorage.getItem('firebaseUserId');
+        if (!currentUserId) {
+          showToast?.('로그인이 필요합니다');
+          return;
+        }
+        const friendList = await getMyFriends(currentUserId);
         setFriends(friendList);
       } catch (error) {
         console.error('친구 목록 불러오기 실패:', error);
@@ -346,8 +351,8 @@ const CreateGroupModal = ({ onClose, showToast }) => {
   // 검색 필터링
   const filteredFriends = friends.filter(friend => {
     if (!searchQuery) return true;
-    const displayName = friend.displayName || '익명';
-    const wsCode = friend.wsCode || '';
+    const displayName = friend.friendName || friend.displayName || '익명';
+    const wsCode = friend.friendWorkspaceCode || friend.wsCode || '';
     return displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
            wsCode.toLowerCase().includes(searchQuery.toLowerCase());
   });
@@ -363,10 +368,10 @@ const CreateGroupModal = ({ onClose, showToast }) => {
     });
   };
 
-  // 그룹 생성
+  // 단체방 생성
   const handleCreate = async () => {
     if (!groupName.trim()) {
-      showToast?.('그룹 이름을 입력해주세요');
+      showToast?.('단체방 이름을 입력해주세요');
       return;
     }
 
@@ -380,11 +385,11 @@ const CreateGroupModal = ({ onClose, showToast }) => {
     try {
       const currentUserId = localStorage.getItem('firebaseUserId');
       await createGroupChat(currentUserId, groupName.trim(), selectedFriends);
-      showToast?.('그룹이 생성되었습니다');
+      showToast?.('단체방이 생성되었습니다');
       onClose();
     } catch (error) {
-      console.error('그룹 생성 실패:', error);
-      showToast?.('그룹 생성에 실패했습니다');
+      console.error('단체방 생성 실패:', error);
+      showToast?.('단체방 생성에 실패했습니다');
     } finally {
       setLoading(false);
     }
@@ -410,7 +415,7 @@ const CreateGroupModal = ({ onClose, showToast }) => {
         <Header>
           <Title>
             <Users size={24} />
-            그룹 만들기
+            단체방 만들기
           </Title>
           <CloseButton onClick={onClose}>
             <X size={20} />
@@ -418,12 +423,12 @@ const CreateGroupModal = ({ onClose, showToast }) => {
         </Header>
 
         <Content>
-          {/* 그룹 이름 입력 */}
+          {/* 단체방 이름 입력 */}
           <InputGroup>
-            <Label>그룹 이름</Label>
+            <Label>단체방 이름</Label>
             <Input
               type="text"
-              placeholder="그룹 이름을 입력하세요"
+              placeholder="단체방 이름을 입력하세요"
               value={groupName}
               onChange={(e) => setGroupName(e.target.value)}
               maxLength={50}
@@ -449,21 +454,23 @@ const CreateGroupModal = ({ onClose, showToast }) => {
                 <FriendList>
                   {filteredFriends.length > 0 ? (
                     filteredFriends.map(friend => {
-                      const isSelected = selectedFriends.includes(friend.userId);
-                      const displayName = friend.displayName || '익명';
+                      const friendId = friend.friendId || friend.id;
+                      const isSelected = selectedFriends.includes(friendId);
+                      const displayName = friend.friendName || friend.displayName || '익명';
+                      const wsCode = friend.friendWorkspaceCode || friend.wsCode || '';
 
                       return (
                         <FriendItem
-                          key={friend.userId}
+                          key={friendId}
                           $selected={isSelected}
-                          onClick={() => toggleFriend(friend.userId)}
+                          onClick={() => toggleFriend(friendId)}
                         >
-                          <Avatar $color={getAvatarColor(friend.userId)}>
+                          <Avatar $color={getAvatarColor(friendId)}>
                             {displayName.charAt(0).toUpperCase()}
                           </Avatar>
                           <FriendInfo>
                             <FriendName>{displayName}</FriendName>
-                            <FriendCode>@{friend.wsCode}</FriendCode>
+                            <FriendCode>@{wsCode.replace('WS-', '')}</FriendCode>
                           </FriendInfo>
                           {isSelected && <CheckIcon />}
                         </FriendItem>

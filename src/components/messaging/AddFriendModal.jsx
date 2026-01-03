@@ -102,15 +102,17 @@ const SearchSection = styled.div`
 `;
 
 const SearchInputWrapper = styled.div`
-  position: relative;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 `;
 
 const SearchInput = styled.input`
-  width: 100%;
+  flex: 1;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #e0e0e0;
-  padding: 14px 48px 14px 16px;
+  padding: 14px 16px;
   border-radius: 12px;
   font-size: 15px;
   transition: all 0.2s;
@@ -129,22 +131,16 @@ const SearchInput = styled.input`
 `;
 
 const SearchButton = styled.button`
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
   background: rgba(74, 144, 226, 0.2);
   border: 1px solid rgba(74, 144, 226, 0.4);
   color: #4a90e2;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 13px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  white-space: nowrap;
 
   &:hover:not(:disabled) {
     background: rgba(74, 144, 226, 0.3);
@@ -421,7 +417,7 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
                 <SearchInputWrapper>
                   <SearchInput
                     type="text"
-                    placeholder="WS 코드 입력 (예: WXWF7U 또는 WS-WXWF7U)"
+                    placeholder="ID 입력 (예: WSD5D2)"
                     value={searchId}
                     onChange={(e) => setSearchId(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && !searching && handleSearch()}
@@ -460,7 +456,7 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
                   <InfoBox $type="info">
                     <AlertCircle size={18} />
                     <span>
-                      친구의 프로필 페이지에서 확인할 수 있는 WS 코드를 입력하세요.
+                      친구의 ID(프로필 페이지에서 확인)를 입력하세요.
                       <br />
                       대소문자 구분 없이 입력 가능합니다.
                     </span>

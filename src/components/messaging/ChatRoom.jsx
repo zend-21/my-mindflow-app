@@ -3,8 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Plus, Settings, X } from 'lucide-react';
-import { subscribeToMessages, sendMessage, markDMAsRead } from '../../services/directMessageService';
-import { subscribeToGroupMessages, sendGroupMessage, markAllMessagesAsRead } from '../../services/groupChatService';
+import { subscribeToMessages, sendMessage, markDMAsRead, subscribeToDMRoom } from '../../services/directMessageService';
+import { subscribeToGroupMessages, sendGroupMessage, markAllMessagesAsRead, acceptInvitation, rejectInvitation } from '../../services/groupChatService';
 import { playChatMessageSound, notificationSettings } from '../../utils/notificationSounds';
 import CollapsibleDocumentEditor from './CollapsibleDocumentEditor';
 import CollaborativeDocumentEditor from './CollaborativeDocumentEditor';
@@ -507,6 +507,71 @@ const SendButton = styled.button`
   }
 `;
 
+// 초대 수락/거부 배너
+const InvitationBanner = styled.div`
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+  border: 1px solid rgba(102, 126, 234, 0.3);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin: 12px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+`;
+
+const InvitationText = styled.div`
+  color: #e0e0e0;
+  font-size: 14px;
+  line-height: 1.5;
+
+  strong {
+    color: #ffffff;
+    font-weight: 600;
+  }
+`;
+
+const InvitationActions = styled.div`
+  display: flex;
+  gap: 12px;
+`;
+
+const InvitationButton = styled.button`
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const AcceptButton = styled(InvitationButton)`
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  }
+`;
+
+const RejectButton = styled(InvitationButton)`
+  background: rgba(255, 255, 255, 0.05);
+  color: #e0e0e0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+  }
+`;
+
 // 빈 상태
 const EmptyState = styled.div`
   flex: 1;
@@ -549,6 +614,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
   const [showPermissionModal, setShowPermissionModal] = useState(false); // 권한 관리 모달
   const [permissions, setPermissions] = useState({ editors: [], manager: null }); // 권한 정보
   const [selectedMemoToLoad, setSelectedMemoToLoad] = useState(null); // CollaborativeDocumentEditor에 전달할 메모
+  const [processingInvitation, setProcessingInvitation] = useState(false); // 초대 처리 중
+  const [myMemberStatus, setMyMemberStatus] = useState(null); // 내 멤버 상태 (active/pending/rejected)
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const currentUserId = localStorage.getItem('firebaseUserId');
@@ -658,32 +725,30 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
 
   const otherUser = getOtherUserInfo();
 
-  // 권한 정보 실시간 구독 (그룹 채팅만)
+  // ⚡ 권한 정보 실시간 구독 (그룹 채팅만) - 최적화: 2개 리스너 통합
   useEffect(() => {
     if (!chat.id || chat.type !== 'group') return;
 
     let isMounted = true;
+    const unsubscribers = [];
 
-    // 권한 문서와 현재 문서 정보 구독
+    // 권한 문서 구독
     const permRef = doc(db, 'chatRooms', chat.id, 'sharedDocument', 'permissions');
-    const docRef = doc(db, 'chatRooms', chat.id, 'sharedDocument', 'currentDoc');
-
     const unsubscribePerm = onSnapshot(permRef, (permDoc) => {
       if (!isMounted) return;
       const permData = permDoc.data();
-
-      // 권한 정보 업데이트
       setPermissions(prev => ({
         ...prev,
         editors: permData?.editors || []
       }));
     });
+    unsubscribers.push(unsubscribePerm);
 
+    // 문서 정보 구독
+    const docRef = doc(db, 'chatRooms', chat.id, 'sharedDocument', 'currentDoc');
     const unsubscribeDoc = onSnapshot(docRef, (docSnapshot) => {
       if (!isMounted) return;
       const docData = docSnapshot.data();
-
-      // 문서 매니저 정보 업데이트 (문서를 업로드한 사람)
       if (docData?.lastEditedBy) {
         setPermissions(prev => ({
           ...prev,
@@ -691,12 +756,38 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
         }));
       }
     });
+    unsubscribers.push(unsubscribeDoc);
 
     return () => {
       isMounted = false;
-      unsubscribePerm();
-      unsubscribeDoc();
+      unsubscribers.forEach(unsub => unsub());
     };
+  }, [chat.id, chat.type]);
+
+  // 그룹 채팅에서 내 멤버 상태 확인
+  useEffect(() => {
+    if (!chat.id || chat.type !== 'group' || !currentUserId) return;
+
+    // chat.membersInfo에서 내 상태 확인
+    const myStatus = chat.membersInfo?.[currentUserId]?.status;
+    setMyMemberStatus(myStatus || 'active');
+  }, [chat.id, chat.type, chat.membersInfo, currentUserId]);
+
+  // 1:1 채팅방 데이터 실시간 구독 (lastAccessTime 업데이트 감지)
+  const [chatRoomData, setChatRoomData] = useState(chat);
+
+  useEffect(() => {
+    if (!chat.id || chat.type === 'group') {
+      setChatRoomData(chat);
+      return;
+    }
+
+    // 1:1 채팅방 데이터 실시간 구독
+    const unsubscribe = subscribeToDMRoom(chat.id, (updatedChat) => {
+      setChatRoomData(updatedChat);
+    });
+
+    return () => unsubscribe();
   }, [chat.id, chat.type]);
 
   // 메시지 실시간 구독
@@ -787,6 +878,38 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
 
     // 일반 참여자는 아이콘 없음
     return null;
+  };
+
+  // 초대 수락 핸들러
+  const handleAcceptInvitation = async () => {
+    setProcessingInvitation(true);
+    try {
+      await acceptInvitation(chat.id, currentUserId);
+      setMyMemberStatus('active');
+      showToast?.('✅ 단체방에 참여했습니다');
+    } catch (error) {
+      console.error('초대 수락 실패:', error);
+      showToast?.('❌ 초대 수락에 실패했습니다');
+    } finally {
+      setProcessingInvitation(false);
+    }
+  };
+
+  // 초대 거부 핸들러
+  const handleRejectInvitation = async () => {
+    setProcessingInvitation(true);
+    try {
+      await rejectInvitation(chat.id, currentUserId);
+      setMyMemberStatus('rejected');
+      showToast?.('초대를 거부했습니다');
+      // 거부 후 채팅방 닫기
+      setTimeout(() => onClose(), 1000);
+    } catch (error) {
+      console.error('초대 거부 실패:', error);
+      showToast?.('❌ 초대 거부에 실패했습니다');
+    } finally {
+      setProcessingInvitation(false);
+    }
   };
 
   // 메시지 전송
@@ -944,7 +1067,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
           </ChatInfo>
         </HeaderLeft>
         <HeaderRight>
-          {chat.type === 'group' && isRoomOwner && (
+          {isRoomOwner && chat.type === 'group' && (
             <MenuButton onClick={() => setShowPermissionModal(true)} title="권한 관리">
               <Settings size={20} />
             </MenuButton>
@@ -957,6 +1080,30 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
           </MenuButton>
         </HeaderRight>
       </Header>
+
+      {/* 초대 수락/거부 배너 (pending 상태일 때만 표시) */}
+      {chat.type === 'group' && myMemberStatus === 'pending' && (
+        <InvitationBanner>
+          <InvitationText>
+            <strong>{chat.groupName}</strong> 단체방에 초대되었습니다.<br />
+            참여하시겠습니까?
+          </InvitationText>
+          <InvitationActions>
+            <RejectButton
+              onClick={handleRejectInvitation}
+              disabled={processingInvitation}
+            >
+              {processingInvitation ? '처리 중...' : '거부'}
+            </RejectButton>
+            <AcceptButton
+              onClick={handleAcceptInvitation}
+              disabled={processingInvitation}
+            >
+              {processingInvitation ? '처리 중...' : '수락'}
+            </AcceptButton>
+          </InvitationActions>
+        </InvitationBanner>
+      )}
 
       {/* 협업 문서 (펼쳤을 때만 표시) */}
       {showDocument && (
@@ -1004,9 +1151,9 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
               let isUnreadByOther = false;
               let unreadCount = 0;
 
-              if (isMine && chat.type !== 'group') {
+              if (isMine && chatRoomData.type !== 'group') {
                 // 1:1 채팅: 상대방의 lastAccessTime 확인
-                const otherLastAccess = chat.lastAccessTime?.[otherUserId];
+                const otherLastAccess = chatRoomData.lastAccessTime?.[otherUserId];
                 const messageTime = message.createdAt?.toDate?.() || new Date(message.createdAt);
 
                 if (otherLastAccess) {
@@ -1017,9 +1164,14 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                   // lastAccessTime이 없으면 읽지 않은 것으로 간주
                   isUnreadByOther = true;
                 }
-              } else if (isMine && chat.type === 'group') {
+              } else if (isMine && chatRoomData.type === 'group') {
                 // 그룹 채팅: readBy 배열로 읽지 않은 사람 수 계산
-                const totalMembers = chat.members?.length || 0;
+                // 거절한 멤버(rejected)는 제외하고 활성 멤버만 카운트
+                const activeMembers = chat.members?.filter(memberId => {
+                  const memberStatus = chat.membersInfo?.[memberId]?.status;
+                  return memberStatus === 'active';
+                }) || [];
+                const totalMembers = activeMembers.length;
                 const readByCount = message.readBy?.length || 1; // readBy에 발신자 포함
                 unreadCount = totalMembers - readByCount;
                 isUnreadByOther = unreadCount > 0;

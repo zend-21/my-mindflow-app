@@ -591,42 +591,42 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [userId, enabled, memos, folders, trash, macros, calendar, activities]);
 
-  // 📱 포그라운드 복귀 시 자동 동기화 체크 (Evernote 방식)
+  // ⚡ 포그라운드 복귀 시 자동 동기화 체크 (최적화: localStorage 기반 증분 동기화)
   useEffect(() => {
     if (!userId || !enabled || !migrated) return;
+
+    let lastVisibilityChange = Date.now();
 
     const handleVisibilityChange = async () => {
       // 앱이 포그라운드로 복귀 (백그라운드 → 포그라운드)
       if (!document.hidden) {
-        console.log('📱 앱 포그라운드 복귀 - 동기화 체크 시작');
+        const now = Date.now();
+        const timeSinceLastCheck = now - lastVisibilityChange;
+        lastVisibilityChange = now;
+
+        // ⚡ 최적화: 5초 이내 재진입은 무시 (과도한 동기화 방지)
+        if (timeSinceLastCheck < 5000) {
+          console.log('📱 포그라운드 복귀 무시 (5초 이내 재진입)');
+          return;
+        }
+
+        console.log('📱 앱 포그라운드 복귀 - 미동기화 항목 체크');
         setSyncStatus('syncing');
 
         try {
-          // Firestore에서 최신 데이터 가져오기
-          const data = await fetchAllUserData(userId);
-
-          // localStorage와 비교하여 변경사항 확인
+          // ⚡ 최적화: Firestore 전체 조회 없이 localStorage만 확인
           const localMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
           const localCalendar = JSON.parse(localStorage.getItem('calendarSchedules_shared') || '{}');
-          const localFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
 
-          // localStorage에만 있는 항목 찾기 (Firestore 저장 실패했던 것들)
+          // localStorage에서 저장 실패 마크가 있는 항목만 찾기
           const unsyncedMemos = localMemos.filter(localMemo => {
-            const inFirestore = data.memos.find(m => m.id === localMemo.id);
-            if (!inFirestore) {
-              const lastSaved = localStorage.getItem(`firestore_saved_memo_${localMemo.id}`);
-              return !lastSaved; // 한 번도 저장 안 된 것만
-            }
-            return false;
+            const lastSaved = localStorage.getItem(`firestore_saved_memo_${localMemo.id}`);
+            return !lastSaved; // 한 번도 저장 안 된 것만
           });
 
           const unsyncedCalendar = Object.keys(localCalendar).filter(dateKey => {
-            const inFirestore = data.calendar?.[dateKey];
-            if (!inFirestore) {
-              const lastSaved = localStorage.getItem(`firestore_saved_calendar_${dateKey}`);
-              return !lastSaved; // 한 번도 저장 안 된 것만
-            }
-            return false;
+            const lastSaved = localStorage.getItem(`firestore_saved_calendar_${dateKey}`);
+            return !lastSaved; // 한 번도 저장 안 된 것만
           });
 
           // 미동기화 항목 자동 업로드
@@ -676,18 +676,33 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [userId, enabled, migrated]);
 
-  // 🌐 온라인/오프라인 상태 감지
+  // 🌐 온라인/오프라인 상태 감지 (⚡ debounce 추가)
   useEffect(() => {
     if (!userId || !enabled || !migrated) return;
+
+    let onlineDebounceTimer = null;
 
     const handleOffline = () => {
       console.log('📴 네트워크 오프라인 감지');
       setSyncStatus('offline');
+      // 온라인 복귀 대기 중인 타이머가 있으면 취소
+      if (onlineDebounceTimer) {
+        clearTimeout(onlineDebounceTimer);
+        onlineDebounceTimer = null;
+      }
     };
 
-    const handleOnline = async () => {
-      console.log('🌐 네트워크 온라인 복귀 - 미동기화 항목 업로드 시작');
+    const handleOnline = () => {
+      // ⚡ 최적화: 3초 debounce (네트워크 불안정 시 중복 동기화 방지)
+      if (onlineDebounceTimer) {
+        clearTimeout(onlineDebounceTimer);
+      }
+
+      console.log('🌐 네트워크 온라인 감지 - 3초 후 동기화 시작');
       setSyncStatus('syncing');
+
+      onlineDebounceTimer = setTimeout(async () => {
+        console.log('🌐 네트워크 온라인 복귀 - 미동기화 항목 업로드 시작');
 
       try {
         // localStorage에서 모든 항목 가져오기
@@ -771,6 +786,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
         console.error('❌ 온라인 복귀 동기화 실패:', err);
         setSyncStatus('offline');
       }
+      }, 3000); // 3초 debounce
     };
 
     window.addEventListener('online', handleOnline);
@@ -779,6 +795,10 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      // ⚡ 클린업 시 타이머 제거
+      if (onlineDebounceTimer) {
+        clearTimeout(onlineDebounceTimer);
+      }
     };
   }, [userId, enabled, migrated]);
 
