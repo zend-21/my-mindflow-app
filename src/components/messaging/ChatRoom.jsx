@@ -4,7 +4,8 @@ import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Plus, Settings, X, UserCog, UserPlus } from 'lucide-react';
 import { subscribeToMessages, sendMessage, markDMAsRead, subscribeToDMRoom } from '../../services/directMessageService';
-import { subscribeToGroupMessages, sendGroupMessage, markAllMessagesAsRead, acceptInvitation, rejectInvitation } from '../../services/groupChatService';
+import { subscribeToGroupMessages, sendGroupMessage, markAllMessagesAsRead, acceptInvitation, rejectInvitation, inviteMembersToGroup, transferRoomOwnership } from '../../services/groupChatService';
+import { getMyFriends } from '../../services/friendService';
 import { playChatMessageSound, notificationSettings } from '../../utils/notificationSounds';
 import CollapsibleDocumentEditor from './CollapsibleDocumentEditor';
 import CollaborativeDocumentEditor from './CollaborativeDocumentEditor';
@@ -793,6 +794,160 @@ const EmptyDescription = styled.div`
   line-height: 1.5;
 `;
 
+// 멤버 초대/위임 모달 추가 스타일
+const SearchBarWrapper = styled.div`
+  margin-bottom: 16px;
+`;
+
+const SearchInput = styled.input`
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e0e0e0;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  transition: all 0.2s;
+
+  &::placeholder {
+    color: #666;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: #667eea;
+    background: rgba(255, 255, 255, 0.08);
+  }
+`;
+
+const FriendListWrapper = styled.div`
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+  }
+`;
+
+const SelectableMemberItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: ${props => props.$selected ? 'rgba(102, 126, 234, 0.15)' : 'rgba(255, 255, 255, 0.03)'};
+  border: 1px solid ${props => props.$selected ? 'rgba(102, 126, 234, 0.4)' : 'rgba(255, 255, 255, 0.1)'};
+  border-radius: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: ${props => props.$selected ? 'rgba(102, 126, 234, 0.2)' : 'rgba(255, 255, 255, 0.05)'};
+    border-color: ${props => props.$selected ? 'rgba(102, 126, 234, 0.5)' : 'rgba(255, 255, 255, 0.2)'};
+  }
+`;
+
+const CheckMark = styled.span`
+  color: #667eea;
+  font-size: 20px;
+  font-weight: bold;
+  flex-shrink: 0;
+`;
+
+const SelectedInfo = styled.div`
+  font-size: 13px;
+  color: #888;
+  text-align: center;
+  margin-top: 12px;
+`;
+
+const ModalFooter = styled.div`
+  padding: 20px 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  gap: 12px;
+`;
+
+const CancelButton = styled.button`
+  flex: 1;
+  padding: 14px 24px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: #e0e0e0;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const ConfirmButton = styled.button`
+  flex: 1;
+  padding: 14px 24px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
+const EmptyStateContainer = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+`;
+
+const WarningMessage = styled.div`
+  background: rgba(251, 191, 36, 0.1);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  color: #fbbf24;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  margin-bottom: 20px;
+  text-align: center;
+`;
+
 const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -810,6 +965,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
   const [showMenuDropdown, setShowMenuDropdown] = useState(false); // 점 세개 드롭다운
   const [showInviteMembersModal, setShowInviteMembersModal] = useState(false); // 멤버 초대 모달
   const [showTransferOwnerModal, setShowTransferOwnerModal] = useState(false); // 방장 위임 모달
+  const [friends, setFriends] = useState([]); // 친구 목록 (멤버 초대용)
+  const [selectedFriendsToInvite, setSelectedFriendsToInvite] = useState([]); // 초대할 친구 선택
+  const [searchQueryInvite, setSearchQueryInvite] = useState(''); // 초대 모달 검색어
+  const [selectedMemberToTransfer, setSelectedMemberToTransfer] = useState(null); // 위임할 멤버 선택
+  const [loadingInvite, setLoadingInvite] = useState(false); // 초대 중
+  const [loadingTransfer, setLoadingTransfer] = useState(false); // 위임 중
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -969,6 +1130,23 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
     const myStatus = chat.membersInfo?.[currentUserId]?.status;
     setMyMemberStatus(myStatus || 'active');
   }, [chat.id, chat.type, chat.membersInfo, currentUserId]);
+
+  // 친구 목록 불러오기 (멤버 초대용)
+  useEffect(() => {
+    if (!showInviteMembersModal || !currentUserId) return;
+
+    const loadFriends = async () => {
+      try {
+        const friendList = await getMyFriends(currentUserId);
+        setFriends(friendList);
+      } catch (error) {
+        console.error('친구 목록 불러오기 실패:', error);
+        showToast?.('친구 목록을 불러올 수 없습니다');
+      }
+    };
+
+    loadFriends();
+  }, [showInviteMembersModal, currentUserId, showToast]);
 
   // 1:1 채팅방 데이터 실시간 구독 (lastAccessTime 업데이트 감지)
   const [chatRoomData, setChatRoomData] = useState(chat);
@@ -1229,6 +1407,65 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
     const prevDate = prevMsg.createdAt?.toDate?.() || new Date(prevMsg.createdAt);
 
     return currentDate.toDateString() !== prevDate.toDateString();
+  };
+
+  // 멤버 초대 핸들러
+  const handleInviteMembers = async () => {
+    if (selectedFriendsToInvite.length === 0) {
+      showToast?.('최소 1명의 친구를 선택해주세요');
+      return;
+    }
+
+    // 이미 그룹에 있는 친구 필터링
+    const alreadyMembers = selectedFriendsToInvite.filter(friendId =>
+      chat.members?.includes(friendId)
+    );
+
+    if (alreadyMembers.length > 0) {
+      showToast?.('이미 그룹에 있는 친구가 포함되어 있습니다');
+      return;
+    }
+
+    setLoadingInvite(true);
+    try {
+      await inviteMembersToGroup(chat.id, currentUserId, selectedFriendsToInvite);
+      showToast?.(`${selectedFriendsToInvite.length}명을 초대했습니다`);
+      setShowInviteMembersModal(false);
+      setSelectedFriendsToInvite([]);
+      setSearchQueryInvite('');
+    } catch (error) {
+      console.error('멤버 초대 실패:', error);
+      showToast?.(error.message || '멤버 초대에 실패했습니다');
+    } finally {
+      setLoadingInvite(false);
+    }
+  };
+
+  // 방장 위임 핸들러
+  const handleTransferOwnership = async () => {
+    if (!selectedMemberToTransfer) {
+      showToast?.('위임할 멤버를 선택해주세요');
+      return;
+    }
+
+    if (selectedMemberToTransfer === currentUserId) {
+      showToast?.('자기 자신에게는 위임할 수 없습니다');
+      return;
+    }
+
+    setLoadingTransfer(true);
+    try {
+      await transferRoomOwnership(chat.id, currentUserId, selectedMemberToTransfer);
+      const transferredMemberName = chat.membersInfo?.[selectedMemberToTransfer]?.displayName || '알 수 없음';
+      showToast?.(`${transferredMemberName}님에게 방장 권한을 위임했습니다`);
+      setShowTransferOwnerModal(false);
+      setSelectedMemberToTransfer(null);
+    } catch (error) {
+      console.error('방장 위임 실패:', error);
+      showToast?.(error.message || '방장 위임에 실패했습니다');
+    } finally {
+      setLoadingTransfer(false);
+    }
   };
 
   // 아바타 색상 생성
@@ -1605,46 +1842,197 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
         </ModalOverlay>
       )}
 
-      {/* 멤버 초대 모달 - CreateGroupModal 재사용하면 됨 (추후 구현) */}
+      {/* 멤버 초대 모달 */}
       {showInviteMembersModal && (
-        <ModalOverlay onClick={() => setShowInviteMembersModal(false)}>
+        <ModalOverlay onClick={() => {
+          setShowInviteMembersModal(false);
+          setSelectedFriendsToInvite([]);
+          setSearchQueryInvite('');
+        }}>
           <ModalContainer onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
               <ModalTitle>
                 <UserPlus size={24} />
                 멤버 초대
               </ModalTitle>
-              <CloseButton onClick={() => setShowInviteMembersModal(false)}>
+              <CloseButton onClick={() => {
+                setShowInviteMembersModal(false);
+                setSelectedFriendsToInvite([]);
+                setSearchQueryInvite('');
+              }}>
                 <X size={20} />
               </CloseButton>
             </ModalHeader>
             <ModalContent>
-              <div style={{ color: '#888', textAlign: 'center', padding: '40px 20px' }}>
-                멤버 초대 기능 구현 예정
-              </div>
+              {friends.length > 0 ? (
+                <>
+                  {/* 검색 바 */}
+                  <SearchBarWrapper>
+                    <SearchInput
+                      type="text"
+                      placeholder="친구 검색..."
+                      value={searchQueryInvite}
+                      onChange={(e) => setSearchQueryInvite(e.target.value)}
+                    />
+                  </SearchBarWrapper>
+
+                  {/* 친구 목록 */}
+                  <FriendListWrapper>
+                    {friends
+                      .filter(friend => {
+                        if (!searchQueryInvite) return true;
+                        const displayName = friend.friendName || friend.displayName || '익명';
+                        const wsCode = friend.friendWorkspaceCode || friend.wsCode || '';
+                        return displayName.toLowerCase().includes(searchQueryInvite.toLowerCase()) ||
+                               wsCode.toLowerCase().includes(searchQueryInvite.toLowerCase());
+                      })
+                      .filter(friend => {
+                        // 이미 그룹 멤버인 친구는 제외
+                        const friendId = friend.friendId || friend.id;
+                        return !chat.members?.includes(friendId);
+                      })
+                      .map(friend => {
+                        const friendId = friend.friendId || friend.id;
+                        const isSelected = selectedFriendsToInvite.includes(friendId);
+                        const displayName = friend.friendName || friend.displayName || '익명';
+                        const wsCode = friend.friendWorkspaceCode || friend.wsCode || '';
+
+                        return (
+                          <SelectableMemberItem
+                            key={friendId}
+                            $selected={isSelected}
+                            onClick={() => {
+                              setSelectedFriendsToInvite(prev =>
+                                prev.includes(friendId)
+                                  ? prev.filter(id => id !== friendId)
+                                  : [...prev, friendId]
+                              );
+                            }}
+                          >
+                            <MemberAvatar $color={getAvatarColor(friendId)}>
+                              {displayName.charAt(0).toUpperCase()}
+                            </MemberAvatar>
+                            <MemberInfo>
+                              <MemberName>{displayName}</MemberName>
+                              <MemberStatus>@{wsCode.replace('WS-', '')}</MemberStatus>
+                            </MemberInfo>
+                            {isSelected && <CheckMark>✓</CheckMark>}
+                          </SelectableMemberItem>
+                        );
+                      })}
+                  </FriendListWrapper>
+
+                  {selectedFriendsToInvite.length > 0 && (
+                    <SelectedInfo>{selectedFriendsToInvite.length}명 선택됨</SelectedInfo>
+                  )}
+                </>
+              ) : (
+                <EmptyStateContainer>
+                  <EmptyIcon>👥</EmptyIcon>
+                  <EmptyTitle>친구가 없습니다</EmptyTitle>
+                  <EmptyDescription>
+                    친구 탭에서 친구를 추가해보세요
+                  </EmptyDescription>
+                </EmptyStateContainer>
+              )}
             </ModalContent>
+            <ModalFooter>
+              <CancelButton onClick={() => {
+                setShowInviteMembersModal(false);
+                setSelectedFriendsToInvite([]);
+                setSearchQueryInvite('');
+              }}>
+                취소
+              </CancelButton>
+              <ConfirmButton
+                onClick={handleInviteMembers}
+                disabled={loadingInvite || selectedFriendsToInvite.length === 0}
+              >
+                {loadingInvite ? '초대 중...' : '초대하기'}
+              </ConfirmButton>
+            </ModalFooter>
           </ModalContainer>
         </ModalOverlay>
       )}
 
-      {/* 방장 위임 모달 - 추후 구현 */}
+      {/* 방장 위임 모달 */}
       {showTransferOwnerModal && (
-        <ModalOverlay onClick={() => setShowTransferOwnerModal(false)}>
+        <ModalOverlay onClick={() => {
+          setShowTransferOwnerModal(false);
+          setSelectedMemberToTransfer(null);
+        }}>
           <ModalContainer onClick={(e) => e.stopPropagation()}>
             <ModalHeader>
               <ModalTitle>
                 <UserCog size={24} />
                 방장 위임
               </ModalTitle>
-              <CloseButton onClick={() => setShowTransferOwnerModal(false)}>
+              <CloseButton onClick={() => {
+                setShowTransferOwnerModal(false);
+                setSelectedMemberToTransfer(null);
+              }}>
                 <X size={20} />
               </CloseButton>
             </ModalHeader>
             <ModalContent>
-              <div style={{ color: '#888', textAlign: 'center', padding: '40px 20px' }}>
-                방장 위임 기능 구현 예정
-              </div>
+              <WarningMessage>
+                ⚠️ 방장을 위임하면 이전 방장은 일반 멤버가 됩니다
+              </WarningMessage>
+
+              {/* 멤버 목록 (방장 제외, active 상태만) */}
+              <FriendListWrapper>
+                {chat.membersInfo && Object.entries(chat.membersInfo)
+                  .filter(([memberId, memberInfo]) => {
+                    // 방장 본인 제외, active 상태만
+                    return memberId !== chat.creatorId &&
+                           memberId !== currentUserId &&
+                           memberInfo.status === 'active';
+                  })
+                  .map(([memberId, memberInfo]) => {
+                    const isSelected = selectedMemberToTransfer === memberId;
+                    const displayName = memberInfo.displayName || '익명';
+
+                    return (
+                      <SelectableMemberItem
+                        key={memberId}
+                        $selected={isSelected}
+                        onClick={() => setSelectedMemberToTransfer(memberId)}
+                      >
+                        <MemberAvatar $color={getAvatarColor(memberId)}>
+                          {displayName.charAt(0).toUpperCase()}
+                        </MemberAvatar>
+                        <MemberInfo>
+                          <MemberName>{displayName}</MemberName>
+                          <MemberStatus $status="active">
+                            {memberInfo.status === 'pending' ? '초대 대기중' : '참여중'}
+                          </MemberStatus>
+                        </MemberInfo>
+                        {isSelected && <CheckMark>✓</CheckMark>}
+                      </SelectableMemberItem>
+                    );
+                  })}
+              </FriendListWrapper>
+
+              {selectedMemberToTransfer && (
+                <SelectedInfo>
+                  {chat.membersInfo?.[selectedMemberToTransfer]?.displayName}님을 새 방장으로 선택했습니다
+                </SelectedInfo>
+              )}
             </ModalContent>
+            <ModalFooter>
+              <CancelButton onClick={() => {
+                setShowTransferOwnerModal(false);
+                setSelectedMemberToTransfer(null);
+              }}>
+                취소
+              </CancelButton>
+              <ConfirmButton
+                onClick={handleTransferOwnership}
+                disabled={loadingTransfer || !selectedMemberToTransfer}
+              >
+                {loadingTransfer ? '위임 중...' : '위임하기'}
+              </ConfirmButton>
+            </ModalFooter>
           </ModalContainer>
         </ModalOverlay>
       )}

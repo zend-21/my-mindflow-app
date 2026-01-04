@@ -34,7 +34,8 @@
       "Bash(git config:*)",
       "Bash(firebase firestore:indexes:*)",
       "Bash(git stash:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(firebase hosting:releases:list:*)"
     ],
     "deny": [],
     "ask": []

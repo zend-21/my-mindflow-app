@@ -10,6 +10,14 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "release": {
+      "rules": [
+        {
+          "type": "version",
+          "keep": 5
+        }
+      ]
+    },
     "headers": [
       {
         "source": "/index.html",
