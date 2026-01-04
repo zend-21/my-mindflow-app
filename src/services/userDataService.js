@@ -976,21 +976,26 @@ export const migrateLocalStorageToFirestore = async (userId) => {
   try {
     console.log('📦 localStorage → Firestore (개별 문서) 마이그레이션 시작...');
 
-    // localStorage에서 데이터 읽기
-    const memos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
-    const folders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
-    const trash = JSON.parse(localStorage.getItem('trashedItems_shared') || '[]');
-    const macros = JSON.parse(localStorage.getItem('macroTexts') || '[]');
-    const calendar = JSON.parse(localStorage.getItem('calendarSchedules_shared') || '{}');
-    const activities = JSON.parse(localStorage.getItem('recentActivities_shared') || '[]');
+    // ⚠️ 계정별 localStorage만 읽기 (공유 키 사용 안 함)
+    const getUserStorage = (key) => {
+      const data = localStorage.getItem(`user_${userId}_${key}`);
+      return data ? JSON.parse(data) : null;
+    };
+
+    const memos = getUserStorage('memos') || [];
+    const folders = getUserStorage('folders') || [];
+    const trash = getUserStorage('trash') || [];
+    const macros = getUserStorage('macros') || [];
+    const calendar = getUserStorage('calendar') || {};
+    const activities = getUserStorage('activities') || [];
 
     const settings = {
-      widgets: JSON.parse(localStorage.getItem('widgets_shared') || '["StatsGrid", "QuickActions", "RecentActivity"]'),
-      displayCount: JSON.parse(localStorage.getItem('displayCount_shared') || '5'),
-      nickname: localStorage.getItem('userNickname') || null,
-      profileImageType: localStorage.getItem('profileImageType') || 'avatar',
-      selectedAvatarId: localStorage.getItem('selectedAvatarId') || null,
-      avatarBgColor: localStorage.getItem('avatarBgColor') || 'none'
+      widgets: getUserStorage('widgets') || ['StatsGrid', 'QuickActions', 'RecentActivity'],
+      displayCount: getUserStorage('displayCount') || 5,
+      nickname: getUserStorage('nickname') || null,
+      profileImageType: getUserStorage('profileImageType') || 'avatar',
+      selectedAvatarId: getUserStorage('selectedAvatarId') || null,
+      avatarBgColor: getUserStorage('avatarBgColor') || 'none'
     };
 
     const batch = writeBatch(db);
