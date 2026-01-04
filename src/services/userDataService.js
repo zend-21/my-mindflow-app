@@ -1656,3 +1656,135 @@ export const deleteBase64ImagesFromCalendar = async (userId) => {
 
   return deletedCount;
 };
+
+// ========================================
+// 🗑️ 사용자 전체 데이터 삭제
+// ========================================
+
+/**
+ * 특정 사용자의 모든 Firestore 데이터를 삭제합니다
+ * @param {string} userId - 사용자 UID
+ * @returns {Promise<Object>} 삭제된 항목 수
+ */
+export const deleteAllUserData = async (userId) => {
+  if (!userId) {
+    throw new Error('userId가 필요합니다');
+  }
+
+  console.log('🗑️ 사용자 데이터 전체 삭제 시작:', userId);
+
+  const deleteCounts = {
+    memos: 0,
+    folders: 0,
+    trash: 0,
+    calendar: 0,
+    activities: 0,
+    settings: 0
+  };
+
+  try {
+    // 1. 메모 삭제
+    const memosRef = collection(db, 'mindflowUsers', userId, 'memos');
+    const memosSnapshot = await getDocs(memosRef);
+    const memoBatch = writeBatch(db);
+    memosSnapshot.docs.forEach(doc => {
+      memoBatch.delete(doc.ref);
+      deleteCounts.memos++;
+    });
+    if (deleteCounts.memos > 0) await memoBatch.commit();
+
+    // 2. 폴더 삭제
+    const foldersRef = collection(db, 'mindflowUsers', userId, 'folders');
+    const foldersSnapshot = await getDocs(foldersRef);
+    const folderBatch = writeBatch(db);
+    foldersSnapshot.docs.forEach(doc => {
+      folderBatch.delete(doc.ref);
+      deleteCounts.folders++;
+    });
+    if (deleteCounts.folders > 0) await folderBatch.commit();
+
+    // 3. 휴지통 삭제
+    const trashRef = collection(db, 'mindflowUsers', userId, 'trash');
+    const trashSnapshot = await getDocs(trashRef);
+    const trashBatch = writeBatch(db);
+    trashSnapshot.docs.forEach(doc => {
+      trashBatch.delete(doc.ref);
+      deleteCounts.trash++;
+    });
+    if (deleteCounts.trash > 0) await trashBatch.commit();
+
+    // 4. 캘린더 삭제
+    const calendarRef = collection(db, 'mindflowUsers', userId, 'calendar');
+    const calendarSnapshot = await getDocs(calendarRef);
+    const calendarBatch = writeBatch(db);
+    calendarSnapshot.docs.forEach(doc => {
+      calendarBatch.delete(doc.ref);
+      deleteCounts.calendar++;
+    });
+    if (deleteCounts.calendar > 0) await calendarBatch.commit();
+
+    // 5. 활동 삭제
+    const activitiesRef = collection(db, 'mindflowUsers', userId, 'activities');
+    const activitiesSnapshot = await getDocs(activitiesRef);
+    const activityBatch = writeBatch(db);
+    activitiesSnapshot.docs.forEach(doc => {
+      activityBatch.delete(doc.ref);
+      deleteCounts.activities++;
+    });
+    if (deleteCounts.activities > 0) await activityBatch.commit();
+
+    // 6. 설정 삭제
+    const settingsRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
+    const settingsDoc = await getDoc(settingsRef);
+    if (settingsDoc.exists()) {
+      await deleteDoc(settingsRef);
+      deleteCounts.settings = 1;
+    }
+
+    console.log('✅ Firestore 데이터 삭제 완료:', deleteCounts);
+
+    // localStorage의 계정별 데이터도 삭제
+    const prefix = `user_${userId}_`;
+    const keysToDelete = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(prefix)) {
+        keysToDelete.push(key);
+      }
+    }
+    keysToDelete.forEach(key => localStorage.removeItem(key));
+    console.log(`✅ localStorage 데이터도 삭제: ${keysToDelete.length}개 항목`);
+
+    return deleteCounts;
+  } catch (error) {
+    console.error('❌ 데이터 삭제 실패:', error);
+    throw error;
+  }
+};
+
+// 전역 함수로 등록 (개발자 도구에서 쉽게 접근)
+if (typeof window !== 'undefined') {
+  window._cleanupUserData = async () => {
+    const userId = localStorage.getItem('firebaseUserId') || localStorage.getItem('currentUserId');
+    if (!userId) {
+      console.error('❌ 로그인된 사용자가 없습니다');
+      return;
+    }
+
+    const confirmed = confirm(`⚠️ 경고!\n\n사용자 "${userId}"의 모든 데이터를 삭제합니다.\n\n✅ Firestore 데이터\n✅ localStorage 데이터\n\n이 작업은 되돌릴 수 없습니다!\n\n정말 삭제하시겠습니까?`);
+
+    if (confirmed) {
+      try {
+        const result = await deleteAllUserData(userId);
+        console.log('✅ 데이터 정리 완료!', result);
+        alert('데이터가 모두 삭제되었습니다. 페이지를 새로고침합니다.');
+        window.location.reload();
+      } catch (error) {
+        console.error('❌ 오류 발생:', error);
+        alert('데이터 삭제 중 오류가 발생했습니다: ' + error.message);
+      }
+    }
+  };
+
+  console.log('💡 데이터 정리 함수 사용법:\n\n  window._cleanupUserData()\n\n⚠️ 경고: 현재 로그인된 사용자의 모든 데이터를 삭제합니다!');
+}
