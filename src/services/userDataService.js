@@ -1753,20 +1753,7 @@ export const deleteAllUserData = async (userId) => {
       }
     }
     keysToDelete.forEach(key => localStorage.removeItem(key));
-    console.log(`✅ localStorage 계정별 데이터 삭제: ${keysToDelete.length}개 항목`);
-
-    // ⚠️ 공유 localStorage 키도 삭제 (재마이그레이션 방지)
-    const sharedKeys = ['memos_shared', 'memoFolders', 'trash', 'macros', 'calendar', 'activities'];
-    let sharedKeysDeleted = 0;
-    sharedKeys.forEach(key => {
-      if (localStorage.getItem(key)) {
-        localStorage.removeItem(key);
-        sharedKeysDeleted++;
-      }
-    });
-    if (sharedKeysDeleted > 0) {
-      console.log(`✅ localStorage 공유 키 삭제: ${sharedKeysDeleted}개 항목`);
-    }
+    console.log(`✅ localStorage 데이터도 삭제: ${keysToDelete.length}개 항목`);
 
     return deleteCounts;
   } catch (error) {
