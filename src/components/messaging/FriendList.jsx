@@ -1,11 +1,11 @@
 // 👥 친구 탭 - 친구 관리 (카카오톡 스타일)
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Search, UserPlus, MessageCircle, UserMinus, Shield, ChevronRight } from 'lucide-react';
+import { Search, UserPlus, MessageCircle, UserMinus, /* Shield, */ ChevronRight } from 'lucide-react'; // Shield는 MVP에서 본인인증 제외로 미사용
 import { getMyFriends } from '../../services/friendService';
-import { checkVerificationStatus, checkVerificationStatusBatch } from '../../services/verificationService';
+// import { checkVerificationStatus, checkVerificationStatusBatch } from '../../services/verificationService';
 import { createOrGetDMRoom } from '../../services/directMessageService';
-import VerificationModal from './VerificationModal';
+// import VerificationModal from './VerificationModal'; // MVP에서 제외
 import ChatRoom from './ChatRoom';
 import AddFriendModal from './AddFriendModal';
 
@@ -356,8 +356,9 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
   const [friends, setFriends] = useState([]);
   const [loading, setLoading] = useState(true);
   const [myProfile, setMyProfile] = useState(null);
-  const [isVerified, setIsVerified] = useState(false);
-  const [showVerificationModal, setShowVerificationModal] = useState(false);
+  // MVP에서 본인인증 제외
+  // const [isVerified, setIsVerified] = useState(false);
+  // const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [selectedChat, setSelectedChat] = useState(null);
   const [isAddFriendModalOpen, setIsAddFriendModalOpen] = useState(false);
 
@@ -388,9 +389,9 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
         }
       }
 
-      // 본인인증 상태 확인
-      const verificationStatus = await checkVerificationStatus(userId);
-      setIsVerified(verificationStatus.verified);
+      // 본인인증 상태 확인 - MVP에서 제외
+      // const verificationStatus = await checkVerificationStatus(userId);
+      // setIsVerified(verificationStatus.verified);
 
       setMyProfile({
         nickname,
@@ -407,16 +408,17 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
       const friendsList = await getMyFriends(userId);
 
       // ⚡ 배치로 모든 친구의 인증 상태 확인 (N개 개별 조회 → 1회 배치 조회)
-      const friendIds = friendsList.map(f => f.friendId);
-      const verificationMap = await checkVerificationStatusBatch(friendIds);
+      // MVP에서 본인인증 제외
+      // const friendIds = friendsList.map(f => f.friendId);
+      // const verificationMap = await checkVerificationStatusBatch(friendIds);
 
       // 인증 상태를 친구 정보에 병합
-      const friendsWithVerification = friendsList.map(friend => ({
-        ...friend,
-        verified: verificationMap.get(friend.friendId)?.verified || false
-      }));
+      // const friendsWithVerification = friendsList.map(friend => ({
+      //   ...friend,
+      //   verified: verificationMap.get(friend.friendId)?.verified || false
+      // }));
 
-      setFriends(friendsWithVerification);
+      setFriends(friendsList); // 인증 상태 없이 그대로 사용
       setLoading(false);
     } catch (error) {
       console.error('친구 목록 조회 오류:', error);
@@ -528,25 +530,31 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
           <MyProfileContent>
             <MyAvatar $color={getAvatarColor(myProfile.userId)}>
               {myProfile.nickname?.charAt(0).toUpperCase() || '나'}
+              {/* MVP에서 본인인증 제외
               {isVerified && (
                 <VerifiedBadge>
                   <Shield size={12} />
                 </VerifiedBadge>
               )}
+              */}
             </MyAvatar>
             <MyInfo>
               <MyName>
                 {myProfile.nickname}
+                {/* MVP에서 본인인증 제외
                 {!isVerified && (
                   <VerifyButton onClick={() => setShowVerificationModal(true)}>
                     <Shield size={12} />
                     본인인증
                   </VerifyButton>
                 )}
+                */}
               </MyName>
+              {/* MVP에서 본인인증 제외
               {isVerified && (
                 <MyStatus>인증된 사용자</MyStatus>
               )}
+              */}
             </MyInfo>
             <ChevronRight size={20} color="#666" />
           </MyProfileContent>
@@ -586,11 +594,13 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
               <FriendItem key={friend.id}>
                 <Avatar $color={getAvatarColor(friend.friendId)}>
                   {friend.friendName?.charAt(0).toUpperCase() || '?'}
+                  {/* MVP에서 본인인증 제외
                   {friend.verified && (
                     <VerifiedBadge>
                       <Shield size={10} />
                     </VerifiedBadge>
                   )}
+                  */}
                 </Avatar>
 
                 <FriendInfo>
@@ -622,7 +632,7 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
         )}
       </FriendListContainer>
 
-      {/* 본인인증 모달 */}
+      {/* 본인인증 모달 - MVP에서 제외
       {showVerificationModal && (
         <VerificationModal
           onClose={() => setShowVerificationModal(false)}
@@ -635,6 +645,7 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
           showToast={showToast}
         />
       )}
+      */}
 
       {/* 채팅방 */}
       {selectedChat && (

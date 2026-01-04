@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
-import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Plus, Settings, X } from 'lucide-react';
+import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Plus, Settings, X, UserCog, UserPlus } from 'lucide-react';
 import { subscribeToMessages, sendMessage, markDMAsRead, subscribeToDMRoom } from '../../services/directMessageService';
 import { subscribeToGroupMessages, sendGroupMessage, markAllMessagesAsRead, acceptInvitation, rejectInvitation } from '../../services/groupChatService';
 import { playChatMessageSound, notificationSettings } from '../../utils/notificationSounds';
@@ -12,6 +12,7 @@ import SharedMemoSelectorModal from './SharedMemoSelectorModal';
 import PermissionManagementModal from './PermissionManagementModal';
 import { db } from '../../firebase/config';
 import { doc, setDoc, serverTimestamp, onSnapshot, getDoc } from 'firebase/firestore';
+import { getCurrentUserId, getCurrentUserData } from '../../utils/userStorage';
 
 // 전체화면 컨테이너
 const FullScreenContainer = styled.div`
@@ -123,10 +124,49 @@ const MenuButton = styled.button`
   justify-content: center;
   border-radius: 8px;
   transition: all 0.2s;
+  position: relative;
 
   &:hover {
     background: rgba(255, 255, 255, 0.05);
     color: #ffffff;
+  }
+`;
+
+// 드롭다운 메뉴
+const DropdownMenu = styled.div`
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: linear-gradient(180deg, #2a2a2a 0%, #1f1f1f 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  min-width: 180px;
+  z-index: 1000;
+  overflow: hidden;
+`;
+
+const DropdownItem = styled.button`
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  color: #e0e0e0;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+  }
+
+  &:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   }
 `;
 
@@ -572,6 +612,156 @@ const RejectButton = styled(InvitationButton)`
   }
 `;
 
+// 모달 스타일
+const ModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000;
+  padding: 20px;
+`;
+
+const ModalContainer = styled.div`
+  background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 500px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const ModalHeader = styled.div`
+  padding: 24px 24px 20px 24px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+`;
+
+const ModalTitle = styled.h2`
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+`;
+
+const CloseButton = styled.button`
+  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  color: #888;
+  padding: 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+`;
+
+const ModalContent = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+  }
+`;
+
+const MemberItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+`;
+
+const MemberAvatar = styled.div`
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: ${props => props.$color || 'linear-gradient(135deg, #667eea, #764ba2)'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #ffffff;
+  flex-shrink: 0;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+`;
+
+const MemberInfo = styled.div`
+  flex: 1;
+  min-width: 0;
+`;
+
+const MemberName = styled.div`
+  font-size: 15px;
+  font-weight: 600;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+`;
+
+const MemberStatus = styled.span`
+  font-size: 11px;
+  color: ${props => props.$status === 'active' ? '#4ade80' : props.$status === 'pending' ? '#fbbf24' : '#888'};
+  background: ${props => props.$status === 'active' ? 'rgba(74, 222, 128, 0.1)' : props.$status === 'pending' ? 'rgba(251, 191, 36, 0.1)' : 'rgba(136, 136, 136, 0.1)'};
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 500;
+`;
+
+const OwnerBadge = styled.span`
+  font-size: 11px;
+  color: #667eea;
+  background: rgba(102, 126, 234, 0.15);
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-weight: 600;
+`;
+
 // 빈 상태
 const EmptyState = styled.div`
   flex: 1;
@@ -611,14 +801,21 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
   const [showDocument, setShowDocument] = useState(false);
   const [currentDocument, setCurrentDocument] = useState(null); // 현재 편집중인 문서
   const [showSharedMemoSelector, setShowSharedMemoSelector] = useState(false); // 공유 폴더 메모 선택 모달
-  const [showPermissionModal, setShowPermissionModal] = useState(false); // 권한 관리 모달
+  const [showPermissionModal, setShowPermissionModal] = useState(false); // 권한 관리 모달 (deprecated)
   const [permissions, setPermissions] = useState({ editors: [], manager: null }); // 권한 정보
   const [selectedMemoToLoad, setSelectedMemoToLoad] = useState(null); // CollaborativeDocumentEditor에 전달할 메모
   const [processingInvitation, setProcessingInvitation] = useState(false); // 초대 처리 중
   const [myMemberStatus, setMyMemberStatus] = useState(null); // 내 멤버 상태 (active/pending/rejected)
+  const [showMemberListModal, setShowMemberListModal] = useState(false); // 참여자 목록 모달
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false); // 점 세개 드롭다운
+  const [showInviteMembersModal, setShowInviteMembersModal] = useState(false); // 멤버 초대 모달
+  const [showTransferOwnerModal, setShowTransferOwnerModal] = useState(false); // 방장 위임 모달
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
-  const currentUserId = localStorage.getItem('firebaseUserId');
+
+  // 🔐 계정별 localStorage에서 사용자 정보 가져오기
+  const currentUserId = getCurrentUserId() || localStorage.getItem('firebaseUserId'); // fallback
+  const currentUserName = getCurrentUserData('displayName') || localStorage.getItem('userDisplayName') || '익명';
 
   // 이모티콘 카테고리별 분류
   const emojiCategories = {
@@ -850,9 +1047,9 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
     };
   }, [chat.id, currentUserId]);
 
-  // 방장 여부 확인 (그룹 채팅인 경우 createdBy가 방장, DM은 모두 방장)
+  // 방장 여부 확인 (그룹 채팅인 경우 creatorId가 방장, DM은 모두 방장)
   const isRoomOwner = chat.type === 'group'
-    ? chat.createdBy === currentUserId
+    ? (chat.creatorId === currentUserId || chat.createdBy === currentUserId) // creatorId와 createdBy 둘 다 체크
     : true; // DM은 모두 편집 가능
 
   // 사용자 역할 확인 함수
@@ -1067,17 +1264,51 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
           </ChatInfo>
         </HeaderLeft>
         <HeaderRight>
-          {isRoomOwner && chat.type === 'group' && (
-            <MenuButton onClick={() => setShowPermissionModal(true)} title="권한 관리">
+          {chat.type === 'group' && (
+            <MenuButton onClick={() => setShowMemberListModal(true)} title="참여자 목록">
               <Settings size={20} />
             </MenuButton>
           )}
           <MenuButton onClick={handleToggleDocument} title="공유 문서">
             <FileText size={20} />
           </MenuButton>
-          <MenuButton onClick={() => showToast?.('메뉴 기능 구현 예정')}>
-            <MoreVertical size={20} />
-          </MenuButton>
+          {chat.type === 'group' && (
+            <MenuButton
+              onClick={() => {
+                if (isRoomOwner) {
+                  setShowMenuDropdown(!showMenuDropdown);
+                } else {
+                  showToast?.('방장만 이용할 수 있습니다');
+                }
+              }}
+              title="메뉴"
+            >
+              <MoreVertical size={20} />
+              {/* 드롭다운 메뉴 (방장만 표시) */}
+              {showMenuDropdown && isRoomOwner && (
+                <DropdownMenu onClick={(e) => e.stopPropagation()}>
+                  <DropdownItem
+                    onClick={() => {
+                      setShowInviteMembersModal(true);
+                      setShowMenuDropdown(false);
+                    }}
+                  >
+                    <Users size={16} />
+                    멤버 초대
+                  </DropdownItem>
+                  <DropdownItem
+                    onClick={() => {
+                      setShowTransferOwnerModal(true);
+                      setShowMenuDropdown(false);
+                    }}
+                  >
+                    <UserCog size={16} />
+                    방장 위임
+                  </DropdownItem>
+                </DropdownMenu>
+              )}
+            </MenuButton>
+          )}
         </HeaderRight>
       </Header>
 
@@ -1112,7 +1343,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
             key={currentDocument?.originalMemoId || 'default'} // 문서 변경 시 재마운트
             chatRoomId={chat.id}
             currentUserId={currentUserId}
-            currentUserName={localStorage.getItem('userDisplayName') || '익명'}
+            currentUserName={currentUserName}
             isManager={isRoomOwner}
             canEdit={true} // 1:1은 자동 편집 권한, 그룹은 권한 시스템 적용
             chatType={chat.type} // 1:1 vs 그룹 구분
@@ -1301,7 +1532,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
         />
       )}
 
-      {/* 권한 관리 모달 (그룹 채팅만, 방장만) */}
+      {/* 권한 관리 모달 (deprecated) */}
       {showPermissionModal && chat.type === 'group' && (
         <PermissionManagementModal
           chatRoomId={chat.id}
@@ -1310,6 +1541,112 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
           showToast={showToast}
           onClose={() => setShowPermissionModal(false)}
         />
+      )}
+
+      {/* 참여자 목록 모달 */}
+      {showMemberListModal && chat.type === 'group' && (
+        <ModalOverlay onClick={() => setShowMemberListModal(false)}>
+          <ModalContainer onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <ModalTitle>
+                <Users size={24} />
+                참여자 목록
+              </ModalTitle>
+              <CloseButton onClick={() => setShowMemberListModal(false)}>
+                <X size={20} />
+              </CloseButton>
+            </ModalHeader>
+            <ModalContent>
+              {/* 방장 먼저 표시 */}
+              {chat.membersInfo && Object.entries(chat.membersInfo).map(([memberId, memberInfo]) => {
+                if (memberId !== chat.creatorId) return null;
+                const isOwner = memberId === chat.creatorId;
+
+                return (
+                  <MemberItem key={memberId}>
+                    <MemberAvatar $color={getAvatarColor(memberId)}>
+                      {memberInfo.displayName?.charAt(0).toUpperCase() || '?'}
+                    </MemberAvatar>
+                    <MemberInfo>
+                      <MemberName>
+                        {memberInfo.displayName || '익명'}
+                        {isOwner && <OwnerBadge>방장</OwnerBadge>}
+                      </MemberName>
+                      <MemberStatus $status={memberInfo.status || 'active'}>
+                        {memberInfo.status === 'pending' ? '초대 대기중' : memberInfo.status === 'rejected' ? '거부' : '참여중'}
+                      </MemberStatus>
+                    </MemberInfo>
+                  </MemberItem>
+                );
+              })}
+
+              {/* 나머지 멤버들 */}
+              {chat.membersInfo && Object.entries(chat.membersInfo).map(([memberId, memberInfo]) => {
+                if (memberId === chat.creatorId) return null;
+
+                return (
+                  <MemberItem key={memberId}>
+                    <MemberAvatar $color={getAvatarColor(memberId)}>
+                      {memberInfo.displayName?.charAt(0).toUpperCase() || '?'}
+                    </MemberAvatar>
+                    <MemberInfo>
+                      <MemberName>
+                        {memberInfo.displayName || '익명'}
+                      </MemberName>
+                      <MemberStatus $status={memberInfo.status || 'active'}>
+                        {memberInfo.status === 'pending' ? '초대 대기중' : memberInfo.status === 'rejected' ? '거부' : '참여중'}
+                      </MemberStatus>
+                    </MemberInfo>
+                  </MemberItem>
+                );
+              })}
+            </ModalContent>
+          </ModalContainer>
+        </ModalOverlay>
+      )}
+
+      {/* 멤버 초대 모달 - CreateGroupModal 재사용하면 됨 (추후 구현) */}
+      {showInviteMembersModal && (
+        <ModalOverlay onClick={() => setShowInviteMembersModal(false)}>
+          <ModalContainer onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <ModalTitle>
+                <UserPlus size={24} />
+                멤버 초대
+              </ModalTitle>
+              <CloseButton onClick={() => setShowInviteMembersModal(false)}>
+                <X size={20} />
+              </CloseButton>
+            </ModalHeader>
+            <ModalContent>
+              <div style={{ color: '#888', textAlign: 'center', padding: '40px 20px' }}>
+                멤버 초대 기능 구현 예정
+              </div>
+            </ModalContent>
+          </ModalContainer>
+        </ModalOverlay>
+      )}
+
+      {/* 방장 위임 모달 - 추후 구현 */}
+      {showTransferOwnerModal && (
+        <ModalOverlay onClick={() => setShowTransferOwnerModal(false)}>
+          <ModalContainer onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <ModalTitle>
+                <UserCog size={24} />
+                방장 위임
+              </ModalTitle>
+              <CloseButton onClick={() => setShowTransferOwnerModal(false)}>
+                <X size={20} />
+              </CloseButton>
+            </ModalHeader>
+            <ModalContent>
+              <div style={{ color: '#888', textAlign: 'center', padding: '40px 20px' }}>
+                방장 위임 기능 구현 예정
+              </div>
+            </ModalContent>
+          </ModalContainer>
+        </ModalOverlay>
       )}
     </FullScreenContainer>,
     document.body

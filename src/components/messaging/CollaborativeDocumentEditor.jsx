@@ -968,7 +968,8 @@ const CollaborativeDocumentEditor = ({
   const [isOneOnOneChat, setIsOneOnOneChat] = useState(false); // 1:1 대화방 여부
   const [invitePermission, setInvitePermission] = useState('managers_and_submanagers'); // 초대 권한 설정
   const [showPermissionGuideModal, setShowPermissionGuideModal] = useState(false); // 권한 안내 모달
-  const [documentOwner, setDocumentOwner] = useState(null); // 문서 소유자 정보 { userId, nickname, wsCode }
+  const [documentOwner, setDocumentOwner] = useState(null); // 현재 문서 소유자 정보 { userId, nickname, wsCode }
+  const [originalOwner, setOriginalOwner] = useState(null); // 원본 작성자 정보 { userId, nickname, wsCode }
   const [showOwnerModal, setShowOwnerModal] = useState(false); // 문서 소유자 ID 모달
   const [showRejectConfirmModal, setShowRejectConfirmModal] = useState(false); // 거부 확인 모달
   const [showApproveConfirmModal, setShowApproveConfirmModal] = useState(false); // 승인 확인 모달
@@ -1102,6 +1103,28 @@ const CollaborativeDocumentEditor = ({
     };
   }, [chatRoomId, currentUserId, isManager, canEdit, chatType]);
 
+  // 임시 문서 감지 (상대방이 작성 중인 경우)
+  useEffect(() => {
+    if (!chatRoomId || !isOneOnOneChat) return;
+
+    const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+    const unsubscribe = onSnapshot(docRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+
+        // 상대방이 임시 문서를 생성한 경우
+        if (data.isTemporary && data.createdBy !== currentUserId) {
+          // 임시 문서 ID 설정 (상대방 작성 중 표시용)
+          if (!currentDocId) {
+            setCurrentDocId(data.tempDocId);
+          }
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [chatRoomId, currentUserId, isOneOnOneChat, currentDocId]);
+
   // 편집 이력의 닉네임 실시간 가져오기
   useEffect(() => {
     const fetchNicknames = async () => {
@@ -1217,6 +1240,22 @@ const CollaborativeDocumentEditor = ({
               nickname: ownerNickname || currentUserName || '알 수 없음',
               wsCode: wsCode
             });
+
+            // 원본 소유자 정보 설정 (Firestore에서 읽어옴)
+            if (data.originalOwnerId) {
+              setOriginalOwner({
+                userId: data.originalOwnerId,
+                nickname: data.originalOwnerNickname || '알 수 없음',
+                wsCode: data.originalOwnerCode || null
+              });
+            } else {
+              // 원본 소유자 정보가 없으면 현재 소유자와 동일 (새 문서)
+              setOriginalOwner({
+                userId: currentUserId,
+                nickname: ownerNickname || currentUserName || '알 수 없음',
+                wsCode: wsCode
+              });
+            }
           } catch (error) {
             console.error('문서 소유자 정보 조회 실패:', error);
             setDocumentOwner({
@@ -1224,10 +1263,12 @@ const CollaborativeDocumentEditor = ({
               nickname: currentUserName || '알 수 없음',
               wsCode: null
             });
+            setOriginalOwner(null);
           }
         } else {
           // 내용이 없으면 소유자 정보도 없음
           setDocumentOwner(null);
+          setOriginalOwner(null);
         }
       } else {
         // 문서가 없으면 빈 상태로 초기화
@@ -2481,6 +2522,38 @@ const CollaborativeDocumentEditor = ({
     setShowFullScreenEdit(false);
   }, []);
 
+  // 새 문서 작성 시작 핸들러
+  const handleCreateNewDocument = useCallback(async () => {
+    const tempDocId = `temp_${Date.now()}`;
+
+    try {
+      // Firestore에 임시 문서 플래그 저장
+      if (chatRoomId) {
+        const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+        await setDoc(docRef, {
+          isTemporary: true,
+          createdBy: currentUserId,
+          createdAt: serverTimestamp(),
+          tempDocId: tempDocId
+        });
+      }
+
+      // 로컬 state 설정
+      setCurrentDocId(tempDocId);
+      setShowFullScreenEdit(true);
+
+      // 편집창이 열린 후 포커스
+      setTimeout(() => {
+        if (fullScreenContentRef.current) {
+          fullScreenContentRef.current.focus();
+        }
+      }, 100);
+    } catch (error) {
+      console.error('임시 문서 생성 실패:', error);
+      showToast?.('문서 생성에 실패했습니다');
+    }
+  }, [chatRoomId, currentUserId, showToast]);
+
   // 임시 문서 저장 핸들러
   const handleSaveTempDocument = useCallback(async () => {
     if (!currentUserId || !content || !content.trim()) {
@@ -2548,7 +2621,7 @@ const CollaborativeDocumentEditor = ({
       setCurrentDocId(newMemoId);
       setTitle(documentTitle);
 
-      // 6. 문서 소유자 정보 설정
+      // 6. 문서 소유자 정보 설정 (임시 문서는 작성자가 원본 소유자)
       try {
         const ownerNickname = await getUserNickname(currentUserId);
         const workspaceId = `workspace_${currentUserId}`;
@@ -2556,13 +2629,45 @@ const CollaborativeDocumentEditor = ({
         const workspaceSnap = await getDoc(workspaceRef);
         const wsCode = workspaceSnap.exists() ? workspaceSnap.data().workspaceCode : null;
 
-        setDocumentOwner({
+        const ownerInfo = {
           userId: currentUserId,
           nickname: ownerNickname || currentUserName || '알 수 없음',
           wsCode: wsCode
-        });
+        };
+
+        setDocumentOwner(ownerInfo);
+        setOriginalOwner(ownerInfo); // 임시 문서는 작성자가 원본 소유자
       } catch (error) {
         console.error('문서 소유자 정보 조회 실패:', error);
+      }
+
+      // 7. Firestore chatRoom의 임시 플래그 제거 및 정식 문서 정보 업데이트
+      if (chatRoomId) {
+        try {
+          const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+
+          const ownerNickname = await getUserNickname(currentUserId);
+          const workspaceId = `workspace_${currentUserId}`;
+          const workspaceRef = doc(db, 'workspaces', workspaceId);
+          const workspaceSnap = await getDoc(workspaceRef);
+          const wsCode = workspaceSnap.exists() ? workspaceSnap.data().workspaceCode : null;
+
+          await setDoc(docRef, {
+            isTemporary: false,
+            memoId: newMemoId,
+            originalMemoId: newMemoId,
+            content: content,
+            title: documentTitle,
+            lastEditedBy: currentUserId,
+            lastEditedAt: serverTimestamp(),
+            // 원본 소유자 정보 (변경 불가)
+            originalOwnerId: currentUserId,
+            originalOwnerNickname: ownerNickname || currentUserName || '알 수 없음',
+            originalOwnerCode: wsCode
+          });
+        } catch (error) {
+          console.error('대화방 문서 업데이트 실패:', error);
+        }
       }
 
       showToast?.('문서가 공유 폴더에 저장되었습니다');
@@ -2570,7 +2675,7 @@ const CollaborativeDocumentEditor = ({
       console.error('임시 문서 저장 실패:', error);
       showToast?.('문서 저장에 실패했습니다');
     }
-  }, [currentUserId, content, currentDocId, showToast, currentUserName]);
+  }, [currentUserId, content, currentDocId, showToast, currentUserName, chatRoomId]);
 
   // 편집 마커 클릭 핸들러 - 수정 모달 열기
   const handleEditMarkerClick = useCallback(async (clickedEditId, markerElement) => {
@@ -3392,13 +3497,16 @@ const CollaborativeDocumentEditor = ({
     setCurrentDocId(null);
     setDocumentOwner(null); // 문서 소유자 정보 초기화
 
-    // Firestore의 currentDoc 비우기
+    // Firestore의 currentDoc 비우기 (임시 문서 플래그도 제거)
     try {
       const currentDocRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
       await setDoc(currentDocRef, {
         title: '',
         content: '',
         originalMemoId: null,
+        isTemporary: false,
+        tempDocId: null,
+        createdBy: null,
         lastEditedBy: currentUserId,
         lastEditedByName: currentUserName,
         lastEditedAt: serverTimestamp()
@@ -3502,20 +3610,11 @@ const CollaborativeDocumentEditor = ({
       <EditorHeader onClick={() => !collapsed && setCollapsed(false)}>
         <HeaderLeft>
           <DocumentIcon>📄</DocumentIcon>
-          {!content && !title && isOneOnOneChat ? (
+          {!content && !title && isOneOnOneChat && !currentDocId ? (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                // 임시 문서 ID 생성
-                const tempDocId = `temp_${Date.now()}`;
-                setCurrentDocId(tempDocId);
-                setShowFullScreenEdit(true);
-                // 편집창이 열린 후 포커스
-                setTimeout(() => {
-                  if (fullScreenContentRef.current) {
-                    fullScreenContentRef.current.focus();
-                  }
-                }, 100);
+                handleCreateNewDocument();
               }}
               style={{
                 flex: 1,
@@ -3610,24 +3709,44 @@ const CollaborativeDocumentEditor = ({
             </button>
           </div>
         ) : documentOwner && currentDocId && !currentDocId.startsWith('temp_') ? (
-          <div
-            onClick={() => setShowOwnerModal(true)}
-            style={{
-              padding: '8px 16px',
-              background: 'rgba(74, 144, 226, 0.1)',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-              fontSize: '12px',
-              color: '#4a90e2',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
-            title="클릭하여 고유 ID 확인"
-          >
-            <Users size={14} />
-            문서 소유자: {documentOwner.nickname}{documentOwner.userId === currentUserId ? ' (나)' : ''}
-          </div>
+          <>
+            <div
+              onClick={() => setShowOwnerModal(true)}
+              style={{
+                padding: '8px 16px',
+                background: 'rgba(74, 144, 226, 0.1)',
+                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                fontSize: '12px',
+                color: '#4a90e2',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              title="클릭하여 고유 ID 확인"
+            >
+              <Users size={14} />
+              문서 소유자: {documentOwner.nickname}{documentOwner.userId === currentUserId ? ' (나)' : ''}
+            </div>
+            {/* 원본 작성자 표시 (현재 소유자와 다른 경우만) */}
+            {originalOwner && originalOwner.userId !== documentOwner.userId && (
+              <div
+                style={{
+                  padding: '6px 16px',
+                  background: 'rgba(128, 128, 128, 0.1)',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                  fontSize: '11px',
+                  color: '#999',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                <FileText size={12} />
+                원본 작성자: {originalOwner.nickname} {originalOwner.wsCode ? `(WS-${originalOwner.wsCode})` : ''}
+              </div>
+            )}
+          </>
         ) : null}
 
         {/* 도구 모음 */}
@@ -5189,24 +5308,44 @@ const CollaborativeDocumentEditor = ({
                 새 문서(임시 문서)
               </div>
             ) : documentOwner && currentDocId && !currentDocId.startsWith('temp_') ? (
-              <div
-                onClick={() => setShowOwnerModal(true)}
-                style={{
-                  padding: '8px 16px',
-                  background: 'rgba(74, 144, 226, 0.1)',
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                  fontSize: '11px',
-                  color: '#4a90e2',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-                title="클릭하여 고유 ID 확인"
-              >
-                <Users size={12} />
-                문서 소유자: {documentOwner.nickname}{documentOwner.userId === currentUserId ? ' (나)' : ''}
-              </div>
+              <>
+                <div
+                  onClick={() => setShowOwnerModal(true)}
+                  style={{
+                    padding: '8px 16px',
+                    background: 'rgba(74, 144, 226, 0.1)',
+                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                    fontSize: '11px',
+                    color: '#4a90e2',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                  title="클릭하여 고유 ID 확인"
+                >
+                  <Users size={12} />
+                  문서 소유자: {documentOwner.nickname}{documentOwner.userId === currentUserId ? ' (나)' : ''}
+                </div>
+                {/* 원본 작성자 표시 (현재 소유자와 다른 경우만) */}
+                {originalOwner && originalOwner.userId !== documentOwner.userId && (
+                  <div
+                    style={{
+                      padding: '5px 16px',
+                      background: 'rgba(128, 128, 128, 0.1)',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                      fontSize: '10px',
+                      color: '#999',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <FileText size={11} />
+                    원본 작성자: {originalOwner.nickname} {originalOwner.wsCode ? `(WS-${originalOwner.wsCode})` : ''}
+                  </div>
+                )}
+              </>
             ) : null}
 
             {/* 툴바 - 2줄 레이아웃 */}

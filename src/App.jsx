@@ -20,6 +20,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import useAlarmManager from './hooks/useAlarmManager';
 import { getRandomStealthPhrase } from './utils/stealthPhrases';
+import { setCurrentUserId, setCurrentUserData, getCurrentUserId, checkSync, migrateUserData, logout as userStorageLogout } from './utils/userStorage';
 // 하위 컴포넌트들
 import Header from './components/Header.jsx';
 import StatsGrid from './components/StatsGrid.jsx';
@@ -357,7 +358,25 @@ function App() {
                 console.log('✅ Firebase Auth 사용자 감지:', user.uid);
                 setFirebaseUser(user);
 
-                // localStorage에 저장 (기존 코드와의 호환성)
+                // 🔐 계정별 localStorage 관리
+                const currentLocalUserId = getCurrentUserId();
+
+                // 계정이 변경된 경우
+                if (currentLocalUserId && currentLocalUserId !== user.uid) {
+                    console.log('🔄 계정 전환 감지:', currentLocalUserId, '→', user.uid);
+                }
+
+                // 현재 사용자 설정
+                setCurrentUserId(user.uid);
+
+                // 기존 방식에서 새 방식으로 마이그레이션 (1회만)
+                const migrated = localStorage.getItem(`migrated_${user.uid}`);
+                if (!migrated) {
+                    migrateUserData(user.uid);
+                    localStorage.setItem(`migrated_${user.uid}`, 'true');
+                }
+
+                // localStorage에 저장 (기존 코드와의 호환성 - deprecated)
                 localStorage.setItem('firebaseUserId', user.uid);
 
                 // 🧹 base64 이미지 데이터 자동 정리 (1회만 실행)
@@ -384,6 +403,9 @@ function App() {
                         console.error('프로필 복원 실패:', e);
                     }
                 }
+
+                // Firebase Auth와 localStorage 동기화 확인
+                checkSync(user.uid);
             } else {
                 console.log('❌ Firebase Auth 로그아웃 상태');
                 setFirebaseUser(null);
@@ -1835,9 +1857,15 @@ function App() {
             setProfile(profileData);
             setAccessTokenState(accessToken);
 
-            // localStorage에 로그인 정보 저장
+            // 🔐 계정별 localStorage에 사용자 정보 저장 (새 방식)
+            setCurrentUserData('displayName', userInfo.name);
+            setCurrentUserData('email', userInfo.email);
+            setCurrentUserData('picture', pictureUrl);
+
+            // localStorage에 로그인 정보 저장 (기존 방식 - 호환성)
             localStorage.setItem('userProfile', JSON.stringify(profileData)); // ✅ 추가: 프로필 저장
             localStorage.setItem('firebaseUserId', firebaseUserId);
+            localStorage.setItem('userDisplayName', userInfo.name); // 추가: displayName 명시적 저장
             localStorage.setItem('accessToken', accessToken);
             localStorage.setItem('userInfo', JSON.stringify(userInfo));
             localStorage.setItem('userPicture', pictureUrl);
@@ -2500,7 +2528,10 @@ function App() {
         setProfile(null);
         setAccessTokenState(null);
 
-        // localStorage 완전 정리
+        // 🔐 계정별 localStorage 정리 (새 방식)
+        userStorageLogout();
+
+        // localStorage 완전 정리 (기존 방식 - 호환성)
         localStorage.removeItem('userProfile');
         localStorage.removeItem('accessToken');
         localStorage.removeItem('tokenExpiresAt');

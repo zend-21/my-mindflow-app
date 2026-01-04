@@ -579,6 +579,60 @@ export const updateGroupImage = async (groupId, creatorId, newImage) => {
   }
 };
 
+/**
+ * 방장 권한 위임
+ * @param {string} groupId - 그룹 채팅방 ID
+ * @param {string} currentCreatorId - 현재 방장 UID
+ * @param {string} newCreatorId - 새 방장 UID
+ */
+export const transferRoomOwnership = async (groupId, currentCreatorId, newCreatorId) => {
+  try {
+    const groupRef = doc(db, 'groupChats', groupId);
+    const groupDoc = await getDoc(groupRef);
+
+    if (!groupDoc.exists()) {
+      throw new Error('그룹을 찾을 수 없습니다.');
+    }
+
+    const groupData = groupDoc.data();
+
+    // 권한 확인 (현재 방장만 가능)
+    if (groupData.creatorId !== currentCreatorId) {
+      throw new Error('방장만 권한을 위임할 수 있습니다.');
+    }
+
+    // 새 방장이 멤버인지 확인
+    if (!groupData.members.includes(newCreatorId)) {
+      throw new Error('그룹 멤버에게만 방장 권한을 위임할 수 있습니다.');
+    }
+
+    // 방장 변경
+    await updateDoc(groupRef, {
+      creatorId: newCreatorId,
+      updatedAt: serverTimestamp()
+    });
+
+    // 시스템 메시지
+    const currentCreatorName = groupData.membersInfo[currentCreatorId]?.displayName || '알 수 없음';
+    const newCreatorName = groupData.membersInfo[newCreatorId]?.displayName || '알 수 없음';
+    await addDoc(collection(db, 'groupChats', groupId, 'messages'), {
+      type: 'system',
+      content: `${currentCreatorName}님이 ${newCreatorName}님에게 방장 권한을 위임했습니다.`,
+      createdAt: serverTimestamp(),
+      metadata: {
+        action: 'ownership_transferred',
+        fromUserId: currentCreatorId,
+        toUserId: newCreatorId
+      }
+    });
+
+    console.log('✅ 방장 권한 위임 완료:', newCreatorId);
+  } catch (error) {
+    console.error('❌ 방장 권한 위임 실패:', error);
+    throw error;
+  }
+};
+
 // ==================== 초대 관리 ====================
 
 /**
