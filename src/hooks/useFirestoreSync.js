@@ -42,6 +42,43 @@ import {
   deleteActivityFromFirestore,
   fetchFortuneProfileFromFirestore
 } from '../services/userDataService';
+import { getCurrentUserId, getUserData, setUserData } from '../utils/userStorage';
+
+/**
+ * 계정별 localStorage 헬퍼 함수
+ */
+const getAccountLocalStorage = (userId, key) => {
+  if (!userId) return null;
+  const data = getUserData(userId, key);
+  return data ? JSON.parse(data) : null;
+};
+
+const setAccountLocalStorage = (userId, key, value) => {
+  if (!userId) return;
+  setUserData(userId, key, JSON.stringify(value));
+};
+
+// 하위 호환성을 위한 폴백 함수
+const getLocalStorageWithFallback = (userId, key, legacyKey) => {
+  // 1. 계정별 저장소에서 먼저 확인
+  const accountData = getAccountLocalStorage(userId, key);
+  if (accountData !== null) return accountData;
+
+  // 2. 기존 방식 localStorage 확인 (하위 호환)
+  const legacyData = localStorage.getItem(legacyKey);
+  if (legacyData) {
+    try {
+      const parsed = JSON.parse(legacyData);
+      // 계정별 저장소로 마이그레이션
+      setAccountLocalStorage(userId, key, parsed);
+      return parsed;
+    } catch (e) {
+      console.error('localStorage parse error:', e);
+    }
+  }
+
+  return null;
+};
 
 /**
  * Firestore와 로컬 상태를 실시간으로 동기화하는 훅 (산업 표준 방식)
@@ -154,8 +191,8 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
                                   Object.keys(data.calendar || {}).length > 0;
 
         if (!hasFirestoreData) {
-          const localMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
-          const localFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
+          const localMemos = getLocalStorageWithFallback(userId, 'memos', 'memos_shared') || [];
+          const localFolders = getLocalStorageWithFallback(userId, 'folders', 'memoFolders') || [];
           const hasLocalData = localMemos.length > 0 || localFolders.length > 0;
 
           if (hasLocalData) {
@@ -188,12 +225,12 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
           console.log('✅ Firestore 데이터 로드');
 
           // ⭐ Evernote 방식: 다중 기기 동기화 + 오프라인 병합
-          const localMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
-          const localFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
-          const localCalendar = JSON.parse(localStorage.getItem('calendarSchedules_shared') || '{}');
-          const localTrash = JSON.parse(localStorage.getItem('trashedItems_shared') || '[]');
-          const localActivities = JSON.parse(localStorage.getItem('recentActivities_shared') || '[]');
-          const localMacros = JSON.parse(localStorage.getItem('macroTexts') || '[]');
+          const localMemos = getLocalStorageWithFallback(userId, 'memos', 'memos_shared') || [];
+          const localFolders = getLocalStorageWithFallback(userId, 'folders', 'memoFolders') || [];
+          const localCalendar = getLocalStorageWithFallback(userId, 'calendar', 'calendarSchedules_shared') || {};
+          const localTrash = getLocalStorageWithFallback(userId, 'trash', 'trashedItems_shared') || [];
+          const localActivities = getLocalStorageWithFallback(userId, 'activities', 'recentActivities_shared') || [];
+          const localMacros = getLocalStorageWithFallback(userId, 'macros', 'macroTexts') || [];
 
           // 📝 메모 병합 (개별 문서별로 처리)
           const mergedMemos = data.memos.map(firestoreMemo => {
@@ -493,14 +530,14 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
         const currentFolders = folders.length > 0 ? folders : (data.folders || []);
         const currentCalendar = Object.keys(calendar).length > 0 ? calendar : (data.calendar || {});
 
-        localStorage.setItem('memos_shared', JSON.stringify(currentMemos));
-        localStorage.setItem('memoFolders', JSON.stringify(currentFolders));
-        localStorage.setItem('trashedItems_shared', JSON.stringify(data.trash || []));
-        localStorage.setItem('macroTexts', JSON.stringify(data.macros || []));
-        localStorage.setItem('calendarSchedules_shared', JSON.stringify(currentCalendar));
-        localStorage.setItem('recentActivities_shared', JSON.stringify(data.activities || []));
-        localStorage.setItem('widgets_shared', JSON.stringify(data.settings?.widgets || ['StatsGrid', 'QuickActions', 'RecentActivity']));
-        localStorage.setItem('displayCount_shared', JSON.stringify(data.settings?.displayCount || 5));
+        setAccountLocalStorage(userId, 'memos', currentMemos);
+        setAccountLocalStorage(userId, 'folders', currentFolders);
+        setAccountLocalStorage(userId, 'trash', data.trash || []);
+        setAccountLocalStorage(userId, 'macros', data.macros || []);
+        setAccountLocalStorage(userId, 'calendar', currentCalendar);
+        setAccountLocalStorage(userId, 'activities', data.activities || []);
+        setAccountLocalStorage(userId, 'widgets', data.settings?.widgets || ['StatsGrid', 'QuickActions', 'RecentActivity']);
+        setAccountLocalStorage(userId, 'displayCount', data.settings?.displayCount || 5);
 
         // 닉네임은 별도 nicknames 컬렉션에서 가져오기
         try {
@@ -524,8 +561,8 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
         setError(err);
 
         // 오류 시 localStorage 폴백
-        const fallbackMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
-        const fallbackFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
+        const fallbackMemos = getLocalStorageWithFallback(userId, 'memos', 'memos_shared') || [];
+        const fallbackFolders = getLocalStorageWithFallback(userId, 'folders', 'memoFolders') || [];
         setMemos(fallbackMemos);
         setFolders(fallbackFolders);
       } finally {
@@ -557,12 +594,12 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     if (!userId || !enabled || !migrated) return;
 
     try {
-      localStorage.setItem('memos_shared', JSON.stringify(memos));
-      localStorage.setItem('memoFolders', JSON.stringify(folders));
-      localStorage.setItem('trashedItems_shared', JSON.stringify(trash));
-      localStorage.setItem('macroTexts', JSON.stringify(macros));
-      localStorage.setItem('calendarSchedules_shared', JSON.stringify(calendar));
-      localStorage.setItem('recentActivities_shared', JSON.stringify(activities));
+      setAccountLocalStorage(userId, 'memos', memos);
+      setAccountLocalStorage(userId, 'folders', folders);
+      setAccountLocalStorage(userId, 'trash', trash);
+      setAccountLocalStorage(userId, 'macros', macros);
+      setAccountLocalStorage(userId, 'calendar', calendar);
+      setAccountLocalStorage(userId, 'activities', activities);
     } catch (error) {
       console.error('localStorage 동기화 실패:', error);
     }
@@ -575,12 +612,12 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     const handleBeforeUnload = () => {
       // localStorage 긴급 저장 (동기)
       try {
-        localStorage.setItem('memos_shared', JSON.stringify(memos));
-        localStorage.setItem('memoFolders', JSON.stringify(folders));
-        localStorage.setItem('trashedItems_shared', JSON.stringify(trash));
-        localStorage.setItem('macroTexts', JSON.stringify(macros));
-        localStorage.setItem('calendarSchedules_shared', JSON.stringify(calendar));
-        localStorage.setItem('recentActivities_shared', JSON.stringify(activities));
+        setAccountLocalStorage(userId, 'memos', memos);
+        setAccountLocalStorage(userId, 'folders', folders);
+        setAccountLocalStorage(userId, 'trash', trash);
+        setAccountLocalStorage(userId, 'macros', macros);
+        setAccountLocalStorage(userId, 'calendar', calendar);
+        setAccountLocalStorage(userId, 'activities', activities);
         console.log('✅ 브라우저 종료 전 긴급 백업 완료');
       } catch (error) {
         console.error('❌ 긴급 백업 실패:', error);
@@ -615,8 +652,8 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
         try {
           // ⚡ 최적화: Firestore 전체 조회 없이 localStorage만 확인
-          const localMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
-          const localCalendar = JSON.parse(localStorage.getItem('calendarSchedules_shared') || '{}');
+          const localMemos = JSON.parse(getUserData(userId, 'memos') || '[]');
+          const localCalendar = JSON.parse(getUserData(userId, 'calendar') || '{}');
 
           // localStorage에서 저장 실패 마크가 있는 항목만 찾기
           const unsyncedMemos = localMemos.filter(localMemo => {
@@ -706,10 +743,10 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
       try {
         // localStorage에서 모든 항목 가져오기
-        const localMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
-        const localCalendar = JSON.parse(localStorage.getItem('calendarSchedules_shared') || '{}');
-        const localFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
-        const localMacros = JSON.parse(localStorage.getItem('macroTexts') || '[]');
+        const localMemos = JSON.parse(getUserData(userId, 'memos') || '[]');
+        const localCalendar = JSON.parse(getUserData(userId, 'calendar') || '{}');
+        const localFolders = JSON.parse(getUserData(userId, 'folders') || '[]');
+        const localMacros = JSON.parse(getUserData(userId, 'macros') || '[]');
         const localActivities = JSON.parse(localStorage.getItem('recentActivities_shared') || '[]');
 
         // 미동기화 항목 찾기 (firestore_saved가 없거나 다른 것들)
@@ -843,7 +880,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     setMemos(prev => {
       const exists = prev.find(m => m.id === memo.id);
       const updated = exists ? prev.map(m => m.id === memo.id ? memo : m) : [...prev, memo];
-      localStorage.setItem('memos_shared', JSON.stringify(updated));
+      setAccountLocalStorage(userId, 'memos', updated);
       return updated;
     });
 
@@ -855,7 +892,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
   const deleteMemo = useCallback((memoId) => {
     setMemos(prev => {
       const updated = prev.filter(m => m.id !== memoId);
-      localStorage.setItem('memos_shared', JSON.stringify(updated));
+      setAccountLocalStorage(userId, 'memos', updated);
       return updated;
     });
 
@@ -1045,7 +1082,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
   // 메모 배열 동기화 (하위 호환)
   const syncMemos = useCallback((newMemos) => {
     setMemos(newMemos);
-    localStorage.setItem('memos_shared', JSON.stringify(newMemos));
+    setAccountLocalStorage(userId, 'memos', newMemos);
 
     // 🚀 변경 감지 후 각 메모를 개별 저장
     newMemos.forEach(memo => {
@@ -1088,7 +1125,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     const hasValidMacro = newMacros.some(m => m && m.trim().length > 0);
     if (!hasValidMacro) {
       try {
-        const existing = JSON.parse(localStorage.getItem('macroTexts') || '[]');
+        const existing = JSON.parse(getUserData(userId, 'macros') || '[]');
         const hasExistingData = existing.some(m => m && m.trim().length > 0);
         if (hasExistingData) {
           console.warn('⚠️ syncMacros: Firestore 데이터가 비어있어 기존 localStorage 유지');
@@ -1101,7 +1138,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
     // 기존 데이터와 비교하여 변경된 경우에만 저장
     try {
-      const existing = JSON.parse(localStorage.getItem('macroTexts') || '[]');
+      const existing = JSON.parse(getUserData(userId, 'macros') || '[]');
       const hasChanged = newMacros.length !== existing.length ||
                         newMacros.some((macro, index) => macro !== existing[index]);
 
@@ -1172,10 +1209,10 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
     try {
       // localStorage에서 모든 항목 가져오기
-      const localMemos = JSON.parse(localStorage.getItem('memos_shared') || '[]');
-      const localCalendar = JSON.parse(localStorage.getItem('calendarSchedules_shared') || '{}');
-      const localFolders = JSON.parse(localStorage.getItem('memoFolders') || '[]');
-      const localMacros = JSON.parse(localStorage.getItem('macroTexts') || '[]');
+      const localMemos = JSON.parse(getUserData(userId, 'memos') || '[]');
+      const localCalendar = JSON.parse(getUserData(userId, 'calendar') || '{}');
+      const localFolders = JSON.parse(getUserData(userId, 'folders') || '[]');
+      const localMacros = JSON.parse(getUserData(userId, 'macros') || '[]');
       const localTrash = JSON.parse(localStorage.getItem('trashMemos_shared') || '[]');
 
       // 미동기화 항목 찾기
