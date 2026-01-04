@@ -191,14 +191,15 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
                                   Object.keys(data.calendar || {}).length > 0;
 
         if (!hasFirestoreData) {
-          const localMemos = getLocalStorageWithFallback(userId, 'memos', 'memos_shared') || [];
-          const localFolders = getLocalStorageWithFallback(userId, 'folders', 'memoFolders') || [];
+          // ⚠️ 계정별 localStorage만 확인 (공유 localStorage 사용 안 함)
+          const localMemos = getAccountLocalStorage(userId, 'memos') || [];
+          const localFolders = getAccountLocalStorage(userId, 'folders') || [];
           const hasLocalData = localMemos.length > 0 || localFolders.length > 0;
 
           if (hasLocalData) {
-            console.log('📦 Firestore 비어있음 - localStorage 데이터 마이그레이션 시작...');
+            console.log('📦 Firestore 비어있음 - 계정별 localStorage 데이터 마이그레이션 시작...');
             await migrateLocalStorageToFirestore(userId);
-            console.log('✅ localStorage 마이그레이션 완료!');
+            console.log('✅ 계정별 localStorage 마이그레이션 완료!');
 
             // 마이그레이션 후 다시 로드
             const refreshedData = await fetchAllUserData(userId);
