@@ -1,7 +1,7 @@
 // 📥 초대 코드로 단체방 참여 모달
 import { useState } from 'react';
 import styled from 'styled-components';
-import { X, Key } from 'lucide-react';
+import { X, Key, AlertCircle } from 'lucide-react';
 import { joinGroupByInviteCode } from '../../services/groupChatService';
 
 const ModalOverlay = styled.div`
@@ -170,7 +170,7 @@ const JoinGroupModal = ({ onClose, showToast }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleJoin = async () => {
+  const handleJoin = async (forceJoin = false) => {
     if (!inviteCode.trim()) {
       setError('초대 코드를 입력해주세요');
       return;
@@ -186,7 +186,7 @@ const JoinGroupModal = ({ onClose, showToast }) => {
         return;
       }
 
-      const result = await joinGroupByInviteCode(inviteCode.trim(), userId);
+      const result = await joinGroupByInviteCode(inviteCode.trim(), userId, forceJoin);
 
       if (result.success) {
         showToast?.(`✅ ${result.message}`);
@@ -194,6 +194,22 @@ const JoinGroupModal = ({ onClose, showToast }) => {
       }
     } catch (err) {
       console.error('단체방 참여 실패:', err);
+
+      // 차단 사용자가 있는 경우
+      if (err.message?.startsWith('BLOCKED_MEMBERS_IN_GROUP:')) {
+        const blockedNames = err.message.replace('BLOCKED_MEMBERS_IN_GROUP:', '');
+        const confirmed = window.confirm(
+          `참여자 중에 차단한 사용자가 있습니다.\n\n차단한 사용자: ${blockedNames}\n\n이 방에 참여하시겠습니까?\n(참여하면 이 방에서는 서로 대화할 수 있습니다)`
+        );
+
+        if (confirmed) {
+          // 사용자가 참여를 선택한 경우 forceJoin으로 다시 호출
+          await handleJoin(true);
+        }
+        setLoading(false);
+        return;
+      }
+
       setError(err.message || '단체방 참여에 실패했습니다');
     } finally {
       setLoading(false);
@@ -237,7 +253,10 @@ const JoinGroupModal = ({ onClose, showToast }) => {
             <ErrorText>{error}</ErrorText>
           ) : (
             <InfoText>
-              단체방 방장에게 받은 초대 코드를 입력하세요 (예: INV-WS90D7)
+              🌐 공개방의 초대 코드를 입력하세요 (예: INV-WS90D7)<br />
+              <span style={{ fontSize: '12px', color: '#666' }}>
+                * 비공개방은 초대 코드로 참여할 수 없습니다
+              </span>
             </InfoText>
           )}
         </Content>

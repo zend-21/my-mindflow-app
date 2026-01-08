@@ -4,7 +4,8 @@ import styled from 'styled-components';
 import { subscribeToMyDMRooms } from '../../services/directMessageService';
 import { subscribeToMyGroupChats } from '../../services/groupChatService';
 import { playNewMessageNotification, notificationSettings } from '../../utils/notificationSounds';
-import { Search, Plus, Pin, Users, Key } from 'lucide-react';
+import { getUserDisplayName } from '../../services/nicknameService';
+import { Search, Pin, Users, Mail } from 'lucide-react';
 import CreateGroupModal from './CreateGroupModal';
 import JoinGroupModal from './JoinGroupModal';
 import ChatRoom from './ChatRoom';
@@ -69,32 +70,6 @@ const SearchInput = styled.input`
 const ActionButtons = styled.div`
   display: flex;
   gap: 8px;
-`;
-
-const NewChatButton = styled.button`
-  background: linear-gradient(135deg, #4a90e2, #357abd);
-  border: none;
-  color: #ffffff;
-  padding: 10px 14px;
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
-  font-size: 13px;
-  font-weight: 600;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(74, 144, 226, 0.4);
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
 `;
 
 const NewGroupButton = styled.button`
@@ -181,17 +156,39 @@ const ChatItemContent = styled.div`
   align-items: center;
 `;
 
+const AvatarContainer = styled.div`
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+`;
+
 const Avatar = styled.div`
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: ${props => props.$color || 'linear-gradient(135deg, #667eea, #764ba2)'};
+  background: ${props => props.$color || '#5f6368'};
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
   flex-shrink: 0;
   border: 2px solid rgba(255, 255, 255, 0.1);
+`;
+
+const AvatarBadge = styled.div`
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 20px;
+  height: 20px;
+  background: rgba(26, 26, 26, 0.95);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
 `;
 
 const ChatInfo = styled.div`
@@ -248,9 +245,8 @@ const GroupBadge = styled.span`
 
 const UnreadBadge = styled.div`
   position: absolute;
-  top: 50%;
+  bottom: 12px;
   right: 20px;
-  transform: translateY(-50%);
   background: linear-gradient(135deg, #4a90e2, #357abd);
   color: #ffffff;
   font-size: 11px;
@@ -308,9 +304,55 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showJoinGroupModal, setShowJoinGroupModal] = useState(false);
   const [selectedChat, setSelectedChat] = useState(null);
+  const [userNicknames, setUserNicknames] = useState({}); // userId -> 앱 닉네임 매핑
+  const [nicknamesLoaded, setNicknamesLoaded] = useState(false); // 닉네임 로딩 완료 여부
 
   // 이전 읽지 않은 메시지 개수 추적 (알림음 재생 여부 판단)
   const prevUnreadCountRef = useRef({});
+
+  // 대화방 참여자들의 앱 닉네임 가져오기
+  const fetchNicknamesForRooms = async (rooms, currentUserId) => {
+    // 백그라운드에서 닉네임 업데이트 (로딩 화면 표시하지 않음)
+    const nicknameMap = {};
+
+    for (const room of rooms) {
+      const otherUserId = room.participants?.find(id => id !== currentUserId);
+
+      // 나와의 대화방인 경우 (otherUserId가 없음)
+      if (!otherUserId) {
+        // 내 닉네임 가져오기
+        if (!nicknameMap[currentUserId]) {
+          try {
+            const myInfo = room.participantsInfo?.[currentUserId];
+            const fallbackName = myInfo?.displayName || '나';
+            const nickname = await getUserDisplayName(currentUserId, fallbackName);
+            nicknameMap[currentUserId] = nickname;
+          } catch (error) {
+            console.warn(`내 닉네임 조회 실패:`, error);
+            const fallbackName = room.participantsInfo?.[currentUserId]?.displayName || '나';
+            nicknameMap[currentUserId] = fallbackName;
+          }
+        }
+      } else if (!nicknameMap[otherUserId]) {
+        // 일반 1:1 대화방
+        try {
+          const otherUserInfo = room.participantsInfo?.[otherUserId];
+          const fallbackName = otherUserInfo?.displayName || '익명';
+          const nickname = await getUserDisplayName(otherUserId, fallbackName);
+          nicknameMap[otherUserId] = nickname;
+        } catch (error) {
+          console.warn(`닉네임 조회 실패 (${otherUserId}):`, error);
+          const fallbackName = room.participantsInfo?.[otherUserId]?.displayName || '익명';
+          nicknameMap[otherUserId] = fallbackName;
+        }
+      }
+    }
+
+    setUserNicknames(prev => ({ ...prev, ...nicknameMap }));
+    if (!nicknamesLoaded) {
+      setNicknamesLoaded(true); // 최초 로딩만 완료 표시
+    }
+  };
 
   useEffect(() => {
     let dmLoaded = false;
@@ -336,6 +378,10 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
       }
 
       setChatRooms(rooms);
+
+      // 대화방 참여자들의 앱 닉네임 가져오기
+      fetchNicknamesForRooms(rooms, currentUserId);
+
       dmLoaded = true;
       if (groupLoaded) setLoading(false);
     });
@@ -387,14 +433,19 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
     if (!searchQuery) return true;
 
     const otherUserId = room.participants?.find(id => id !== localStorage.getItem('firebaseUserId'));
-    const otherUserInfo = room.participantsInfo?.[otherUserId];
-    const displayName = otherUserInfo?.displayName || '익명';
+    const displayName = userNicknames[otherUserId] || room.participantsInfo?.[otherUserId]?.displayName || '익명';
 
     return displayName.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
-  // 그룹 채팅 검색 필터링
+  // 그룹 채팅 검색 필터링 및 강퇴된 사용자 필터링
   const filteredGroups = groupChats.filter(group => {
+    // 강퇴된 사용자는 해당 그룹을 볼 수 없음
+    const currentUserId = localStorage.getItem('firebaseUserId');
+    if (group.kickedUsers && group.kickedUsers.includes(currentUserId)) {
+      return false;
+    }
+
     if (!searchQuery) return true;
     return group.groupName?.toLowerCase().includes(searchQuery.toLowerCase());
   });
@@ -413,22 +464,39 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
   const pinnedChats = allChats.filter(chat => chat.pinned);
   const regularChats = allChats.filter(chat => !chat.pinned);
 
+  // 실제 활성화된 멤버 수 계산 (pending, rejected 제외)
+  const getActiveMemberCount = (chat) => {
+    if (chat.type !== 'group' || !chat.membersInfo) {
+      return 0;
+    }
+
+    return Object.values(chat.membersInfo).filter(
+      memberInfo => memberInfo.status === 'active'
+    ).length;
+  };
+
+  // 🆕 selectedChat 실시간 동기화 (Firestore 업데이트 반영)
+  useEffect(() => {
+    if (!selectedChat) return;
+
+    // allChats에서 동일한 ID의 채팅방 찾기
+    const updatedChat = allChats.find(chat => chat.id === selectedChat.id);
+
+    // 업데이트된 채팅방이 있고, 실제로 변경사항이 있을 때만 갱신
+    if (updatedChat) {
+      // 깊은 비교 대신 updatedAt 타임스탬프로 변경 여부 확인
+      const currentUpdatedAt = selectedChat.updatedAt?.toMillis?.() || 0;
+      const newUpdatedAt = updatedChat.updatedAt?.toMillis?.() || 0;
+
+      if (newUpdatedAt > currentUpdatedAt) {
+        setSelectedChat(updatedChat);
+      }
+    }
+  }, [allChats]); // allChats만 의존성으로 설정
+
   const handleChatClick = (chat) => {
     console.log('대화방 클릭:', chat);
     setSelectedChat(chat);
-  };
-
-  const handleNewChat = () => {
-    // 🔐 휴대폰 인증 필요
-    if (requirePhoneAuth) {
-      requirePhoneAuth('새 대화 시작', () => {
-        // 인증 후 실행
-        showToast?.('새 대화 시작 기능 구현 예정');
-      });
-    } else {
-      // requirePhoneAuth가 없으면 바로 실행 (fallback)
-      showToast?.('새 대화 시작 기능 구현 예정');
-    }
   };
 
   const handleNewGroup = () => {
@@ -463,21 +531,13 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
     return date.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
   };
 
-  // 아바타 색상 생성
-  const getAvatarColor = (userId) => {
-    const colors = [
-      'linear-gradient(135deg, #667eea, #764ba2)',
-      'linear-gradient(135deg, #f093fb, #f5576c)',
-      'linear-gradient(135deg, #4facfe, #00f2fe)',
-      'linear-gradient(135deg, #43e97b, #38f9d7)',
-      'linear-gradient(135deg, #fa709a, #fee140)',
-      'linear-gradient(135deg, #30cfd0, #330867)',
-    ];
-    const index = userId ? userId.charCodeAt(0) % colors.length : 0;
-    return colors[index];
+  // 아바타 색상 생성 - 모던하고 심플한 단색 사용
+  const getAvatarColor = () => {
+    // 모던한 회색 계열 단색 (카카오톡, 텔레그램 스타일)
+    return '#5f6368';
   };
 
-  if (loading) {
+  if (loading || !nicknamesLoaded) {
     return (
       <Container>
         <EmptyState>
@@ -503,14 +563,11 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
             />
           </SearchInputWrapper>
           <ActionButtons>
-            <NewChatButton onClick={handleNewChat} title="새 대화">
-              <Plus size={18} />
-            </NewChatButton>
             <NewGroupButton onClick={handleNewGroup} title="단체방 만들기">
               <Users size={18} />
             </NewGroupButton>
             <NewGroupButton onClick={() => setShowJoinGroupModal(true)} title="초대 코드로 참여">
-              <Key size={18} />
+              <Mail size={18} />
             </NewGroupButton>
           </ActionButtons>
         </SearchBar>
@@ -543,10 +600,15 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
                   const currentUserId = localStorage.getItem('firebaseUserId');
 
                   // 1:1 대화인 경우
-                  if (chat.type === 'dm') {
+                  if (chat.type === 'dm' || chat.type === 'self') {
                     const otherUserId = chat.participants?.find(id => id !== currentUserId);
-                    const otherUserInfo = chat.participantsInfo?.[otherUserId];
-                    const displayName = otherUserInfo?.displayName || '익명';
+
+                    // 나와의 대화인 경우
+                    const isSelfChat = !otherUserId;
+                    const displayUserId = isSelfChat ? currentUserId : otherUserId;
+                    const displayName = isSelfChat
+                      ? `${userNicknames[currentUserId] || chat.participantsInfo?.[currentUserId]?.displayName || '나'} (나)`
+                      : userNicknames[otherUserId] || chat.participantsInfo?.[otherUserId]?.displayName || '익명';
                     const unreadCount = chat.unreadCount?.[currentUserId] || 0;
 
                     return (
@@ -556,7 +618,7 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
                         onClick={() => handleChatClick(chat)}
                       >
                         <ChatItemContent>
-                          <Avatar $color={getAvatarColor(otherUserId)}>
+                          <Avatar $color={getAvatarColor(displayUserId)}>
                             {displayName.charAt(0).toUpperCase()}
                           </Avatar>
                           <ChatInfo>
@@ -579,7 +641,8 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
                   // 그룹 채팅인 경우
                   const groupName = chat.groupName || '이름 없는 그룹';
                   const unreadCount = chat.unreadCount?.[currentUserId] || 0;
-                  const memberCount = chat.members?.length || 0;
+                  const memberCount = getActiveMemberCount(chat);
+                  const isPublic = chat.isPublic || false; // 🆕 공개방 여부
 
                   return (
                     <ChatItem
@@ -588,9 +651,17 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
                       onClick={() => handleChatClick(chat)}
                     >
                       <ChatItemContent>
-                        <Avatar $color="linear-gradient(135deg, #667eea, #764ba2)">
-                          <Users size={24} />
-                        </Avatar>
+                        <AvatarContainer>
+                          <Avatar
+                            $color="#0088cc"
+                            style={chat.groupImage ? { backgroundImage: `url(${chat.groupImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                          >
+                            {!chat.groupImage && <Users size={24} />}
+                          </Avatar>
+                          <AvatarBadge title={isPublic ? '공개방' : '비공개방'}>
+                            {isPublic ? '🌐' : '🔒'}
+                          </AvatarBadge>
+                        </AvatarContainer>
                         <ChatInfo>
                           <ChatHeader>
                             <ChatName>
@@ -624,10 +695,15 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
                   const currentUserId = localStorage.getItem('firebaseUserId');
 
                   // 1:1 대화인 경우
-                  if (chat.type === 'dm') {
+                  if (chat.type === 'dm' || chat.type === 'self') {
                     const otherUserId = chat.participants?.find(id => id !== currentUserId);
-                    const otherUserInfo = chat.participantsInfo?.[otherUserId];
-                    const displayName = otherUserInfo?.displayName || '익명';
+
+                    // 나와의 대화인 경우
+                    const isSelfChat = !otherUserId;
+                    const displayUserId = isSelfChat ? currentUserId : otherUserId;
+                    const displayName = isSelfChat
+                      ? `${userNicknames[currentUserId] || chat.participantsInfo?.[currentUserId]?.displayName || '나'} (나)`
+                      : userNicknames[otherUserId] || chat.participantsInfo?.[otherUserId]?.displayName || '익명';
                     const unreadCount = chat.unreadCount?.[currentUserId] || 0;
 
                     return (
@@ -637,7 +713,7 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
                         onClick={() => handleChatClick(chat)}
                       >
                         <ChatItemContent>
-                          <Avatar $color={getAvatarColor(otherUserId)}>
+                          <Avatar $color={getAvatarColor(displayUserId)}>
                             {displayName.charAt(0).toUpperCase()}
                           </Avatar>
                           <ChatInfo>
@@ -660,7 +736,8 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
                   // 그룹 채팅인 경우
                   const groupName = chat.groupName || '이름 없는 그룹';
                   const unreadCount = chat.unreadCount?.[currentUserId] || 0;
-                  const memberCount = chat.members?.length || 0;
+                  const memberCount = getActiveMemberCount(chat);
+                  const isPublic = chat.isPublic || false; // 🆕 공개방 여부
 
                   return (
                     <ChatItem
@@ -669,9 +746,17 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
                       onClick={() => handleChatClick(chat)}
                     >
                       <ChatItemContent>
-                        <Avatar $color="linear-gradient(135deg, #667eea, #764ba2)">
-                          <Users size={24} />
-                        </Avatar>
+                        <AvatarContainer>
+                          <Avatar
+                            $color="#0088cc"
+                            style={chat.groupImage ? { backgroundImage: `url(${chat.groupImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                          >
+                            {!chat.groupImage && <Users size={24} />}
+                          </Avatar>
+                          <AvatarBadge title={isPublic ? '공개방' : '비공개방'}>
+                            {isPublic ? '🌐' : '🔒'}
+                          </AvatarBadge>
+                        </AvatarContainer>
                         <ChatInfo>
                           <ChatHeader>
                             <ChatName>

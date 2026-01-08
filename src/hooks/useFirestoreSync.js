@@ -909,19 +909,19 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     setFolders(prev => {
       const exists = prev.find(f => f.id === folder.id);
       const updated = exists ? prev.map(f => f.id === folder.id ? folder : f) : [...prev, folder];
-      localStorage.setItem('memoFolders', JSON.stringify(updated));
+      setAccountLocalStorage(userId, 'folders', updated);
       return updated;
     });
 
     // 🚀 변경 감지 후 서버에 저장
     debouncedSave(saveFolderToFirestore, `folder_${folder.id}`, folder, folder);
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 폴더 삭제
   const deleteFolder = useCallback((folderId) => {
     setFolders(prev => {
       const updated = prev.filter(f => f.id !== folderId);
-      localStorage.setItem('memoFolders', JSON.stringify(updated));
+      setAccountLocalStorage(userId, 'folders', updated);
       return updated;
     });
 
@@ -937,19 +937,19 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     setTrash(prev => {
       const exists = prev.find(t => t.id === item.id);
       const updated = exists ? prev.map(t => t.id === item.id ? item : t) : [...prev, item];
-      localStorage.setItem('trashedItems_shared', JSON.stringify(updated));
+      setAccountLocalStorage(userId, 'trash', updated);
       return updated;
     });
 
     // 🚀 변경 감지 후 서버에 저장
     debouncedSave(saveTrashItemToFirestore, `trash_${item.id}`, item, item);
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 휴지통 항목 삭제
   const deleteTrashItem = useCallback((itemId) => {
     setTrash(prev => {
       const updated = prev.filter(t => t.id !== itemId);
-      localStorage.setItem('trashedItems_shared', JSON.stringify(updated));
+      setAccountLocalStorage(userId, 'trash', updated);
       return updated;
     });
 
@@ -965,7 +965,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     setMacros(prev => {
       const updated = [...prev];
       updated[index] = macroText;
-      localStorage.setItem('macroTexts', JSON.stringify(updated));
+      setAccountLocalStorage(userId, 'macros', updated);
 
       // 🚀 변경 감지 후 전체 배열을 Firestore에 저장
       if (userId && enabled) {
@@ -981,7 +981,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     setMacros(prev => {
       const updated = [...prev];
       updated[index] = '';
-      localStorage.setItem('macroTexts', JSON.stringify(updated));
+      setAccountLocalStorage(userId, 'macros', updated);
 
       // 전체 배열을 Firestore에 저장
       if (userId && enabled) {
@@ -998,21 +998,21 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
   const syncCalendarDate = useCallback((dateKey, schedule) => {
     setCalendar(prev => {
       const updated = { ...prev, [dateKey]: schedule };
-      localStorage.setItem('calendarSchedules_shared', JSON.stringify(updated));
+      setAccountLocalStorage(userId, 'calendar', updated);
       return updated;
     });
 
     // 🚀 변경 감지 후 서버에 저장
     // saveCalendarDateToFirestore(userId, dateKey, schedule) 형식으로 호출됨
     debouncedSave(saveCalendarDateToFirestore, `calendar_${dateKey}`, schedule, dateKey, schedule);
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 캘린더 날짜 삭제
   const deleteCalendarDate = useCallback((dateKey) => {
     setCalendar(prev => {
       const updated = { ...prev };
       delete updated[dateKey];
-      localStorage.setItem('calendarSchedules_shared', JSON.stringify(updated));
+      setAccountLocalStorage(userId, 'calendar', updated);
       return updated;
     });
 
@@ -1028,19 +1028,19 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     setActivities(prev => {
       const exists = prev.find(a => a.id === activity.id);
       const updated = exists ? prev.map(a => a.id === activity.id ? activity : a) : [...prev, activity];
-      localStorage.setItem('recentActivities_shared', JSON.stringify(updated));
+      setAccountLocalStorage(userId, 'activities', updated);
       return updated;
     });
 
     // 🚀 변경 감지 후 서버에 저장
     debouncedSave(saveActivityToFirestore, `activity_${activity.id}`, activity, activity);
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 활동 삭제
   const deleteActivity = useCallback((activityId) => {
     setActivities(prev => {
       const updated = prev.filter(a => a.id !== activityId);
-      localStorage.setItem('recentActivities_shared', JSON.stringify(updated));
+      setAccountLocalStorage(userId, 'activities', updated);
       return updated;
     });
 
@@ -1089,30 +1089,30 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     newMemos.forEach(memo => {
       debouncedSave(saveMemoToFirestore, `memo_${memo.id}`, memo, memo);
     });
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 폴더 배열 동기화 (하위 호환)
   const syncFolders = useCallback((newFolders) => {
     setFolders(newFolders);
-    localStorage.setItem('memoFolders', JSON.stringify(newFolders));
+    setAccountLocalStorage(userId, 'folders', newFolders);
 
     // 🚀 변경 감지 후 각 폴더를 개별 저장
     newFolders.forEach(folder => {
       debouncedSave(saveFolderToFirestore, `folder_${folder.id}`, folder, folder);
     });
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 휴지통 배열 동기화 (하위 호환)
   const syncTrash = useCallback((newTrash) => {
     setTrash(newTrash);
-    localStorage.setItem('trashedItems_shared', JSON.stringify(newTrash));
+    setAccountLocalStorage(userId, 'trash', newTrash);
 
     newTrash.forEach(item => {
       if (item && item.id) {
         debouncedSave(saveTrashItemToFirestore, `trash_${item.id}`, item, item);
       }
     });
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 매크로 배열 동기화 (하위 호환)
   const syncMacros = useCallback((newMacros) => {
@@ -1153,7 +1153,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
     console.log('💾 매크로 localStorage 저장:', newMacros);
     setMacros(newMacros);
-    localStorage.setItem('macroTexts', JSON.stringify(newMacros));
+    setAccountLocalStorage(userId, 'macros', newMacros);
 
     // 전체 배열을 한 번에 Firestore에 저장
     if (userId && enabled) {
@@ -1169,7 +1169,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     console.log('🔍 [syncCalendar] 시작:', Object.keys(newCalendar).length, '개 날짜');
 
     setCalendar(newCalendar);
-    localStorage.setItem('calendarSchedules_shared', JSON.stringify(newCalendar));
+    setAccountLocalStorage(userId, 'calendar', newCalendar);
 
     Object.entries(newCalendar).forEach(([dateKey, schedule]) => {
       // 의미 있는 데이터가 있는지 확인
@@ -1184,19 +1184,19 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
         console.log('⏭️ [syncCalendar] 빈 스케줄 건너뜀:', dateKey);
       }
     });
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 활동 배열 동기화 (하위 호환)
   const syncActivities = useCallback((newActivities) => {
     setActivities(newActivities);
-    localStorage.setItem('recentActivities_shared', JSON.stringify(newActivities));
+    setAccountLocalStorage(userId, 'activities', newActivities);
 
     newActivities.forEach(activity => {
       if (activity && activity.id) {
         debouncedSave(saveActivityToFirestore, `activity_${activity.id}`, activity, activity);
       }
     });
-  }, [debouncedSave]);
+  }, [debouncedSave, userId]);
 
   // 수동 동기화 함수
   const manualSync = useCallback(async () => {

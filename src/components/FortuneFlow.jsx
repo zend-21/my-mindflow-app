@@ -16,6 +16,7 @@ import {
     isUserLoggedIn,
     IS_TESTING_MODE
 } from '../utils/fortuneLogic';
+import { getProfileSetting } from '../utils/userStorage';
 
 /**
  * 🔮 FortuneFlow - 운세 전체 플로우 통합 컴포넌트
@@ -52,7 +53,7 @@ const FortuneFlow = ({ onClose, profile, userId, saveFortuneProfileToFirestore, 
         setFortuneData(data);
 
         // Check if user has chosen "Don't show again"
-        const noticeHidden = localStorage.getItem('fortuneNoticeHidden');
+        const noticeHidden = getProfileSetting('fortuneNoticeHidden');
 
         if (noticeHidden === 'true') {
             // Skip notice, go to profile check

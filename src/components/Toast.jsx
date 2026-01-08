@@ -80,6 +80,8 @@ const SimpleToastBox = styled.div`
   min-width: 200px;
   max-width: 400px;
   pointer-events: auto;
+  white-space: pre-line;
+  line-height: 1.5;
 `;
 
 const ToastHeader = styled.div`
@@ -180,7 +182,7 @@ const Toast = ({ message, onClose }) => {
       setTimeout(() => {
         if (onClose) onClose();
       }, 200); // 페이드아웃 애니메이션 후 닫기
-    }, 2000); // 2초 후 사라짐
+    }, 4000); // 4초 후 사라짐
 
     return () => clearTimeout(timer);
   }, [message, id, onClose]);

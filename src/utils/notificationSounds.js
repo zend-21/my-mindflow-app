@@ -5,10 +5,21 @@
  */
 let audioContext = null;
 
-const getAudioContext = () => {
+const getAudioContext = async () => {
   if (!audioContext) {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
   }
+
+  // 모바일에서 AudioContext가 suspended 상태일 수 있음 - resume 필요
+  if (audioContext.state === 'suspended') {
+    try {
+      await audioContext.resume();
+      console.log('🔊 AudioContext resumed');
+    } catch (error) {
+      console.error('AudioContext resume 실패:', error);
+    }
+  }
+
   return audioContext;
 };
 

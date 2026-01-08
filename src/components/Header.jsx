@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { getDailyGreeting } from '../utils/greetingMessages';
 import { avatarList } from './avatars/AvatarIcons';
+import { getProfileSetting } from '../utils/userStorage';
 
 const HeaderWrapper = styled.header`
   background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
@@ -183,9 +184,9 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
     // 아바타 변경 이벤트 리스너
     useEffect(() => {
         const handleAvatarChange = (e) => {
-            // localStorage에서 직접 읽어오기 (SideMenu와 동일한 방식)
-            setSelectedAvatarId(localStorage.getItem('selectedAvatarId') || null);
-            setAvatarBgColor(localStorage.getItem('avatarBgColor') || 'none');
+            // 계정별 localStorage에서 읽어오기
+            setSelectedAvatarId(getProfileSetting('selectedAvatarId') || null);
+            setAvatarBgColor(getProfileSetting('avatarBgColor') || 'none');
             setProfileImageType('avatar');
         };
         window.addEventListener('avatarChanged', handleAvatarChange);
@@ -204,7 +205,7 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
     // 커스텀 프로필 사진 변경 이벤트 리스너
     useEffect(() => {
         const handleProfilePictureChange = () => {
-            setCustomPicture(localStorage.getItem('customProfilePicture') || null);
+            setCustomPicture(getProfileSetting('customProfilePicture') || null);
         };
         window.addEventListener('profilePictureChanged', handleProfilePictureChange);
         return () => window.removeEventListener('profilePictureChanged', handleProfilePictureChange);

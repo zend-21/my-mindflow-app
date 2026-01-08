@@ -44,10 +44,19 @@ export const getUserByWorkspaceCode = async (workspaceCode) => {
       return null;
     }
 
+    const userData = userDoc.data();
+
+    // 닉네임 가져오기 (앱 내 설정 우선)
+    const nicknameDocRef = doc(db, 'nicknames', userId);
+    const nicknameDoc = await getDoc(nicknameDocRef);
+    const nickname = nicknameDoc.exists() ? nicknameDoc.data().nickname : null;
+
     return {
       id: userId,
       workspaceCode: normalizedCode,
-      ...userDoc.data(),
+      ...userData,
+      // 닉네임이 있으면 displayName 덮어쓰기
+      displayName: nickname || userData.displayName || '익명',
     };
   } catch (error) {
     console.error('WS 코드로 사용자 검색 오류:', error);
@@ -56,7 +65,7 @@ export const getUserByWorkspaceCode = async (workspaceCode) => {
 };
 
 /**
- * 즉시 양방향 친구 추가 (QR 스캔용)
+ * 일방향 친구 추가 (카카오톡 방식)
  * @param {string} myUserId - 내 사용자 ID
  * @param {string} targetWorkspaceCode - 친구의 WS 코드
  */
@@ -74,7 +83,13 @@ export const addFriendInstantly = async (myUserId, targetWorkspaceCode) => {
       throw new Error('자기 자신은 추가할 수 없습니다');
     }
 
-    // 2. 내 정보 가져오기
+    // 2. 이미 친구인지 확인
+    const alreadyFriend = await isFriend(myUserId, targetUser.id);
+    if (alreadyFriend) {
+      throw new Error('이미 친구로 등록된 사용자입니다');
+    }
+
+    // 3. 내 정보 가져오기
     const myUserDoc = await getDoc(doc(db, 'users', myUserId));
     if (!myUserDoc.exists()) {
       throw new Error('내 정보를 찾을 수 없습니다');
@@ -82,7 +97,7 @@ export const addFriendInstantly = async (myUserId, targetWorkspaceCode) => {
 
     const myUserData = myUserDoc.data();
 
-    // 3. 내 워크스페이스 정보 가져오기
+    // 4. 내 워크스페이스 정보 가져오기
     const myWorkspaceQuery = query(
       collection(db, 'workspaces'),
       where('userId', '==', myUserId)
@@ -90,28 +105,57 @@ export const addFriendInstantly = async (myUserId, targetWorkspaceCode) => {
     const myWorkspaceSnapshot = await getDocs(myWorkspaceQuery);
     const myWorkspaceCode = myWorkspaceSnapshot.docs[0]?.data().workspaceCode;
 
-    // 4. 양방향 친구 추가
     const timestamp = Timestamp.now();
 
-    // 내 친구 목록에 추가
+    // 4-1. 상대방의 앱 닉네임 가져오기 (우선순위)
+    let targetDisplayName = targetUser.displayName || targetUser.email || '익명';
+    try {
+      const { getUserDisplayName } = await import('./nicknameService');
+      targetDisplayName = await getUserDisplayName(targetUser.id, targetUser.displayName);
+    } catch (error) {
+      console.warn('타겟 사용자 닉네임 조회 실패:', error);
+    }
+
+    // 4-2. 내 앱 닉네임 가져오기
+    let myDisplayName = myUserData.displayName || myUserData.email || '익명';
+    try {
+      const { getUserDisplayName } = await import('./nicknameService');
+      myDisplayName = await getUserDisplayName(myUserId, myUserData.displayName);
+    } catch (error) {
+      console.warn('내 닉네임 조회 실패:', error);
+    }
+
+    // 5. 내 친구 목록에만 추가 (일방향)
     await setDoc(doc(db, 'users', myUserId, 'friends', targetUser.id), {
       friendId: targetUser.id,
-      friendName: targetUser.displayName || targetUser.email || '익명',
+      friendName: targetDisplayName,
       friendEmail: targetUser.email || '',
       friendWorkspaceCode: targetWorkspaceCode,
       addedAt: timestamp,
     });
 
-    // 상대방 친구 목록에 추가
-    await setDoc(doc(db, 'users', targetUser.id, 'friends', myUserId), {
-      friendId: myUserId,
-      friendName: myUserData.displayName || myUserData.email || '익명',
-      friendEmail: myUserData.email || '',
-      friendWorkspaceCode: myWorkspaceCode,
-      addedAt: timestamp,
+    // 6. 상대방의 friendRequests에 내가 추가했다는 알림 (상대방은 아직 친구 아님)
+    await setDoc(doc(db, 'users', targetUser.id, 'friendRequests', myUserId), {
+      requesterId: myUserId,
+      requesterName: myDisplayName,
+      requesterEmail: myUserData.email || '',
+      requesterWorkspaceCode: myWorkspaceCode,
+      requestedAt: timestamp,
     });
 
-    console.log('✅ 친구 추가 완료:', targetUser.displayName || targetUser.email);
+    // 7. deletedFriends에서 삭제 (재추가하는 경우)
+    try {
+      const { permanentlyDeleteFriend } = await import('./userManagementService');
+      await permanentlyDeleteFriend(myUserId, targetUser.id);
+      console.log('🗑️ deletedFriends에서 제거 완료');
+    } catch (error) {
+      console.warn('deletedFriends 삭제 실패 (무시):', error);
+      // deletedFriends에 없을 수도 있으므로 실패는 무시
+    }
+
+    // DM 방은 항상 유지되므로 숨김 해제 불필요
+
+    console.log('✅ 친구 추가 완료 (일방향):', targetUser.displayName || targetUser.email);
 
     return {
       success: true,
@@ -151,17 +195,34 @@ export const getMyFriends = async (userId) => {
 };
 
 /**
- * 친구 삭제
+ * 친구 삭제 (일방향 - 카카오톡 방식)
+ * 내 친구 목록에서만 삭제되고, 상대방 친구 목록에는 남아있음
+ * DM 방은 유지되며 계속 대화 가능 (카카오톡 방식)
  */
 export const removeFriend = async (myUserId, friendId) => {
   try {
-    // 내 친구 목록에서 삭제
+    // 1. 친구 데이터 가져오기 (deletedFriends에 저장하기 위해)
+    const friendDoc = await getDoc(doc(db, 'users', myUserId, 'friends', friendId));
+    const friendData = friendDoc.exists() ? friendDoc.data() : null;
+
+    // 2. 내 친구 목록에서만 삭제 (상대방 친구 목록에는 유지)
     await deleteDoc(doc(db, 'users', myUserId, 'friends', friendId));
 
-    // 상대방 친구 목록에서도 삭제
-    await deleteDoc(doc(db, 'users', friendId, 'friends', myUserId));
+    // 3. deletedFriends 컬렉션에 추가
+    if (friendData) {
+      try {
+        const { addToDeletedFriends } = await import('./userManagementService');
+        await addToDeletedFriends(myUserId, friendData);
+      } catch (error) {
+        console.warn('삭제된 친구 목록 추가 실패 (무시):', error);
+        // deletedFriends 추가 실패는 치명적이지 않으므로 계속 진행
+      }
+    }
 
-    console.log('✅ 친구 삭제 완료');
+    // 카카오톡 방식: DM 방은 유지하고 계속 대화 가능
+    // (DM 방 숨김 처리 제거)
+
+    console.log('✅ 친구 삭제 완료 (일방향, DM 방 유지)');
     return { success: true };
   } catch (error) {
     console.error('❌ 친구 삭제 실패:', error);
@@ -182,5 +243,94 @@ export const isFriend = async (myUserId, targetUserId) => {
   } catch (error) {
     console.error('친구 확인 오류:', error);
     return false;
+  }
+};
+
+/**
+ * 나를 친구로 추가한 사람 목록 가져오기
+ */
+export const getFriendRequests = async (userId) => {
+  try {
+    const requestsRef = collection(db, 'users', userId, 'friendRequests');
+    const snapshot = await getDocs(requestsRef);
+
+    const requests = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    return requests;
+  } catch (error) {
+    console.error('친구 요청 목록 조회 오류:', error);
+    throw error;
+  }
+};
+
+/**
+ * 친구 요청 수락 (나도 상대방을 친구로 추가)
+ */
+export const acceptFriendRequest = async (myUserId, requesterId) => {
+  try {
+    // 1. 요청자 정보 가져오기
+    const requestDoc = await getDoc(doc(db, 'users', myUserId, 'friendRequests', requesterId));
+
+    if (!requestDoc.exists()) {
+      throw new Error('친구 요청을 찾을 수 없습니다');
+    }
+
+    const requestData = requestDoc.data();
+    const timestamp = Timestamp.now();
+
+    // 2. 내 친구 목록에 추가
+    await setDoc(doc(db, 'users', myUserId, 'friends', requesterId), {
+      friendId: requesterId,
+      friendName: requestData.requesterName,
+      friendEmail: requestData.requesterEmail,
+      friendWorkspaceCode: requestData.requesterWorkspaceCode,
+      addedAt: timestamp,
+    });
+
+    // 3. friendRequests에서 삭제 (이제 친구가 되었으므로)
+    await deleteDoc(doc(db, 'users', myUserId, 'friendRequests', requesterId));
+
+    // 4. deletedFriends에서 삭제 (재추가하는 경우)
+    try {
+      const { permanentlyDeleteFriend } = await import('./userManagementService');
+      await permanentlyDeleteFriend(myUserId, requesterId);
+      console.log('🗑️ deletedFriends에서 제거 완료');
+    } catch (error) {
+      console.warn('deletedFriends 삭제 실패 (무시):', error);
+      // deletedFriends에 없을 수도 있으므로 실패는 무시
+    }
+
+    // DM 방은 항상 유지되므로 숨김 해제 불필요
+
+    console.log('✅ 친구 요청 수락 완료');
+    return { success: true };
+  } catch (error) {
+    console.error('❌ 친구 요청 수락 실패:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
+/**
+ * 친구 요청 거절/숨기기
+ */
+export const rejectFriendRequest = async (myUserId, requesterId) => {
+  try {
+    // friendRequests에서 삭제 (상대방은 여전히 나를 친구로 보고 있음)
+    await deleteDoc(doc(db, 'users', myUserId, 'friendRequests', requesterId));
+
+    console.log('✅ 친구 요청 거절 완료');
+    return { success: true };
+  } catch (error) {
+    console.error('❌ 친구 요청 거절 실패:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
   }
 };

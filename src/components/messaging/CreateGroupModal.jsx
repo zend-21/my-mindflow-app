@@ -96,6 +96,71 @@ const InputGroup = styled.div`
   margin-bottom: 24px;
 `;
 
+// 🆕 방 타입 선택
+const RoomTypeSelector = styled.div`
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+`;
+
+const RoomTypeOption = styled.label`
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: ${props => props.$selected ? 'rgba(74, 144, 226, 0.15)' : 'rgba(255, 255, 255, 0.03)'};
+  border: 2px solid ${props => props.$selected ? '#4a90e2' : 'rgba(255, 255, 255, 0.08)'};
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: ${props => props.$selected ? 'rgba(74, 144, 226, 0.2)' : 'rgba(255, 255, 255, 0.05)'};
+    border-color: ${props => props.$selected ? '#4a90e2' : 'rgba(255, 255, 255, 0.15)'};
+  }
+
+  input[type="radio"] {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border: 2px solid ${props => props.$selected ? '#4a90e2' : 'rgba(255, 255, 255, 0.3)'};
+    border-radius: 50%;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+
+    &:checked::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 10px;
+      height: 10px;
+      background: #4a90e2;
+      border-radius: 50%;
+    }
+  }
+`;
+
+const RoomTypeLabel = styled.div`
+  flex: 1;
+`;
+
+const RoomTypeName = styled.div`
+  font-size: 15px;
+  font-weight: 600;
+  color: ${props => props.$selected ? '#4a90e2' : '#e0e0e0'};
+  margin-bottom: 4px;
+`;
+
+const RoomTypeDesc = styled.div`
+  font-size: 12px;
+  color: ${props => props.$selected ? 'rgba(74, 144, 226, 0.8)' : '#888'};
+  line-height: 1.4;
+`;
+
 const Label = styled.label`
   display: block;
   font-size: 14px;
@@ -327,6 +392,7 @@ const CreateGroupModal = ({ onClose, showToast }) => {
   const [friends, setFriends] = useState([]);
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isPublic, setIsPublic] = useState(false); // 🆕 공개/비공개 선택 (기본값: 비공개)
 
   useEffect(() => {
     // 친구 목록 불러오기
@@ -375,7 +441,8 @@ const CreateGroupModal = ({ onClose, showToast }) => {
       return;
     }
 
-    if (selectedFriends.length === 0) {
+    // 비공개방일 때만 멤버 선택 필수
+    if (!isPublic && selectedFriends.length === 0) {
       showToast?.('최소 1명의 친구를 선택해주세요');
       return;
     }
@@ -384,12 +451,21 @@ const CreateGroupModal = ({ onClose, showToast }) => {
 
     try {
       const currentUserId = localStorage.getItem('firebaseUserId');
-      await createGroupChat(currentUserId, groupName.trim(), selectedFriends);
+      // 공개방이면 초기 멤버 없이 생성, 비공개방이면 선택한 친구들과 함께 생성
+      const membersToInvite = isPublic ? [] : selectedFriends;
+      await createGroupChat(currentUserId, groupName.trim(), membersToInvite, null, isPublic);
       showToast?.('단체방이 생성되었습니다');
       onClose();
     } catch (error) {
       console.error('단체방 생성 실패:', error);
-      showToast?.('단체방 생성에 실패했습니다');
+
+      // 차단한 사용자 에러 처리
+      if (error.message?.startsWith('BLOCKED_BY_YOU:')) {
+        const blockedNames = error.message.replace('BLOCKED_BY_YOU:', '');
+        showToast?.(`차단한 사용자는 초대할 수 없습니다: ${blockedNames}`);
+      } else {
+        showToast?.('단체방 생성에 실패했습니다');
+      }
     } finally {
       setLoading(false);
     }
@@ -435,9 +511,42 @@ const CreateGroupModal = ({ onClose, showToast }) => {
             />
           </InputGroup>
 
-          {/* 친구 선택 */}
+          {/* 🆕 공개/비공개 선택 */}
           <InputGroup>
-            <Label>멤버 선택 ({selectedFriends.length}명)</Label>
+            <Label>방 타입</Label>
+            <RoomTypeSelector>
+              <RoomTypeOption $selected={!isPublic}>
+                <input
+                  type="radio"
+                  name="roomType"
+                  checked={!isPublic}
+                  onChange={() => setIsPublic(false)}
+                />
+                <RoomTypeLabel>
+                  <RoomTypeName $selected={!isPublic}>🔒 비공개방</RoomTypeName>
+                  <RoomTypeDesc $selected={!isPublic}>친구를 직접 초대</RoomTypeDesc>
+                </RoomTypeLabel>
+              </RoomTypeOption>
+
+              <RoomTypeOption $selected={isPublic}>
+                <input
+                  type="radio"
+                  name="roomType"
+                  checked={isPublic}
+                  onChange={() => setIsPublic(true)}
+                />
+                <RoomTypeLabel>
+                  <RoomTypeName $selected={isPublic}>🌐 공개방</RoomTypeName>
+                  <RoomTypeDesc $selected={isPublic}>초대 코드로 참여</RoomTypeDesc>
+                </RoomTypeLabel>
+              </RoomTypeOption>
+            </RoomTypeSelector>
+          </InputGroup>
+
+          {/* 친구 선택 (비공개방일 때만 표시) */}
+          {!isPublic && (
+            <InputGroup>
+              <Label>멤버 선택 ({selectedFriends.length}명)</Label>
 
             {friends.length > 0 ? (
               <>
@@ -488,18 +597,19 @@ const CreateGroupModal = ({ onClose, showToast }) => {
                   <SelectedCount>
                     {selectedFriends.length}명 선택됨
                   </SelectedCount>
-                )}
-              </>
-            ) : (
-              <EmptyState>
-                <EmptyIcon>👥</EmptyIcon>
-                <EmptyText>
-                  아직 친구가 없습니다<br />
-                  친구 탭에서 친구를 추가해보세요
-                </EmptyText>
-              </EmptyState>
-            )}
-          </InputGroup>
+                  )}
+                </>
+              ) : (
+                <EmptyState>
+                  <EmptyIcon>👥</EmptyIcon>
+                  <EmptyText>
+                    아직 친구가 없습니다<br />
+                    친구 탭에서 친구를 추가해보세요
+                  </EmptyText>
+                </EmptyState>
+              )}
+            </InputGroup>
+          )}
         </Content>
 
         <Footer>
@@ -508,7 +618,7 @@ const CreateGroupModal = ({ onClose, showToast }) => {
           </CancelButton>
           <CreateButton
             onClick={handleCreate}
-            disabled={loading || !groupName.trim() || selectedFriends.length === 0}
+            disabled={loading || !groupName.trim() || (!isPublic && selectedFriends.length === 0)}
           >
             {loading ? '생성 중...' : '생성하기'}
           </CreateButton>

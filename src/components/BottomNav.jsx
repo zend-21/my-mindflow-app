@@ -1,8 +1,10 @@
 // src/components/BottomNav.jsx
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { fadeInUp } from '../styles.js';
+import { subscribeToMyDMRooms } from '../services/directMessageService';
+import { subscribeToMyGroupChats } from '../services/groupChatService';
 
 const NavContainer = styled.nav`
     display: flex;
@@ -68,7 +70,32 @@ const NavLabel = styled.span`
     font-size: 12px; /* 라벨 폰트 크기 별도 관리 */
 `;
 
+const Badge = styled.div`
+    position: absolute;
+    top: -5px;
+    right: -10px;
+    background: linear-gradient(135deg, #ff416c, #ff4b2b);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 10px;
+    min-width: 18px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(255, 65, 108, 0.4);
+`;
+
+const NavItemWrapper = styled.div`
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+`;
+
 const BottomNav = ({ activeTab, onSwitchTab }) => {
+    const [totalUnreadCount, setTotalUnreadCount] = useState(0);
+    const currentUserId = localStorage.getItem('firebaseUserId');
+
     const tabs = [
         { name: 'home', label: '홈', icon: '🏠' },
         { name: 'memo', label: '메모', icon: '📝' },
@@ -77,17 +104,57 @@ const BottomNav = ({ activeTab, onSwitchTab }) => {
         { name: 'chat', label: '대화', icon: '💬' }
     ];
 
+    // 전체 안 읽은 메시지 개수 계산
+    useEffect(() => {
+        if (!currentUserId) {
+            setTotalUnreadCount(0);
+            return;
+        }
+
+        let dmUnread = 0;
+        let groupUnread = 0;
+
+        const updateTotal = () => {
+            setTotalUnreadCount(dmUnread + groupUnread);
+        };
+
+        // 1:1 채팅 구독
+        const unsubscribeDM = subscribeToMyDMRooms((rooms) => {
+            dmUnread = rooms.reduce((sum, room) => {
+                return sum + (room.unreadCount?.[currentUserId] || 0);
+            }, 0);
+            updateTotal();
+        });
+
+        // 그룹 채팅 구독
+        const unsubscribeGroup = subscribeToMyGroupChats((groups) => {
+            groupUnread = groups.reduce((sum, group) => {
+                return sum + (group.unreadCount?.[currentUserId] || 0);
+            }, 0);
+            updateTotal();
+        });
+
+        return () => {
+            if (unsubscribeDM) unsubscribeDM();
+            if (unsubscribeGroup) unsubscribeGroup();
+        };
+    }, [currentUserId]);
+
     return (
         <NavContainer>
             {tabs.map(tab => (
-                <NavItem
-                    key={tab.name}
-                    $active={activeTab === tab.name}
-                    onClick={() => onSwitchTab(tab.name)}
-                >
-                    <NavIcon $active={activeTab === tab.name}>{tab.icon}</NavIcon>
-                    <NavLabel>{tab.label}</NavLabel>
-                </NavItem>
+                <NavItemWrapper key={tab.name}>
+                    <NavItem
+                        $active={activeTab === tab.name}
+                        onClick={() => onSwitchTab(tab.name)}
+                    >
+                        <NavIcon $active={activeTab === tab.name}>{tab.icon}</NavIcon>
+                        <NavLabel>{tab.label}</NavLabel>
+                    </NavItem>
+                    {tab.name === 'chat' && totalUnreadCount > 0 && (
+                        <Badge>{totalUnreadCount > 99 ? '99+' : totalUnreadCount}</Badge>
+                    )}
+                </NavItemWrapper>
             ))}
         </NavContainer>
     );

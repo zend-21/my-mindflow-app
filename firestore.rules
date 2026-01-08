@@ -58,6 +58,36 @@ service cloud.firestore {
         // 수정/삭제: 본인만
         allow update, delete: if isSignedIn() && request.auth.uid == userId;
       }
+
+      // 🆕 친구 요청 서브컬렉션
+      match /friendRequests/{requestId} {
+        // 읽기: 본인의 친구 요청만
+        allow read: if isSignedIn() && request.auth.uid == userId;
+
+        // 생성: 다른 사람이 나에게 친구 요청을 보내는 경우
+        allow create: if isSignedIn();
+
+        // 수정/삭제: 본인의 친구 요청만 (수락/거부 처리)
+        allow update, delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // 🆕 차단된 사용자 서브컬렉션
+      match /blockedUsers/{blockedUserId} {
+        // 읽기: 로그인한 모든 사용자 (초대 시 차단 확인용)
+        allow read: if isSignedIn();
+
+        // 생성/수정/삭제: 본인만
+        allow create, update, delete: if isSignedIn() && request.auth.uid == userId;
+      }
+
+      // 🆕 삭제된 친구 서브컬렉션
+      match /deletedFriends/{friendId} {
+        // 읽기: 본인만
+        allow read: if isSignedIn() && request.auth.uid == userId;
+
+        // 생성/수정/삭제: 본인만
+        allow create, update, delete: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     // ========================================

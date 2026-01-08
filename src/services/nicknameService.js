@@ -172,3 +172,29 @@ export const deleteNickname = async (userId) => {
         throw error;
     }
 };
+
+/**
+ * 사용자 표시 이름 가져오기 (앱 닉네임 우선, fallback: Google displayName)
+ * @param {string} userId - 사용자 ID
+ * @param {string} fallbackDisplayName - Google displayName (fallback용)
+ * @returns {Promise<string>} 표시할 이름
+ */
+export const getUserDisplayName = async (userId, fallbackDisplayName = '익명') => {
+    if (!userId) {
+        return fallbackDisplayName || '익명';
+    }
+
+    try {
+        // 1순위: 앱 내 닉네임
+        const nickname = await getUserNickname(userId);
+        if (nickname) {
+            return nickname;
+        }
+
+        // 2순위: fallback (Google displayName 등)
+        return fallbackDisplayName || '익명';
+    } catch (error) {
+        console.error('사용자 표시 이름 조회 오류:', error);
+        return fallbackDisplayName || '익명';
+    }
+};

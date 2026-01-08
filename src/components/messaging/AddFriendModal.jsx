@@ -419,7 +419,11 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
                     type="text"
                     placeholder="ID 입력 (예: WSD5D2)"
                     value={searchId}
-                    onChange={(e) => setSearchId(e.target.value)}
+                    onChange={(e) => {
+                      // 영문과 숫자, 하이픈만 허용 (한글 입력 차단)
+                      const value = e.target.value.replace(/[^a-zA-Z0-9-]/g, '');
+                      setSearchId(value);
+                    }}
                     onKeyPress={(e) => e.key === 'Enter' && !searching && handleSearch()}
                   />
                   <SearchButton onClick={handleSearch} disabled={searching}>

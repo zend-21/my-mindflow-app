@@ -1760,6 +1760,24 @@ export const deleteAllUserData = async (userId) => {
     keysToDelete.forEach(key => localStorage.removeItem(key));
     console.log(`✅ localStorage 데이터도 삭제: ${keysToDelete.length}개 항목`);
 
+    // ⚠️ 공유 localStorage 삭제 (다른 계정 데이터 오염 방지)
+    const sharedKeys = ['memos_shared', 'memoFolders', 'trash', 'activities', 'calendar', 'macros'];
+    sharedKeys.forEach(key => {
+      if (localStorage.getItem(key)) {
+        localStorage.removeItem(key);
+        console.log(`🗑️ 공유 localStorage 삭제: ${key}`);
+      }
+    });
+
+    // ⚠️ 마이그레이션 방지: 빈 배열로 설정하여 재마이그레이션 차단
+    localStorage.setItem(`user_${userId}_memos`, JSON.stringify([]));
+    localStorage.setItem(`user_${userId}_folders`, JSON.stringify([]));
+    localStorage.setItem(`user_${userId}_trash`, JSON.stringify([]));
+    localStorage.setItem(`user_${userId}_activities`, JSON.stringify([]));
+    localStorage.setItem(`user_${userId}_calendar`, JSON.stringify({}));
+    localStorage.setItem(`user_${userId}_macros`, JSON.stringify([]));
+    console.log('✅ 마이그레이션 방지 플래그 설정 완료 (빈 데이터로 초기화)');
+
     return deleteCounts;
   } catch (error) {
     console.error('❌ 데이터 삭제 실패:', error);

@@ -4,6 +4,7 @@ import {
   updateDoc, serverTimestamp, onSnapshot, orderBy, limit, addDoc
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
+import { enterRoom, exitRoom, createMarkAsReadDebounced } from './messageService';
 
 /**
  * 1:1 대화방 ID 생성 (정렬된 userId 조합)
@@ -30,12 +31,13 @@ export const createOrGetDMRoom = async (targetUserId, targetUserInfo) => {
 
     const currentUserId = auth.currentUser.uid;
 
-    if (currentUserId === targetUserId) {
-      throw new Error('자기 자신과는 대화할 수 없습니다');
-    }
+    // 나와의 대화 허용 (메모장 용도)
+    const isSelfChat = currentUserId === targetUserId;
 
-    // 1:1 대화방 ID 생성
-    const roomId = generateDMRoomId(currentUserId, targetUserId);
+    // 1:1 대화방 ID 생성 (나와의 대화는 특수 ID 사용)
+    const roomId = isSelfChat
+      ? `dm_self_${currentUserId}`
+      : generateDMRoomId(currentUserId, targetUserId);
     const roomRef = doc(db, 'directMessages', roomId);
 
     // 기존 대화방 확인
@@ -44,16 +46,33 @@ export const createOrGetDMRoom = async (targetUserId, targetUserInfo) => {
     if (existingRoom.exists()) {
       console.log('기존 1:1 대화방 찾음:', roomId);
 
-      // 마지막 접속 시간 업데이트
+      // 마지막 접속 시간 및 상대방 정보 업데이트 (닉네임 변경 반영)
       const updateData = {};
       updateData[`lastAccessTime.${currentUserId}`] = serverTimestamp();
 
+      // 상대방 정보 업데이트 (친구 닉네임 반영)
+      if (targetUserInfo.displayName) {
+        updateData[`participantsInfo.${targetUserId}.displayName`] = targetUserInfo.displayName;
+      }
+
       await updateDoc(roomRef, updateData);
+
+      // 업데이트된 데이터 반환
+      const updatedData = {
+        ...existingRoom.data(),
+        participantsInfo: {
+          ...existingRoom.data().participantsInfo,
+          [targetUserId]: {
+            ...existingRoom.data().participantsInfo?.[targetUserId],
+            displayName: targetUserInfo.displayName || existingRoom.data().participantsInfo?.[targetUserId]?.displayName || '익명'
+          }
+        }
+      };
 
       return {
         success: true,
         roomId,
-        data: existingRoom.data(),
+        data: updatedData,
         isNew: false
       };
     }
@@ -63,19 +82,21 @@ export const createOrGetDMRoom = async (targetUserId, targetUserInfo) => {
 
     const roomData = {
       roomId,
-      type: 'direct', // 1:1 대화방 타입
-      participants: [currentUserId, targetUserId],
+      type: isSelfChat ? 'self' : 'direct', // 나와의 대화는 'self' 타입
+      participants: isSelfChat ? [currentUserId] : [currentUserId, targetUserId],
       participantsInfo: {
         [currentUserId]: {
           displayName: auth.currentUser.displayName || '익명',
           email: auth.currentUser.email || '',
           photoURL: auth.currentUser.photoURL || ''
         },
-        [targetUserId]: {
-          displayName: targetUserInfo.displayName || '익명',
-          email: targetUserInfo.email || '',
-          photoURL: targetUserInfo.photoURL || ''
-        }
+        ...(isSelfChat ? {} : {
+          [targetUserId]: {
+            displayName: targetUserInfo.displayName || '익명',
+            email: targetUserInfo.email || '',
+            photoURL: targetUserInfo.photoURL || ''
+          }
+        })
       },
       createdAt: serverTimestamp(),
       createdBy: currentUserId,
@@ -83,21 +104,21 @@ export const createOrGetDMRoom = async (targetUserId, targetUserInfo) => {
       lastMessageTime: serverTimestamp(), // null 대신 초기 타임스탬프
       unreadCount: {
         [currentUserId]: 0,
-        [targetUserId]: 0
+        ...(isSelfChat ? {} : { [targetUserId]: 0 })
       },
       lastAccessTime: {
         [currentUserId]: serverTimestamp(),
-        [targetUserId]: null
+        ...(isSelfChat ? {} : { [targetUserId]: null })
       },
       // 차단 상태 (나중에 차단 기능 구현시 사용)
       blocked: {
         [currentUserId]: false,
-        [targetUserId]: false
+        ...(isSelfChat ? {} : { [targetUserId]: false })
       },
       // 대화방 숨김 상태 (나중에 구현)
       hidden: {
         [currentUserId]: false,
-        [targetUserId]: false
+        ...(isSelfChat ? {} : { [targetUserId]: false })
       }
     };
 
@@ -212,43 +233,12 @@ export const subscribeToDMRoom = (roomId, callback) => {
 
 /**
  * 읽음 표시 업데이트 (디바운스 적용 - quota 최적화)
- * @param {string} roomId
+ * 공통 messageService 사용
  */
-const markDMAsReadDebounced = (() => {
-  const timeouts = new Map();
-
-  return async (roomId) => {
-    try {
-      if (!auth.currentUser) return;
-
-      // 기존 타이머 취소
-      if (timeouts.has(roomId)) {
-        clearTimeout(timeouts.get(roomId));
-      }
-
-      // 3초 후 실행 (quota 절약)
-      const timeoutId = setTimeout(async () => {
-        const roomRef = doc(db, 'directMessages', roomId);
-
-        const updateData = {
-          [`unreadCount.${auth.currentUser.uid}`]: 0,
-          [`lastAccessTime.${auth.currentUser.uid}`]: serverTimestamp()
-        };
-
-        await updateDoc(roomRef, updateData);
-        timeouts.delete(roomId);
-      }, 3000);
-
-      timeouts.set(roomId, timeoutId);
-
-    } catch (error) {
-      console.error('❌ 읽음 표시 업데이트 오류:', error);
-    }
-  };
-})();
+const markDMAsReadDebounced = createMarkAsReadDebounced('directMessages');
 
 // 기존 함수명 유지 (호환성)
-export const markDMAsRead = markDMAsReadDebounced;
+export const markDMAsRead = (roomId) => markDMAsReadDebounced(roomId, auth.currentUser?.uid);
 
 /**
  * 대화방 나가기 (숨기기)
@@ -318,39 +308,62 @@ export const sendMessage = async (roomId, text, roomData = null) => {
     const messagesRef = collection(db, 'directMessages', roomId, 'messages');
     const roomRef = doc(db, 'directMessages', roomId);
 
+    // ✅ 항상 최신 roomData를 Firestore에서 직접 읽기 (inRoom 상태 실시간 반영)
+    const roomSnap = await getDoc(roomRef);
+    const actualRoomData = roomSnap.exists() ? roomSnap.data() : null;
+    const currentUnreadCount = actualRoomData?.unreadCount || {};
+
+    // 상대방이 방에 있는지 확인
+    const otherUserId = actualRoomData?.participants?.find(id => id !== auth.currentUser.uid);
+    const isOtherUserInRoom = otherUserId && actualRoomData?.inRoom?.[otherUserId] === true;
+
+    console.log('📤 메시지 전송:', {
+      roomId,
+      senderId: auth.currentUser.uid,
+      currentUnreadCount,
+      otherUserId,
+      inRoom: actualRoomData?.inRoom,
+      isOtherUserInRoom,
+      willBeRead: isOtherUserInRoom
+    });
+
     // 메시지 데이터
     const messageData = {
       text: text.trim(),
       senderId: auth.currentUser.uid,
       senderName: auth.currentUser.displayName || '익명',
       createdAt: serverTimestamp(),
-      read: false
+      read: isOtherUserInRoom  // 상대방이 방에 있으면 즉시 read: true
     };
 
     // 메시지 추가
     const messageDoc = await addDoc(messagesRef, messageData);
 
     // 대화방의 lastMessage 업데이트
-    // quota 최적화: roomData가 전달되면 getDoc() 생략
-    let actualRoomData = roomData;
-
-    if (!actualRoomData) {
-      // fallback: roomData 없으면 읽기 (1 read)
-      const roomSnap = await getDoc(roomRef);
-      if (roomSnap.exists()) {
-        actualRoomData = roomSnap.data();
-      }
-    }
-
     if (actualRoomData) {
-      const otherUserId = actualRoomData.participants?.find(id => id !== auth.currentUser.uid);
-      const newUnreadCount = (actualRoomData.unreadCount?.[otherUserId] || 0) + 1;
 
-      await updateDoc(roomRef, {
-        lastMessage: text.trim(),
-        lastMessageTime: serverTimestamp(),
-        [`unreadCount.${otherUserId}`]: newUnreadCount
-      });
+      // 나와의 대화인 경우 (otherUserId가 없음)
+      if (!otherUserId) {
+        await updateDoc(roomRef, {
+          lastMessage: text.trim(),
+          lastMessageTime: serverTimestamp()
+        });
+      } else {
+        // 일반 1:1 대화
+        // 상대방이 방에 없을 때만 unreadCount 증가
+        const updateData = {
+          lastMessage: text.trim(),
+          lastMessageTime: serverTimestamp()
+        };
+
+        if (!isOtherUserInRoom) {
+          // ✅ 현재 값을 가져와서 1 증가 (그룹 채팅과 동일)
+          const currentCount = currentUnreadCount[otherUserId] || 0;
+          updateData[`unreadCount.${otherUserId}`] = currentCount + 1;
+        }
+
+        await updateDoc(roomRef, updateData);
+      }
     }
 
     return {
@@ -363,6 +376,18 @@ export const sendMessage = async (roomId, text, roomData = null) => {
     throw error;
   }
 };
+
+/**
+ * 1:1 채팅방 입장 (inRoom 상태 업데이트)
+ * 공통 messageService 사용
+ */
+export const enterDMRoom = (roomId, userId) => enterRoom('directMessages', roomId, userId, false);
+
+/**
+ * 1:1 채팅방 퇴장 (inRoom 상태 업데이트)
+ * 공통 messageService 사용
+ */
+export const exitDMRoom = (roomId, userId) => exitRoom('directMessages', roomId, userId);
 
 /**
  * 메시지 목록 실시간 구독 (quota 최적화: 최근 50개 + 증분 업데이트)
@@ -395,10 +420,10 @@ export const subscribeToMessages = (roomId, callback) => {
       callback(messages);
       isInitialLoad = false;
     } else {
-      // 증분 업데이트: 변경된 메시지만 처리
+      // 증분 업데이트: 변경된 메시지만 처리 (추가 + 수정)
       const changes = [];
       snapshot.docChanges().forEach(change => {
-        if (change.type === 'added') {
+        if (change.type === 'added' || change.type === 'modified') {
           changes.push({
             id: change.doc.id,
             ...change.doc.data()
@@ -419,4 +444,76 @@ export const subscribeToMessages = (roomId, callback) => {
       }
     }
   });
+};
+
+/**
+ * 특정 사용자와의 DM 방 숨기기 (친구 삭제 시 사용)
+ * @param {string} myUserId - 내 사용자 ID
+ * @param {string} targetUserId - 상대방 사용자 ID
+ * @returns {Promise<{success: boolean}>}
+ */
+export const hideDMRoomWithUser = async (myUserId, targetUserId) => {
+  try {
+    const roomId = generateDMRoomId(myUserId, targetUserId);
+    const roomRef = doc(db, 'directMessages', roomId);
+
+    // 대화방이 존재하는지 확인
+    const roomDoc = await getDoc(roomRef);
+
+    if (!roomDoc.exists()) {
+      // 대화방이 없으면 숨길 것도 없음
+      console.log('대화방이 존재하지 않음:', roomId);
+      return { success: true };
+    }
+
+    // 나만 대화방 숨김 처리 (상대방은 모름)
+    const updateData = {};
+    updateData[`hidden.${myUserId}`] = true;
+
+    await updateDoc(roomRef, updateData);
+
+    console.log('✅ DM 방 숨김 완료:', roomId);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ DM 방 숨김 실패:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
+/**
+ * 특정 사용자와의 DM 방 숨김 해제 (친구 재추가 시 사용 가능)
+ * @param {string} myUserId - 내 사용자 ID
+ * @param {string} targetUserId - 상대방 사용자 ID
+ * @returns {Promise<{success: boolean}>}
+ */
+export const unhideDMRoomWithUser = async (myUserId, targetUserId) => {
+  try {
+    const roomId = generateDMRoomId(myUserId, targetUserId);
+    const roomRef = doc(db, 'directMessages', roomId);
+
+    const roomDoc = await getDoc(roomRef);
+
+    if (!roomDoc.exists()) {
+      console.log('대화방이 존재하지 않음:', roomId);
+      return { success: true };
+    }
+
+    // 숨김 해제
+    const updateData = {};
+    updateData[`hidden.${myUserId}`] = false;
+
+    await updateDoc(roomRef, updateData);
+
+    console.log('✅ DM 방 숨김 해제 완료:', roomId);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ DM 방 숨김 해제 실패:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
 };

@@ -12,10 +12,11 @@ import { avatarList } from './avatars/AvatarIcons';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import QRCode from 'qrcode';
-import { Copy, Lock } from 'lucide-react';
-import { checkNicknameAvailability, updateNickname } from '../services/nicknameService';
+import { Copy, Lock, Trash2 } from 'lucide-react';
+import { checkNicknameAvailability, updateNickname, deleteNickname } from '../services/nicknameService';
 import ChangePasswordModal from './ChangePasswordModal';
 import { hasMasterPassword } from '../services/keyManagementService';
+import { getProfileSetting, setProfileSetting } from '../utils/userStorage';
 
 // 🎨 Styled Components
 
@@ -234,28 +235,22 @@ const DefaultProfileIcon = styled.div`
 const ProfileImageClickable = styled.div`
     position: relative;
     cursor: pointer;
-
-    &:hover .edit-overlay {
-        opacity: 1;
-    }
 `;
 
 const EditOverlay = styled.div`
     position: absolute;
-    top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    opacity: 0;
-    transition: opacity 0.2s;
+    padding-bottom: 8px;
+    opacity: 1; /* 모바일에서 항상 표시 */
     color: white;
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 400;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 `;
 
 const RemoveButton = styled.button`
@@ -321,10 +316,14 @@ const NicknameContainer = styled.div`
 
 const Nickname = styled.h2`
     margin: 0;
-    font-size: 24px;
-    font-weight: 600;
+    font-size: 20px;
+    font-weight: 400;
     color: #ffffff;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 `;
 
 const EditButton = styled.button`
@@ -364,7 +363,7 @@ const InfoRowInHeader = styled.div`
 `;
 
 const InfoTextInHeader = styled.span`
-    font-size: 16px;
+    font-size: 14px;
     color: #e0e0e0;
     font-weight: 400;
     text-align: center;
@@ -391,7 +390,7 @@ const WsCodeSection = styled.div`
 `;
 
 const WsCodeText = styled.div`
-    font-size: 16px;
+    font-size: 14px;
     color: #e0e0e0;
     font-weight: 400;
     text-align: center;
@@ -1018,6 +1017,38 @@ const SecurityButton = styled.button`
     }
 `;
 
+const CleanupButton = styled.button`
+    width: 100%;
+    padding: 14px;
+    background: rgba(255, 165, 0, 0.1);
+    border: 1px solid rgba(255, 165, 0, 0.3);
+    border-radius: 12px;
+    color: #ffa500;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+
+    &:hover {
+        background: rgba(255, 165, 0, 0.2);
+        border-color: rgba(255, 165, 0, 0.5);
+        box-shadow: 0 2px 8px rgba(255, 165, 0, 0.2);
+    }
+
+    &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        &:hover {
+            background: rgba(255, 165, 0, 0.1);
+            box-shadow: none;
+        }
+    }
+`;
+
 // 🎯 Main Component
 
 const BACKGROUND_COLORS = {
@@ -1037,22 +1068,22 @@ const BACKGROUND_COLORS = {
     'custom': () => localStorage.getItem('avatarCustomColor') || '#FF1493',
 };
 
-const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) => {
+const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, onCleanupOrphanedMemos, onClose }) => {
     const [isFortuneExpanded, setIsFortuneExpanded] = useState(false);
     const [isEditingNickname, setIsEditingNickname] = useState(false);
-    const [nickname, setNickname] = useState(profile?.nickname || '');
+    const [nickname, setNickname] = useState(''); // 초기값 빈 문자열로 변경 - Firebase에서 로드
     const [isBirthdayReminderEnabled, setIsBirthdayReminderEnabled] = useState(false);
     const [birthdayCalendarType, setBirthdayCalendarType] = useState('solar'); // 'solar' | 'lunar'
     const [isFortuneInputModalOpen, setIsFortuneInputModalOpen] = useState(false);
     const [isFortuneFlowOpen, setIsFortuneFlowOpen] = useState(false);
     const [imageError, setImageError] = useState(false);
 
-    // 아바타 관련 상태
-    const [profileImageType, setProfileImageType] = useState(localStorage.getItem('profileImageType') || 'avatar'); // 'avatar' | 'photo'
-    const [selectedAvatarId, setSelectedAvatarId] = useState(localStorage.getItem('selectedAvatarId') || null);
+    // 아바타 관련 상태 (계정별로 분리)
+    const [profileImageType, setProfileImageType] = useState(getProfileSetting('profileImageType') || 'avatar'); // 'avatar' | 'photo'
+    const [selectedAvatarId, setSelectedAvatarId] = useState(getProfileSetting('selectedAvatarId') || null);
     const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
-    const [avatarBgColor, setAvatarBgColor] = useState(localStorage.getItem('avatarBgColor') || 'none');
-    const [customPicture, setCustomPicture] = useState(localStorage.getItem('customProfilePicture') || null);
+    const [avatarBgColor, setAvatarBgColor] = useState(getProfileSetting('avatarBgColor') || 'none');
+    const [customPicture, setCustomPicture] = useState(getProfileSetting('customProfilePicture') || null);
 
     // 생년월일 마스킹 관련 상태
     const [isBirthDateRevealed, setIsBirthDateRevealed] = useState(false);
@@ -1086,6 +1117,10 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     const totalSchedules = Object.keys(calendarSchedules || {}).length;
     const importantMemos = memos?.filter(m => m.isImportant).length || 0;
 
+    // 숨겨진 메모 계산 (존재하지 않는 폴더에 속한 메모)
+    const folderIds = new Set(folders?.map(f => f.id) || []);
+    const orphanedMemosCount = memos?.filter(memo => memo.folderId && !folderIds.has(memo.folderId)).length || 0;
+
     // 닉네임 저장
     const handleSaveNickname = async () => {
         if (!nickname.trim()) {
@@ -1093,7 +1128,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
             return;
         }
 
-        const savedNickname = localStorage.getItem('userNickname');
+        const savedNickname = getProfileSetting('userNickname');
         const newNickname = nickname.trim();
 
         // 닉네임이 변경되지 않았으면 그냥 종료
@@ -1121,7 +1156,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
             }
 
             // localStorage에 저장
-            localStorage.setItem('userNickname', newNickname);
+            setProfileSetting('userNickname', newNickname);
 
             // nickname state 업데이트 (즉시 UI 반영)
             setNickname(newNickname);
@@ -1152,6 +1187,64 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
         }
     };
 
+    // 프로필 초기화 (구글 프로필로 되돌리기)
+    const handleResetProfile = async () => {
+        if (!window.confirm('구글 계정 프로필로 되돌리시겠습니까?\n(닉네임과 프로필 사진이 초기화됩니다)')) {
+            return;
+        }
+
+        try {
+            const userId = localStorage.getItem('firebaseUserId');
+            if (!userId) {
+                showToast?.('⚠️ 사용자 정보를 찾을 수 없습니다');
+                return;
+            }
+
+            // 1. Firestore 닉네임 삭제
+            await deleteNickname(userId);
+
+            // 2. localStorage 프로필 설정 초기화
+            setProfileSetting('userNickname', '');
+            setProfileSetting('profileImageType', 'avatar');
+            setProfileSetting('selectedAvatarId', '');
+            setProfileSetting('avatarBgColor', 'none');
+            setProfileSetting('customProfilePicture', '');
+
+            // 3. Firestore settings 초기화
+            try {
+                const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
+                const currentSettings = await fetchSettingsFromFirestore(userId);
+                await saveSettingsToFirestore(userId, {
+                    ...currentSettings,
+                    nickname: '',
+                    profileImageType: 'avatar',
+                    selectedAvatarId: null,
+                    avatarBgColor: 'none',
+                    customProfilePicture: null
+                });
+                console.log('✅ settings 프로필 초기화 완료');
+            } catch (settingsError) {
+                console.error('settings 프로필 초기화 실패:', settingsError);
+            }
+
+            // 4. 로컬 state 업데이트
+            setNickname('');
+            setProfileImageType('avatar');
+            setSelectedAvatarId(null);
+            setAvatarBgColor('none');
+            setCustomPicture(null);
+
+            // 5. 이벤트 발생으로 다른 컴포넌트 동기화
+            window.dispatchEvent(new CustomEvent('nicknameChanged', { detail: '' }));
+            window.dispatchEvent(new CustomEvent('profileImageTypeChanged', { detail: 'avatar' }));
+
+            showToast?.('✅ 구글 프로필로 되돌렸습니다');
+        } catch (error) {
+            console.error('프로필 초기화 오류:', error);
+            showToast?.('❌ 프로필 초기화 중 오류가 발생했습니다');
+        }
+    };
+
     // 프로필 이미지 에러 처리
     const handleImageError = () => {
         console.log('⚠️ 프로필 이미지 로드 실패 - Placeholder 표시');
@@ -1165,7 +1258,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     const handleImageTypeChange = async (type) => {
         console.log('🔄 프로필 이미지 타입 변경:', type);
         setProfileImageType(type);
-        localStorage.setItem('profileImageType', type);
+        setProfileSetting('profileImageType', type);
 
         // Header에 알림
         window.dispatchEvent(new CustomEvent('profileImageTypeChanged', { detail: type }));
@@ -1193,7 +1286,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     // 아바타 선택 핸들러
     const handleAvatarSelect = async (avatarId) => {
         setSelectedAvatarId(avatarId);
-        localStorage.setItem('selectedAvatarId', avatarId);
+        setProfileSetting('selectedAvatarId', avatarId);
         showToast?.('아바타가 변경되었습니다');
 
         // 🔥 Firestore settings에도 동기화
@@ -1237,6 +1330,38 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
     };
 
     // 컴포넌트 언마운트 시 타이머 정리
+    // 🔥 프로필 페이지 마운트 시 Firebase에서 최신 닉네임 직접 로드
+    useEffect(() => {
+        const loadLatestNickname = async () => {
+            try {
+                const userId = localStorage.getItem('firebaseUserId');
+                if (!userId) return;
+
+                // Firebase에서 최신 닉네임 가져오기
+                const { getUserNickname } = await import('../services/nicknameService');
+                const latestNickname = await getUserNickname(userId);
+
+                if (latestNickname) {
+                    // Firebase에 닉네임이 있으면 그것을 사용
+                    setNickname(latestNickname);
+                    // localStorage도 업데이트
+                    setProfileSetting('userNickname', latestNickname);
+                } else {
+                    // Firebase에 닉네임이 없으면 localStorage 또는 profile 사용
+                    const savedNickname = getProfileSetting('userNickname');
+                    setNickname(savedNickname || profile?.nickname || '');
+                }
+            } catch (error) {
+                console.error('최신 닉네임 로드 오류:', error);
+                // 오류 시 localStorage 또는 profile 사용
+                const savedNickname = getProfileSetting('userNickname');
+                setNickname(savedNickname || profile?.nickname || '');
+            }
+        };
+
+        loadLatestNickname();
+    }, []); // 컴포넌트 마운트 시 한 번만 실행
+
     useEffect(() => {
         return () => {
             if (birthDateTimerRef.current) {
@@ -1562,9 +1687,9 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
             const hash = await calculateHash(imageUrl);
 
             try {
-                // localStorage에 URL만 저장 (Base64 대신)
-                localStorage.setItem('customProfilePicture', imageUrl);
-                localStorage.setItem('customProfilePictureHash', hash);
+                // localStorage에 URL만 저장 (Base64 대신) - 계정별로 분리
+                setProfileSetting('customProfilePicture', imageUrl);
+                setProfileSetting('customProfilePictureHash', hash);
             } catch (storageError) {
                 if (storageError.name === 'QuotaExceededError') {
                     showToast?.('저장 공간이 부족합니다');
@@ -1808,9 +1933,29 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                                     <NicknameInput
                                         type="text"
                                         value={nickname}
-                                        onChange={(e) => setNickname(e.target.value)}
+                                        onChange={(e) => {
+                                            const value = e.target.value;
+
+                                            // 가중치 계산: 한글 2포인트, 영문/숫자 1포인트
+                                            let totalPoints = 0;
+
+                                            for (let char of value) {
+                                                // 한글 범위: AC00-D7A3 (가-힣)
+                                                if (/[\uAC00-\uD7A3]/.test(char)) {
+                                                    totalPoints += 2;
+                                                } else {
+                                                    totalPoints += 1;
+                                                }
+                                            }
+
+                                            // 총 16포인트 이하 (한글 기준 8자)
+                                            if (totalPoints <= 16) {
+                                                setNickname(value);
+                                            }
+                                        }}
                                         onBlur={handleSaveNickname}
                                         onKeyPress={(e) => e.key === 'Enter' && handleSaveNickname()}
+                                        maxLength={16}
                                         autoFocus
                                     />
                                     <EditButton onClick={handleSaveNickname}>닉 저장</EditButton>
@@ -1823,10 +1968,10 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                             )}
                         </NicknameContainer>
 
-                        {/* 이메일 행 - 마스킹 처리 */}
+                        {/* 이메일 행 */}
                         {profile && (
                             <InfoRowInHeader>
-                                <InfoTextInHeader>계정: {maskEmail(profile.email)}</InfoTextInHeader>
+                                <InfoTextInHeader>로그인 계정: {profile.email}</InfoTextInHeader>
                             </InfoRowInHeader>
                         )}
 
@@ -1834,7 +1979,7 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                         {profile && wsCode && (
                             <WsCodeQrContainer>
                                 <WsCodeSection>
-                                    <WsCodeText>ID: {(wsCode.split('-')[1] || wsCode).toUpperCase()}</WsCodeText>
+                                    <WsCodeText>셰어노트 ID: {(wsCode.split('-')[1] || wsCode).toUpperCase()}</WsCodeText>
                                     <CopyButtonInHeader onClick={handleCopyWsCode}>
                                         <Copy size={14} />
                                         복사
@@ -1877,6 +2022,17 @@ const ProfilePage = ({ profile, memos, calendarSchedules, showToast, onClose }) 
                         </StatItem>
                     </StatsGrid>
                 </Section>
+
+                {/* 데이터 정리 */}
+                {orphanedMemosCount > 0 && (
+                    <Section>
+                        <SectionTitle>🧹 데이터 정리</SectionTitle>
+                        <CleanupButton onClick={onCleanupOrphanedMemos}>
+                            <Trash2 size={18} />
+                            숨겨진 메모 정리 ({orphanedMemosCount}개)
+                        </CleanupButton>
+                    </Section>
+                )}
 
                 {/* 보안 설정 */}
                 {hasMasterPasswordSet && (

@@ -959,23 +959,28 @@ const TrashPage = ({ showToast }) => {
         setSelectedItem(null);
     };
 
-    const handleDeleteFromDetail = () => {
+    const handleDeleteFromDetail = async () => {
         if (!selectedItem) return;
 
-        permanentDelete([selectedItem.id]);
-        showToast('항목이 영구 삭제되었습니다 🔥');
+        try {
+            await permanentDelete([selectedItem.id]);
+            showToast('항목이 영구 삭제되었습니다 🔥');
 
-        // 시크릿 문서 검증 상태 초기화
-        if (selectedItem.type === 'secret') {
-            setDecryptedSecretContent(prev => {
-                const newContent = { ...prev };
-                delete newContent[selectedItem.id];
-                return newContent;
-            });
+            // 시크릿 문서 검증 상태 초기화
+            if (selectedItem.type === 'secret') {
+                setDecryptedSecretContent(prev => {
+                    const newContent = { ...prev };
+                    delete newContent[selectedItem.id];
+                    return newContent;
+                });
+            }
+
+            setIsDetailModalOpen(false);
+            setSelectedItem(null);
+        } catch (error) {
+            console.error('영구 삭제 실패:', error);
+            showToast('❌ 영구 삭제 중 오류가 발생했습니다');
         }
-
-        setIsDetailModalOpen(false);
-        setSelectedItem(null);
     };
 
     const handleSelectAll = () => {
@@ -1261,10 +1266,15 @@ const TrashPage = ({ showToast }) => {
                     message={`선택한 ${selectedIds.size}개 항목을 영구적으로 삭제하시겠습니까?`}
                     onConfirm={async () => {
                         const count = selectedIds.size;
-                        await permanentDelete(Array.from(selectedIds));
-                        showToast(`${count}개 항목이 영구 삭제되었습니다 🔥`);
-                        setSelectedIds(new Set());
-                        setIsDeleteConfirmOpen(false);
+                        try {
+                            await permanentDelete(Array.from(selectedIds));
+                            showToast(`${count}개 항목이 영구 삭제되었습니다 🔥`);
+                            setSelectedIds(new Set());
+                            setIsDeleteConfirmOpen(false);
+                        } catch (error) {
+                            console.error('영구 삭제 실패:', error);
+                            showToast('❌ 영구 삭제 중 오류가 발생했습니다');
+                        }
                     }}
                     onCancel={() => setIsDeleteConfirmOpen(false)}
                 />

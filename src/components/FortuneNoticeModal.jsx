@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import styled from 'styled-components';
+import { setProfileSetting } from '../utils/userStorage';
 
 // 🎨 Styled Components
 
@@ -180,7 +181,7 @@ const FortuneNoticeModal = ({ onConfirm }) => {
     const handleConfirm = () => {
         if (dontShowAgain) {
             // "다시 보지 않기" 선택 시 localStorage에 저장
-            localStorage.setItem('fortuneNoticeHidden', 'true');
+            setProfileSetting('fortuneNoticeHidden', 'true');
         }
         onConfirm();
     };

@@ -635,18 +635,14 @@ const StealthBadge = styled.span`
     justify-content: center;
 `;
 
-// 공유 뱃지 (공개: 형광 그린, 비공개: 형광 레드) - 시크릿 카테고리 뱃지 스타일
+// 공유 뱃지 (형광 그린 - 공유 폴더 색상과 동일)
 const ShareBadge = styled.span`
     width: 24px;
     height: 24px;
     border-radius: 50%;
-    background: ${props => props.$isPublic
-        ? 'rgba(0, 255, 136, 0.2)'
-        : 'rgba(255, 107, 107, 0.2)'};
-    border: 1px solid ${props => props.$isPublic
-        ? 'rgba(0, 255, 136, 0.3)'
-        : 'rgba(255, 107, 107, 0.3)'};
-    color: ${props => props.$isPublic ? '#00ff88' : '#ff6b6b'};
+    background: rgba(0, 255, 136, 0.2);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    color: #00ff88;
     display: flex;
     align-items: center;
     justify-content: center;

@@ -89,14 +89,17 @@ export const useTrash = (autoDeleteDays = 30, externalTrashedItems = null, exter
         const newTrashItems = trashedItems.filter(item => !idsSet.has(item.id));
         setTrashedItems(newTrashItems);
 
-        // 즉시 Firestore 저장 (디바운스 없이)
+        // 즉시 Firestore 저장 (디바운스 없이) - await로 완료 대기
         const userId = localStorage.getItem('firebaseUserId');
         if (userId) {
-            import('../services/userDataService').then(({ saveTrashToFirestore }) => {
-                saveTrashToFirestore(userId, newTrashItems).catch(err => {
-                    console.error('휴지통 복원 후 저장 실패:', err);
-                });
-            });
+            try {
+                const { saveTrashToFirestore } = await import('../services/userDataService');
+                await saveTrashToFirestore(userId, newTrashItems);
+                console.log('✅ 휴지통 복원 Firestore 저장 완료');
+            } catch (err) {
+                console.error('❌ 휴지통 복원 후 저장 실패:', err);
+                throw err; // 에러를 상위로 전파
+            }
         }
 
         console.log(`✅ 복원 완료: ${ids.length}개 아이템 (일반: ${normalItems.length}, 시크릿: ${secretItems.length})`);
@@ -133,14 +136,17 @@ export const useTrash = (autoDeleteDays = 30, externalTrashedItems = null, exter
         const newTrashItems = trashedItems.filter(item => !idsSet.has(item.id));
         setTrashedItems(newTrashItems);
 
-        // 즉시 Firestore 저장 (디바운스 없이)
+        // 즉시 Firestore 저장 (디바운스 없이) - await로 완료 대기
         const userId = localStorage.getItem('firebaseUserId');
         if (userId) {
-            import('../services/userDataService').then(({ saveTrashToFirestore }) => {
-                saveTrashToFirestore(userId, newTrashItems).catch(err => {
-                    console.error('휴지통 영구 삭제 후 저장 실패:', err);
-                });
-            });
+            try {
+                const { saveTrashToFirestore } = await import('../services/userDataService');
+                await saveTrashToFirestore(userId, newTrashItems);
+                console.log('✅ 휴지통 Firestore 저장 완료');
+            } catch (err) {
+                console.error('❌ 휴지통 영구 삭제 후 저장 실패:', err);
+                throw err; // 에러를 상위로 전파하여 사용자에게 알림
+            }
         }
 
         console.log(`✅ 영구 삭제 완료: ${ids.length}개 아이템 (일반: ${normalItems.length}, 시크릿: ${secretItems.length})`);
@@ -149,18 +155,21 @@ export const useTrash = (autoDeleteDays = 30, externalTrashedItems = null, exter
     /**
      * 휴지통 비우기 (모든 아이템 영구 삭제)
      */
-    const emptyTrash = () => {
+    const emptyTrash = async () => {
         const count = trashedItems.length;
         setTrashedItems([]);
 
-        // 즉시 Firestore 저장 (디바운스 없이)
+        // 즉시 Firestore 저장 (디바운스 없이) - await로 완료 대기
         const userId = localStorage.getItem('firebaseUserId');
         if (userId) {
-            import('../services/userDataService').then(({ saveTrashToFirestore }) => {
-                saveTrashToFirestore(userId, []).catch(err => {
-                    console.error('휴지통 비우기 후 저장 실패:', err);
-                });
-            });
+            try {
+                const { saveTrashToFirestore } = await import('../services/userDataService');
+                await saveTrashToFirestore(userId, []);
+                console.log('✅ 휴지통 비우기 Firestore 저장 완료');
+            } catch (err) {
+                console.error('❌ 휴지통 비우기 후 저장 실패:', err);
+                throw err; // 에러를 상위로 전파
+            }
         }
 
         console.log(`🧹 휴지통 비우기: ${count}개 아이템 삭제`);
@@ -169,7 +178,7 @@ export const useTrash = (autoDeleteDays = 30, externalTrashedItems = null, exter
     /**
      * 자동 삭제 기간이 지난 아이템 자동 삭제 (자정 기준)
      */
-    const autoDeleteExpiredItems = () => {
+    const autoDeleteExpiredItems = async () => {
         // 오늘 자정
         const todayMidnight = new Date();
         todayMidnight.setHours(0, 0, 0, 0);
@@ -191,14 +200,17 @@ export const useTrash = (autoDeleteDays = 30, externalTrashedItems = null, exter
             setTrashedItems(updatedItems);
             const deletedCount = beforeCount - updatedItems.length;
 
-            // 즉시 Firestore 저장 (디바운스 없이)
+            // 즉시 Firestore 저장 (디바운스 없이) - await로 완료 대기
             const userId = localStorage.getItem('firebaseUserId');
             if (userId) {
-                import('../services/userDataService').then(({ saveTrashToFirestore }) => {
-                    saveTrashToFirestore(userId, updatedItems).catch(err => {
-                        console.error('자동 삭제 후 저장 실패:', err);
-                    });
-                });
+                try {
+                    const { saveTrashToFirestore } = await import('../services/userDataService');
+                    await saveTrashToFirestore(userId, updatedItems);
+                    console.log('✅ 자동 삭제 Firestore 저장 완료');
+                } catch (err) {
+                    console.error('❌ 자동 삭제 후 저장 실패:', err);
+                    throw err; // 에러를 상위로 전파
+                }
             }
 
             console.log(`🕐 자동 삭제: ${deletedCount}개 아이템 (${autoDeletePeriod}일 경과)`);

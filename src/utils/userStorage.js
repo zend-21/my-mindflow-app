@@ -34,7 +34,8 @@ export const setUserData = (userId, key, value) => {
   }
   const storageKey = `user_${userId}_${key}`;
   localStorage.setItem(storageKey, value);
-  console.log(`✅ 사용자 데이터 저장: ${storageKey} = ${value}`);
+  // 로그 제거 - 너무 많은 로그가 성능에 영향
+  // console.log(`✅ 사용자 데이터 저장: ${storageKey} = ${value}`);
 };
 
 /**
@@ -221,4 +222,32 @@ export const migrateUserData = (userId) => {
   }
 
   console.log('✅ 마이그레이션 완료');
+};
+
+/**
+ * 현재 사용자의 프로필 설정 저장
+ * @param {string} key - 설정 키 (profileImageType, selectedAvatarId, avatarBgColor, customProfilePicture 등)
+ * @param {string} value - 설정 값
+ */
+export const setProfileSetting = (key, value) => {
+  const userId = getCurrentUserId();
+  if (!userId) {
+    console.error('⚠️ setProfileSetting: 현재 로그인한 사용자가 없습니다');
+    return;
+  }
+  setUserData(userId, key, value);
+};
+
+/**
+ * 현재 사용자의 프로필 설정 가져오기
+ * @param {string} key - 설정 키
+ * @returns {string|null} 설정 값
+ */
+export const getProfileSetting = (key) => {
+  const userId = getCurrentUserId();
+  if (!userId) {
+    console.error('⚠️ getProfileSetting: 현재 로그인한 사용자가 없습니다');
+    return null;
+  }
+  return getUserData(userId, key);
 };

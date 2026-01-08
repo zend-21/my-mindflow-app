@@ -20,7 +20,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import useAlarmManager from './hooks/useAlarmManager';
 import { getRandomStealthPhrase } from './utils/stealthPhrases';
-import { setCurrentUserId, setCurrentUserData, getCurrentUserId, checkSync, migrateUserData, logout as userStorageLogout } from './utils/userStorage';
+import { setCurrentUserId, setCurrentUserData, getCurrentUserId, checkSync, migrateUserData, logout as userStorageLogout, getProfileSetting, setProfileSetting } from './utils/userStorage';
 // 하위 컴포넌트들
 import Header from './components/Header.jsx';
 import StatsGrid from './components/StatsGrid.jsx';
@@ -319,6 +319,7 @@ function App() {
     const [isGapiReady, setIsGapiReady] = useState(false);
     
     const [activeTab, setActiveTab] = useState('home');
+    const [previousTab, setPreviousTab] = useState('home'); // 프로필 페이지 이전 탭 저장
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isMacroModalOpen, setIsMacroModalOpen] = useState(false);
     const [isFortuneFlowOpen, setIsFortuneFlowOpen] = useState(false);
@@ -776,6 +777,7 @@ function App() {
 
     const handleProfileClick = () => {
         setIsMenuOpen(false);
+        setPreviousTab(activeTab); // 현재 탭을 이전 탭으로 저장
         setActiveTab('profile');
     };   
 
@@ -1297,6 +1299,78 @@ function App() {
         // Firestore 동기화는 자동으로 됨 (useFirestoreSync의 디바운싱)
     };
 
+    // ⭐ 공유 폴더 메모들의 hasPendingEdits 플래그 자동 동기화 (공유 폴더 진입 시에만)
+    useEffect(() => {
+        if (!userId || !isAuthenticated || memoContext?.activeFolder !== 'shared') return;
+
+        const verifySharedFolderBadges = async () => {
+            const sharedMemos = memos.filter(memo => memo.folderId === 'shared');
+            if (sharedMemos.length === 0) return;
+
+            let hasChanges = false;
+            const updatedMemos = [...memos];
+
+            console.log(`🔍 공유 폴더 배지 검증 시작 (${sharedMemos.length}개 메모)`);
+
+            for (const memo of sharedMemos) {
+                try {
+                    // editHistory 컬렉션 확인
+                    const { collection, getDocs, query, where } = await import('firebase/firestore');
+                    const editHistoryRef = collection(db, 'mindflowUsers', userId, 'memos', memo.id, 'editHistory');
+                    const pendingQuery = query(editHistoryRef, where('status', '==', 'pending'));
+                    const snapshot = await getDocs(pendingQuery);
+
+                    const actualHasPending = snapshot.size > 0;
+                    const currentHasPending = memo.hasPendingEdits === true;
+
+                    // 실제 상태와 플래그가 다르면 수정
+                    if (actualHasPending !== currentHasPending) {
+                        console.log(`🔄 배지 자동 동기화: ${memo.id} - ${currentHasPending} → ${actualHasPending}`);
+                        const memoIndex = updatedMemos.findIndex(m => m.id === memo.id);
+                        if (memoIndex !== -1) {
+                            updatedMemos[memoIndex] = { ...updatedMemos[memoIndex], hasPendingEdits: actualHasPending };
+                            hasChanges = true;
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`배지 검증 실패 (${memo.id}):`, error);
+                }
+            }
+
+            if (hasChanges) {
+                console.log(`✅ 배지 동기화 완료 - 변경됨`);
+                syncMemos(updatedMemos);
+            } else {
+                console.log(`✅ 배지 검증 완료 - 변경사항 없음`);
+            }
+        };
+
+        // 공유 폴더를 처음 열 때만 1회 실행 (디바운싱)
+        const timer = setTimeout(verifySharedFolderBadges, 500);
+        return () => clearTimeout(timer);
+    }, [memoContext?.activeFolder, userId, isAuthenticated]); // memos 제거 - 공유 폴더 진입 시에만 1회 실행
+
+    // 숨겨진 메모 정리 (존재하지 않는 폴더에 속한 메모들을 미분류로 이동)
+    const handleCleanupOrphanedMemos = () => {
+        const folderIds = new Set(folders.map(f => f.id));
+        const orphanedMemos = memos.filter(memo => memo.folderId && !folderIds.has(memo.folderId));
+
+        if (orphanedMemos.length === 0) {
+            showToast('숨겨진 메모가 없습니다');
+            return;
+        }
+
+        const cleanedMemos = memos.map(memo => {
+            if (memo.folderId && !folderIds.has(memo.folderId)) {
+                return { ...memo, folderId: null };
+            }
+            return memo;
+        });
+
+        syncMemos(cleanedMemos);
+        showToast(`${orphanedMemos.length}개의 숨겨진 메모를 미분류로 이동했습니다`);
+    };
+
     // 메모 폴더 복원 (공유 해제 시)
     const handleRestoreMemoFolder = (memoId) => {
         syncMemos(
@@ -1590,7 +1664,7 @@ function App() {
             const savedProfile = localStorage.getItem('userProfile');
             const savedToken = localStorage.getItem('accessToken');
             const savedTokenExpiresAt = localStorage.getItem('tokenExpiresAt');
-            const savedCustomPicture = localStorage.getItem('customProfilePicture');
+            const savedCustomPicture = getProfileSetting('customProfilePicture');
             const userId = localStorage.getItem('firebaseUserId');
 
             if (savedProfile) {
@@ -1607,10 +1681,12 @@ function App() {
                         const firestoreNickname = await getUserNickname(userId);
                         if (firestoreNickname) {
                             profileData.nickname = firestoreNickname;
-                            localStorage.setItem('userNickname', firestoreNickname); // localStorage 동기화
+                            setProfileSetting('userNickname', firestoreNickname); // localStorage 동기화
+                            // ✅ Header와 SideMenu에 알림
+                            window.dispatchEvent(new CustomEvent('nicknameChanged', { detail: firestoreNickname }));
                         } else {
                             // Firestore에 없으면 localStorage 사용
-                            const savedNickname = localStorage.getItem('userNickname');
+                            const savedNickname = getProfileSetting('userNickname');
                             if (savedNickname) {
                                 profileData.nickname = savedNickname;
                             }
@@ -1622,31 +1698,31 @@ function App() {
                             if (settings) {
                                 // profileImageType 복원
                                 if (settings.profileImageType) {
-                                    localStorage.setItem('profileImageType', settings.profileImageType);
+                                    setProfileSetting('profileImageType', settings.profileImageType);
                                     // Header와 SideMenu에 알림
                                     window.dispatchEvent(new CustomEvent('profileImageTypeChanged', { detail: settings.profileImageType }));
                                 }
                                 // 아바타 설정 복원
                                 if (settings.selectedAvatarId) {
-                                    localStorage.setItem('selectedAvatarId', settings.selectedAvatarId);
+                                    setProfileSetting('selectedAvatarId', settings.selectedAvatarId);
                                     window.dispatchEvent(new CustomEvent('avatarChanged', {
                                         detail: { avatarId: settings.selectedAvatarId, bgColor: settings.avatarBgColor || 'none' }
                                     }));
                                 }
                                 if (settings.avatarBgColor) {
-                                    localStorage.setItem('avatarBgColor', settings.avatarBgColor);
+                                    setProfileSetting('avatarBgColor', settings.avatarBgColor);
                                     window.dispatchEvent(new CustomEvent('avatarBgColorChanged', { detail: settings.avatarBgColor }));
                                 }
                                 // 커스텀 프로필 사진 복원
                                 if (settings.customProfilePicture) {
-                                    localStorage.setItem('customProfilePicture', settings.customProfilePicture);
+                                    setProfileSetting('customProfilePicture', settings.customProfilePicture);
                                     // ✅ Header와 SideMenu에 알림 (다른 기기에서 변경된 프사 반영)
                                     window.dispatchEvent(new CustomEvent('profilePictureChanged', {
                                         detail: { picture: settings.customProfilePicture, hash: settings.customProfilePictureHash }
                                     }));
                                 }
                                 if (settings.customProfilePictureHash) {
-                                    localStorage.setItem('customProfilePictureHash', settings.customProfilePictureHash);
+                                    setProfileSetting('customProfilePictureHash', settings.customProfilePictureHash);
                                 }
                                 console.log('✅ 프로필 이미지 설정 복원 완료');
                             }
@@ -1656,7 +1732,7 @@ function App() {
                     } catch (error) {
                         console.error('닉네임 로드 실패:', error);
                         // 에러 시 localStorage 폴백
-                        const savedNickname = localStorage.getItem('userNickname');
+                        const savedNickname = getProfileSetting('userNickname');
                         if (savedNickname) {
                             profileData.nickname = savedNickname;
                         }
@@ -1837,6 +1913,10 @@ function App() {
         try {
             console.log('🔓 Google 로그인 처리 (휴대폰 인증 없음)');
 
+            // 🔄 inRoom 상태 초기화 (새로고침 시 잘못된 상태 정리)
+            const { initializeInRoomStatus } = await import('./services/messageService');
+            initializeInRoomStatus(firebaseUserId);
+
             // 사용자 프로필 설정
             const profileData = {
                 email: userInfo.email,
@@ -1844,8 +1924,8 @@ function App() {
                 picture: pictureUrl
             };
 
-            const savedNickname = localStorage.getItem('userNickname');
-            const savedCustomPicture = localStorage.getItem('customProfilePicture');
+            const savedNickname = getProfileSetting('userNickname');
+            const savedCustomPicture = getProfileSetting('customProfilePicture');
 
             if (savedNickname) {
                 profileData.nickname = savedNickname;
@@ -1969,8 +2049,8 @@ function App() {
             };
 
             // ✅ 기존에 저장된 커스텀 닉네임 및 프로필 사진이 있으면 추가
-            const savedNickname = localStorage.getItem('userNickname');
-            const savedCustomPicture = localStorage.getItem('customProfilePicture');
+            const savedNickname = getProfileSetting('userNickname');
+            const savedCustomPicture = getProfileSetting('customProfilePicture');
 
             if (savedNickname) {
                 profileData.nickname = savedNickname;
@@ -2928,7 +3008,12 @@ function App() {
                                 setShowHeader={setShowHeader}
                             />
                         )}
-                        {activeTab === 'chat' && <MessagingHub showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={handleUpdateMemoPendingFlag} />}
+                        {/* 채팅은 상태 유지를 위해 항상 렌더링하되 CSS로 숨김 (로그인한 경우만) */}
+                        {profile && (
+                            <div style={{ display: activeTab === 'chat' ? 'block' : 'none', height: '100%' }}>
+                                <MessagingHub showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={handleUpdateMemoPendingFlag} />
+                            </div>
+                        )}
                     </ContentArea>
 
                     <FloatingButton onClick={handleOpenNewMemoFromFAB} activeTab={activeTab} />
@@ -3144,15 +3229,19 @@ function App() {
                 <Timer onClose={() => setIsTimerOpen(false)} />
             )}
 
-            {/* 👤 프로필 페이지 모달 */}
-            {activeTab === 'profile' && (
-                <ProfilePage
-                    profile={profile}
-                    memos={memos}
-                    calendarSchedules={calendarSchedules}
-                    showToast={showToast}
-                    onClose={() => setActiveTab('home')}
-                />
+            {/* 👤 프로필 페이지 모달 - 상태 유지를 위해 항상 렌더링 */}
+            {profile && (
+                <div style={{ display: activeTab === 'profile' ? 'block' : 'none' }}>
+                    <ProfilePage
+                        profile={profile}
+                        memos={memos}
+                        folders={folders}
+                        calendarSchedules={calendarSchedules}
+                        showToast={showToast}
+                        onCleanupOrphanedMemos={handleCleanupOrphanedMemos}
+                        onClose={() => setActiveTab(previousTab)}
+                    />
+                </div>
             )}
 
             {/* 📱 휴대폰 인증 모달 */}

@@ -5,6 +5,7 @@
 
 import { getTarotData, getHoroscopeData, getLuckyElementsData } from './fortuneData';
 import { getRandomFortune, getCombinedFortune } from './fortuneSelector';
+import { getProfileSetting, setProfileSetting } from './userStorage';
 
 // 천간 (Heavenly Stems) - 10개
 const HEAVENLY_STEMS = ['갑', '을', '병', '정', '무', '기', '경', '신', '임', '계'];
@@ -1142,7 +1143,7 @@ export const isUserLoggedIn = () => {
 export const saveUserProfile = async (userData, userId = null, saveToFirestore = null) => {
     if (isUserLoggedIn() && userId) {
         // ⭐ 로그인 사용자: localStorage + Firestore 동시 저장
-        localStorage.setItem('fortuneUserProfile', JSON.stringify(userData));
+        setProfileSetting('fortuneUserProfile', JSON.stringify(userData));
 
         // Firestore 저장 (제공된 경우)
         if (saveToFirestore && typeof saveToFirestore === 'function') {
@@ -1162,7 +1163,7 @@ export const saveUserProfile = async (userData, userId = null, saveToFirestore =
             ...userData,
             savedDate: savedDate
         };
-        localStorage.setItem('fortuneUserProfile_guest', JSON.stringify(dataWithDate));
+        setProfileSetting('fortuneUserProfile_guest', JSON.stringify(dataWithDate));
     }
 };
 
@@ -1181,7 +1182,7 @@ export const getUserProfile = async (userId = null, fetchFromFirestore = null) =
                 const firestoreProfile = await fetchFromFirestore(userId);
                 if (firestoreProfile) {
                     // Firestore 데이터를 localStorage에도 캐싱
-                    localStorage.setItem('fortuneUserProfile', JSON.stringify(firestoreProfile));
+                    setProfileSetting('fortuneUserProfile', JSON.stringify(firestoreProfile));
                     console.log('✅ 운세 프로필 Firestore 로드 완료');
                     return firestoreProfile;
                 }
@@ -1192,7 +1193,7 @@ export const getUserProfile = async (userId = null, fetchFromFirestore = null) =
         }
 
         // Firestore 실패 시 localStorage 폴백
-        const saved = localStorage.getItem('fortuneUserProfile');
+        const saved = getProfileSetting('fortuneUserProfile');
         const localProfile = saved ? JSON.parse(saved) : null;
 
         if (localProfile) {
@@ -1202,7 +1203,7 @@ export const getUserProfile = async (userId = null, fetchFromFirestore = null) =
         return localProfile;
     } else {
         // 게스트: localStorage만 사용 (당일만 유효)
-        const saved = localStorage.getItem('fortuneUserProfile_guest');
+        const saved = getProfileSetting('fortuneUserProfile_guest');
         if (!saved) return null;
 
         const savedData = JSON.parse(saved);
@@ -1216,8 +1217,7 @@ export const getUserProfile = async (userId = null, fetchFromFirestore = null) =
             return userData;
         }
 
-        // 날짜가 다르면 삭제하고 null 반환
-        localStorage.removeItem('fortuneUserProfile_guest');
+        // 날짜가 다르면 삭제하고 null 반환 (계정별 삭제는 불필요 - 다음 로그인 시 자동 덮어쓰기)
         return null;
     }
 };
