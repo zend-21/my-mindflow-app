@@ -1,5 +1,7 @@
 // 메시지 알림 효과음 생성 유틸리티 (Web Audio API 사용)
 
+import { getCurrentUserData, setCurrentUserData } from './userStorage';
+
 /**
  * AudioContext 싱글톤
  */
@@ -27,11 +29,11 @@ const getAudioContext = async () => {
  * 효과음 1: 새 메시지 알림 (채팅창 밖에서)
  * 카카오톡 스타일의 부드러운 알림음
  */
-export const playNewMessageNotification = () => {
+export const playNewMessageNotification = async () => {
   try {
     if (!notificationSettings.enabled) return;
 
-    const ctx = getAudioContext();
+    const ctx = await getAudioContext();
     const currentTime = ctx.currentTime;
 
     // 메인 톤 (두 개의 주파수로 화음 생성)
@@ -74,11 +76,11 @@ export const playNewMessageNotification = () => {
  * 효과음 2: 채팅 중 메시지 수신 (채팅창 안에서)
  * 매우 부드러운 팝 사운드
  */
-export const playChatMessageSound = () => {
+export const playChatMessageSound = async () => {
   try {
     if (!notificationSettings.enabled) return;
 
-    const ctx = getAudioContext();
+    const ctx = await getAudioContext();
     const currentTime = ctx.currentTime;
 
     // 짧고 부드러운 펄스 사운드
@@ -115,11 +117,11 @@ export const playChatMessageSound = () => {
  * 효과음 3: 부드러운 버블 팝 (대안)
  * 더 귀여운 느낌의 효과음
  */
-export const playBubblePopSound = () => {
+export const playBubblePopSound = async () => {
   try {
     if (!notificationSettings.enabled) return;
 
-    const ctx = getAudioContext();
+    const ctx = await getAudioContext();
     const currentTime = ctx.currentTime;
 
     const oscillator = ctx.createOscillator();
@@ -163,7 +165,7 @@ export const notificationSettings = {
  */
 export const toggleNotificationSound = (enabled) => {
   notificationSettings.enabled = enabled;
-  localStorage.setItem('notificationSoundEnabled', enabled ? 'true' : 'false');
+  setCurrentUserData('notificationSoundEnabled', enabled ? 'true' : 'false');
 };
 
 /**
@@ -171,15 +173,15 @@ export const toggleNotificationSound = (enabled) => {
  */
 export const setNotificationVolume = (volume) => {
   notificationSettings.volume = Math.max(0, Math.min(1, volume));
-  localStorage.setItem('notificationVolume', notificationSettings.volume.toString());
+  setCurrentUserData('notificationVolume', notificationSettings.volume.toString());
 };
 
 /**
  * 저장된 설정 불러오기
  */
 export const loadNotificationSettings = () => {
-  const enabled = localStorage.getItem('notificationSoundEnabled');
-  const volume = localStorage.getItem('notificationVolume');
+  const enabled = getCurrentUserData('notificationSoundEnabled');
+  const volume = getCurrentUserData('notificationVolume');
 
   if (enabled !== null) {
     notificationSettings.enabled = enabled === 'true';

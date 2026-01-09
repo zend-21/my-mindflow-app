@@ -20,7 +20,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import useAlarmManager from './hooks/useAlarmManager';
 import { getRandomStealthPhrase } from './utils/stealthPhrases';
-import { setCurrentUserId, setCurrentUserData, getCurrentUserId, checkSync, migrateUserData, logout as userStorageLogout, getProfileSetting, setProfileSetting } from './utils/userStorage';
+import { setCurrentUserId, setCurrentUserData, getCurrentUserId, checkSync, migrateUserData, logout as userStorageLogout, getProfileSetting, setProfileSetting, cleanupSharedKeys } from './utils/userStorage';
 // 하위 컴포넌트들
 import Header from './components/Header.jsx';
 import StatsGrid from './components/StatsGrid.jsx';
@@ -1913,6 +1913,9 @@ function App() {
         try {
             console.log('🔓 Google 로그인 처리 (휴대폰 인증 없음)');
 
+            // 🧹 공유 키 정리 (보안: 이전 사용자 데이터 노출 방지)
+            cleanupSharedKeys();
+
             // 🔄 inRoom 상태 초기화 (새로고침 시 잘못된 상태 정리)
             const { initializeInRoomStatus } = await import('./services/messageService');
             initializeInRoomStatus(firebaseUserId);
@@ -2611,7 +2614,10 @@ function App() {
         // 🔐 계정별 localStorage 정리 (새 방식)
         userStorageLogout();
 
-        // localStorage 완전 정리 (기존 방식 - 호환성)
+        // 🧹 공유 키 정리 (보안: 이전 사용자 데이터 노출 방지)
+        cleanupSharedKeys();
+
+        // localStorage 완전 정리 (기존 방식 - 호환성, cleanupSharedKeys와 중복이지만 안전성을 위해 유지)
         localStorage.removeItem('userProfile');
         localStorage.removeItem('accessToken');
         localStorage.removeItem('tokenExpiresAt');
@@ -2907,6 +2913,28 @@ function App() {
             window.removeEventListener('itemsRestored', handleRestore);
         };
     }, []);
+
+    // 메모 생성 이벤트 리스너 (대화방에서 문서 저장 시)
+    useEffect(() => {
+        const handleMemoCreated = async (event) => {
+            const { memoId } = event.detail;
+            console.log('📝 [App.jsx] 새 메모 생성 감지:', memoId);
+
+            // Firestore에서 메모 목록 다시 불러오기
+            try {
+                const updatedMemos = await fetchAllUserData(userId, 'memos');
+                syncMemos(updatedMemos);
+                console.log('✅ [App.jsx] 메모 목록 새로고침 완료');
+            } catch (error) {
+                console.error('❌ [App.jsx] 메모 목록 새로고침 실패:', error);
+            }
+        };
+
+        window.addEventListener('memoCreated', handleMemoCreated);
+        return () => {
+            window.removeEventListener('memoCreated', handleMemoCreated);
+        };
+    }, [userId, syncMemos]);
 
     if (isLoading) {
         return (

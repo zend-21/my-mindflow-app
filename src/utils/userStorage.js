@@ -251,3 +251,111 @@ export const getProfileSetting = (key) => {
   }
   return getUserData(userId, key);
 };
+
+/**
+ * 🧪 공유 키 목록 확인 (테스트용 - 삭제하지 않고 로그만 출력)
+ */
+export const testCleanupSharedKeys = () => {
+  console.log('🧪 [테스트] 공유 키 스캔 시작 (삭제 안 함)');
+
+  const sharedKeyPatterns = [
+    '_shared',
+    'firebaseUserId',
+    'userDisplayName',
+    'userEmail',
+    'userProfile',
+    'userPicture',
+    'workspaceCode',
+    'accessToken',
+    'userInfo',
+    'tokenExpiresAt',
+    'lastLoginTime',
+    'mindflowUserId',
+    'isPhoneVerified'
+  ];
+
+  const foundKeys = [];
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key) {
+      // user_ 로 시작하는 키는 계정별 키이므로 제외
+      if (key.startsWith('user_') || key === 'currentUserId') {
+        continue;
+      }
+
+      // 공유 키 패턴과 매칭되는지 확인
+      const isSharedKey = sharedKeyPatterns.some(pattern =>
+        key.includes(pattern) || key === pattern
+      );
+
+      if (isSharedKey) {
+        foundKeys.push(key);
+      }
+    }
+  }
+
+  console.log(`📋 [테스트] 발견된 공유 키 (${foundKeys.length}개):`);
+  foundKeys.forEach(key => {
+    const value = localStorage.getItem(key);
+    const preview = value && value.length > 50 ? value.substring(0, 50) + '...' : value;
+    console.log(`  - ${key}: ${preview}`);
+  });
+
+  return foundKeys;
+};
+
+/**
+ * 공유 키 정리 (계정별 키는 유지, 공유 키만 삭제)
+ */
+export const cleanupSharedKeys = () => {
+  console.log('🧹 공유 키 정리 시작');
+
+  const sharedKeyPatterns = [
+    '_shared',
+    'firebaseUserId',
+    'userDisplayName',
+    'userEmail',
+    'userProfile',
+    'userPicture',
+    'workspaceCode',
+    'accessToken',
+    'userInfo',
+    'tokenExpiresAt',
+    'lastLoginTime',
+    'mindflowUserId',
+    'isPhoneVerified',
+    'lastSyncTime'
+  ];
+
+  const keysToDelete = [];
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key) {
+      // user_ 로 시작하는 키는 계정별 키이므로 제외
+      if (key.startsWith('user_') || key === 'currentUserId') {
+        continue;
+      }
+
+      // 공유 키 패턴과 매칭되는지 확인
+      const isSharedKey = sharedKeyPatterns.some(pattern =>
+        key.includes(pattern) || key === pattern
+      );
+
+      if (isSharedKey) {
+        keysToDelete.push(key);
+      }
+    }
+  }
+
+  // 찾은 키들 삭제
+  keysToDelete.forEach(key => {
+    localStorage.removeItem(key);
+  });
+
+  console.log(`✅ 공유 키 정리 완료: ${keysToDelete.length}개 항목 삭제`);
+  if (keysToDelete.length > 0) {
+    console.log('  삭제된 키:', keysToDelete.join(', '));
+  }
+};

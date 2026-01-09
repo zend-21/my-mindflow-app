@@ -1210,21 +1210,23 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
             setProfileSetting('avatarBgColor', 'none');
             setProfileSetting('customProfilePicture', '');
 
-            // 3. Firestore settings 초기화
+            // 3. Firestore users/{userId}/settings/profile 초기화
             try {
-                const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
-                const currentSettings = await fetchSettingsFromFirestore(userId);
-                await saveSettingsToFirestore(userId, {
-                    ...currentSettings,
-                    nickname: '',
+                const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+                const { db } = await import('../firebase/config');
+
+                const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+                await setDoc(settingsRef, {
                     profileImageType: 'avatar',
                     selectedAvatarId: null,
                     avatarBgColor: 'none',
-                    customProfilePicture: null
-                });
-                console.log('✅ settings 프로필 초기화 완료');
+                    profileImageVersion: null,
+                    updatedAt: serverTimestamp(),
+                }, { merge: true });
+
+                console.log('✅ Firestore 프로필 설정 초기화 완료');
             } catch (settingsError) {
-                console.error('settings 프로필 초기화 실패:', settingsError);
+                console.error('Firestore 프로필 설정 초기화 실패:', settingsError);
             }
 
             // 4. 로컬 state 업데이트
@@ -1263,16 +1265,19 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
         // Header에 알림
         window.dispatchEvent(new CustomEvent('profileImageTypeChanged', { detail: type }));
 
-        // 🔥 Firestore settings에도 동기화
+        // 🔥 Firestore users/{userId}/settings/profile에 동기화
         try {
             const userId = localStorage.getItem('firebaseUserId');
             if (userId) {
-                const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
-                const currentSettings = await fetchSettingsFromFirestore(userId);
-                await saveSettingsToFirestore(userId, {
-                    ...currentSettings,
-                    profileImageType: type
-                });
+                const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+                const { db } = await import('../firebase/config');
+
+                const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+                await setDoc(settingsRef, {
+                    profileImageType: type,
+                    updatedAt: serverTimestamp(),
+                }, { merge: true });
+
                 console.log('✅ 프로필 이미지 타입 Firestore 동기화 완료');
             }
         } catch (error) {
@@ -1289,17 +1294,21 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
         setProfileSetting('selectedAvatarId', avatarId);
         showToast?.('아바타가 변경되었습니다');
 
-        // 🔥 Firestore settings에도 동기화
+        // 🔥 Firestore users/{userId}/settings/profile에 동기화
         try {
             const userId = localStorage.getItem('firebaseUserId');
             if (userId) {
-                const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
-                const currentSettings = await fetchSettingsFromFirestore(userId);
-                await saveSettingsToFirestore(userId, {
-                    ...currentSettings,
+                const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+                const { db } = await import('../firebase/config');
+
+                const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+                await setDoc(settingsRef, {
+                    profileImageType: 'avatar',
                     selectedAvatarId: avatarId,
-                    avatarBgColor: avatarBgColor // 현재 배경색도 함께 저장
-                });
+                    avatarBgColor: avatarBgColor,
+                    updatedAt: serverTimestamp(),
+                }, { merge: true });
+
                 console.log('✅ 아바타 선택 Firestore 동기화 완료');
             }
         } catch (error) {
@@ -1362,6 +1371,56 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
         loadLatestNickname();
     }, []); // 컴포넌트 마운트 시 한 번만 실행
 
+    // 🔥 프로필 사진 Firestore에서 로드
+    useEffect(() => {
+        const loadProfileSettings = async () => {
+            const userId = localStorage.getItem('firebaseUserId');
+            if (!userId) return;
+
+            try {
+                const { doc, getDoc } = await import('firebase/firestore');
+                const { db } = await import('../firebase/config');
+                const { getProfileImageUrl } = await import('../utils/storageService');
+
+                const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+                const settingsSnap = await getDoc(settingsRef);
+
+                if (settingsSnap.exists()) {
+                    const settings = settingsSnap.data();
+
+                    // Firestore에서 가져온 설정으로 업데이트
+                    if (settings.profileImageType) {
+                        setProfileImageType(settings.profileImageType);
+                        setProfileSetting('profileImageType', settings.profileImageType);
+
+                        // 'photo' 모드면 버전 기반 URL 사용
+                        if (settings.profileImageType === 'photo') {
+                            const version = settings.profileImageVersion || null;
+                            const imageUrl = getProfileImageUrl(userId, version);
+                            setCustomPicture(imageUrl);
+                        }
+                    }
+                    if (settings.selectedAvatarId) {
+                        setSelectedAvatarId(settings.selectedAvatarId);
+                        setProfileSetting('selectedAvatarId', settings.selectedAvatarId);
+                    }
+                    if (settings.avatarBgColor) {
+                        setAvatarBgColor(settings.avatarBgColor);
+                        setProfileSetting('avatarBgColor', settings.avatarBgColor);
+                    }
+                    console.log('✅ Firestore에서 프로필 설정 로드 완료:', {
+                        profileImageType: settings.profileImageType,
+                        profileImageVersion: settings.profileImageVersion
+                    });
+                }
+            } catch (error) {
+                console.error('프로필 설정 로드 오류:', error);
+            }
+        };
+
+        loadProfileSettings();
+    }, []); // 컴포넌트 마운트 시 한 번만 실행
+
     useEffect(() => {
         return () => {
             if (birthDateTimerRef.current) {
@@ -1376,16 +1435,19 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
             const newColor = e.detail;
             setAvatarBgColor(newColor);
 
-            // 🔥 Firestore settings에도 동기화
+            // 🔥 Firestore users/{userId}/settings/profile에 동기화
             try {
                 const userId = localStorage.getItem('firebaseUserId');
                 if (userId) {
-                    const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
-                    const currentSettings = await fetchSettingsFromFirestore(userId);
-                    await saveSettingsToFirestore(userId, {
-                        ...currentSettings,
-                        avatarBgColor: newColor
-                    });
+                    const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+                    const { db } = await import('../firebase/config');
+
+                    const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+                    await setDoc(settingsRef, {
+                        avatarBgColor: newColor,
+                        updatedAt: serverTimestamp(),
+                    }, { merge: true });
+
                     console.log('✅ 아바타 배경색 Firestore 동기화 완료');
                 }
             } catch (error) {
@@ -1677,54 +1739,40 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
         try {
             showToast?.('이미지 업로드 중...');
 
-            // R2에 이미지 업로드 (uploadImage는 이미 압축/리사이즈 처리됨)
-            const { uploadImage } = await import('../utils/storageService');
-            const imageUrl = await uploadImage(file, 'profile-images');
-
-            console.log('✅ 프로필 이미지 R2 업로드 성공:', imageUrl);
-
-            // 해시 계산
-            const hash = await calculateHash(imageUrl);
-
-            try {
-                // localStorage에 URL만 저장 (Base64 대신) - 계정별로 분리
-                setProfileSetting('customProfilePicture', imageUrl);
-                setProfileSetting('customProfilePictureHash', hash);
-            } catch (storageError) {
-                if (storageError.name === 'QuotaExceededError') {
-                    showToast?.('저장 공간이 부족합니다');
-                } else {
-                    showToast?.('이미지 저장에 실패했습니다');
-                }
-                console.error('localStorage 저장 오류:', storageError);
+            const userId = localStorage.getItem('firebaseUserId');
+            if (!userId) {
+                showToast?.('로그인이 필요합니다');
                 e.target.value = '';
                 return;
             }
 
-            // 프로필 상태 업데이트 (URL로)
+            // R2에 프로필 이미지 업로드 (Firestore settings/profile에 자동 저장됨)
+            const { uploadProfileImage, getProfileImageUrl } = await import('../utils/storageService');
+            await uploadProfileImage(file, userId);
+
+            // Firestore에서 최신 버전 정보 가져오기
+            const { doc, getDoc } = await import('firebase/firestore');
+            const { db } = await import('../firebase/config');
+            const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+            const settingsSnap = await getDoc(settingsRef);
+            const version = settingsSnap.exists() ? settingsSnap.data().profileImageVersion : null;
+
+            // 버전 기반 URL 생성
+            const imageUrl = getProfileImageUrl(userId, version);
+
+            console.log('✅ 프로필 이미지 업로드 완료 (버전:', version + ')');
+
+            // localStorage에 'photo' 모드 저장
+            setProfileSetting('profileImageType', 'photo');
+            setProfileImageType('photo');
+
+            // 프로필 상태 업데이트
             setCustomPicture(imageUrl);
 
-            // 프로필 상태 업데이트 이벤트 발생
+            // 프로필 상태 업데이트 이벤트 발생 (다른 컴포넌트 동기화)
             window.dispatchEvent(new CustomEvent('profilePictureChanged', {
-                detail: { picture: imageUrl, hash }
+                detail: { picture: imageUrl }
             }));
-
-            // 🔥 Firestore settings에도 동기화
-            try {
-                const userId = localStorage.getItem('firebaseUserId');
-                if (userId) {
-                    const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
-                    const currentSettings = await fetchSettingsFromFirestore(userId);
-                    await saveSettingsToFirestore(userId, {
-                        ...currentSettings,
-                        customProfilePicture: imageUrl,
-                        customProfilePictureHash: hash
-                    });
-                    console.log('✅ 커스텀 프로필 사진 Firestore 동기화 완료');
-                }
-            } catch (error) {
-                console.error('커스텀 프로필 사진 동기화 실패:', error);
-            }
 
             showToast?.('프로필 사진이 변경되었습니다 📸');
 

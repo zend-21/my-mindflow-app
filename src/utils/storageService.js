@@ -196,6 +196,83 @@ const deleteFromR2 = async (url) => {
 };
 
 /**
+ * 프로필 이미지를 고정된 파일명으로 업로드 (덮어쓰기)
+ * @param {File|Blob} file - 업로드할 파일 또는 Blob
+ * @param {string} userId - 사용자 ID
+ * @returns {Promise<string>} 업로드된 파일의 URL (항상 동일)
+ */
+export const uploadProfileImage = async (file, userId) => {
+  if (!userId) {
+    throw new Error('userId is required for profile image upload');
+  }
+
+  try {
+    // S3 Client 설정
+    const s3Client = new S3Client({
+      region: 'auto',
+      endpoint: import.meta.env.VITE_R2_ENDPOINT?.trim(),
+      credentials: {
+        accessKeyId: import.meta.env.VITE_R2_ACCESS_KEY_ID?.trim(),
+        secretAccessKey: import.meta.env.VITE_R2_SECRET_ACCESS_KEY?.trim(),
+      },
+    });
+
+    // 고정된 파일명 (항상 덮어쓰기)
+    const key = `profile-images/${userId}.jpg`;
+
+    // 파일을 ArrayBuffer로 변환
+    const arrayBuffer = await file.arrayBuffer();
+
+    // R2에 업로드 (기존 파일 자동 덮어쓰기)
+    const command = new PutObjectCommand({
+      Bucket: import.meta.env.VITE_R2_BUCKET_NAME?.trim(),
+      Key: key,
+      Body: new Uint8Array(arrayBuffer),
+      ContentType: 'image/jpeg', // 항상 JPEG로 통일
+      CacheControl: 'no-cache', // 캐시 무효화 (즉시 반영)
+    });
+
+    await s3Client.send(command);
+
+    // 🆕 Firestore에 프로필 사진 설정 저장 (버전 + 타입)
+    const { doc, updateDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+    const { db } = await import('../firebase/config');
+
+    const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+    const version = Date.now();
+
+    await setDoc(settingsRef, {
+      profileImageType: 'photo', // 사진 모드로 전환
+      profileImageVersion: version, // 버전 번호
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+
+    // 공개 URL 생성 (버전 포함)
+    const publicUrl = `${import.meta.env.VITE_R2_PUBLIC_URL?.trim()}/${key}?v=${version}`;
+
+    console.log('✅ 프로필 이미지 업로드 완료 (버전:', version + ')');
+    return publicUrl;
+  } catch (error) {
+    console.error('❌ 프로필 이미지 업로드 실패:', error);
+    throw new Error(`프로필 이미지 업로드 실패: ${error.message}`);
+  }
+};
+
+/**
+ * 프로필 이미지 URL 생성 (버전 기반 - Firestore에서 읽음)
+ * @param {string} userId - 사용자 ID
+ * @param {number} version - 프로필 이미지 버전 (Firestore에서 읽은 값)
+ * @returns {string} 프로필 이미지 URL
+ */
+export const getProfileImageUrl = (userId, version = null) => {
+  if (!userId) return null;
+
+  // 버전이 제공되면 사용, 없으면 기본 URL (하위 호환성)
+  const versionParam = version ? `?v=${version}` : '';
+  return `${import.meta.env.VITE_R2_PUBLIC_URL?.trim()}/profile-images/${userId}.jpg${versionParam}`;
+};
+
+/**
  * 현재 사용 중인 스토리지 제공자 반환
  * @returns {string} 'firebase' | 'r2'
  */

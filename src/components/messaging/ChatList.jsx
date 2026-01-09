@@ -306,6 +306,7 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
   const [selectedChat, setSelectedChat] = useState(null);
   const [userNicknames, setUserNicknames] = useState({}); // userId -> 앱 닉네임 매핑
   const [nicknamesLoaded, setNicknamesLoaded] = useState(false); // 닉네임 로딩 완료 여부
+  const [userProfilePictures, setUserProfilePictures] = useState({}); // userId -> profilePictureUrl 매핑
 
   // 이전 읽지 않은 메시지 개수 추적 (알림음 재생 여부 판단)
   const prevUnreadCountRef = useRef({});
@@ -427,6 +428,80 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
       }
     };
   }, []);
+
+  // 🆕 사용자 프로필 사진 실시간 구독
+  useEffect(() => {
+    // 1:1 대화방 및 그룹 채팅방의 모든 참여자 ID 수집
+    const userIds = new Set();
+
+    // 1:1 대화방 참여자
+    chatRooms.forEach(room => {
+      room.participants?.forEach(userId => userIds.add(userId));
+    });
+
+    // 그룹 채팅방 참여자
+    groupChats.forEach(group => {
+      Object.keys(group.membersInfo || {}).forEach(userId => {
+        if (group.membersInfo[userId]?.status === 'active') {
+          userIds.add(userId);
+        }
+      });
+    });
+
+    // Firestore 리스너 배열
+    const unsubscribers = [];
+
+    // 각 사용자의 프로필 설정 구독
+    userIds.forEach(async (userId) => {
+      const { doc, onSnapshot } = await import('firebase/firestore');
+      const { db } = await import('../../firebase/config');
+      const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+
+      const unsubscribe = onSnapshot(settingsRef, async (docSnap) => {
+        if (docSnap.exists()) {
+          const settings = docSnap.data();
+          const imageType = settings.profileImageType || 'avatar';
+
+          // 'photo' 모드면 버전 기반 URL 사용
+          if (imageType === 'photo') {
+            const { getProfileImageUrl } = await import('../../utils/storageService');
+            const version = settings.profileImageVersion || null;
+            const imageUrl = getProfileImageUrl(userId, version);
+            setUserProfilePictures(prev => ({
+              ...prev,
+              [userId]: imageUrl
+            }));
+          } else {
+            // 아바타 모드면 프로필 사진 제거
+            setUserProfilePictures(prev => {
+              const newState = { ...prev };
+              delete newState[userId];
+              return newState;
+            });
+          }
+        } else {
+          // Firestore에 데이터가 없으면 프로필 사진 제거
+          setUserProfilePictures(prev => {
+            const newState = { ...prev };
+            delete newState[userId];
+            return newState;
+          });
+        }
+      }, (error) => {
+        console.error(`❌ Firestore 리스너 오류 (${userId}):`, error);
+      });
+
+      unsubscribers.push(unsubscribe);
+    });
+
+    return () => {
+      unsubscribers.forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      });
+    };
+  }, [chatRooms, groupChats]);
 
   // 1:1 대화 검색 필터링
   const filteredDMs = chatRooms.filter(room => {
@@ -566,9 +641,13 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
             <NewGroupButton onClick={handleNewGroup} title="단체방 만들기">
               <Users size={18} />
             </NewGroupButton>
+            {/* ⚠️ 공개방 기능 임시 비활성화 (2026-01-09)
+                - 문서 협업 기능과 보안 이슈로 인해 당분간 비공개 단체방만 운영
+                - 필요시 아래 주석을 해제하여 공개방 참여 기능 재활성화 가능
             <NewGroupButton onClick={() => setShowJoinGroupModal(true)} title="초대 코드로 참여">
               <Mail size={18} />
             </NewGroupButton>
+            */}
           </ActionButtons>
         </SearchBar>
       </SearchSection>
@@ -618,8 +697,11 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
                         onClick={() => handleChatClick(chat)}
                       >
                         <ChatItemContent>
-                          <Avatar $color={getAvatarColor(displayUserId)}>
-                            {displayName.charAt(0).toUpperCase()}
+                          <Avatar
+                            $color={getAvatarColor(displayUserId)}
+                            style={userProfilePictures[displayUserId] ? { backgroundImage: `url(${userProfilePictures[displayUserId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                          >
+                            {!userProfilePictures[displayUserId] && displayName.charAt(0).toUpperCase()}
                           </Avatar>
                           <ChatInfo>
                             <ChatHeader>
@@ -713,8 +795,11 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
                         onClick={() => handleChatClick(chat)}
                       >
                         <ChatItemContent>
-                          <Avatar $color={getAvatarColor(displayUserId)}>
-                            {displayName.charAt(0).toUpperCase()}
+                          <Avatar
+                            $color={getAvatarColor(displayUserId)}
+                            style={userProfilePictures[displayUserId] ? { backgroundImage: `url(${userProfilePictures[displayUserId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                          >
+                            {!userProfilePictures[displayUserId] && displayName.charAt(0).toUpperCase()}
                           </Avatar>
                           <ChatInfo>
                             <ChatHeader>

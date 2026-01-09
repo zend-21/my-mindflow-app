@@ -342,16 +342,13 @@ const ContentEditableArea = styled.div`
 
   /* 형광펜 스타일 (pending 상태) */
   .highlight {
-    display: inline;
     background: linear-gradient(180deg, rgba(255, 235, 59, 0.35), rgba(255, 193, 7, 0.35));
     border-bottom: 2px solid #ffc107;
     cursor: pointer;
     position: relative;
-    padding: 0 2px;
-    border-radius: 2px;
+    padding: 2px 4px;
+    border-radius: 3px;
     transition: all 0.2s;
-    white-space: normal;
-    line-height: inherit;
 
     &:hover {
       background: linear-gradient(180deg, rgba(255, 235, 59, 0.5), rgba(255, 193, 7, 0.5));
@@ -368,19 +365,16 @@ const ContentEditableArea = styled.div`
 
   /* 취소선 스타일 (삭제 표시) */
   .strikethrough {
-    display: inline;
     text-decoration: line-through;
     text-decoration-color: #ff5757;
     text-decoration-thickness: 2px;
     background: rgba(255, 87, 87, 0.1);
-    padding: 0 2px;
-    border-radius: 2px;
+    padding: 2px 4px;
+    border-radius: 3px;
     cursor: pointer;
     position: relative;
     opacity: 0.7;
     transition: all 0.2s;
-    white-space: normal;
-    line-height: inherit;
 
     &:hover {
       background: rgba(255, 87, 87, 0.2);
@@ -714,19 +708,16 @@ const FullScreenEditArea = styled.div`
 
   /* 취소선 스타일 */
   .strikethrough {
-    display: inline;
     text-decoration: line-through;
     text-decoration-color: #ff5757;
     text-decoration-thickness: 2px;
     background: rgba(255, 87, 87, 0.1);
-    padding: 0 2px;
-    border-radius: 2px;
+    padding: 2px 4px;
+    border-radius: 3px;
     cursor: pointer;
     position: relative;
     opacity: 0.7;
     transition: all 0.2s;
-    white-space: normal;
-    line-height: inherit;
 
     &:hover {
       background: rgba(255, 87, 87, 0.2);
@@ -736,16 +727,13 @@ const FullScreenEditArea = styled.div`
 
   /* 형광펜 스타일 */
   .highlight {
-    display: inline;
     background: linear-gradient(180deg, rgba(255, 235, 59, 0.35), rgba(255, 193, 7, 0.35));
     border-bottom: 2px solid #ffc107;
     cursor: pointer;
     position: relative;
-    padding: 0 2px;
-    border-radius: 2px;
+    padding: 2px 4px;
+    border-radius: 3px;
     transition: all 0.2s;
-    white-space: normal;
-    line-height: inherit;
 
     &:hover {
       background: linear-gradient(180deg, rgba(255, 235, 59, 0.5), rgba(255, 193, 7, 0.5));
@@ -1032,11 +1020,9 @@ const CollaborativeDocumentEditor = ({
 
     let isMounted = true;
 
-    // 1:1 채팅인 경우 자동으로 편집 권한 부여
+    // 1:1 채팅인 경우
     if (chatType === '1:1' || chatType === 'direct') {
-      setActualCanEdit(true); // 1:1은 무조건 편집 가능
-
-      // 매니저는 문서를 올린 사람인지 확인
+      // 매니저 및 편집 권한 확인
       const loadManagerStatus = async () => {
         try {
           const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
@@ -1044,16 +1030,21 @@ const CollaborativeDocumentEditor = ({
 
           if (isMounted && docSnap.exists()) {
             const docData = docSnap.data();
-            setActualIsManager(docData.lastEditedBy === currentUserId);
+            const isDocOwner = docData.lastEditedBy === currentUserId;
+            setActualIsManager(isDocOwner);
+            // 문서 소유자만 편집 가능, 아니면 읽기 전용 (마커만 가능)
+            setActualCanEdit(isDocOwner);
           } else {
-            // 문서가 없으면 기본값 사용
+            // 문서가 없으면 양쪽 모두 편집 가능
             setActualIsManager(isManager);
+            setActualCanEdit(true);
           }
         } catch (error) {
           if (error.code !== 'permission-denied') {
             console.error('매니저 상태 로드 오류:', error);
           }
           setActualIsManager(isManager);
+          setActualCanEdit(true);
         }
       };
 
@@ -1234,13 +1225,7 @@ const CollaborativeDocumentEditor = ({
 
         // contentEditable 영역 업데이트
         if (contentRef.current) {
-          // <p> 태그를 <br> 태그로 변환 (마커 줄바꿈 문제 방지)
-          let htmlContent = data.content || '';
-          // </p><p> -> <br> 변환
-          htmlContent = htmlContent.replace(/<\/p>\s*<p>/gi, '<br>');
-          // 남은 <p>, </p> 태그 제거
-          htmlContent = htmlContent.replace(/<\/?p>/gi, '');
-          contentRef.current.innerHTML = htmlContent;
+          contentRef.current.innerHTML = data.content || '';
         }
 
         // 문서 소유자 정보 설정 (실제 내용이 있을 때만)
@@ -1308,14 +1293,6 @@ const CollaborativeDocumentEditor = ({
         editsSnap.forEach((doc) => {
           edits.push({ id: doc.id, ...doc.data() });
         });
-
-        // 문서 위치 순으로 정렬
-        edits.sort((a, b) => {
-          const offsetA = a.absoluteOffsets?.startOffset ?? Infinity;
-          const offsetB = b.absoluteOffsets?.startOffset ?? Infinity;
-          return offsetA - offsetB;
-        });
-
         setPendingEdits(edits);
       } else {
         // 문서 ID가 없으면 편집 이력도 없음
@@ -1501,41 +1478,9 @@ const CollaborativeDocumentEditor = ({
 
     // editHistory를 순회하며 마커 재생성
     edits.forEach(edit => {
-      const { id, type, oldText, absoluteOffsets } = edit;
+      const { id, type, oldText } = edit;
 
-      // 1. absoluteOffsets가 있으면 정확한 위치에 마커 생성
-      if (absoluteOffsets && typeof absoluteOffsets.startOffset === 'number' && typeof absoluteOffsets.endOffset === 'number') {
-        try {
-          const range = absoluteOffsetToRange(tempDiv, absoluteOffsets.startOffset, absoluteOffsets.endOffset);
-          if (range && range.toString() === oldText) {
-            // 마커 span 생성
-            const markerSpan = document.createElement('span');
-            markerSpan.dataset.editId = id;
-            markerSpan.dataset.editType = type || 'highlight';
-            markerSpan.className = type || 'highlight';
-            markerSpan.textContent = range.toString();
-
-            // Range 내용을 마커로 교체
-            range.deleteContents();
-            range.insertNode(markerSpan);
-
-            // 삽입 후 위치 보정: nextSibling이 <p> 태그면 그 안 맨 앞으로 이동
-            if (markerSpan.nextSibling && markerSpan.nextSibling.nodeName === 'P') {
-              const pTag = markerSpan.nextSibling;
-              markerSpan.remove();
-              pTag.insertBefore(markerSpan, pTag.firstChild);
-              console.log('🔧 마커 재생성 시 <p> 태그 안으로 이동');
-            }
-
-            console.log(`✅ 마커 재생성 성공 (offset 사용): ${oldText.substring(0, 20)}...`);
-            return; // 성공하면 다음 edit로
-          }
-        } catch (error) {
-          console.warn('⚠️ offset 기반 마커 재생성 실패, 텍스트 검색으로 fallback:', error);
-        }
-      }
-
-      // 2. Fallback: oldText 기반 텍스트 검색
+      // oldText와 일치하는 텍스트 노드를 찾아서 마커로 감싸기
       const walker = document.createTreeWalker(
         tempDiv,
         NodeFilter.SHOW_TEXT,
@@ -1585,16 +1530,6 @@ const CollaborativeDocumentEditor = ({
             }
 
             parent.replaceChild(fragment, textNode);
-
-            // 삽입 후 위치 보정: markerSpan의 nextSibling이 <p> 태그면 그 안 맨 앞으로 이동
-            if (markerSpan.nextSibling && markerSpan.nextSibling.nodeName === 'P') {
-              const pTag = markerSpan.nextSibling;
-              markerSpan.remove();
-              pTag.insertBefore(markerSpan, pTag.firstChild);
-              console.log('🔧 마커 재생성(텍스트 검색) 시 <p> 태그 안으로 이동');
-            }
-
-            console.log(`⚠️ 마커 재생성 (텍스트 검색 사용): ${oldText.substring(0, 20)}...`);
             break; // 각 edit는 한 번만 적용
           }
         }
@@ -1618,59 +1553,40 @@ const CollaborativeDocumentEditor = ({
         edits.push({ id: doc.id, ...doc.data() });
       });
 
-      // 문서 위치 순으로 정렬
-      edits.sort((a, b) => {
-        const offsetA = a.absoluteOffsets?.startOffset ?? Infinity;
-        const offsetB = b.absoluteOffsets?.startOffset ?? Infinity;
-        return offsetA - offsetB;
-      });
-
       console.log('📝 편집 이력 먼저 로드 - 개수:', edits.length);
 
-      // 2. 원본 컨텐츠 설정 (기본값)
+      // 2. 로컬 캐시에서 편집 중인 버전 확인 (우선순위 1)
       let contentToLoad = memo.content || '';
       let titleToLoad = extractTitleFromContent(memo.content || '');
-      let useOriginal = true; // 원본 사용 여부 플래그
 
       console.log('📄 문서 불러오기 시작 - ID:', memo.id);
       console.log('📄 원본 memo.content 길이:', memo.content?.length || 0);
       console.log('📄 원본 컨텐츠에 마커 포함?', memo.content?.includes('data-edit-id') || false);
 
-      // 3. 로컬 캐시에서 편집 중인 버전 확인 (우선순위 1)
       if (globalDocumentCache.has(memo.id)) {
         const cached = globalDocumentCache.get(memo.id);
-        if (cached.content) {
-          contentToLoad = cached.content;
-          titleToLoad = cached.title;
-          useOriginal = false;
-          console.log('✅ 캐시에서 편집 중이던 문서 복원:', memo.id);
-          console.log('📄 캐시 컨텐츠 길이:', contentToLoad.length);
-          console.log('📄 캐시 컨텐츠에 마커 포함?', contentToLoad.includes('data-edit-id'));
-        }
-      }
-
-      // 4. currentDoc에서 편집 중인 버전 확인 (우선순위 2)
-      if (useOriginal) {
+        contentToLoad = cached.content;
+        titleToLoad = cached.title;
+        console.log('✅ 캐시에서 편집 중이던 문서 복원:', memo.id);
+        console.log('📄 캐시 컨텐츠 길이:', contentToLoad.length);
+        console.log('📄 캐시 컨텐츠에 마커 포함?', contentToLoad.includes('data-edit-id'));
+      } else {
+        // 3. currentDoc에서 편집 중인 버전 확인 (우선순위 2)
         const currentDocSnap = await getDoc(currentDocRef);
         if (currentDocSnap.exists()) {
           const currentDocData = currentDocSnap.data();
-          // currentDoc이 현재 불러올 문서와 동일하고, content가 있으면 사용
-          // 단, content가 비어있으면 비우기 후 상태이므로 원본 사용
-          if (currentDocData.originalMemoId === memo.id && currentDocData.content && currentDocData.content.trim()) {
+          if (currentDocData.originalMemoId === memo.id && currentDocData.content) {
             contentToLoad = currentDocData.content;
             titleToLoad = currentDocData.title || titleToLoad;
-            useOriginal = false;
             console.log('✅ Firestore에서 편집 중이던 문서 복원:', memo.id);
             console.log('📄 Firestore 컨텐츠 길이:', contentToLoad.length);
             console.log('📄 Firestore 컨텐츠에 마커 포함?', contentToLoad.includes('data-edit-id'));
-          } else if (currentDocData.originalMemoId === memo.id && (!currentDocData.content || !currentDocData.content.trim())) {
-            console.log('⚠️ currentDoc이 비어있음 (비우기 후 상태) - 원본 사용');
+          } else {
+            console.log('⚠️ currentDoc에 해당 문서 없음, 원본 사용');
           }
+        } else {
+          console.log('⚠️ currentDoc 자체가 없음, 원본 사용');
         }
-      }
-
-      if (useOriginal) {
-        console.log('✅ 원본 memo.content 사용');
       }
 
       // 4. ⭐ 마커 재생성: editHistory가 있는데 HTML에 마커가 없으면 재생성
@@ -1713,17 +1629,6 @@ const CollaborativeDocumentEditor = ({
 
       // 8. pendingEdits 업데이트
       setPendingEdits(edits.length > 0 ? edits : []);
-
-      // 8-1. hasPendingEdits 플래그 동기화
-      // ⭐ 중요: editHistory에 항목이 있더라도, pending 상태인 것이 없으면 배지 제거
-      const hasPending = edits.length > 0;
-      if (!hasPending && memo.hasPendingEdits === true) {
-        console.log('📝 수정 대기중인 항목 없음 (모두 승인/거부/리셋됨) - hasPendingEdits 플래그 제거:', memo.id);
-        await updateMemoPendingFlag(memo.id, false);
-      } else if (hasPending && memo.hasPendingEdits !== true) {
-        console.log('📝 수정 대기중인 항목 발견 - hasPendingEdits 플래그 추가:', memo.id);
-        await updateMemoPendingFlag(memo.id, true);
-      }
 
       // 9. 문서 소유자 정보 가져오기 (현재 로그인한 사용자)
       try {
@@ -1892,14 +1797,6 @@ const CollaborativeDocumentEditor = ({
       snapshot.forEach((doc) => {
         edits.push({ id: doc.id, ...doc.data() });
       });
-
-      // 문서 위치 순으로 정렬 (absoluteOffsets.startOffset 기준)
-      edits.sort((a, b) => {
-        const offsetA = a.absoluteOffsets?.startOffset ?? Infinity;
-        const offsetB = b.absoluteOffsets?.startOffset ?? Infinity;
-        return offsetA - offsetB;
-      });
-
       setPendingEdits(edits);
     }, (error) => {
       if (error.code !== 'permission-denied') {
@@ -1954,7 +1851,7 @@ const CollaborativeDocumentEditor = ({
       const newTitle = extractTitleFromContent(content);
       setTitle(newTitle);
     } else {
-      setTitle('제목 없음');
+      setTitle(''); // 🆕 빈 문자열로 설정 (문서 비우기 후 재로드 가능하도록)
     }
   }, [content, extractTitleFromContent]);
 
@@ -2481,23 +2378,18 @@ const CollaborativeDocumentEditor = ({
         // 취소선: 원본 텍스트 + 삭제 이유
         editData.oldText = pendingMarker.text;
         editData.reason = editReasonText || ''; // 삭제 이유
-        editData.absoluteOffsets = pendingMarker.absoluteOffsets; // 위치 정보 저장
       } else if (pendingMarker.type === 'highlight') {
         // 형광펜: 원본 텍스트 + 대체 텍스트 + 설명
         // 대체 텍스트가 비어있으면 주석 기능으로 활용
         editData.oldText = pendingMarker.text;
         editData.newText = editInputText.trim() || pendingMarker.text; // 대체 텍스트 (비어있으면 원본 유지)
         editData.description = editReasonText || ''; // 설명
-        editData.absoluteOffsets = pendingMarker.absoluteOffsets; // 위치 정보 저장
       }
 
-      console.log('💾 editHistory 저장 시도:', { memoId: currentDocId, chatRoomId, editData });
       const editDoc = await addDoc(editHistoryRef, editData);
-      console.log('✅ editHistory 저장 완료:', editDoc.id);
 
       // 메모 문서에 pending 플래그 설정
       await updateMemoPendingFlag(currentDocId, true);
-      console.log('✅ hasPendingEdits 플래그 설정 완료');
 
       // 프로그래밍 방식 변경 플래그 설정
       programmaticChangeRef.current = true;
@@ -2569,67 +2461,34 @@ const CollaborativeDocumentEditor = ({
           markerSpan.dataset.editId = editDoc.id;
           markerSpan.dataset.editType = 'strikethrough';
           markerSpan.dataset.canEdit = actualCanEdit ? 'true' : 'false';
+          markerSpan.textContent = pendingMarker.text;
         } else if (pendingMarker.type === 'highlight') {
           markerSpan.className = 'highlight';
           markerSpan.dataset.editId = editDoc.id;
           markerSpan.dataset.editType = 'highlight';
           markerSpan.dataset.canEdit = actualCanEdit ? 'true' : 'false';
+          // 승인 전까지는 원본 텍스트 표시
+          markerSpan.textContent = pendingMarker.text;
         }
 
         try {
-          // surroundContents가 range 내용을 자동으로 markerSpan에 넣어줌
           range.surroundContents(markerSpan);
           console.log(`✅ ${pendingMarker.type} 마커 삽입 완료`);
         } catch (error) {
-          // surroundContents는 여러 노드를 걸칠 때 실패함 - 정상적인 fallback 동작
-          console.log('ℹ️ 여러 단락 선택 - 수동 분할 방식 사용');
-
-          // 수동 분할 방식: Range를 3개로 분할하여 처리
-          const selectedText = range.toString();
-
-          // 1. startContainer가 텍스트 노드인지 확인
-          let startNode = range.startContainer;
-          let endNode = range.endContainer;
-
-          // 2. startNode가 텍스트 노드이면 split
-          if (startNode.nodeType === Node.TEXT_NODE) {
-            // startOffset 위치에서 텍스트 노드 분할
-            if (range.startOffset > 0 && range.startOffset < startNode.length) {
-              // 텍스트 중간에서 시작하는 경우 분할
-              const afterNode = startNode.splitText(range.startOffset);
-              // range를 분할된 뒤쪽 노드로 이동
-              range.setStart(afterNode, 0);
-              startNode = afterNode;
-            }
+          console.warn('⚠️ surroundContents 실패, 대체 방법 사용:', error.message);
+          // surroundContents 실패 시 대체 방법 사용
+          try {
+            // 선택된 내용을 텍스트로 추출하여 새로운 텍스트 노드 생성
+            const selectedText = range.toString();
+            markerSpan.textContent = selectedText;
+            range.deleteContents();
+            range.insertNode(markerSpan);
+            console.log(`✅ ${pendingMarker.type} 마커 삽입 완료 (대체 방법)`);
+          } catch (fallbackError) {
+            console.error('❌ 마커 삽입 완전 실패:', fallbackError);
+            showToast?.('마커 삽입에 실패했습니다');
+            return;
           }
-
-          // 3. endNode가 텍스트 노드이면 split
-          if (range.endContainer.nodeType === Node.TEXT_NODE) {
-            endNode = range.endContainer;
-            if (range.endOffset > 0 && range.endOffset < endNode.length) {
-              // 텍스트 중간에서 끝나는 경우 분할
-              endNode.splitText(range.endOffset);
-            }
-          }
-
-          // 4. 이제 range 내용을 추출하고 마커로 감싸기
-          const fragment = range.extractContents();
-
-          // fragment의 텍스트만 추출
-          markerSpan.textContent = selectedText;
-
-          // 5. 마커 삽입
-          range.insertNode(markerSpan);
-
-          // 6. 삽입 후 위치 보정: nextSibling이 <p> 태그면 그 안 맨 앞으로 이동
-          if (markerSpan.nextSibling && markerSpan.nextSibling.nodeName === 'P') {
-            const pTag = markerSpan.nextSibling;
-            markerSpan.remove();
-            pTag.insertBefore(markerSpan, pTag.firstChild);
-            console.log('🔧 마커를 <p> 태그 안으로 이동');
-          }
-
-          console.log(`✅ ${pendingMarker.type} 마커 삽입 완료 (수동 분할 방식)`);
         }
       }
 
@@ -3641,23 +3500,16 @@ const CollaborativeDocumentEditor = ({
     setCurrentDocId(null);
     setDocumentOwner(null); // 문서 소유자 정보 초기화
 
-    // Firestore의 currentDoc 비우기 (임시 문서 플래그도 제거)
+    // 🆕 lastSelectedMemoIdRef 리셋 (같은 문서 재로드 가능하도록)
+    lastSelectedMemoIdRef.current = null;
+
+    // Firestore의 currentDoc 완전히 삭제 (빈 객체로 설정하면 불러오기 시 문제 발생)
     try {
       const currentDocRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
-      await setDoc(currentDocRef, {
-        title: '',
-        content: '',
-        originalMemoId: null,
-        isTemporary: false,
-        tempDocId: null,
-        createdBy: null,
-        lastEditedBy: currentUserId,
-        lastEditedByName: currentUserName,
-        lastEditedAt: serverTimestamp()
-      });
-      console.log('✅ Firestore currentDoc 비우기 완료');
+      await deleteDoc(currentDocRef);
+      console.log('✅ Firestore currentDoc 삭제 완료');
     } catch (error) {
-      console.error('❌ Firestore currentDoc 비우기 실패:', error);
+      console.error('❌ Firestore currentDoc 삭제 실패:', error);
     }
 
     // 캐시에서도 제거 (수정 대기중이었다면 마커 정보가 유지되도록 하지 않음)
@@ -3754,7 +3606,7 @@ const CollaborativeDocumentEditor = ({
       <EditorHeader onClick={() => !collapsed && setCollapsed(false)}>
         <HeaderLeft>
           <DocumentIcon>📄</DocumentIcon>
-          {!content && !title && isOneOnOneChat && !currentDocId ? (
+          {!content && !title && !currentDocId ? (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -3904,11 +3756,21 @@ const CollaborativeDocumentEditor = ({
             )}
 
             {actualCanEdit ? (
-              <EditButton onClick={() => setShowFullScreenEdit(true)} title="큰 화면에서 편집하기">
+              <EditButton
+                onClick={() => setShowFullScreenEdit(true)}
+                title="큰 화면에서 편집하기"
+                disabled={!content && !title}
+                style={{ opacity: (!content && !title) ? 0.5 : 1, cursor: (!content && !title) ? 'not-allowed' : 'pointer' }}
+              >
                 📝
               </EditButton>
             ) : (
-              <EditButton onClick={() => setShowFullScreenEdit(true)} title="큰 화면에서 보기">
+              <EditButton
+                onClick={() => setShowFullScreenEdit(true)}
+                title="큰 화면에서 보기"
+                disabled={!content && !title}
+                style={{ opacity: (!content && !title) ? 0.5 : 1, cursor: (!content && !title) ? 'not-allowed' : 'pointer' }}
+              >
                 📝
               </EditButton>
             )}
@@ -4035,7 +3897,7 @@ const CollaborativeDocumentEditor = ({
         {/* contentEditable 영역 - 미리보기에서는 읽기 전용 */}
         <ContentEditableArea
           ref={contentRef}
-          contentEditable={true}
+          contentEditable={false}
           suppressContentEditableWarning
           onInput={(e) => {
             // 프로그래밍 방식 변경은 허용
@@ -4050,21 +3912,6 @@ const CollaborativeDocumentEditor = ({
             }
           }}
           onKeyDown={(e) => {
-            // Enter 키: <p> 태그 대신 <br> 태그 삽입 (줄바꿈 문제 방지)
-            if (e.key === 'Enter' && actualCanEdit) {
-              e.preventDefault();
-              const selection = window.getSelection();
-              const range = selection.getRangeAt(0);
-              range.deleteContents();
-              const br = document.createElement('br');
-              range.insertNode(br);
-              range.setStartAfter(br);
-              range.collapse(true);
-              selection.removeAllRanges();
-              selection.addRange(range);
-              return;
-            }
-
             // 텍스트 수정 키는 모두 막기 (선택 키는 허용)
             const allowedKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'];
             const isSelectionKey = e.shiftKey || e.ctrlKey || e.metaKey;
@@ -5565,47 +5412,17 @@ const CollaborativeDocumentEditor = ({
             <FullScreenContent>
               <FullScreenEditArea
                 ref={fullScreenContentRef}
-                contentEditable={true}
+                contentEditable={false}
                 suppressContentEditableWarning
                 onInput={(e) => {
-                  // 프로그래밍 방식 변경은 허용
-                  if (programmaticChangeRef.current) {
-                    programmaticChangeRef.current = false;
-                    return;
-                  }
-                  // 편집 권한이 있으면 입력 허용
-                  if (actualCanEdit) {
-                    const newContent = e.currentTarget.innerHTML;
-                    // setContent 호출하지 않고 debouncedSave만 호출 (입력 뒤섞임 방지)
-                    debouncedSave(newContent);
-                    return;
-                  }
-                  // 권한 없으면 입력 방지
+                  // 대화방에서는 항상 읽기 전용 - 직접 편집 차단
                   e.preventDefault();
                   if (fullScreenContentRef.current) {
                     fullScreenContentRef.current.innerHTML = content;
                   }
                 }}
                 onKeyDown={(e) => {
-                  // Enter 키: <p> 태그 대신 <br> 태그 삽입 (줄바꿈 문제 방지)
-                  if (e.key === 'Enter' && actualCanEdit) {
-                    e.preventDefault();
-                    const selection = window.getSelection();
-                    const range = selection.getRangeAt(0);
-                    range.deleteContents();
-                    const br = document.createElement('br');
-                    range.insertNode(br);
-                    range.setStartAfter(br);
-                    range.collapse(true);
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                    return;
-                  }
-
-                  // 편집 권한이 있으면 모든 키 허용
-                  if (actualCanEdit) return;
-
-                  // 권한 없으면 텍스트 수정 키는 막기 (선택 키는 허용)
+                  // 대화방에서는 항상 텍스트 수정 차단 (선택 키는 허용)
                   const allowedKeys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'];
                   const isSelectionKey = e.shiftKey || e.ctrlKey || e.metaKey;
 
@@ -5614,15 +5431,11 @@ const CollaborativeDocumentEditor = ({
                   }
                 }}
                 onPaste={(e) => {
-                  // 편집 권한이 있으면 붙여넣기 허용
-                  if (actualCanEdit) return;
-                  // 권한 없으면 붙여넣기 방지
+                  // 대화방에서는 항상 붙여넣기 차단
                   e.preventDefault();
                 }}
                 onCut={(e) => {
-                  // 편집 권한이 있으면 잘라내기 허용
-                  if (actualCanEdit) return;
-                  // 권한 없으면 잘라내기 방지
+                  // 대화방에서는 항상 잘라내기 차단
                   e.preventDefault();
                 }}
                 onClick={(e) => {

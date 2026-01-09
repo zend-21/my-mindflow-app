@@ -88,6 +88,15 @@ service cloud.firestore {
         // 생성/수정/삭제: 본인만
         allow create, update, delete: if isSignedIn() && request.auth.uid == userId;
       }
+
+      // 🆕 사용자 설정 서브컬렉션
+      match /settings/{settingType} {
+        // 읽기: 모든 로그인한 사용자 (프로필 사진, 아바타 표시용)
+        allow read: if isSignedIn();
+
+        // 생성/수정/삭제: 본인만
+        allow create, update, delete: if isSignedIn() && request.auth.uid == userId;
+      }
     }
 
     // ========================================

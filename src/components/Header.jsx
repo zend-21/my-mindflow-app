@@ -163,13 +163,106 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
     const [avatarBgColor, setAvatarBgColor] = useState('none');
     const [customPicture, setCustomPicture] = useState(null);
 
-    // profile이 변경될 때마다 imageError 초기화 및 아바타 설정 로드
+    // Firestore 실시간 리스너: 프로필 설정 변경 감지
     useEffect(() => {
-        setImageError(false);
-        setProfileImageType(localStorage.getItem('profileImageType') || 'avatar');
-        setSelectedAvatarId(localStorage.getItem('selectedAvatarId') || null);
-        setAvatarBgColor(localStorage.getItem('avatarBgColor') || 'none');
-        setCustomPicture(localStorage.getItem('customProfilePicture') || null);
+        const userId = localStorage.getItem('firebaseUserId');
+        if (!userId) return;
+
+        let unsubscribe;
+
+        const setupListener = async () => {
+            try {
+                const { doc, getDoc, onSnapshot } = await import('firebase/firestore');
+                const { db } = await import('../firebase/config');
+                const { getProfileImageUrl } = await import('../utils/storageService');
+
+                const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+
+                // 🆕 먼저 현재 데이터를 즉시 가져오기 (깜빡임 방지)
+                const initialSnap = await getDoc(settingsRef);
+                if (initialSnap.exists()) {
+                    const settings = initialSnap.data();
+                    const imageType = settings.profileImageType || 'avatar';
+
+                    setProfileImageType(imageType);
+
+                    if (imageType === 'photo') {
+                        const version = settings.profileImageVersion || null;
+                        const imageUrl = getProfileImageUrl(userId, version);
+                        setCustomPicture(imageUrl);
+                    } else {
+                        setCustomPicture(null);
+                    }
+
+                    if (settings.selectedAvatarId) {
+                        setSelectedAvatarId(settings.selectedAvatarId);
+                    }
+                    if (settings.avatarBgColor) {
+                        setAvatarBgColor(settings.avatarBgColor);
+                    }
+
+                    console.log('✅ Header: 초기 프로필 설정 로드 완료');
+                }
+
+                // 실시간 리스너 설정 (변경 감지용)
+                unsubscribe = onSnapshot(settingsRef, (docSnap) => {
+                    setImageError(false);
+
+                    if (docSnap.exists()) {
+                        const settings = docSnap.data();
+                        const imageType = settings.profileImageType || 'avatar';
+
+                        setProfileImageType(imageType);
+
+                        // 'photo' 모드면 버전 기반 URL 사용
+                        if (imageType === 'photo') {
+                            const version = settings.profileImageVersion || null;
+                            const imageUrl = getProfileImageUrl(userId, version);
+                            setCustomPicture(imageUrl);
+                        } else {
+                            setCustomPicture(null);
+                        }
+
+                        if (settings.selectedAvatarId) {
+                            setSelectedAvatarId(settings.selectedAvatarId);
+                        } else {
+                            setSelectedAvatarId(null);
+                        }
+
+                        if (settings.avatarBgColor) {
+                            setAvatarBgColor(settings.avatarBgColor);
+                        } else {
+                            setAvatarBgColor('none');
+                        }
+
+                        console.log('✅ Header: Firestore 프로필 설정 실시간 업데이트', {
+                            imageType,
+                            version: settings.profileImageVersion,
+                            avatarId: settings.selectedAvatarId,
+                            bgColor: settings.avatarBgColor
+                        });
+                    } else {
+                        // Firestore에 데이터가 없으면 기본값
+                        setProfileImageType('avatar');
+                        setCustomPicture(null);
+                        setSelectedAvatarId(null);
+                        setAvatarBgColor('none');
+                    }
+                }, (error) => {
+                    console.error('❌ Firestore 리스너 오류:', error);
+                });
+            } catch (error) {
+                console.error('프로필 설정 리스너 설정 오류:', error);
+            }
+        };
+
+        setupListener();
+
+        return () => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+        };
     }, [profile]);
 
     // 배경색 변경 이벤트 리스너
@@ -196,7 +289,13 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
     // 프로필 이미지 타입 변경 이벤트 리스너
     useEffect(() => {
         const handleProfileImageTypeChange = (e) => {
-            setProfileImageType(e.detail);
+            const newType = e.detail;
+            setProfileImageType(newType);
+
+            // 'avatar' 모드로 변경되면 사진 초기화
+            if (newType === 'avatar') {
+                setCustomPicture(null);
+            }
         };
         window.addEventListener('profileImageTypeChanged', handleProfileImageTypeChange);
         return () => window.removeEventListener('profileImageTypeChanged', handleProfileImageTypeChange);
@@ -204,8 +303,23 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
 
     // 커스텀 프로필 사진 변경 이벤트 리스너
     useEffect(() => {
-        const handleProfilePictureChange = () => {
-            setCustomPicture(getProfileSetting('customProfilePicture') || null);
+        const handleProfilePictureChange = async (e) => {
+            const userId = localStorage.getItem('firebaseUserId');
+            if (!userId) return;
+
+            // Firestore에서 최신 버전 정보 가져오기
+            const { doc, getDoc } = await import('firebase/firestore');
+            const { db } = await import('../firebase/config');
+            const { getProfileImageUrl } = await import('../utils/storageService');
+
+            const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+            const settingsSnap = await getDoc(settingsRef);
+
+            const version = settingsSnap.exists() ? settingsSnap.data().profileImageVersion : null;
+            const imageUrl = getProfileImageUrl(userId, version);
+
+            setCustomPicture(imageUrl);
+            setProfileImageType('photo');
         };
         window.addEventListener('profilePictureChanged', handleProfilePictureChange);
         return () => window.removeEventListener('profilePictureChanged', handleProfilePictureChange);

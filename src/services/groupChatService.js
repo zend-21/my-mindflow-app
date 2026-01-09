@@ -447,22 +447,52 @@ export const sendGroupMessage = async (groupId, senderId, content, type = 'text'
 };
 
 /**
- * 그룹 채팅 메시지 실시간 구독
+ * 그룹 채팅 메시지 실시간 구독 (참여 시점 이후 메시지만 표시)
  * @param {string} groupId - 그룹 채팅방 ID
+ * @param {string} userId - 현재 사용자 ID (참여 시점 확인용)
  * @param {Function} callback - 메시지 목록을 받을 콜백
  * @returns {Function} unsubscribe 함수
  */
-export const subscribeToGroupMessages = (groupId, callback) => {
-  const messagesRef = collection(db, 'groupChats', groupId, 'messages');
-  // ⚡ Firestore 최적화: 최근 100개 메시지만 로드 (desc로 변경 후 클라이언트에서 reverse)
-  const q = query(messagesRef, orderBy('createdAt', 'desc'), limit(100));
+export const subscribeToGroupMessages = (groupId, userId, callback) => {
+  // 먼저 그룹 정보를 가져와서 사용자의 joinedAt 확인
+  const groupRef = doc(db, 'groupChats', groupId);
 
-  return onSnapshot(q, (snapshot) => {
-    const messages = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })).reverse(); // 최신순으로 가져왔으므로 다시 오래된순으로 정렬
-    callback(messages);
+  return onSnapshot(groupRef, async (groupSnap) => {
+    if (!groupSnap.exists()) {
+      callback([]);
+      return;
+    }
+
+    const groupData = groupSnap.data();
+    const memberInfo = groupData.membersInfo?.[userId];
+    const joinedAt = memberInfo?.joinedAt;
+
+    const messagesRef = collection(db, 'groupChats', groupId, 'messages');
+
+    let q;
+    if (joinedAt) {
+      // 참여 시점 이후의 메시지만 조회 (카카오톡 방식)
+      q = query(
+        messagesRef,
+        where('createdAt', '>=', joinedAt),
+        orderBy('createdAt', 'desc'),
+        limit(100)
+      );
+      console.log(`📨 ${userId}의 참여 시점 이후 메시지만 조회`);
+    } else {
+      // joinedAt이 없으면 모든 메시지 조회 (하위 호환성 - 방장 등)
+      q = query(messagesRef, orderBy('createdAt', 'desc'), limit(100));
+      console.log(`📨 모든 메시지 조회 (joinedAt 없음)`);
+    }
+
+    // 메시지 구독
+    onSnapshot(q, (snapshot) => {
+      const messages = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })).reverse(); // 최신순으로 가져왔으므로 다시 오래된순으로 정렬
+      callback(messages);
+    });
   });
 };
 

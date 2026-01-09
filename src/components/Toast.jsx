@@ -182,7 +182,7 @@ const Toast = ({ message, onClose }) => {
       setTimeout(() => {
         if (onClose) onClose();
       }, 200); // 페이드아웃 애니메이션 후 닫기
-    }, 4000); // 4초 후 사라짐
+    }, 2000); // 2초 후 사라짐
 
     return () => clearTimeout(timer);
   }, [message, id, onClose]);

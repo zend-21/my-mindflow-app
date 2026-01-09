@@ -26,10 +26,10 @@ const Overlay = styled.div`
     background: rgba(0, 0, 0, 0.6);
     display: flex;
     /* ★★★ 수정: 중앙 정렬 속성 주석 해제 ★★★ */
-    justify-content: center; 
+    justify-content: center;
     align-items: flex-start;
     align-items: center;
-    z-index: 10000;
+    z-index: 500000;
     animation: ${fadeIn} 0.3s ease-out;
     
     /* ★★★ 수정: ModalContent가 넘치더라도 Overlay가 전체 화면을 덮도록 설정 ★★★ */
@@ -227,11 +227,11 @@ const ConfirmOverlay = styled.div`
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.4); 
+    background: rgba(0, 0, 0, 0.4);
     display: flex;
     justify-content: center;
     align-items: center;
-    z-index: 11000; /* 메인 모달(4000)보다 높게 */
+    z-index: 510000; /* NewMemoModal(500000)보다 높게 */
     animation: ${fadeIn} 0.2s ease-out;
 `;
 
@@ -280,7 +280,7 @@ const ToastOverlay = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 12000; /* 확인 모달(5000) 보다도 높게 설정 */
+  z-index: 520000; /* ConfirmOverlay(510000)보다 높게 */
   background: rgba(0, 0, 0, 0.2); 
   animation: ${fadeIn} 0.2s ease-out;
 `;

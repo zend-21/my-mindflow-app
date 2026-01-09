@@ -2,20 +2,29 @@
 import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
-import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Plus, Settings, X, UserCog, UserPlus, Trash2, Mail, Copy, Shield } from 'lucide-react';
-import { subscribeToMessages, sendMessage, markDMAsRead, subscribeToDMRoom, enterDMRoom, exitDMRoom } from '../../services/directMessageService';
-import { subscribeToGroupMessages, sendGroupMessage, markAllMessagesAsRead, markGroupAsRead, acceptInvitation, rejectInvitation, inviteMembersToGroup, transferRoomOwnership, removeMemberFromGroup, deleteGroupChat, cancelInvitation, updateGroupRoomType, appointSubManager, updateGroupImage, enterGroupRoom, exitGroupRoom } from '../../services/groupChatService';
+import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Settings, X, UserCog, UserPlus, Trash2, Mail, Copy, Shield } from 'lucide-react';
+// 🆕 통합 채팅 서비스 (1:1 + 그룹)
+import {
+  sendMessage as sendUnifiedMessage,
+  subscribeToMessages as subscribeToUnifiedMessages,
+  markAsRead as markUnifiedAsRead,
+  markAllMessagesAsRead as markAllUnifiedMessagesAsRead,
+  enterChatRoom as enterUnifiedChatRoom,
+  exitChatRoom as exitUnifiedChatRoom
+} from '../../services/unifiedChatService';
+// 개별 서비스 (그룹 관리 기능용)
+import { subscribeToDMRoom } from '../../services/directMessageService';
+import { acceptInvitation, rejectInvitation, inviteMembersToGroup, transferRoomOwnership, removeMemberFromGroup, deleteGroupChat, cancelInvitation, updateGroupRoomType, appointSubManager, updateGroupImage } from '../../services/groupChatService';
 import { getMyFriends, getUserByWorkspaceCode } from '../../services/friendService';
 import { getUserNickname } from '../../services/nicknameService';
 import { isUserBlocked } from '../../services/userManagementService';
 import { playChatMessageSound, notificationSettings } from '../../utils/notificationSounds';
-import CollapsibleDocumentEditor from './CollapsibleDocumentEditor';
 import CollaborativeDocumentEditor from './CollaborativeDocumentEditor';
 import SharedMemoSelectorModal from './SharedMemoSelectorModal';
 import PermissionManagementModal from './PermissionManagementModal';
 import AppointSubManagerModal from './AppointSubManagerModal';
 import { db } from '../../firebase/config';
-import { doc, setDoc, serverTimestamp, onSnapshot, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { getCurrentUserId, getCurrentUserData } from '../../utils/userStorage';
 
 // 전체화면 컨테이너
@@ -1269,6 +1278,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
   const [showPermissionModal, setShowPermissionModal] = useState(false); // 권한 관리 모달 (deprecated)
   const [permissions, setPermissions] = useState({ editors: [], manager: null }); // 권한 정보
   const [selectedMemoToLoad, setSelectedMemoToLoad] = useState(null); // CollaborativeDocumentEditor에 전달할 메모
+  const [isPageVisible, setIsPageVisible] = useState(!document.hidden); // 🆕 페이지 가시성 상태
   const [processingInvitation, setProcessingInvitation] = useState(false); // 초대 처리 중
   const [myMemberStatus, setMyMemberStatus] = useState(null); // 내 멤버 상태 (active/pending/rejected)
   const [showMemberListModal, setShowMemberListModal] = useState(false); // 참여자 목록 모달
@@ -1596,6 +1606,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
 
   // 1:1 채팅방 데이터 실시간 구독 (lastAccessTime 업데이트 감지)
   const [chatRoomData, setChatRoomData] = useState(chat);
+  const [userProfilePictures, setUserProfilePictures] = useState({}); // userId -> profilePictureUrl 매핑
 
   useEffect(() => {
     if (!chat.id || chat.type === 'group') {
@@ -1623,10 +1634,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
     const timeoutId = setTimeout(() => {
       if (!isMounted) return;
 
-      // 채팅 타입에 따라 다른 구독 함수 사용
-      const subscribeFunc = chat.type === 'group' ? subscribeToGroupMessages : subscribeToMessages;
-
-      unsubscribe = subscribeFunc(chat.id, (newMessages) => {
+      // 🆕 통합 메시지 구독 (1:1과 그룹 모두 지원)
+      unsubscribe = subscribeToUnifiedMessages(chat.id, chat.type, currentUserId, (newMessages) => {
         if (!isMounted) return;
 
         // 새 메시지가 추가되었고, 내가 보낸 메시지가 아니면 효과음 재생
@@ -1638,13 +1647,9 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
           }
         }
 
-        // 새 메시지 도착 시 즉시 읽음 처리
+        // 새 메시지 도착 시 페이지가 보이는 경우에만 읽음 처리
         if (prevMessageCount > 0 && newMessages.length > prevMessageCount) {
-          if (chat.type === 'group') {
-            markGroupAsRead(chat.id, currentUserId);
-          } else {
-            markDMAsRead(chat.id);
-          }
+          markUnifiedAsRead(chat.id, chat.type, currentUserId, isPageVisible);
         }
 
         prevMessageCount = newMessages.length;
@@ -1658,14 +1663,9 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
         }, 100);
       });
 
-      // 읽음 표시 (채팅 타입에 따라 다른 함수 호출)
-      if (chat.type === 'group') {
-        // 그룹 채팅: unreadCount를 0으로 설정하고 메시지 읽음 처리
-        markGroupAsRead(chat.id, currentUserId);
-        markAllMessagesAsRead(chat.id, currentUserId);
-      } else {
-        markDMAsRead(chat.id);
-      }
+      // 🆕 읽음 표시 (통합 함수 사용 - 페이지 가시성 확인)
+      markUnifiedAsRead(chat.id, chat.type, currentUserId, isPageVisible);
+      markAllUnifiedMessagesAsRead(chat.id, chat.type, currentUserId, isPageVisible);
     }, 50);
 
     return () => {
@@ -1681,6 +1681,79 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
       }
     };
   }, [chat.id, currentUserId]);
+
+  // 🆕 사용자 프로필 사진 실시간 구독
+  useEffect(() => {
+    // 채팅방에 참여한 모든 사용자 ID 수집
+    const userIds = new Set();
+
+    // 1:1 채팅인 경우
+    if (chat.type !== 'group') {
+      chat.participants?.forEach(userId => userIds.add(userId));
+    } else {
+      // 그룹 채팅인 경우
+      Object.keys(chat.membersInfo || {}).forEach(userId => {
+        if (chat.membersInfo[userId]?.status === 'active') {
+          userIds.add(userId);
+        }
+      });
+    }
+
+    // 메시지 발신자 ID도 추가
+    messages.forEach(message => {
+      if (message.senderId) {
+        userIds.add(message.senderId);
+      }
+    });
+
+    // Firestore 리스너 배열
+    const unsubscribers = [];
+
+    // 각 사용자의 프로필 설정 구독
+    userIds.forEach(userId => {
+      const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+
+      const unsubscribe = onSnapshot(settingsRef, async (docSnap) => {
+        if (docSnap.exists()) {
+          const settings = docSnap.data();
+          const imageType = settings.profileImageType || 'avatar';
+
+          // 'photo' 모드면 버전 기반 URL 사용
+          if (imageType === 'photo') {
+            const { getProfileImageUrl } = await import('../../utils/storageService');
+            const version = settings.profileImageVersion || null;
+            const imageUrl = getProfileImageUrl(userId, version);
+            setUserProfilePictures(prev => ({
+              ...prev,
+              [userId]: imageUrl
+            }));
+          } else {
+            // 아바타 모드면 프로필 사진 제거
+            setUserProfilePictures(prev => {
+              const newState = { ...prev };
+              delete newState[userId];
+              return newState;
+            });
+          }
+        } else {
+          // Firestore에 데이터가 없으면 프로필 사진 제거
+          setUserProfilePictures(prev => {
+            const newState = { ...prev };
+            delete newState[userId];
+            return newState;
+          });
+        }
+      }, (error) => {
+        console.error(`❌ Firestore 리스너 오류 (${userId}):`, error);
+      });
+
+      unsubscribers.push(unsubscribe);
+    });
+
+    return () => {
+      unsubscribers.forEach(unsubscribe => unsubscribe());
+    };
+  }, [chat.id, chat.type, chat.participants, chat.membersInfo, messages]);
 
   // 🆕 chat.isPublic이 변경되면 selectedRoomType 자동 업데이트
   useEffect(() => {
@@ -1801,24 +1874,33 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
     }
   };
 
-  // 🆕 채팅방 입장/퇴장 처리
+  // 🆕 Page Visibility API - 페이지 가시성 감지
   useEffect(() => {
-    if (chat.type === 'group') {
-      // 그룹 채팅방
-      enterGroupRoom(chat.id, currentUserId);
-      return () => {
-        exitGroupRoom(chat.id, currentUserId);
-      };
-    } else {
-      // 1:1 채팅방
-      enterDMRoom(chat.id, currentUserId);
-      return () => {
-        exitDMRoom(chat.id, currentUserId);
-      };
-    }
+    const handleVisibilityChange = () => {
+      const visible = !document.hidden;
+      setIsPageVisible(visible);
+      console.log(`📱 페이지 가시성 변경: ${visible ? '보임' : '숨김'}`);
+
+      // 페이지가 다시 보이면 읽음 처리
+      if (visible) {
+        markUnifiedAsRead(chat.id, chat.type, currentUserId, true);
+        markAllUnifiedMessagesAsRead(chat.id, chat.type, currentUserId, true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [chat.id, chat.type, currentUserId]);
 
-  // 메시지 전송
+  // 🆕 채팅방 입장/퇴장 처리 (통합)
+  useEffect(() => {
+    enterUnifiedChatRoom(chat.id, chat.type, currentUserId);
+    return () => {
+      exitUnifiedChatRoom(chat.id, chat.type, currentUserId);
+    };
+  }, [chat.id, chat.type, currentUserId]);
+
+  // 메시지 전송 (통합)
   const handleSendMessage = async () => {
     if (!inputText.trim() || sending) return;
 
@@ -1833,13 +1915,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
     setSending(true);
 
     try {
-      // 채팅 타입에 따라 다른 전송 함수 사용
-      if (chat.type === 'group') {
-        await sendGroupMessage(chat.id, currentUserId, textToSend);
-      } else {
-        // quota 최적화: roomData 전달하여 getDoc() 생략
-        await sendMessage(chat.id, textToSend, chat);
-      }
+      // 🆕 통합 메시지 전송
+      await sendUnifiedMessage(chat.id, chat.type, currentUserId, textToSend, chatRoomData);
 
       // 스크롤을 맨 아래로
       setTimeout(() => {
@@ -1887,8 +1964,15 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
 
   // 공유 메모 선택 핸들러
   const handleSelectSharedMemo = (memo) => {
+    // 🆕 먼저 null로 리셋한 후 메모 설정 (React가 변경을 확실히 감지하도록)
+    // 같은 메모를 여러 번 선택해도 매번 useEffect가 트리거됨
+    setSelectedMemoToLoad(null);
+
     // CollaborativeDocumentEditor에 메모 전달 (확인 로직은 에디터에서 처리)
-    setSelectedMemoToLoad(memo);
+    setTimeout(() => {
+      setSelectedMemoToLoad(memo);
+    }, 0);
+
     setShowSharedMemoSelector(false);
 
     // 문서창이 닫혀있으면 열기
@@ -2373,9 +2457,15 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
             $clickable={otherUser.isGroup && isRoomOwner}
             onClick={handleAvatarClick}
             title={otherUser.isGroup && isRoomOwner ? '프로필 이미지 변경' : ''}
-            style={chat.groupImage ? { backgroundImage: `url(${chat.groupImage})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+            style={
+              chat.groupImage
+                ? { backgroundImage: `url(${chat.groupImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                : (!otherUser.isGroup && userProfilePictures[otherUser.userId])
+                ? { backgroundImage: `url(${userProfilePictures[otherUser.userId]})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+                : {}
+            }
           >
-            {!chat.groupImage && (otherUser.isGroup ? <Users size={20} /> : (nicknamesLoaded ? otherUser.name.charAt(0).toUpperCase() : '...'))}
+            {!chat.groupImage && !userProfilePictures[otherUser.userId] && (otherUser.isGroup ? <Users size={20} /> : (nicknamesLoaded ? otherUser.name.charAt(0).toUpperCase() : '...'))}
             {otherUser.isGroup && (
               <AvatarBadge title={chat.isPublic ? '공개방' : '비공개방'}>
                 {chat.isPublic ? '🌐' : '🔒'}
@@ -2408,82 +2498,97 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
             <div style={{ position: 'relative' }}>
               <MenuButton
                 onClick={() => {
-                  if (isRoomOwner) {
-                    setShowMenuDropdown(!showMenuDropdown);
-                  } else {
-                    showToast?.('방장만 이용할 수 있습니다');
-                  }
+                  setShowMenuDropdown(!showMenuDropdown);
                 }}
                 title="메뉴"
               >
                 <MoreVertical size={20} />
               </MenuButton>
-              {/* 드롭다운 메뉴 (방장만 표시) */}
-              {showMenuDropdown && isRoomOwner && (
+              {/* 드롭다운 메뉴 */}
+              {showMenuDropdown && (
                 <DropdownMenu onClick={(e) => e.stopPropagation()}>
-                  {/* 비공개방일 때만 멤버 초대 메뉴 표시 */}
-                  {!chat.isPublic && (
+                  {/* 방장 전용 메뉴 */}
+                  {isRoomOwner && (
+                    <>
+                      {/* 비공개방일 때만 멤버 초대 메뉴 표시 */}
+                      {!chat.isPublic && (
+                        <DropdownItem
+                          onClick={() => {
+                            setShowInviteMembersModal(true);
+                            setShowMenuDropdown(false);
+                          }}
+                        >
+                          <Users size={16} />
+                          멤버 초대
+                        </DropdownItem>
+                      )}
+                      {/* 공개방일 때만 초대 코드 보기 메뉴 표시 */}
+                      {chat.isPublic && (
+                        <DropdownItem
+                          onClick={() => {
+                            setShowInviteCodeModal(true);
+                            setShowMenuDropdown(false);
+                          }}
+                        >
+                          <Mail size={16} />
+                          초대 코드 보기
+                        </DropdownItem>
+                      )}
+                      {/* 🆕 방 공개 설정 변경 메뉴 */}
+                      <DropdownItem
+                        onClick={() => {
+                          setSelectedRoomType(chat.isPublic); // 현재 방 타입으로 초기화
+                          setShowRoomTypeModal(true);
+                          setShowMenuDropdown(false);
+                        }}
+                      >
+                        <Settings size={16} />
+                        방 공개 설정
+                      </DropdownItem>
+                      <DropdownItem
+                        onClick={() => {
+                          setShowAppointSubManagerModal(true);
+                          setShowMenuDropdown(false);
+                        }}
+                      >
+                        <Shield size={16} />
+                        부방장 임명
+                      </DropdownItem>
+                      <DropdownItem
+                        onClick={() => {
+                          setShowTransferOwnerModal(true);
+                          setShowMenuDropdown(false);
+                        }}
+                      >
+                        <UserCog size={16} />
+                        방장 위임
+                      </DropdownItem>
+                      <DropdownItem
+                        onClick={() => {
+                          setShowMenuDropdown(false);
+                          handleDeleteGroup();
+                        }}
+                        style={{ color: '#ef4444' }}
+                      >
+                        <Trash2 size={16} />
+                        단체방 삭제
+                      </DropdownItem>
+                    </>
+                  )}
+
+                  {/* 일반 참여자용 메뉴 */}
+                  {!isRoomOwner && (
                     <DropdownItem
                       onClick={() => {
-                        setShowInviteMembersModal(true);
                         setShowMenuDropdown(false);
+                        handleLeaveGroup();
                       }}
+                      style={{ color: '#ef4444' }}
                     >
-                      <Users size={16} />
-                      멤버 초대
+                      <Trash2 size={16} />
+                      현재 단체방 탈퇴
                     </DropdownItem>
                   )}
-                  {/* 공개방일 때만 초대 코드 보기 메뉴 표시 */}
-                  {chat.isPublic && (
-                    <DropdownItem
-                      onClick={() => {
-                        setShowInviteCodeModal(true);
-                        setShowMenuDropdown(false);
-                      }}
-                    >
-                      <Mail size={16} />
-                      초대 코드 보기
-                    </DropdownItem>
-                  )}
-                  {/* 🆕 방 공개 설정 변경 메뉴 */}
-                  <DropdownItem
-                    onClick={() => {
-                      setSelectedRoomType(chat.isPublic); // 현재 방 타입으로 초기화
-                      setShowRoomTypeModal(true);
-                      setShowMenuDropdown(false);
-                    }}
-                  >
-                    <Settings size={16} />
-                    방 공개 설정
-                  </DropdownItem>
-                  <DropdownItem
-                    onClick={() => {
-                      setShowAppointSubManagerModal(true);
-                      setShowMenuDropdown(false);
-                    }}
-                  >
-                    <Shield size={16} />
-                    부방장 임명
-                  </DropdownItem>
-                  <DropdownItem
-                    onClick={() => {
-                      setShowTransferOwnerModal(true);
-                      setShowMenuDropdown(false);
-                    }}
-                  >
-                    <UserCog size={16} />
-                    방장 위임
-                  </DropdownItem>
-                  <DropdownItem
-                    onClick={() => {
-                      setShowMenuDropdown(false);
-                      handleDeleteGroup();
-                    }}
-                    style={{ color: '#ef4444' }}
-                  >
-                    <Trash2 size={16} />
-                    단체방 삭제
-                  </DropdownItem>
                 </DropdownMenu>
               )}
             </div>
@@ -2654,8 +2759,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                   )}
                   <MessageItem $isMine={isMine}>
                     {!isMine && showAvatar && (
-                      <MessageAvatar $color={getAvatarColor(message.senderId)}>
-                        {(memberNicknames[message.senderId] || message.senderName || '?').charAt(0).toUpperCase()}
+                      <MessageAvatar
+                        $color={getAvatarColor(message.senderId)}
+                        style={userProfilePictures[message.senderId] ? { backgroundImage: `url(${userProfilePictures[message.senderId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                      >
+                        {!userProfilePictures[message.senderId] && (memberNicknames[message.senderId] || message.senderName || '?').charAt(0).toUpperCase()}
                         {userRole && (
                           <RoleBadge title={userRole.label}>
                             {userRole.icon}
@@ -2765,42 +2873,6 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
         )}
       </InputContainer>
 
-      {/* 단체방 나가기 버튼 */}
-      {chat.type === 'group' && (
-        <div style={{
-          padding: '12px 20px',
-          background: '#1a1a1a',
-          borderTop: '1px solid rgba(255, 255, 255, 0.1)'
-        }}>
-          <button
-            onClick={handleLeaveGroup}
-            style={{
-              width: '100%',
-              padding: '12px',
-              background: 'linear-gradient(135deg, #f56565, #e53e3e)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: '500',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              boxShadow: '0 2px 8px rgba(245, 101, 101, 0.3)'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(245, 101, 101, 0.4)';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = '0 2px 8px rgba(245, 101, 101, 0.3)';
-            }}
-          >
-            채팅방 나가기
-          </button>
-        </div>
-      )}
-
       {/* 공유 폴더 메모 선택 모달 */}
       {showSharedMemoSelector && (
         <SharedMemoSelectorModal
@@ -2854,8 +2926,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
 
                 return (
                   <MemberItem key={memberId} onClick={() => handleShowMemberDetail(memberId, displayName)} style={{ cursor: 'pointer' }}>
-                    <MemberAvatar $color={getAvatarColor(memberId)}>
-                      {displayName.charAt(0).toUpperCase()}
+                    <MemberAvatar
+                      $color={getAvatarColor(memberId)}
+                      style={userProfilePictures[memberId] ? { backgroundImage: `url(${userProfilePictures[memberId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                    >
+                      {!userProfilePictures[memberId] && displayName.charAt(0).toUpperCase()}
                     </MemberAvatar>
                     <MemberInfo>
                       <MemberName>
@@ -2905,8 +2980,14 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                       handleShowMemberDetail(memberId, displayName);
                     }}
                   >
-                    <MemberAvatar $color={getAvatarColor(memberId)} style={{ opacity: hasLeftAfterKick ? 0.6 : 1 }}>
-                      {displayName.charAt(0).toUpperCase()}
+                    <MemberAvatar
+                      $color={getAvatarColor(memberId)}
+                      style={{
+                        opacity: hasLeftAfterKick ? 0.6 : 1,
+                        ...(userProfilePictures[memberId] ? { backgroundImage: `url(${userProfilePictures[memberId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {})
+                      }}
+                    >
+                      {!userProfilePictures[memberId] && displayName.charAt(0).toUpperCase()}
                     </MemberAvatar>
                     <MemberInfo>
                       <MemberName style={{ opacity: hasLeftAfterKick ? 0.7 : 1 }}>
@@ -3029,8 +3110,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                                 );
                               }}
                             >
-                              <MemberAvatar $color={getAvatarColor(friendId)}>
-                                {displayName.charAt(0).toUpperCase()}
+                              <MemberAvatar
+                                $color={getAvatarColor(friendId)}
+                                style={userProfilePictures[friendId] ? { backgroundImage: `url(${userProfilePictures[friendId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                              >
+                                {!userProfilePictures[friendId] && displayName.charAt(0).toUpperCase()}
                               </MemberAvatar>
                               <MemberInfo>
                                 <MemberName>{displayName}</MemberName>
@@ -3084,8 +3168,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
 
                   {searchedUser && (
                     <UserCardContainer>
-                      <MemberAvatar $color={getAvatarColor(searchedUser.id)}>
-                        {(searchedUser.displayName || '익명').charAt(0).toUpperCase()}
+                      <MemberAvatar
+                        $color={getAvatarColor(searchedUser.id)}
+                        style={userProfilePictures[searchedUser.id] ? { backgroundImage: `url(${userProfilePictures[searchedUser.id]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                      >
+                        {!userProfilePictures[searchedUser.id] && (searchedUser.displayName || '익명').charAt(0).toUpperCase()}
                       </MemberAvatar>
                       <MemberInfo>
                         <MemberName>{searchedUser.displayName || '익명'}</MemberName>
@@ -3171,8 +3258,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                         $selected={isSelected}
                         onClick={() => setSelectedMemberToTransfer(memberId)}
                       >
-                        <MemberAvatar $color={getAvatarColor(memberId)}>
-                          {displayName.charAt(0).toUpperCase()}
+                        <MemberAvatar
+                          $color={getAvatarColor(memberId)}
+                          style={userProfilePictures[memberId] ? { backgroundImage: `url(${userProfilePictures[memberId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                        >
+                          {!userProfilePictures[memberId] && displayName.charAt(0).toUpperCase()}
                         </MemberAvatar>
                         <MemberInfo>
                           <MemberName>{displayName}</MemberName>

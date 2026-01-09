@@ -392,7 +392,10 @@ const CreateGroupModal = ({ onClose, showToast }) => {
   const [friends, setFriends] = useState([]);
   const [selectedFriends, setSelectedFriends] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [isPublic, setIsPublic] = useState(false); // 🆕 공개/비공개 선택 (기본값: 비공개)
+  // ⚠️ 공개방 기능 임시 비활성화 (2026-01-09)
+  // - 문서 협업 기능과 보안 이슈로 인해 당분간 비공개 단체방만 운영
+  // - 필요시 아래 값을 true로 변경하고 UI 주석을 해제하여 공개방 기능 재활성화 가능
+  const [isPublic, setIsPublic] = useState(false); // 항상 비공개방으로 고정
 
   useEffect(() => {
     // 친구 목록 불러오기
@@ -511,7 +514,9 @@ const CreateGroupModal = ({ onClose, showToast }) => {
             />
           </InputGroup>
 
-          {/* 🆕 공개/비공개 선택 */}
+          {/* ⚠️ 공개/비공개 선택 UI 임시 비활성화 (2026-01-09)
+              - 문서 협업 기능과 보안 이슈로 인해 당분간 비공개 단체방만 운영
+              - 필요시 아래 주석을 해제하여 공개방 선택 UI 재활성화 가능
           <InputGroup>
             <Label>방 타입</Label>
             <RoomTypeSelector>
@@ -542,8 +547,9 @@ const CreateGroupModal = ({ onClose, showToast }) => {
               </RoomTypeOption>
             </RoomTypeSelector>
           </InputGroup>
+          */}
 
-          {/* 친구 선택 (비공개방일 때만 표시) */}
+          {/* 친구 선택 (항상 표시 - 비공개방만 운영) */}
           {!isPublic && (
             <InputGroup>
               <Label>멤버 선택 ({selectedFriends.length}명)</Label>
