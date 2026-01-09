@@ -38,7 +38,8 @@ export const sendMessage = async (chatId, chatType, userId, message, roomData = 
   if (type === 'group') {
     return await sendGroupMessage(chatId, userId, message);
   } else {
-    return await sendDMMessage(chatId, userId, message, roomData);
+    // DM은 userId 파라미터 불필요 (roomId, text, roomData 순서)
+    return await sendDMMessage(chatId, message, roomData);
   }
 };
 
