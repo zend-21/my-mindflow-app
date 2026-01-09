@@ -1407,48 +1407,6 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
   // 선택된 이모지 카테고리 상태
   const [selectedEmojiCategory, setSelectedEmojiCategory] = useState('😊 표정');
 
-  // 상대방 정보 가져오기
-  const getOtherUserInfo = () => {
-    if (chat.type === 'group') {
-      // 실제 활성화된 멤버 수 계산 (pending, rejected 제외)
-      const activeMemberCount = chat.membersInfo
-        ? Object.values(chat.membersInfo).filter(memberInfo => memberInfo.status === 'active').length
-        : 0;
-
-      return {
-        name: chat.groupName || '이름 없는 그룹',
-        isGroup: true,
-        memberCount: activeMemberCount
-      };
-    }
-
-    const otherUserId = chat.participants?.find(id => id !== currentUserId);
-
-    // 나와의 대화인 경우 (otherUserId가 없음)
-    if (!otherUserId) {
-      const myInfo = chat.participantsInfo?.[currentUserId];
-      const myDisplayName = userNicknames[currentUserId] || myInfo?.displayName || currentUserName || '나';
-      return {
-        name: `${myDisplayName} (나)`,
-        userId: currentUserId,
-        isGroup: false,
-        isSelfChat: true
-      };
-    }
-
-    const otherUserInfo = chat.participantsInfo?.[otherUserId];
-    // 앱 닉네임 우선, fallback으로 Google displayName 사용
-    const displayName = userNicknames[otherUserId] || otherUserInfo?.displayName || '익명';
-    return {
-      name: displayName,
-      userId: otherUserId,
-      isGroup: false,
-      isSelfChat: false
-    };
-  };
-
-  const otherUser = getOtherUserInfo();
-
   // ⚡ 권한 정보 실시간 구독 (그룹 채팅만) - 최적화: 2개 리스너 통합
   useEffect(() => {
     if (!chat.id || chat.type !== 'group') return;
@@ -1608,6 +1566,48 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
   const [chatRoomData, setChatRoomData] = useState(chat);
   const [userProfilePictures, setUserProfilePictures] = useState({}); // userId -> profilePictureUrl 매핑
   const [userNicknames, setUserNicknames] = useState({}); // userId -> 닉네임 매핑
+
+  // 상대방 정보 가져오기
+  const getOtherUserInfo = () => {
+    if (chat.type === 'group') {
+      // 실제 활성화된 멤버 수 계산 (pending, rejected 제외)
+      const activeMemberCount = chat.membersInfo
+        ? Object.values(chat.membersInfo).filter(memberInfo => memberInfo.status === 'active').length
+        : 0;
+
+      return {
+        name: chat.groupName || '이름 없는 그룹',
+        isGroup: true,
+        memberCount: activeMemberCount
+      };
+    }
+
+    const otherUserId = chat.participants?.find(id => id !== currentUserId);
+
+    // 나와의 대화인 경우 (otherUserId가 없음)
+    if (!otherUserId) {
+      const myInfo = chat.participantsInfo?.[currentUserId];
+      const myDisplayName = userNicknames[currentUserId] || myInfo?.displayName || currentUserName || '나';
+      return {
+        name: `${myDisplayName} (나)`,
+        userId: currentUserId,
+        isGroup: false,
+        isSelfChat: true
+      };
+    }
+
+    const otherUserInfo = chat.participantsInfo?.[otherUserId];
+    // 앱 닉네임 우선, fallback으로 Google displayName 사용
+    const displayName = userNicknames[otherUserId] || otherUserInfo?.displayName || '익명';
+    return {
+      name: displayName,
+      userId: otherUserId,
+      isGroup: false,
+      isSelfChat: false
+    };
+  };
+
+  const otherUser = getOtherUserInfo();
 
   useEffect(() => {
     if (!chat.id || chat.type === 'group') {
