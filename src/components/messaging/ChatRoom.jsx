@@ -1297,7 +1297,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
   const [selectedMemberToTransfer, setSelectedMemberToTransfer] = useState(null); // 위임할 멤버 선택
   const [loadingInvite, setLoadingInvite] = useState(false); // 초대 중
   const [loadingTransfer, setLoadingTransfer] = useState(false); // 위임 중
-  const [memberNicknames, setMemberNicknames] = useState({}); // 멤버 닉네임 캐시
+  // memberNicknames는 userNicknames로 통합됨 (실시간 구독)
   const [nicknamesLoaded, setNicknamesLoaded] = useState(false); // 닉네임 로딩 완료 여부
   const [showRemoveMemberModal, setShowRemoveMemberModal] = useState(false); // 강퇴 확인 모달
   const [memberToRemove, setMemberToRemove] = useState(null); // 강퇴할 멤버 { id, name }
@@ -1427,7 +1427,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
     // 나와의 대화인 경우 (otherUserId가 없음)
     if (!otherUserId) {
       const myInfo = chat.participantsInfo?.[currentUserId];
-      const myDisplayName = memberNicknames[currentUserId] || myInfo?.displayName || currentUserName || '나';
+      const myDisplayName = userNicknames[currentUserId] || myInfo?.displayName || currentUserName || '나';
       return {
         name: `${myDisplayName} (나)`,
         userId: currentUserId,
@@ -1438,7 +1438,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
 
     const otherUserInfo = chat.participantsInfo?.[otherUserId];
     // 앱 닉네임 우선, fallback으로 Google displayName 사용
-    const displayName = memberNicknames[otherUserId] || otherUserInfo?.displayName || '익명';
+    const displayName = userNicknames[otherUserId] || otherUserInfo?.displayName || '익명';
     return {
       name: displayName,
       userId: otherUserId,
@@ -1607,6 +1607,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
   // 1:1 채팅방 데이터 실시간 구독 (lastAccessTime 업데이트 감지)
   const [chatRoomData, setChatRoomData] = useState(chat);
   const [userProfilePictures, setUserProfilePictures] = useState({}); // userId -> profilePictureUrl 매핑
+  const [userNicknames, setUserNicknames] = useState({}); // userId -> 닉네임 매핑
 
   useEffect(() => {
     if (!chat.id || chat.type === 'group') {
@@ -1755,6 +1756,69 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
     };
   }, [chat.id, chat.type, chat.participants, chat.membersInfo, messages]);
 
+  // 🆕 사용자 닉네임 실시간 구독
+  useEffect(() => {
+    // 채팅방에 참여한 모든 사용자 ID 수집
+    const userIds = new Set();
+
+    // 1:1 채팅인 경우
+    if (chat.type !== 'group') {
+      chat.participants?.forEach(userId => userIds.add(userId));
+    } else {
+      // 그룹 채팅인 경우
+      Object.keys(chat.membersInfo || {}).forEach(userId => {
+        if (chat.membersInfo[userId]?.status === 'active') {
+          userIds.add(userId);
+        }
+      });
+    }
+
+    // 메시지 발신자 ID도 추가
+    messages.forEach(message => {
+      if (message.senderId) {
+        userIds.add(message.senderId);
+      }
+    });
+
+    // Firestore 리스너 배열
+    const unsubscribers = [];
+
+    // 각 사용자의 닉네임 구독
+    userIds.forEach(userId => {
+      const nicknameRef = doc(db, 'users', userId, 'settings', 'nickname');
+
+      const unsubscribe = onSnapshot(nicknameRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          const nickname = data.nickname || null;
+          setUserNicknames(prev => ({
+            ...prev,
+            [userId]: nickname
+          }));
+        } else {
+          // 닉네임이 없으면 제거
+          setUserNicknames(prev => {
+            const newState = { ...prev };
+            delete newState[userId];
+            return newState;
+          });
+        }
+      }, (error) => {
+        console.error(`❌ 닉네임 리스너 오류 (${userId}):`, error);
+      });
+
+      unsubscribers.push(unsubscribe);
+    });
+
+    return () => {
+      unsubscribers.forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      });
+    };
+  }, [chat.id, chat.type, chat.participants, chat.membersInfo, messages]);
+
   // 🆕 chat.isPublic이 변경되면 selectedRoomType 자동 업데이트
   useEffect(() => {
     if (chat.type === 'group') {
@@ -1762,7 +1826,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
     }
   }, [chat.isPublic, chat.type]);
 
-  // 멤버들의 닉네임 조회
+  // 멤버들의 닉네임 초기 로딩 (실시간 구독이 업데이트함)
   useEffect(() => {
     const fetchNicknames = async () => {
       setNicknamesLoaded(false); // 닉네임 로딩 시작
@@ -1775,7 +1839,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
             nicknames[memberId] = nickname;
           }
         }
-        setMemberNicknames(nicknames);
+        setUserNicknames(prev => ({ ...prev, ...nicknames }));
       } else if (chat.type !== 'group' && chat.participants) {
         // 1:1 채팅 - 상대방 닉네임 조회
         const nicknames = {};
@@ -1787,7 +1851,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
             }
           }
         }
-        setMemberNicknames(nicknames);
+        setUserNicknames(prev => ({ ...prev, ...nicknames }));
       }
 
       setNicknamesLoaded(true); // 닉네임 로딩 완료
@@ -2767,7 +2831,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                         $color={getAvatarColor(message.senderId)}
                         style={userProfilePictures[message.senderId] ? { backgroundImage: `url(${userProfilePictures[message.senderId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                       >
-                        {!userProfilePictures[message.senderId] && (memberNicknames[message.senderId] || message.senderName || '?').charAt(0).toUpperCase()}
+                        {!userProfilePictures[message.senderId] && (userNicknames[message.senderId] || message.senderName || '?').charAt(0).toUpperCase()}
                         {userRole && (
                           <RoleBadge title={userRole.label}>
                             {userRole.icon}
@@ -2777,7 +2841,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                     )}
                     {!isMine && !showAvatar && <div style={{ width: '32px' }} />}
                     <MessageContent $isMine={isMine}>
-                      {!isMine && showAvatar && <SenderName>{memberNicknames[message.senderId] || message.senderName}</SenderName>}
+                      {!isMine && showAvatar && <SenderName>{userNicknames[message.senderId] || message.senderName}</SenderName>}
                       <MessageBubble $isMine={isMine}>
                         {message.text || message.content}
                       </MessageBubble>
@@ -2917,7 +2981,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
               {chat.membersInfo && Object.entries(chat.membersInfo).map(([memberId, memberInfo]) => {
                 if (memberId !== chat.creatorId) return null;
                 const isOwner = memberId === chat.creatorId;
-                const displayName = memberNicknames[memberId] || memberInfo.displayName || '익명';
+                const displayName = userNicknames[memberId] || memberInfo.displayName || '익명';
 
                 // 상태 표시 - 초대 대기중/거부만 표시
                 let statusText = null;
@@ -2954,7 +3018,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
               {/* 나머지 멤버들 */}
               {chat.membersInfo && Object.entries(chat.membersInfo).map(([memberId, memberInfo]) => {
                 if (memberId === chat.creatorId) return null;
-                const displayName = memberNicknames[memberId] || memberInfo.displayName || '익명';
+                const displayName = userNicknames[memberId] || memberInfo.displayName || '익명';
                 const memberStatus = memberInfo.status || 'active';
 
                 // 강퇴 여부 확인
