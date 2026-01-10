@@ -1699,33 +1699,34 @@ const CollaborativeDocumentEditor = ({
         console.log('💾 재생성된 마커를 캐시에 저장:', memo.id);
       }
 
-      // 5. 문서 소유자 정보 먼저 가져오기 (Firestore 저장에 사용)
+      // 5. 원본 문서의 소유자 정보 가져오기 (memo.userId)
+      const originalOwnerId = memo.userId || currentUserId;
       let ownerNickname;
       let wsCode = null;
 
       try {
-        // 닉네임 조회
-        ownerNickname = await getUserNickname(currentUserId);
+        // 원본 문서 작성자의 닉네임 조회
+        ownerNickname = await getUserNickname(originalOwnerId);
 
-        // 쉐어노트 ID 조회
-        const workspaceId = `workspace_${currentUserId}`;
+        // 원본 문서 작성자의 워크스페이스 코드 조회
+        const workspaceId = `workspace_${originalOwnerId}`;
         const workspaceRef = doc(db, 'workspaces', workspaceId);
         const workspaceSnap = await getDoc(workspaceRef);
         wsCode = workspaceSnap.exists() ? workspaceSnap.data().workspaceCode : null;
 
-        console.log('✅ 문서 소유자 정보:', { userId: currentUserId, nickname: ownerNickname, wsCode });
+        console.log('✅ 원본 문서 소유자 정보:', { userId: originalOwnerId, nickname: ownerNickname, wsCode });
       } catch (error) {
         console.error('문서 소유자 정보 조회 실패:', error);
         ownerNickname = currentUserName;
       }
 
-      // 6. currentDoc 업데이트 (문서 불러오기 - 소유자 변경하지 않음)
+      // 6. currentDoc 업데이트 (문서 불러오기 - 원본 소유자 유지)
       // 기존 문서의 소유자 정보 확인
       const existingDocSnap = await getDoc(currentDocRef);
       const existingData = existingDocSnap.exists() ? existingDocSnap.data() : {};
 
-      // 문서 소유자는 최초 불러온 사람으로 유지 (이미 문서가 있으면 소유자 변경 안 함)
-      const docOwner = existingData.lastEditedBy || currentUserId;
+      // 문서 소유자는 원본 문서의 소유자로 설정 (기존에 있으면 기존 유지, 없으면 원본 소유자)
+      const docOwner = existingData.lastEditedBy || originalOwnerId;
       const docOwnerName = existingData.lastEditedByName || (ownerNickname || currentUserName);
 
       await setDoc(currentDocRef, {
@@ -1951,9 +1952,20 @@ const CollaborativeDocumentEditor = ({
       // 내용이 변경된 경우 반영 (다른 사용자의 마커 추가 포함)
       const hasContentChanged = data.content !== content;
       const isDifferentUser = data.lastEditedBy && data.lastEditedBy !== currentUserId;
+      const incomingDocId = data.memoId || data.originalMemoId;
+
+      // 현재 작업 중인 문서와 다른 문서가 들어오면 무시 (자동 전환 방지)
+      if (currentDocId && incomingDocId && currentDocId !== incomingDocId) {
+        console.log('⚠️ 다른 문서 감지 - 자동 전환 방지:', {
+          current: currentDocId,
+          incoming: incomingDocId,
+          message: '현재 작업 중인 문서를 유지합니다'
+        });
+        return;
+      }
 
       if (isDifferentUser || hasContentChanged) {
-        console.log('📡 문서 실시간 업데이트 감지:', data.memoId,
+        console.log('📡 문서 실시간 업데이트 감지:', incomingDocId,
           isDifferentUser ? `from user: ${data.lastEditedBy}` : '(content changed)');
 
         // 임시 문서는 동기화하지 않음
@@ -1966,7 +1978,7 @@ const CollaborativeDocumentEditor = ({
         programmaticChangeRef.current = true;
         setContent(data.content || '');
         setTitle(data.title || '');
-        setCurrentDocId(data.memoId || data.originalMemoId);
+        setCurrentDocId(incomingDocId);
 
         // 문서 소유자의 최신 닉네임 조회
         let ownerNickname = data.lastEditedByName || '알 수 없음';
