@@ -1,7 +1,10 @@
 // 📄 공유 폴더 메모 선택 모달
 import { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
-import { X, Search, FileText, Calendar, Folder } from 'lucide-react';
+import { X, Search, FileText, Calendar, Folder, Lock } from 'lucide-react';
+import { checkFrozenDocuments } from '../../utils/frozenDocumentUtils';
+import { collection, collectionGroup, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../../firebase/config';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -144,7 +147,7 @@ const MemoItem = styled.div`
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   padding: 16px;
-  cursor: pointer;
+  cursor: ${props => props.$frozen ? 'not-allowed' : 'pointer'};
   transition: all 0.2s;
   display: flex;
   flex-direction: column;
@@ -153,16 +156,39 @@ const MemoItem = styled.div`
   min-width: 0;
   overflow: hidden;
   margin-bottom: 0;
+  opacity: ${props => props.$frozen ? 0.5 : 1};
+  position: relative;
+
+  ${props => props.$frozen && `
+    &::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 12px;
+    }
+  `}
 
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: #4a90e2;
-    transform: translateY(-2px);
+    background: ${props => props.$frozen ? 'rgba(255, 255, 255, 0.03)' : 'rgba(255, 255, 255, 0.08)'};
+    border-color: ${props => props.$frozen ? 'rgba(255, 255, 255, 0.1)' : '#4a90e2'};
+    transform: ${props => props.$frozen ? 'none' : 'translateY(-2px)'};
   }
 
   &:active {
-    transform: scale(0.98);
+    transform: ${props => props.$frozen ? 'none' : 'scale(0.98)'};
   }
+`;
+
+const MemoHeader = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
 `;
 
 const MemoTitle = styled.h3`
@@ -178,6 +204,23 @@ const MemoTitle = styled.h3`
   -webkit-box-orient: vertical;
   word-break: break-word;
   overflow-wrap: break-word;
+  flex: 1;
+`;
+
+const FrozenBadge = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 68, 68, 0.15);
+  border: 1px solid rgba(255, 68, 68, 0.3);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #ff6b6b;
+  white-space: nowrap;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 2;
 `;
 
 const MemoPreview = styled.p`
@@ -234,11 +277,57 @@ const LoadingState = styled.div`
 const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, chatRoomId }) => {
   const [filteredMemos, setFilteredMemos] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [frozenMemoIds, setFrozenMemoIds] = useState(new Set());
+  const [frozenMemoInfo, setFrozenMemoInfo] = useState({});
 
   // allMemos에서 folderId === 'shared'인 메모만 필터링 (useMemo로 메모이제이션)
   const sharedMemos = useMemo(() => {
     return allMemos?.filter(memo => memo.folderId === 'shared') || [];
   }, [allMemos]);
+
+  // 프리즌 상태 체크
+  useEffect(() => {
+    const checkFrozenStatus = async () => {
+      if (sharedMemos.length === 0) return;
+
+      const memoIds = sharedMemos.map(m => m.id);
+
+      try {
+        // 모든 대화방에서 pending 상태인 editHistory 조회
+        const editHistoryQuery = query(
+          collectionGroup(db, 'editHistory'),
+          where('status', '==', 'pending')
+        );
+        const snapshot = await getDocs(editHistoryQuery);
+
+        const frozenSet = new Set();
+        const frozenInfo = {};
+
+        snapshot.docs.forEach(doc => {
+          const pathParts = doc.ref.path.split('/');
+          const roomId = pathParts[1]; // chatRooms/{chatRoomId}
+          const memoId = pathParts[3]; // documents/{memoId}
+
+          // 다른 대화방에서 편집 중인 문서만 프리즌 처리
+          if (memoIds.includes(memoId) && roomId !== chatRoomId) {
+            frozenSet.add(memoId);
+            const data = doc.data();
+            frozenInfo[memoId] = {
+              chatRoomId: roomId,
+              pendingCount: (frozenInfo[memoId]?.pendingCount || 0) + 1
+            };
+          }
+        });
+
+        setFrozenMemoIds(frozenSet);
+        setFrozenMemoInfo(frozenInfo);
+      } catch (error) {
+        console.error('프리즌 상태 체크 실패:', error);
+      }
+    };
+
+    checkFrozenStatus();
+  }, [sharedMemos, chatRoomId]);
 
   useEffect(() => {
     if (!searchQuery) {
@@ -254,7 +343,13 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
   }, [searchQuery, sharedMemos]);
 
   const handleSelectMemo = (memo) => {
-    // 채팅방에서는 프리즈 여부와 관계없이 자유롭게 불러올 수 있음
+    // 다른 대화방에서 편집 중인 문서는 불러올 수 없음
+    if (frozenMemoIds.has(memo.id)) {
+      const info = frozenMemoInfo[memo.id];
+      showToast?.(`다른 대화방에서 작업 중인 문서입니다 (${info?.pendingCount || 0}개 수정 대기중)`);
+      return;
+    }
+
     onSelectMemo(memo);
     onClose();
   };
@@ -324,20 +419,34 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
               </EmptyDescription>
             </EmptyState>
           ) : (
-            filteredMemos.map(memo => (
-              <MemoItem
-                key={memo.id}
-                onClick={() => handleSelectMemo(memo)}
-              >
-                <MemoTitle>{getDisplayTitle(memo)}</MemoTitle>
-                {memo.content && (
-                  <MemoPreview>{memo.content}</MemoPreview>
-                )}
-                <MemoDate>
-                  {formatDate(memo.updatedAt || memo.createdAt)}
-                </MemoDate>
-              </MemoItem>
-            ))
+            filteredMemos.map(memo => {
+              const isFrozen = frozenMemoIds.has(memo.id);
+              const frozenInfo = frozenMemoInfo[memo.id];
+
+              return (
+                <MemoItem
+                  key={memo.id}
+                  onClick={() => handleSelectMemo(memo)}
+                  $frozen={isFrozen}
+                >
+                  <MemoHeader>
+                    <MemoTitle>{getDisplayTitle(memo)}</MemoTitle>
+                    {isFrozen && (
+                      <FrozenBadge>
+                        <Lock size={12} />
+                        {frozenInfo?.pendingCount || 0}개 대기
+                      </FrozenBadge>
+                    )}
+                  </MemoHeader>
+                  {memo.content && (
+                    <MemoPreview>{memo.content}</MemoPreview>
+                  )}
+                  <MemoDate>
+                    {formatDate(memo.updatedAt || memo.createdAt)}
+                  </MemoDate>
+                </MemoItem>
+              );
+            })
           )}
         </MemoList>
       </ModalContainer>

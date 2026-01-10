@@ -1,5 +1,5 @@
 // 💬 대화 탭 - 메시징 허브 (채팅, 친구)
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import styled from 'styled-components';
 import { Settings } from 'lucide-react';
 import ChatList from './ChatList';
@@ -99,6 +99,21 @@ const TabLabel = styled.span`
   }
 `;
 
+const Badge = styled.span`
+  background: #ff4757;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+`;
+
 // 콘텐츠 영역
 const Content = styled.div`
   flex: 1;
@@ -135,6 +150,18 @@ const TabContent = styled.div`
 const MessagingHub = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag }) => {
   const [activeTab, setActiveTab] = useState('chat'); // chat, friends
   const [showSettings, setShowSettings] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0); // 읽지 않은 채팅 수
+  const [friendRequestCount, setFriendRequestCount] = useState(0); // 친구 요청 수
+
+  // ChatList로부터 읽지 않은 메시지 수 업데이트
+  const handleUnreadCountChange = useCallback((count) => {
+    setUnreadChatCount(count);
+  }, []);
+
+  // FriendList로부터 친구 요청 수 업데이트
+  const handleFriendRequestCountChange = useCallback((count) => {
+    setFriendRequestCount(count);
+  }, []);
 
   return (
     <Container>
@@ -146,6 +173,7 @@ const MessagingHub = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingF
           >
             <TabIcon>💬</TabIcon>
             <TabLabel>채팅</TabLabel>
+            {unreadChatCount > 0 && <Badge>{unreadChatCount > 99 ? '99+' : unreadChatCount}</Badge>}
           </Tab>
           <Tab
             $active={activeTab === 'friends'}
@@ -153,6 +181,7 @@ const MessagingHub = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingF
           >
             <TabIcon>👥</TabIcon>
             <TabLabel>친구</TabLabel>
+            {friendRequestCount > 0 && <Badge>{friendRequestCount > 99 ? '99+' : friendRequestCount}</Badge>}
           </Tab>
           <SettingsTab
             onClick={() => setShowSettings(true)}
@@ -166,10 +195,10 @@ const MessagingHub = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingF
       <Content>
         {/* 두 컴포넌트를 모두 마운트하여 실시간 구독 유지, display로 보이기/숨기기 */}
         <TabContent $active={activeTab === 'chat'}>
-          <ChatList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={onUpdateMemoPendingFlag} />
+          <ChatList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={onUpdateMemoPendingFlag} onUnreadCountChange={handleUnreadCountChange} />
         </TabContent>
         <TabContent $active={activeTab === 'friends'}>
-          <FriendList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} />
+          <FriendList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onFriendRequestCountChange={handleFriendRequestCountChange} />
         </TabContent>
       </Content>
 

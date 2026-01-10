@@ -1,9 +1,10 @@
 // 친구 추가 모달 (ID 입력 + QR 스캔)
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { X, Search, QrCode, UserPlus, AlertCircle, CheckCircle } from 'lucide-react';
 import { getUserByWorkspaceCode, addFriendInstantly, isFriend } from '../../services/friendService';
 import QRScannerModal from '../collaboration/QRScannerModal';
+import { avatarList } from '../avatars/AvatarIcons';
 
 const Overlay = styled.div`
   position: fixed;
@@ -277,6 +278,8 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
   const [searchResult, setSearchResult] = useState(null);
   const [message, setMessage] = useState(null);
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+  const [userProfilePicture, setUserProfilePicture] = useState(null);
+  const [userAvatarSettings, setUserAvatarSettings] = useState(null);
 
   const handleSearch = async () => {
     if (!searchId.trim()) {
@@ -389,6 +392,91 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
     }
   };
 
+  // 아바타 배경색 매핑
+  const BACKGROUND_COLORS = {
+    'none': 'transparent',
+    'lavender': 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+    'peach': 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+    'mint': 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+    'sunset': 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+    'ocean': 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+    'pink': '#FF69B4',
+    'blue': '#4169E1',
+    'yellow': '#FFD700',
+    'green': '#32CD32',
+    'purple': '#9370DB',
+  };
+
+  // 아바타 아이콘 렌더링
+  const renderAvatarIcon = () => {
+    if (!userAvatarSettings?.selectedAvatarId) return null;
+
+    const avatar = avatarList.find(a => a.id === userAvatarSettings.selectedAvatarId);
+    if (!avatar) return null;
+
+    const AvatarComponent = avatar.component;
+    const bgColor = BACKGROUND_COLORS[userAvatarSettings.avatarBgColor] || BACKGROUND_COLORS['none'];
+
+    return (
+      <div style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: bgColor,
+        borderRadius: '50%'
+      }}>
+        <div style={{ width: '70%', height: '70%' }}>
+          <AvatarComponent />
+        </div>
+      </div>
+    );
+  };
+
+  // 검색 결과가 있을 때 프로필 로드
+  useEffect(() => {
+    if (!searchResult?.id) {
+      setUserProfilePicture(null);
+      setUserAvatarSettings(null);
+      return;
+    }
+
+    const loadProfile = async () => {
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const { db } = await import('../../firebase/config');
+        const { getProfileImageUrl } = await import('../../utils/storageService');
+
+        const settingsRef = doc(db, 'users', searchResult.id, 'settings', 'profile');
+        const docSnap = await getDoc(settingsRef);
+
+        if (docSnap.exists()) {
+          const settings = docSnap.data();
+          const imageType = settings.profileImageType || 'avatar';
+          const version = settings.profileImageVersion || null;
+          const selectedAvatarId = settings.selectedAvatarId || null;
+          const avatarBgColor = settings.avatarBgColor || 'none';
+
+          if (imageType === 'photo') {
+            const imageUrl = getProfileImageUrl(searchResult.id, version);
+            setUserProfilePicture(imageUrl);
+            setUserAvatarSettings(null);
+          } else {
+            setUserProfilePicture(null);
+            if (selectedAvatarId) {
+              setUserAvatarSettings({ selectedAvatarId, avatarBgColor });
+            }
+          }
+        }
+      } catch (error) {
+        console.error('프로필 로드 실패:', error);
+      }
+    };
+
+    loadProfile();
+  }, [searchResult]);
+
   return (
     <>
       <Overlay onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -434,8 +522,15 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
                 {searchResult && (
                   <ResultSection>
                     <UserCard>
-                      <UserAvatar>
-                        {(searchResult.displayName || searchResult.email || '?').charAt(0).toUpperCase()}
+                      <UserAvatar
+                        style={userProfilePicture ? {
+                          backgroundImage: `url(${userProfilePicture})`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center'
+                        } : {}}
+                      >
+                        {!userProfilePicture && userAvatarSettings && renderAvatarIcon()}
+                        {!userProfilePicture && !userAvatarSettings && (searchResult.displayName || searchResult.email || '?').charAt(0).toUpperCase()}
                       </UserAvatar>
                       <UserInfo>
                         <UserName>{searchResult.displayName || searchResult.email || '익명'}</UserName>

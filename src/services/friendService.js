@@ -11,7 +11,8 @@ import {
   deleteDoc,
   query,
   where,
-  Timestamp
+  Timestamp,
+  serverTimestamp
 } from 'firebase/firestore';
 
 /**
@@ -317,20 +318,103 @@ export const acceptFriendRequest = async (myUserId, requesterId) => {
 };
 
 /**
- * 친구 요청 거절/숨기기
+ * 친구 요청 거절/숨기기 (삭제 대신 hidden 필드 추가)
  */
 export const rejectFriendRequest = async (myUserId, requesterId) => {
   try {
-    // friendRequests에서 삭제 (상대방은 여전히 나를 친구로 보고 있음)
-    await deleteDoc(doc(db, 'users', myUserId, 'friendRequests', requesterId));
+    // friendRequests에 hidden 필드 추가 (삭제하지 않음)
+    await setDoc(doc(db, 'users', myUserId, 'friendRequests', requesterId), {
+      hidden: true,
+      hiddenAt: serverTimestamp()
+    }, { merge: true });
 
-    console.log('✅ 친구 요청 거절 완료');
+    console.log('✅ 친구 요청 숨김 완료');
     return { success: true };
   } catch (error) {
-    console.error('❌ 친구 요청 거절 실패:', error);
+    console.error('❌ 친구 요청 숨김 실패:', error);
     return {
       success: false,
       error: error.message,
+    };
+  }
+};
+
+/**
+ * 숨긴 친구 요청 목록 조회
+ */
+export const getHiddenFriendRequests = async (userId) => {
+  try {
+    const requestsRef = collection(db, 'users', userId, 'friendRequests');
+    const snapshot = await getDocs(requestsRef);
+
+    const hiddenRequests = [];
+
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data();
+
+      // hidden이 true인 요청만 필터링
+      if (data.hidden === true) {
+        hiddenRequests.push({
+          id: docSnap.id,
+          requesterId: data.requesterId || docSnap.id,
+          requesterName: data.requesterName || '익명',
+          requesterWorkspaceCode: data.requesterWorkspaceCode || '-',
+          createdAt: data.createdAt,
+          hiddenAt: data.hiddenAt
+        });
+      }
+    }
+
+    console.log('✅ 숨긴 친구 요청 목록 조회 완료:', hiddenRequests.length);
+    return { success: true, requests: hiddenRequests };
+  } catch (error) {
+    console.error('❌ 숨긴 친구 요청 목록 조회 실패:', error);
+    return {
+      success: false,
+      error: error.message,
+      requests: []
+    };
+  }
+};
+
+/**
+ * 숨긴 친구 요청 복구 (다시 표시)
+ */
+export const unhideRequest = async (userId, requesterId) => {
+  try {
+    const requestRef = doc(db, 'users', userId, 'friendRequests', requesterId);
+
+    // hidden 필드 제거
+    await setDoc(requestRef, {
+      hidden: false
+    }, { merge: true });
+
+    console.log('✅ 친구 요청 복구 완료');
+    return { success: true };
+  } catch (error) {
+    console.error('❌ 친구 요청 복구 실패:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+/**
+ * 숨긴 친구 요청 영구 삭제
+ */
+export const permanentlyDeleteRequest = async (userId, requesterId) => {
+  try {
+    const requestRef = doc(db, 'users', userId, 'friendRequests', requesterId);
+    await deleteDoc(requestRef);
+
+    console.log('✅ 친구 요청 영구 삭제 완료');
+    return { success: true };
+  } catch (error) {
+    console.error('❌ 친구 요청 영구 삭제 실패:', error);
+    return {
+      success: false,
+      error: error.message
     };
   }
 };

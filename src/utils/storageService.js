@@ -24,10 +24,6 @@ import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client
 // Production에서는 무조건 R2 사용
 const STORAGE_PROVIDER = 'r2';  // 임시로 하드코딩
 
-// 디버깅: 실제 사용되는 스토리지 제공자 확인
-console.log('🔧 Storage Provider:', STORAGE_PROVIDER);
-console.log('🔧 R2 Endpoint:', import.meta.env.VITE_R2_ENDPOINT);
-console.log('🔧 R2 Bucket:', import.meta.env.VITE_R2_BUCKET_NAME);
 
 /**
  * 이미지 파일을 스토리지에 업로드
@@ -81,13 +77,6 @@ const uploadToFirebase = async (file, folder, originalFileName = null) => {
  */
 const uploadToR2 = async (file, folder, originalFileName = null) => {
   try {
-    console.log('🔧 R2 업로드 시작:', {
-      fileType: file.type,
-      endpoint: import.meta.env.VITE_R2_ENDPOINT,
-      bucket: import.meta.env.VITE_R2_BUCKET_NAME,
-      hasAccessKey: !!import.meta.env.VITE_R2_ACCESS_KEY_ID,
-      hasSecretKey: !!import.meta.env.VITE_R2_SECRET_ACCESS_KEY,
-    });
 
     // S3 Client 설정 (환경변수의 개행문자 제거)
     const s3Client = new S3Client({
@@ -123,7 +112,6 @@ const uploadToR2 = async (file, folder, originalFileName = null) => {
     // 공개 URL 생성 (R2 Public Development URL 형식)
     const publicUrl = `${import.meta.env.VITE_R2_PUBLIC_URL?.trim()}/${key}`;
 
-    console.log('✅ R2 업로드 완료:', publicUrl);
     return publicUrl;
   } catch (error) {
     console.error('❌ Cloudflare R2 업로드 실패:', error);
@@ -152,9 +140,8 @@ const deleteFromFirebase = async (url) => {
     const { deleteObject, ref: storageRef } = await import('firebase/storage');
     const fileRef = storageRef(storage, url);
     await deleteObject(fileRef);
-    console.log('✅ Firebase Storage 삭제 성공');
   } catch (error) {
-    console.error('❌ Firebase Storage 삭제 실패:', error);
+    console.error('Firebase Storage 삭제 실패:', error);
     // 삭제 실패는 치명적이지 않으므로 에러를 던지지 않음
   }
 };
@@ -188,18 +175,17 @@ const deleteFromR2 = async (url) => {
     });
 
     await s3Client.send(command);
-    console.log('✅ Cloudflare R2 삭제 성공');
   } catch (error) {
-    console.error('❌ Cloudflare R2 삭제 실패:', error);
+    console.error('Cloudflare R2 삭제 실패:', error);
     // 삭제 실패는 치명적이지 않으므로 에러를 던지지 않음
   }
 };
 
 /**
- * 프로필 이미지를 고정된 파일명으로 업로드 (덮어쓰기)
+ * 프로필 이미지를 버전이 포함된 파일명으로 업로드
  * @param {File|Blob} file - 업로드할 파일 또는 Blob
  * @param {string} userId - 사용자 ID
- * @returns {Promise<string>} 업로드된 파일의 URL (항상 동일)
+ * @returns {Promise<string>} 업로드된 파일의 URL
  */
 export const uploadProfileImage = async (file, userId) => {
   if (!userId) {
@@ -217,43 +203,68 @@ export const uploadProfileImage = async (file, userId) => {
       },
     });
 
-    // 고정된 파일명 (항상 덮어쓰기)
-    const key = `profile-images/${userId}.jpg`;
+    // 버전 생성
+    const version = Date.now();
+
+    // 🆕 Firestore에서 이전 버전 정보 가져오기 (이전 파일 삭제용)
+    const { doc, getDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
+    const { db } = await import('../firebase/config');
+
+    const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+    let oldVersion = null;
+
+    try {
+      const oldSettings = await getDoc(settingsRef);
+      if (oldSettings.exists() && oldSettings.data().profileImageVersion) {
+        oldVersion = oldSettings.data().profileImageVersion;
+      }
+    } catch (err) {
+      console.log('이전 버전 정보 없음 (첫 업로드)');
+    }
+
+    // 버전이 포함된 파일명
+    const key = `profile-images/${userId}-${version}.jpg`;
 
     // 파일을 ArrayBuffer로 변환
     const arrayBuffer = await file.arrayBuffer();
 
-    // R2에 업로드 (기존 파일 자동 덮어쓰기)
+    // R2에 업로드
     const command = new PutObjectCommand({
       Bucket: import.meta.env.VITE_R2_BUCKET_NAME?.trim(),
       Key: key,
       Body: new Uint8Array(arrayBuffer),
-      ContentType: 'image/jpeg', // 항상 JPEG로 통일
-      CacheControl: 'no-cache', // 캐시 무효화 (즉시 반영)
+      ContentType: 'image/jpeg',
     });
 
     await s3Client.send(command);
 
-    // 🆕 Firestore에 프로필 사진 설정 저장 (버전 + 타입)
-    const { doc, updateDoc, setDoc, serverTimestamp } = await import('firebase/firestore');
-    const { db } = await import('../firebase/config');
-
-    const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
-    const version = Date.now();
-
+    // Firestore에 프로필 사진 설정 저장 (버전 + 타입)
     await setDoc(settingsRef, {
-      profileImageType: 'photo', // 사진 모드로 전환
-      profileImageVersion: version, // 버전 번호
+      profileImageType: 'photo',
+      profileImageVersion: version,
       updatedAt: serverTimestamp(),
     }, { merge: true });
 
-    // 공개 URL 생성 (버전 포함)
-    const publicUrl = `${import.meta.env.VITE_R2_PUBLIC_URL?.trim()}/${key}?v=${version}`;
+    // 🆕 이전 파일 삭제 (R2 용량 절약)
+    if (oldVersion) {
+      try {
+        const oldKey = `profile-images/${userId}-${oldVersion}.jpg`;
+        const deleteCommand = new DeleteObjectCommand({
+          Bucket: import.meta.env.VITE_R2_BUCKET_NAME?.trim(),
+          Key: oldKey,
+        });
+        await s3Client.send(deleteCommand);
+      } catch (deleteError) {
+        // 이전 파일 삭제 실패는 무시 (파일이 없을 수도 있음)
+      }
+    }
 
-    console.log('✅ 프로필 이미지 업로드 완료 (버전:', version + ')');
+    // 공개 URL 생성 (버전이 파일명에 포함되어 있음)
+    const publicUrl = `${import.meta.env.VITE_R2_PUBLIC_URL?.trim()}/${key}`;
+
     return publicUrl;
   } catch (error) {
-    console.error('❌ 프로필 이미지 업로드 실패:', error);
+    console.error('프로필 이미지 업로드 실패:', error);
     throw new Error(`프로필 이미지 업로드 실패: ${error.message}`);
   }
 };
@@ -267,9 +278,13 @@ export const uploadProfileImage = async (file, userId) => {
 export const getProfileImageUrl = (userId, version = null) => {
   if (!userId) return null;
 
-  // 버전이 제공되면 사용, 없으면 기본 URL (하위 호환성)
-  const versionParam = version ? `?v=${version}` : '';
-  return `${import.meta.env.VITE_R2_PUBLIC_URL?.trim()}/profile-images/${userId}.jpg${versionParam}`;
+  // 버전이 없으면 이전 방식으로 폴백 (하위 호환성)
+  if (!version) {
+    return `${import.meta.env.VITE_R2_PUBLIC_URL?.trim()}/profile-images/${userId}.jpg`;
+  }
+
+  // 버전이 파일명에 포함됨 (예: userId-1234567890.jpg)
+  return `${import.meta.env.VITE_R2_PUBLIC_URL?.trim()}/profile-images/${userId}-${version}.jpg`;
 };
 
 /**

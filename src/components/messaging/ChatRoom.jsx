@@ -24,8 +24,9 @@ import SharedMemoSelectorModal from './SharedMemoSelectorModal';
 import PermissionManagementModal from './PermissionManagementModal';
 import AppointSubManagerModal from './AppointSubManagerModal';
 import { db } from '../../firebase/config';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { getCurrentUserId, getCurrentUserData } from '../../utils/userStorage';
+import { avatarList } from '../avatars/AvatarIcons';
 
 // 전체화면 컨테이너
 const FullScreenContainer = styled.div`
@@ -1565,6 +1566,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
   // 1:1 채팅방 데이터 실시간 구독 (lastAccessTime 업데이트 감지)
   const [chatRoomData, setChatRoomData] = useState(chat);
   const [userProfilePictures, setUserProfilePictures] = useState({}); // userId -> profilePictureUrl 매핑
+  const [userAvatarSettings, setUserAvatarSettings] = useState({}); // userId -> {selectedAvatarId, avatarBgColor} 매핑
   const [userNicknames, setUserNicknames] = useState({}); // userId -> 닉네임 매핑
 
   // 상대방 정보 가져오기
@@ -1683,16 +1685,20 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
     };
   }, [chat.id, currentUserId]);
 
-  // 🆕 사용자 프로필 사진 실시간 구독
+  // 채팅방 참여자 프로필 사진 로드 (페이지 로드 시 1회만)
   useEffect(() => {
-    // 채팅방에 참여한 모든 사용자 ID 수집
     const userIds = new Set();
+
+    // 본인 ID 추가 (항상 포함)
+    if (currentUserId) {
+      userIds.add(currentUserId);
+    }
 
     // 1:1 채팅인 경우
     if (chat.type !== 'group') {
       chat.participants?.forEach(userId => userIds.add(userId));
     } else {
-      // 그룹 채팅인 경우
+      // 그룹 채팅인 경우 - 활성 멤버만
       Object.keys(chat.membersInfo || {}).forEach(userId => {
         if (chat.membersInfo[userId]?.status === 'active') {
           userIds.add(userId);
@@ -1700,72 +1706,78 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
       });
     }
 
-    // 메시지 발신자 ID도 추가
-    messages.forEach(message => {
-      if (message.senderId) {
-        userIds.add(message.senderId);
-      }
-    });
+    // 각 참여자의 프로필 설정 로드 (1회만)
+    const loadProfiles = async () => {
+      const { getProfileImageUrl } = await import('../../utils/storageService');
 
-    // Firestore 리스너 배열
-    const unsubscribers = [];
+      console.log('🔍 [ChatRoom] 프로필 로드 시작:', { userIds: Array.from(userIds), currentUserId });
 
-    // 각 사용자의 프로필 설정 구독
-    userIds.forEach(userId => {
-      const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+      for (const userId of userIds) {
+        try {
+          const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+          const docSnap = await getDoc(settingsRef);
 
-      const unsubscribe = onSnapshot(settingsRef, async (docSnap) => {
-        if (docSnap.exists()) {
-          const settings = docSnap.data();
-          const imageType = settings.profileImageType || 'avatar';
-
-          // 'photo' 모드면 버전 기반 URL 사용
-          if (imageType === 'photo') {
-            const { getProfileImageUrl } = await import('../../utils/storageService');
-            const version = settings.profileImageVersion || null;
-            const imageUrl = getProfileImageUrl(userId, version);
-            setUserProfilePictures(prev => ({
-              ...prev,
-              [userId]: imageUrl
-            }));
-          } else {
-            // 아바타 모드면 프로필 사진 제거
-            setUserProfilePictures(prev => {
-              const newState = { ...prev };
-              delete newState[userId];
-              return newState;
-            });
-          }
-        } else {
-          // Firestore에 데이터가 없으면 프로필 사진 제거
-          setUserProfilePictures(prev => {
-            const newState = { ...prev };
-            delete newState[userId];
-            return newState;
+          console.log(`📄 [ChatRoom] ${userId} 프로필 문서:`, {
+            exists: docSnap.exists(),
+            data: docSnap.data()
           });
+
+          if (docSnap.exists()) {
+            const settings = docSnap.data();
+            const imageType = settings.profileImageType || 'avatar';
+            const version = settings.profileImageVersion || null;
+            const selectedAvatarId = settings.selectedAvatarId || null;
+            const avatarBgColor = settings.avatarBgColor || 'none';
+
+            // 'photo' 모드면 버전 기반 URL 사용
+            if (imageType === 'photo') {
+              const imageUrl = getProfileImageUrl(userId, version);
+              console.log(`✅ [ChatRoom] 프로필 URL 생성:`, { userId, imageUrl });
+              setUserProfilePictures(prev => ({
+                ...prev,
+                [userId]: imageUrl
+              }));
+              // 아바타 설정 제거
+              setUserAvatarSettings(prev => {
+                const newState = { ...prev };
+                delete newState[userId];
+                return newState;
+              });
+            } else {
+              // 아바타 모드면 아바타 설정 저장, 프로필 사진 제거
+              console.log(`⚠️ [ChatRoom] 아바타 모드:`, { userId, selectedAvatarId, avatarBgColor });
+              setUserProfilePictures(prev => {
+                const newState = { ...prev };
+                delete newState[userId];
+                return newState;
+              });
+              if (selectedAvatarId) {
+                setUserAvatarSettings(prev => ({
+                  ...prev,
+                  [userId]: { selectedAvatarId, avatarBgColor }
+                }));
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`프로필 로드 실패 (${userId}):`, error);
         }
-      }, (error) => {
-        console.error(`❌ Firestore 리스너 오류 (${userId}):`, error);
-      });
-
-      unsubscribers.push(unsubscribe);
-    });
-
-    return () => {
-      unsubscribers.forEach(unsubscribe => unsubscribe());
+      }
     };
-  }, [chat.id, chat.type, chat.participants, chat.membersInfo, messages]);
 
-  // 🆕 사용자 닉네임 실시간 구독
+    loadProfiles();
+  }, [chat.id, chat.type, chat.participants, chat.membersInfo, currentUserId]);
+
+  // 🆕 채팅방 참여자만 닉네임 실시간 구독 (효율적)
   useEffect(() => {
-    // 채팅방에 참여한 모든 사용자 ID 수집
+    // 채팅방 참여자만 수집
     const userIds = new Set();
 
     // 1:1 채팅인 경우
     if (chat.type !== 'group') {
       chat.participants?.forEach(userId => userIds.add(userId));
     } else {
-      // 그룹 채팅인 경우
+      // 그룹 채팅인 경우 - 활성 멤버만
       Object.keys(chat.membersInfo || {}).forEach(userId => {
         if (chat.membersInfo[userId]?.status === 'active') {
           userIds.add(userId);
@@ -1773,17 +1785,10 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
       });
     }
 
-    // 메시지 발신자 ID도 추가
-    messages.forEach(message => {
-      if (message.senderId) {
-        userIds.add(message.senderId);
-      }
-    });
-
-    // Firestore 리스너 배열
+    // 실시간 리스너 배열
     const unsubscribers = [];
 
-    // 각 사용자의 닉네임 구독
+    // 각 참여자의 닉네임 실시간 구독
     userIds.forEach(userId => {
       const nicknameRef = doc(db, 'users', userId, 'settings', 'nickname');
 
@@ -1817,7 +1822,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
         }
       });
     };
-  }, [chat.id, chat.type, chat.participants, chat.membersInfo, messages]);
+  }, [chat.id, chat.type, chat.participants, chat.membersInfo]);
 
   // 🆕 chat.isPublic이 변경되면 selectedRoomType 자동 업데이트
   useEffect(() => {
@@ -2512,6 +2517,49 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
     return colors[index];
   };
 
+  // 아바타 배경색 매핑
+  const BACKGROUND_COLORS = {
+    'none': 'transparent',
+    'lavender': 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+    'peach': 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+    'mint': 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+    'sunset': 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+    'ocean': 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+    'pink': '#FF69B4',
+    'blue': '#4169E1',
+    'yellow': '#FFD700',
+    'green': '#32CD32',
+    'purple': '#9370DB',
+  };
+
+  // 아바타 아이콘 렌더링
+  const renderAvatarIcon = (userId) => {
+    const avatarSettings = userAvatarSettings[userId];
+    if (!avatarSettings?.selectedAvatarId) return null;
+
+    const avatar = avatarList.find(a => a.id === avatarSettings.selectedAvatarId);
+    if (!avatar) return null;
+
+    const AvatarComponent = avatar.component;
+    const bgColor = BACKGROUND_COLORS[avatarSettings.avatarBgColor] || BACKGROUND_COLORS['none'];
+
+    return (
+      <div style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: bgColor,
+        borderRadius: '50%'
+      }}>
+        <div style={{ width: '70%', height: '70%' }}>
+          <AvatarComponent />
+        </div>
+      </div>
+    );
+  };
+
   return createPortal(
     <FullScreenContainer>
       {/* 헤더 */}
@@ -2533,7 +2581,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                 : {}
             }
           >
-            {!chat.groupImage && !userProfilePictures[otherUser.userId] && (otherUser.isGroup ? <Users size={20} /> : (nicknamesLoaded ? otherUser.name.charAt(0).toUpperCase() : '...'))}
+            {!chat.groupImage && !userProfilePictures[otherUser.userId] && !otherUser.isGroup && userAvatarSettings[otherUser.userId] && renderAvatarIcon(otherUser.userId)}
+            {!chat.groupImage && !userProfilePictures[otherUser.userId] && !userAvatarSettings[otherUser.userId] && (otherUser.isGroup ? <Users size={20} /> : (nicknamesLoaded ? otherUser.name.charAt(0).toUpperCase() : '...'))}
             {otherUser.isGroup && (
               <AvatarBadge title={chat.isPublic ? '공개방' : '비공개방'}>
                 {chat.isPublic ? '🌐' : '🔒'}
@@ -2831,7 +2880,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                         $color={getAvatarColor(message.senderId)}
                         style={userProfilePictures[message.senderId] ? { backgroundImage: `url(${userProfilePictures[message.senderId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                       >
-                        {!userProfilePictures[message.senderId] && (userNicknames[message.senderId] || message.senderName || '?').charAt(0).toUpperCase()}
+                        {!userProfilePictures[message.senderId] && userAvatarSettings[message.senderId] && renderAvatarIcon(message.senderId)}
+                        {!userProfilePictures[message.senderId] && !userAvatarSettings[message.senderId] && (userNicknames[message.senderId] || message.senderName || '?').charAt(0).toUpperCase()}
                         {userRole && (
                           <RoleBadge title={userRole.label}>
                             {userRole.icon}
@@ -2998,7 +3048,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                       $color={getAvatarColor(memberId)}
                       style={userProfilePictures[memberId] ? { backgroundImage: `url(${userProfilePictures[memberId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                     >
-                      {!userProfilePictures[memberId] && displayName.charAt(0).toUpperCase()}
+                      {!userProfilePictures[memberId] && userAvatarSettings[memberId] && renderAvatarIcon(memberId)}
+                      {!userProfilePictures[memberId] && !userAvatarSettings[memberId] && displayName.charAt(0).toUpperCase()}
                     </MemberAvatar>
                     <MemberInfo>
                       <MemberName>
@@ -3055,7 +3106,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                         ...(userProfilePictures[memberId] ? { backgroundImage: `url(${userProfilePictures[memberId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {})
                       }}
                     >
-                      {!userProfilePictures[memberId] && displayName.charAt(0).toUpperCase()}
+                      {!userProfilePictures[memberId] && userAvatarSettings[memberId] && renderAvatarIcon(memberId)}
+                      {!userProfilePictures[memberId] && !userAvatarSettings[memberId] && displayName.charAt(0).toUpperCase()}
                     </MemberAvatar>
                     <MemberInfo>
                       <MemberName style={{ opacity: hasLeftAfterKick ? 0.7 : 1 }}>
@@ -3182,7 +3234,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                                 $color={getAvatarColor(friendId)}
                                 style={userProfilePictures[friendId] ? { backgroundImage: `url(${userProfilePictures[friendId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                               >
-                                {!userProfilePictures[friendId] && displayName.charAt(0).toUpperCase()}
+                                {!userProfilePictures[friendId] && userAvatarSettings[friendId] && renderAvatarIcon(friendId)}
+                                {!userProfilePictures[friendId] && !userAvatarSettings[friendId] && displayName.charAt(0).toUpperCase()}
                               </MemberAvatar>
                               <MemberInfo>
                                 <MemberName>{displayName}</MemberName>
@@ -3240,7 +3293,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                         $color={getAvatarColor(searchedUser.id)}
                         style={userProfilePictures[searchedUser.id] ? { backgroundImage: `url(${userProfilePictures[searchedUser.id]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                       >
-                        {!userProfilePictures[searchedUser.id] && (searchedUser.displayName || '익명').charAt(0).toUpperCase()}
+                        {!userProfilePictures[searchedUser.id] && userAvatarSettings[searchedUser.id] && renderAvatarIcon(searchedUser.id)}
+                        {!userProfilePictures[searchedUser.id] && !userAvatarSettings[searchedUser.id] && (searchedUser.displayName || '익명').charAt(0).toUpperCase()}
                       </MemberAvatar>
                       <MemberInfo>
                         <MemberName>{searchedUser.displayName || '익명'}</MemberName>
@@ -3330,7 +3384,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
                           $color={getAvatarColor(memberId)}
                           style={userProfilePictures[memberId] ? { backgroundImage: `url(${userProfilePictures[memberId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                         >
-                          {!userProfilePictures[memberId] && displayName.charAt(0).toUpperCase()}
+                          {!userProfilePictures[memberId] && userAvatarSettings[memberId] && renderAvatarIcon(memberId)}
+                          {!userProfilePictures[memberId] && !userAvatarSettings[memberId] && displayName.charAt(0).toUpperCase()}
                         </MemberAvatar>
                         <MemberInfo>
                           <MemberName>{displayName}</MemberName>

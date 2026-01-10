@@ -92,7 +92,7 @@ const FriendItem = styled.div`
   align-items: center;
   padding: 12px;
   border-bottom: 1px solid #f0f0f0;
-  gap: 12px;
+  gap: 10px;
 
   &:last-child {
     border-bottom: none;
@@ -113,41 +113,52 @@ const Avatar = styled.div`
   flex-shrink: 0;
 `;
 
-const FriendInfo = styled.div`
+const RightSection = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   flex: 1;
   min-width: 0;
 `;
 
-const FriendName = styled.div`
+const TopRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const FriendName = styled.span`
   font-size: 14px;
   font-weight: 500;
   color: #333;
-  margin-bottom: 4px;
+  white-space: nowrap;
 `;
 
-const FriendMeta = styled.div`
-  font-size: 12px;
+const FriendMeta = styled.span`
+  font-size: 13px;
   color: #999;
+  white-space: nowrap;
 `;
 
-const ActionButtons = styled.div`
+const BottomRow = styled.div`
   display: flex;
-  gap: 8px;
-  flex-shrink: 0;
+  gap: 6px;
 `;
 
 const ActionButton = styled.button`
-  padding: 6px 12px;
+  padding: 5px 8px;
   border: 1px solid ${props => props.$variant === 'danger' ? '#ff4444' : '#ddd'};
   background: ${props => props.$variant === 'danger' ? '#ff4444' : 'white'};
   color: ${props => props.$variant === 'danger' ? 'white' : '#666'};
-  border-radius: 6px;
-  font-size: 12px;
+  border-radius: 5px;
+  font-size: 11px;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
 
   &:hover {
     background: ${props => props.$variant === 'danger' ? '#ff3333' : '#f5f5f5'};
@@ -298,34 +309,36 @@ const DeletedFriendsModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
                 <Avatar $color={getAvatarColor(friend.friendId)}>
                   {friend.friendName?.charAt(0).toUpperCase() || '?'}
                 </Avatar>
-                <FriendInfo>
-                  <FriendName>{friend.friendName}</FriendName>
-                  <FriendMeta>WS {friend.friendWorkspaceCode}</FriendMeta>
-                </FriendInfo>
-                <ActionButtons>
-                  <ActionButton
-                    onClick={() => handleAddFriend(friend)}
-                    disabled={actionLoading === friend.friendId}
-                  >
-                    <UserPlus size={14} />
-                    친구추가
-                  </ActionButton>
-                  <ActionButton
-                    $variant="danger"
-                    onClick={() => handlePermanentDelete(friend)}
-                    disabled={actionLoading === friend.friendId}
-                  >
-                    <Trash2 size={14} />
-                    영구삭제
-                  </ActionButton>
-                  <ActionButton
-                    onClick={() => handleBlock(friend)}
-                    disabled={actionLoading === friend.friendId}
-                  >
-                    <Ban size={14} />
-                    차단
-                  </ActionButton>
-                </ActionButtons>
+                <RightSection>
+                  <TopRow>
+                    <FriendName>{friend.friendName}</FriendName>
+                    <FriendMeta>{friend.friendWorkspaceCode?.replace('WS-', '') || '-'}</FriendMeta>
+                  </TopRow>
+                  <BottomRow>
+                    <ActionButton
+                      onClick={() => handleAddFriend(friend)}
+                      disabled={actionLoading === friend.friendId}
+                    >
+                      <UserPlus size={13} />
+                      친구추가
+                    </ActionButton>
+                    <ActionButton
+                      $variant="danger"
+                      onClick={() => handlePermanentDelete(friend)}
+                      disabled={actionLoading === friend.friendId}
+                    >
+                      <Trash2 size={13} />
+                      영구삭제
+                    </ActionButton>
+                    <ActionButton
+                      onClick={() => handleBlock(friend)}
+                      disabled={actionLoading === friend.friendId}
+                    >
+                      <Ban size={13} />
+                      차단
+                    </ActionButton>
+                  </BottomRow>
+                </RightSection>
               </FriendItem>
             ))
           )}

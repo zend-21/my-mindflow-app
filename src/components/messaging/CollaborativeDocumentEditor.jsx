@@ -2,7 +2,7 @@
 // 드래그 선택 → 입력 → 자동 형광표시 → 매니저 컨펌 시스템
 import { useState, useEffect, useRef, useCallback } from 'react';
 import styled from 'styled-components';
-import { ChevronDown, ChevronUp, Save, X, Users, Lock, FolderOpen, Info, Strikethrough, Highlighter, Maximize2, Eye, Download, Check, FileText, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, UserCog, HelpCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Save, X, Users, Lock, FolderOpen, Info, Strikethrough, Highlighter, Maximize2, Eye, Download, Check, FileText, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, UserCog, HelpCircle, MessageCircle } from 'lucide-react';
 import {
   doc,
   setDoc,
@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { getUserNickname } from '../../services/nicknameService';
+import MarkerCommentsModal from './MarkerCommentsModal';
 
 // ===== 전역 문서 캐시 (컴포넌트 인스턴스 간 공유) =====
 // 컴포넌트가 언마운트되어도 캐시가 유지되도록 전역으로 관리
@@ -58,7 +59,19 @@ function getNodeAndOffset(container, absoluteOffset) {
 
   while ((currentNode = walker.nextNode())) {
     const nodeLength = currentNode.nodeValue.length;
-    if (currentOffset + nodeLength >= absoluteOffset) {
+    console.log('🔍 노드 탐색:', {
+      nodeText: currentNode.nodeValue.substring(0, 30),
+      nodeLength,
+      currentOffset,
+      targetOffset: absoluteOffset,
+      rangeEnd: currentOffset + nodeLength
+    });
+    if (currentOffset + nodeLength > absoluteOffset) {
+      console.log('✅ 노드 찾음:', {
+        node: currentNode,
+        nodeText: currentNode.nodeValue,
+        offset: absoluteOffset - currentOffset
+      });
       return {
         node: currentNode,
         offset: absoluteOffset - currentOffset
@@ -526,6 +539,34 @@ const ModalTitle = styled.h3`
   margin: 0;
 `;
 
+const ModalSubtitle = styled.div`
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 20px;
+`;
+
+const SubtitleRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 6px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  strong {
+    color: #aaa;
+    font-weight: 600;
+  }
+
+  span {
+    color: #e0e0e0;
+  }
+`;
+
 const ModalBody = styled.div`
   display: flex;
   flex-direction: column;
@@ -941,6 +982,7 @@ const CollaborativeDocumentEditor = ({
   const [pendingEdits, setPendingEdits] = useState([]);
   const [selectedEdits, setSelectedEdits] = useState([]); // 여러 편집 내역 배열
   const [showEditModal, setShowEditModal] = useState(false);
+  const [editCommentCounts, setEditCommentCounts] = useState({}); // 각 편집의 댓글 개수
   const [actualCanEdit, setActualCanEdit] = useState(canEdit); // 실시간 권한
   const [actualIsManager, setActualIsManager] = useState(isManager); // 실시간 매니저 여부
   const [actualIsSubManager, setActualIsSubManager] = useState(false); // 실시간 부방장 여부
@@ -975,6 +1017,8 @@ const CollaborativeDocumentEditor = ({
   const [showApproveConfirmModal, setShowApproveConfirmModal] = useState(false); // 승인 확인 모달
   const [pendingAction, setPendingAction] = useState(null); // 대기 중인 작업 정보
   const [showTempDocLoadWarningModal, setShowTempDocLoadWarningModal] = useState(false); // 임시 문서 불러오기 경고 모달
+  const [showMarkerCommentsModal, setShowMarkerCommentsModal] = useState(false); // 마커 의견 제시 모달
+  const [selectedMarkerForComments, setSelectedMarkerForComments] = useState(null); // 의견을 볼 마커 정보
 
   const contentRef = useRef(null);
   const fullScreenContentRef = useRef(null);
@@ -1014,97 +1058,86 @@ const CollaborativeDocumentEditor = ({
     };
   }, []);
 
-  // 권한 확인 (1:1은 자동 편집 권한, 그룹은 권한 시스템 적용)
+  // 권한 확인 - 통합 로직 (1:1 및 그룹 모두 문서 소유자 기반)
   useEffect(() => {
     if (!chatRoomId || !currentUserId) return;
 
     let isMounted = true;
 
-    // 1:1 채팅인 경우
-    if (chatType === '1:1' || chatType === 'direct') {
-      // 매니저 및 편집 권한 확인
-      const loadManagerStatus = async () => {
-        try {
-          const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
-          const docSnap = await getDoc(docRef);
-
-          if (isMounted && docSnap.exists()) {
-            const docData = docSnap.data();
-            const isDocOwner = docData.lastEditedBy === currentUserId;
-            setActualIsManager(isDocOwner);
-            // 문서 소유자만 편집 가능, 아니면 읽기 전용 (마커만 가능)
-            setActualCanEdit(isDocOwner);
-          } else {
-            // 문서가 없으면 양쪽 모두 편집 가능
-            setActualIsManager(isManager);
-            setActualCanEdit(true);
-          }
-        } catch (error) {
-          if (error.code !== 'permission-denied') {
-            console.error('매니저 상태 로드 오류:', error);
-          }
-          setActualIsManager(isManager);
-          setActualCanEdit(true);
-        }
-      };
-
-      loadManagerStatus();
-      return () => {
-        isMounted = false;
-      };
-    }
-
-    // 그룹 채팅인 경우 기존 권한 시스템 사용
-    setActualIsManager(isManager);
-    setActualCanEdit(canEdit);
-
-    // 권한 문서 읽기 (실시간 리스너 대신 일회성)
-    const loadPermissions = async () => {
+    // 통합된 권한 로드 함수
+    const loadDocumentPermissions = async () => {
       try {
-        // 대화방 문서에서 권한 확인
+        // 1. 대화방 정보 조회
         const roomRef = doc(db, 'chatRooms', chatRoomId);
         const roomSnap = await getDoc(roomRef);
 
-        if (isMounted && roomSnap.exists()) {
-          const roomData = roomSnap.data();
+        if (!isMounted || !roomSnap.exists()) return;
 
-          // 1:1 대화방인지 확인 (type 필드로 판단, 참여자 수가 아님!)
-          const isOneOnOne = roomData.type !== 'group' && !roomData.isGroupChat;
-          setIsOneOnOneChat(isOneOnOne);
+        const roomData = roomSnap.data();
+        const isOneOnOne = roomData.type !== 'group' && !roomData.isGroupChat;
+        setIsOneOnOneChat(isOneOnOne);
 
-          if (isOneOnOne) {
-            // 1:1 대화방: 양쪽 모두 방장 권한 부여 (계급 표시는 안 함)
-            setActualIsManager(true);
-            setActualIsSubManager(false);
-            setActualCanEdit(true);
-          } else {
-            // 단체방: 기존 4단계 권한 시스템
-            const isActualManager = roomData.managers?.includes(currentUserId) || false;
-            const isActualSubManager = roomData.subManagers?.includes(currentUserId) || false;
-            const isEditor = roomData.editors?.includes(currentUserId) || false;
+        // 2. 문서 정보 조회
+        const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+        const docSnap = await getDoc(docRef);
 
-            setActualIsManager(isActualManager);
-            setActualIsSubManager(isActualSubManager);
-            setActualCanEdit(isActualManager || isActualSubManager || isEditor);
+        if (isMounted && docSnap.exists()) {
+          // 문서가 존재하는 경우
+          const docData = docSnap.data();
+          const isDocOwner = docData.lastEditedBy === currentUserId;
 
-            // 초대 권한 설정 로드
-            const invitePerm = roomData.invitePermission || 'managers_and_submanagers';
-            setInvitePermission(invitePerm);
-          }
+          // 1:1 대화방: 모두 마커 추가 가능
+          // 그룹 대화방: 문서 소유자만 편집 가능
+          const canEditDoc = isOneOnOne ? true : isDocOwner;
+
+          setActualCanEdit(canEditDoc);
+          setActualIsManager(isDocOwner);
+
+          console.log('📋 문서 기반 권한 설정:', {
+            chatType: isOneOnOne ? '1:1' : '그룹',
+            documentOwner: docData.lastEditedBy,
+            currentUser: currentUserId,
+            isDocOwner,
+            canEdit: canEditDoc
+          });
+        } else {
+          // 문서가 없는 경우: 모두 편집 가능 (누구든 문서를 불러올 수 있음)
+          setActualCanEdit(true);
+          setActualIsManager(true);
+
+          console.log('📋 문서 없음 - 모두 편집 가능:', {
+            chatType: isOneOnOne ? '1:1' : '그룹'
+          });
         }
+
+        // 3. 그룹 채팅인 경우 추가 권한 정보 로드 (초대 권한 등)
+        if (!isOneOnOne) {
+          const isActualSubManager = roomData.subManagers?.includes(currentUserId) || false;
+          setActualIsSubManager(isActualSubManager);
+
+          // 초대 권한 설정 로드
+          const invitePerm = roomData.invitePermission || 'managers_and_submanagers';
+          setInvitePermission(invitePerm);
+        } else {
+          setActualIsSubManager(false);
+        }
+
       } catch (error) {
         if (error.code !== 'permission-denied') {
           console.error('권한 로드 오류:', error);
         }
+        // 오류 시 기본값 설정
+        setActualCanEdit(true);
+        setActualIsManager(true);
       }
     };
 
-    loadPermissions();
+    loadDocumentPermissions();
 
     return () => {
       isMounted = false;
     };
-  }, [chatRoomId, currentUserId, isManager, canEdit, chatType]);
+  }, [chatRoomId, currentUserId, chatType]);
 
   // 임시 문서 감지 (상대방이 작성 중인 경우)
   useEffect(() => {
@@ -1149,7 +1182,7 @@ const CollaborativeDocumentEditor = ({
     }
   }, [pendingEdits]);
 
-  // 사용자의 6자리 고유 ID 가져오기
+  // 사용자의 쉐어노트 ID 가져오기
   const getUserWorkspaceId = async (userId) => {
     try {
       const workspaceId = `workspace_${userId}`;
@@ -1218,7 +1251,17 @@ const CollaborativeDocumentEditor = ({
 
       if (docSnap.exists()) {
         const data = docSnap.data();
-        setTitle(data.title || '');
+
+        // 첫 번째 줄을 제목으로 자동 설정 (16자 제한)
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = data.content || '';
+        const textContent = tempDiv.textContent || '';
+        const firstLine = textContent.split('\n')[0].trim();
+        const autoTitle = firstLine && firstLine.length > 0
+          ? (firstLine.length > 16 ? firstLine.substring(0, 16) : firstLine)
+          : (data.title || '');
+
+        setTitle(autoTitle);
         setContent(data.content || '');
         setCurrentDocId(data.originalMemoId || null);
         memoId = data.originalMemoId;
@@ -1228,50 +1271,49 @@ const CollaborativeDocumentEditor = ({
           contentRef.current.innerHTML = data.content || '';
         }
 
-        // 문서 소유자 정보 설정 (실제 내용이 있을 때만)
+        // 문서 소유자 정보 설정 (Firestore의 lastEditedBy 사용)
         const hasActualContent = (data.content && data.content.trim()) || data.originalMemoId;
-        if (currentUserId && hasActualContent) {
+        if (hasActualContent && data.lastEditedBy) {
+          // 문서 소유자의 최신 닉네임 조회
+          let ownerNickname = data.lastEditedByName || '알 수 없음';
           try {
-            const ownerNickname = await getUserNickname(currentUserId);
-            const workspaceId = `workspace_${currentUserId}`;
-            const workspaceRef = doc(db, 'workspaces', workspaceId);
-            const workspaceSnap = await getDoc(workspaceRef);
-            const wsCode = workspaceSnap.exists() ? workspaceSnap.data().workspaceCode : null;
-
-            setDocumentOwner({
-              userId: currentUserId,
-              nickname: ownerNickname || currentUserName || '알 수 없음',
-              wsCode: wsCode
-            });
-
-            // 원본 소유자 정보 설정 (Firestore에서 읽어옴)
-            if (data.originalOwnerId) {
-              setOriginalOwner({
-                userId: data.originalOwnerId,
-                nickname: data.originalOwnerNickname || '알 수 없음',
-                wsCode: data.originalOwnerCode || null
-              });
-            } else {
-              // 원본 소유자 정보가 없으면 현재 소유자와 동일 (새 문서)
-              setOriginalOwner({
-                userId: currentUserId,
-                nickname: ownerNickname || currentUserName || '알 수 없음',
-                wsCode: wsCode
-              });
+            const latestNickname = await getUserNickname(data.lastEditedBy);
+            if (latestNickname) {
+              ownerNickname = latestNickname;
             }
           } catch (error) {
-            console.error('문서 소유자 정보 조회 실패:', error);
-            setDocumentOwner({
-              userId: currentUserId,
-              nickname: currentUserName || '알 수 없음',
-              wsCode: null
-            });
-            setOriginalOwner(null);
+            console.log('닉네임 조회 실패, Firestore 값 사용:', error);
           }
+
+          // 워크스페이스 코드 가져오기
+          let wsCode = null;
+          try {
+            const workspaceId = `workspace_${data.lastEditedBy}`;
+            const workspaceRef = doc(db, 'workspaces', workspaceId);
+            const workspaceSnap = await getDoc(workspaceRef);
+            if (workspaceSnap.exists()) {
+              wsCode = workspaceSnap.data().workspaceCode || null;
+            }
+          } catch (error) {
+            console.log('워크스페이스 코드 조회 실패:', error);
+          }
+
+          // 최신 닉네임으로 문서 소유자 정보 설정
+          setDocumentOwner({
+            userId: data.lastEditedBy,
+            nickname: ownerNickname,
+            wsCode: wsCode
+          });
+
+          console.log('📋 초기 문서 로드 - 문서 소유자:', {
+            userId: data.lastEditedBy,
+            nickname: ownerNickname,
+            wsCode,
+            currentUserId
+          });
         } else {
           // 내용이 없으면 소유자 정보도 없음
           setDocumentOwner(null);
-          setOriginalOwner(null);
         }
       } else {
         // 문서가 없으면 빈 상태로 초기화
@@ -1310,6 +1352,59 @@ const CollaborativeDocumentEditor = ({
   useEffect(() => {
     loadDocument();
   }, [loadDocument]);
+
+  // 실시간 편집 이력 구독 (댓글 개수 포함)
+  useEffect(() => {
+    if (!chatRoomId || !currentDocId) return;
+
+    const editsRef = collection(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory');
+    const q = query(editsRef, where('status', '==', 'pending'));
+
+    const unsubscribe = onSnapshot(q, async (snapshot) => {
+      const edits = [];
+
+      for (const docSnap of snapshot.docs) {
+        const editData = { id: docSnap.id, ...docSnap.data() };
+
+        // 각 편집의 댓글 개수 조회
+        const commentsRef = collection(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', docSnap.id, 'comments');
+        const commentsSnapshot = await getDocs(commentsRef);
+        editData.commentCount = commentsSnapshot.size;
+
+        edits.push(editData);
+      }
+
+      setPendingEdits(edits);
+    });
+
+    return () => unsubscribe();
+  }, [chatRoomId, currentDocId]);
+
+  // pendingMarker의 commentCount 업데이트
+  useEffect(() => {
+    if (!pendingMarker || !pendingMarker.id) return;
+
+    const updatedEdit = pendingEdits.find(edit => edit.id === pendingMarker.id);
+    if (updatedEdit && updatedEdit.commentCount !== pendingMarker.commentCount) {
+      setPendingMarker(prev => ({
+        ...prev,
+        commentCount: updatedEdit.commentCount
+      }));
+    }
+  }, [pendingEdits, pendingMarker]);
+
+  // selectedMarkerDetail의 commentCount 업데이트
+  useEffect(() => {
+    if (!selectedMarkerDetail || !selectedMarkerDetail.id) return;
+
+    const updatedEdit = pendingEdits.find(edit => edit.id === selectedMarkerDetail.id);
+    if (updatedEdit && updatedEdit.commentCount !== selectedMarkerDetail.commentCount) {
+      setSelectedMarkerDetail(prev => ({
+        ...prev,
+        commentCount: updatedEdit.commentCount
+      }));
+    }
+  }, [pendingEdits, selectedMarkerDetail]);
 
   // 참여자 목록 로드
   const loadParticipants = useCallback(async () => {
@@ -1604,22 +1699,50 @@ const CollaborativeDocumentEditor = ({
         console.log('💾 재생성된 마커를 캐시에 저장:', memo.id);
       }
 
-      // 5. currentDoc 업데이트
+      // 5. 문서 소유자 정보 먼저 가져오기 (Firestore 저장에 사용)
+      let ownerNickname;
+      let wsCode = null;
+
+      try {
+        // 닉네임 조회
+        ownerNickname = await getUserNickname(currentUserId);
+
+        // 쉐어노트 ID 조회
+        const workspaceId = `workspace_${currentUserId}`;
+        const workspaceRef = doc(db, 'workspaces', workspaceId);
+        const workspaceSnap = await getDoc(workspaceRef);
+        wsCode = workspaceSnap.exists() ? workspaceSnap.data().workspaceCode : null;
+
+        console.log('✅ 문서 소유자 정보:', { userId: currentUserId, nickname: ownerNickname, wsCode });
+      } catch (error) {
+        console.error('문서 소유자 정보 조회 실패:', error);
+        ownerNickname = currentUserName;
+      }
+
+      // 6. currentDoc 업데이트 (문서 불러오기 - 소유자 변경하지 않음)
+      // 기존 문서의 소유자 정보 확인
+      const existingDocSnap = await getDoc(currentDocRef);
+      const existingData = existingDocSnap.exists() ? existingDocSnap.data() : {};
+
+      // 문서 소유자는 최초 불러온 사람으로 유지 (이미 문서가 있으면 소유자 변경 안 함)
+      const docOwner = existingData.lastEditedBy || currentUserId;
+      const docOwnerName = existingData.lastEditedByName || (ownerNickname || currentUserName);
+
       await setDoc(currentDocRef, {
         title: titleToLoad,
         content: contentToLoad,
         originalMemoId: memo.id,
-        lastEditedBy: currentUserId,
-        lastEditedByName: currentUserName,
-        lastEditedAt: serverTimestamp()
+        lastEditedBy: docOwner,
+        lastEditedByName: docOwnerName,
+        lastEditedAt: existingData.lastEditedAt || serverTimestamp()
       }, { merge: true });
 
-      // 6. 로컬 상태 업데이트
+      // 7. 로컬 상태 업데이트
       setTitle(titleToLoad);
       setContent(contentToLoad);
       setCurrentDocId(memo.id);
 
-      // 7. contentEditable 영역 업데이트
+      // 8. contentEditable 영역 업데이트
       if (contentRef.current) {
         contentRef.current.innerHTML = contentToLoad;
       }
@@ -1627,35 +1750,15 @@ const CollaborativeDocumentEditor = ({
         fullScreenContentRef.current.innerHTML = contentToLoad;
       }
 
-      // 8. pendingEdits 업데이트
+      // 9. pendingEdits 업데이트
       setPendingEdits(edits.length > 0 ? edits : []);
 
-      // 9. 문서 소유자 정보 가져오기 (현재 로그인한 사용자)
-      try {
-        // 닉네임 조회
-        const ownerNickname = await getUserNickname(currentUserId);
-
-        // 6자리 고유 ID 조회
-        const workspaceId = `workspace_${currentUserId}`;
-        const workspaceRef = doc(db, 'workspaces', workspaceId);
-        const workspaceSnap = await getDoc(workspaceRef);
-        const wsCode = workspaceSnap.exists() ? workspaceSnap.data().workspaceCode : null;
-
-        console.log('✅ 문서 소유자 정보:', { userId: currentUserId, nickname: ownerNickname, wsCode });
-
-        setDocumentOwner({
-          userId: currentUserId,
-          nickname: ownerNickname || currentUserName || '알 수 없음',
-          wsCode: wsCode
-        });
-      } catch (error) {
-        console.error('문서 소유자 정보 조회 실패:', error);
-        setDocumentOwner({
-          userId: currentUserId,
-          nickname: currentUserName || '알 수 없음',
-          wsCode: null
-        });
-      }
+      // 10. documentOwner 설정 (문서를 불러온 사람)
+      setDocumentOwner({
+        userId: currentUserId,
+        nickname: ownerNickname || currentUserName || '알 수 없음',
+        wsCode: wsCode
+      });
 
       showToast?.('문서를 불러왔습니다');
       setShowLoadConfirmModal(false);
@@ -1807,6 +1910,122 @@ const CollaborativeDocumentEditor = ({
     return () => unsubscribe();
   }, [currentDocId, chatRoomId]);
 
+  // 실시간 문서 내용 및 마커 감시 (chatRoomId만 의존)
+  useEffect(() => {
+    if (!chatRoomId) {
+      return;
+    }
+
+    const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+
+    console.log('🔊 실시간 리스너 시작 - chatRoomId:', chatRoomId);
+
+    const unsubscribe = onSnapshot(docRef, async (snapshot) => {
+      // 문서가 삭제된 경우 (다른 사용자가 문서 비우기 수행)
+      if (!snapshot.exists()) {
+        console.log('📡 문서 삭제 감지 - 실시간 비우기');
+        programmaticChangeRef.current = true;
+        setContent('');
+        setTitle('');
+        setCurrentDocId(null);
+        setPendingEdits([]);
+        setDocumentOwner(null);
+
+        // 통합 권한 업데이트: 문서가 없으면 모두 편집 가능 (1:1 및 그룹 모두 동일)
+        setActualCanEdit(true);
+        setActualIsManager(true);
+        console.log('📡 문서 비움 → 모두 편집 가능 (누구든 문서를 불러올 수 있음)');
+
+        if (contentRef.current) {
+          contentRef.current.innerHTML = '';
+        }
+        if (fullScreenContentRef.current) {
+          fullScreenContentRef.current.innerHTML = '';
+        }
+        return;
+      }
+
+      // 문서가 존재하는 경우 (업데이트 또는 불러오기)
+      const data = snapshot.data();
+
+      // 내용이 변경된 경우 반영 (다른 사용자의 마커 추가 포함)
+      const hasContentChanged = data.content !== content;
+      const isDifferentUser = data.lastEditedBy && data.lastEditedBy !== currentUserId;
+
+      if (isDifferentUser || hasContentChanged) {
+        console.log('📡 문서 실시간 업데이트 감지:', data.memoId,
+          isDifferentUser ? `from user: ${data.lastEditedBy}` : '(content changed)');
+
+        // 임시 문서는 동기화하지 않음
+        if (data.memoId?.startsWith('temp_')) {
+          console.log('⏭️ 임시 문서 무시');
+          return;
+        }
+
+        // content와 title 업데이트
+        programmaticChangeRef.current = true;
+        setContent(data.content || '');
+        setTitle(data.title || '');
+        setCurrentDocId(data.memoId || data.originalMemoId);
+
+        // 문서 소유자의 최신 닉네임 조회
+        let ownerNickname = data.lastEditedByName || '알 수 없음';
+        try {
+          const latestNickname = await getUserNickname(data.lastEditedBy);
+          if (latestNickname) {
+            ownerNickname = latestNickname;
+          }
+        } catch (error) {
+          console.log('닉네임 조회 실패, Firestore 값 사용:', error);
+        }
+
+        // documentOwner 객체로 설정 (userId, nickname)
+        setDocumentOwner({
+          userId: data.lastEditedBy,
+          nickname: ownerNickname,
+          wsCode: null // wsCode는 실시간으로 동기화하지 않음
+        });
+
+        // 통합 권한 업데이트: 문서 소유자만 편집 가능 (1:1 및 그룹 모두 동일)
+        // 다른 사용자가 문서를 불러오면 내 편집 권한이 없어짐
+        const isDocOwner = data.lastEditedBy === currentUserId;
+        setActualCanEdit(isDocOwner);
+        setActualIsManager(isDocOwner);
+        console.log('📡 편집 권한 실시간 업데이트:', {
+          documentOwner: data.lastEditedBy,
+          currentUser: currentUserId,
+          isDocOwner,
+          permission: isDocOwner ? '편집 가능' : '읽기 전용 (마커만 가능)'
+        });
+
+        // contentRef 업데이트
+        if (contentRef.current) {
+          contentRef.current.innerHTML = data.content || '';
+        }
+        if (fullScreenContentRef.current) {
+          fullScreenContentRef.current.innerHTML = data.content || '';
+        }
+
+        // markers 업데이트 (여기가 핵심!)
+        if (data.markers) {
+          console.log('📍 마커 실시간 동기화:', data.markers.length, '개');
+          // markers는 이미 state로 관리되고 있으므로 여기서 업데이트하지 않음
+          // 대신 handleLoadDocument에서 처리하도록 재호출
+          // 또는 별도의 state를 추가하여 관리
+        }
+      }
+    }, (error) => {
+      if (error.code !== 'permission-denied') {
+        console.error('문서 실시간 감시 오류:', error);
+      }
+    });
+
+    return () => {
+      console.log('🔇 실시간 리스너 종료 - chatRoomId:', chatRoomId);
+      unsubscribe();
+    };
+  }, [chatRoomId, currentUserId, chatType]);
+
   // 문서별 편집 이력 컬렉션 참조 가져오기
   const getEditHistoryRef = useCallback((memoId) => {
     if (!memoId) {
@@ -1823,7 +2042,7 @@ const CollaborativeDocumentEditor = ({
     );
   }, [chatRoomId]);
 
-  // 🔧 content에서 첫 문단 추출하여 제목으로 설정
+  // 🔧 content에서 첫 줄 추출하여 제목으로 설정 (15자 제한)
   const extractTitleFromContent = useCallback((htmlContent) => {
     if (!htmlContent || htmlContent.trim() === '') {
       return '제목 없음';
@@ -1832,17 +2051,16 @@ const CollaborativeDocumentEditor = ({
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = htmlContent;
 
-    // 첫 번째 텍스트 노드 또는 첫 줄 추출
+    // 첫 번째 줄 추출 (개행 기준)
     const textContent = tempDiv.textContent || tempDiv.innerText || '';
-    const lines = textContent.split('\n').filter(line => line.trim());
+    const firstLine = textContent.split('\n')[0].trim();
 
-    if (lines.length === 0) {
+    if (!firstLine) {
       return '제목 없음';
     }
 
-    // 첫 줄을 제목으로 사용 (최대 50자)
-    const firstLine = lines[0].trim();
-    return firstLine.length > 50 ? firstLine.substring(0, 50) + '...' : firstLine;
+    // 첫 줄을 제목으로 사용 (최대 16자)
+    return firstLine.length > 16 ? firstLine.substring(0, 16) : firstLine;
   }, []);
 
   // 🔧 content 변경 시 자동으로 제목 업데이트
@@ -1877,14 +2095,20 @@ const CollaborativeDocumentEditor = ({
         });
         console.log('💾 로컬 캐시 저장 완료:', currentDocId);
 
-        // 2. Firestore currentDoc에도 저장
+        // 2. Firestore currentDoc에도 저장 (소유자 정보는 유지)
         const currentDocRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+
+        // 기존 문서 소유자 정보 유지
+        const existingDoc = await getDoc(currentDocRef);
+        const existingOwner = existingDoc.exists() ? existingDoc.data().lastEditedBy : currentUserId;
+        const existingOwnerName = existingDoc.exists() ? existingDoc.data().lastEditedByName : currentUserName;
+
         await setDoc(currentDocRef, {
           title: titleToSave,
           content: newContent,
           originalMemoId: currentDocId,
-          lastEditedBy: currentUserId,
-          lastEditedByName: currentUserName,
+          lastEditedBy: existingOwner,
+          lastEditedByName: existingOwnerName,
           lastEditedAt: serverTimestamp()
         }, { merge: true });
       } catch (error) {
@@ -1921,7 +2145,7 @@ const CollaborativeDocumentEditor = ({
 
   // 닉네임 클릭 시 사용자 ID 표시
   const handleNicknameClick = useCallback(async (userId, nickname) => {
-    // 6자리 고유 ID 가져오기
+    // 쉐어노트 ID 가져오기
     const workspaceId = await getUserWorkspaceId(userId);
 
     if (workspaceId) {
@@ -2002,7 +2226,17 @@ const CollaborativeDocumentEditor = ({
     // 전체 콘텐츠 저장 (디바운싱)
     const newContent = activeRef.current.innerHTML;
     setContent(newContent);
-    debouncedSave(newContent);
+
+    // 첫 번째 줄을 제목으로 자동 설정 (16자 제한)
+    const textContent = activeRef.current.textContent || '';
+    const firstLine = textContent.split('\n')[0].trim();
+    if (firstLine) {
+      const autoTitle = firstLine.length > 16 ? firstLine.substring(0, 16) : firstLine;
+      setTitle(autoTitle);
+      debouncedSave(newContent, autoTitle);
+    } else {
+      debouncedSave(newContent);
+    }
   }, [actualCanEdit, debouncedSave, lastSelection, chatRoomId, currentUserId, currentUserName, showFullScreenEdit]);
 
   // 선택 확정 (마커 생성)
@@ -2407,6 +2641,12 @@ const CollaborativeDocumentEditor = ({
         }
 
         // 절대 오프셋에서 Range 복원
+        console.log('🔄 Range 복원 시도:', {
+          startOffset,
+          endOffset,
+          containerTextLength: container.textContent.length,
+          containerHTML: container.innerHTML.substring(0, 200)
+        });
         const range = absoluteOffsetToRange(container, startOffset, endOffset);
 
         // Range 검증: startContainer와 endContainer가 유효한 노드인지 확인
@@ -2486,6 +2726,14 @@ const CollaborativeDocumentEditor = ({
             console.log(`✅ ${pendingMarker.type} 마커 삽입 완료 (대체 방법)`);
           } catch (fallbackError) {
             console.error('❌ 마커 삽입 완전 실패:', fallbackError);
+            // Firestore에서 방금 추가한 편집 이력 삭제
+            try {
+              await deleteDoc(doc(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', editDoc.id));
+              await updateMemoPendingFlag(currentDocId, false);
+              console.log('🗑️ 실패한 편집 이력 삭제 완료');
+            } catch (deleteError) {
+              console.error('편집 이력 삭제 실패:', deleteError);
+            }
             showToast?.('마커 삽입에 실패했습니다');
             return;
           }
@@ -2712,12 +2960,38 @@ const CollaborativeDocumentEditor = ({
         // 마커 텍스트 가져오기
         const markerText = markerElement?.textContent || editData.oldText || '';
 
+        // wsCode 가져오기 (participants에서 조회 또는 Firestore에서 직접 조회)
+        let wsCode = null;
+        const participant = participants.find(p => p.userId === editData.editedBy);
+        wsCode = participant?.wsCode;
+
+        // participants에 없으면 Firestore에서 직접 조회
+        if (!wsCode && editData.editedBy) {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', editData.editedBy));
+            if (userDoc.exists()) {
+              wsCode = userDoc.data().workspaceCode;
+            }
+          } catch (error) {
+            console.error('wsCode 조회 실패:', error);
+          }
+        }
+
+        // 댓글 개수 조회
+        const commentsRef = collection(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', clickedEditId, 'comments');
+        const commentsSnapshot = await getDocs(commentsRef);
+        const commentCount = commentsSnapshot.size;
+
         // 수정 가능한 입력 모달 표시
         setPendingMarker({
           id: clickedEditId,
           type: editData.type,
           text: markerText,
-          editData: editData
+          commentCount: commentCount,
+          editData: {
+            ...editData,
+            wsCode: wsCode
+          }
         });
 
         // 기존 데이터 불러오기
@@ -2732,8 +3006,13 @@ const CollaborativeDocumentEditor = ({
 
         setShowEditInputModal(true);
       } else {
+        // 댓글 개수 조회
+        const commentsRef = collection(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', clickedEditId, 'comments');
+        const commentsSnapshot = await getDocs(commentsRef);
+        const commentCount = commentsSnapshot.size;
+
         // 미리보기 또는 권한 없으면 조회 전용 모달 표시
-        setSelectedEdits([{ id: clickedEditId, ...editData }]);
+        setSelectedEdits([{ id: clickedEditId, ...editData, commentCount: commentCount }]);
         setShowEditModal(true);
       }
 
@@ -2748,11 +3027,6 @@ const CollaborativeDocumentEditor = ({
 
   // 취소선 적용 핸들러 - 즉시 입력창 표시
   const handleApplyStrikethrough = useCallback(() => {
-    if (!actualCanEdit) {
-      showToast?.('편집 권한이 없습니다');
-      return;
-    }
-
     const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !selection.rangeCount) {
@@ -2771,6 +3045,24 @@ const CollaborativeDocumentEditor = ({
     // 선택 범위를 절대 오프셋으로 저장 (DOM 변경에 안전)
     const absoluteOffsets = rangeToAbsoluteOffset(range, activeRef.current);
 
+    // 겹치는 마커 체크
+    const container = activeRef.current;
+    const markers = container.querySelectorAll('.strikethrough, .highlight');
+    for (const marker of markers) {
+      const markerRange = document.createRange();
+      markerRange.selectNodeContents(marker);
+
+      // range와 markerRange가 겹치는지 확인
+      const comparison = range.compareBoundaryPoints(Range.END_TO_START, markerRange);
+      const comparison2 = range.compareBoundaryPoints(Range.START_TO_END, markerRange);
+
+      if (comparison < 0 && comparison2 > 0) {
+        // 겹침 발생
+        showToast?.('이미 마커가 있는 영역입니다\n기존 마커에 의견을 남겨주세요');
+        return;
+      }
+    }
+
     // 디버깅: range 정보 출력
     console.log('🔍 취소선 range 저장:', {
       startContainer: range.startContainer,
@@ -2779,7 +3071,11 @@ const CollaborativeDocumentEditor = ({
       endOffset: range.endOffset,
       text: selectedText,
       length: selectedText.length,
-      absoluteOffsets: absoluteOffsets
+      absoluteOffsets: absoluteOffsets,
+      startParentTag: range.startContainer.parentNode?.tagName,
+      endParentTag: range.endContainer.parentNode?.tagName,
+      startText: range.startContainer.textContent?.substring(0, 50),
+      endText: range.endContainer.textContent?.substring(0, 50)
     });
 
     // 입력 모달 표시 (취소선 - 삭제 이유 입력)
@@ -2791,15 +3087,10 @@ const CollaborativeDocumentEditor = ({
     });
     setEditInputText('');
     setShowEditInputModal(true);
-  }, [actualCanEdit, showFullScreenEdit, showToast]);
+  }, [showFullScreenEdit, showToast]);
 
   // 형광펜 적용 핸들러 - 즉시 입력창 표시
   const handleApplyHighlighter = useCallback(() => {
-    if (!actualCanEdit) {
-      showToast?.('편집 권한이 없습니다');
-      return;
-    }
-
     const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !selection.rangeCount) {
@@ -2817,6 +3108,24 @@ const CollaborativeDocumentEditor = ({
 
     // 선택 범위를 절대 오프셋으로 저장 (DOM 변경에 안전)
     const absoluteOffsets = rangeToAbsoluteOffset(range, activeRef.current);
+
+    // 겹치는 마커 체크
+    const container = activeRef.current;
+    const markers = container.querySelectorAll('.strikethrough, .highlight');
+    for (const marker of markers) {
+      const markerRange = document.createRange();
+      markerRange.selectNodeContents(marker);
+
+      // range와 markerRange가 겹치는지 확인
+      const comparison = range.compareBoundaryPoints(Range.END_TO_START, markerRange);
+      const comparison2 = range.compareBoundaryPoints(Range.START_TO_END, markerRange);
+
+      if (comparison < 0 && comparison2 > 0) {
+        // 겹침 발생
+        showToast?.('이미 마커가 있는 영역입니다\n기존 마커에 의견을 남겨주세요');
+        return;
+      }
+    }
 
     // 디버깅: range 정보 출력
     console.log('🔍 형광펜 range 저장:', {
@@ -2838,7 +3147,7 @@ const CollaborativeDocumentEditor = ({
     });
     setEditInputText('');
     setShowEditInputModal(true);
-  }, [actualCanEdit, showFullScreenEdit, showToast]);
+  }, [showFullScreenEdit, showToast]);
 
   // 저장 핸들러 - 공유 폴더에 수정본 저장 (매니저만 가능)
   const handleSaveToShared = useCallback(async () => {
@@ -3043,11 +3352,16 @@ const CollaborativeDocumentEditor = ({
     try {
       // 현재 HTML 상태 그대로 Firestore에 저장
       const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+      // 기존 문서 소유자 정보 유지
+      const existingDoc = await getDoc(docRef);
+      const existingOwner = existingDoc.exists() ? existingDoc.data().lastEditedBy : currentUserId;
+      const existingOwnerName = existingDoc.exists() ? existingDoc.data().lastEditedByName : currentUserName;
+
       await setDoc(docRef, {
         title,
         content: content, // 모든 마커가 포함된 HTML
-        lastEditedBy: currentUserId,
-        lastEditedByName: currentUserName,
+        lastEditedBy: existingOwner,
+        lastEditedByName: existingOwnerName,
         lastEditedAt: serverTimestamp(),
         partialApplied: true, // 중간 적용 표시
         version: (await getDoc(docRef)).data()?.version || 0 + 1
@@ -3138,11 +3452,16 @@ const CollaborativeDocumentEditor = ({
 
         // 4. Firestore에 저장
         const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+        // 기존 문서 소유자 정보 유지
+        const existingDoc = await getDoc(docRef);
+        const existingOwner = existingDoc.exists() ? existingDoc.data().lastEditedBy : currentUserId;
+        const existingOwnerName = existingDoc.exists() ? existingDoc.data().lastEditedByName : currentUserName;
+
         await setDoc(docRef, {
           title,
           content: newContent,
-          lastEditedBy: currentUserId,
-          lastEditedByName: currentUserName,
+          lastEditedBy: existingOwner,
+          lastEditedByName: existingOwnerName,
           lastEditedAt: serverTimestamp(),
           version: (await getDoc(docRef)).data()?.version || 0 + 1
         }, { merge: true });
@@ -3265,11 +3584,16 @@ const CollaborativeDocumentEditor = ({
 
       // Firestore에 전체 승인된 내용 저장
       const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+      // 기존 문서 소유자 정보 유지
+      const existingDoc = await getDoc(docRef);
+      const existingOwner = existingDoc.exists() ? existingDoc.data().lastEditedBy : currentUserId;
+      const existingOwnerName = existingDoc.exists() ? existingDoc.data().lastEditedByName : currentUserName;
+
       await setDoc(docRef, {
         title,
         content: finalContent,
-        lastEditedBy: currentUserId,
-        lastEditedByName: currentUserName,
+        lastEditedBy: existingOwner,
+        lastEditedByName: existingOwnerName,
         lastEditedAt: serverTimestamp(),
         finalApplied: true, // 전체 승인 표시
         partialApplied: false,
@@ -3355,11 +3679,14 @@ const CollaborativeDocumentEditor = ({
 
       // 3. Firestore 문서 업데이트 (마커 제거된 내용으로)
       const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+      // 현재 사용자의 닉네임 조회
+      const userNickname = await getUserNickname(currentUserId);
+
       await setDoc(docRef, {
         title,
         content: cleanContent,
         lastEditedBy: currentUserId,
-        lastEditedByName: currentUserName,
+        lastEditedByName: userNickname || currentUserName,
         lastEditedAt: serverTimestamp(),
         version: (await getDoc(docRef)).data()?.version || 0 + 1
       }, { merge: true });
@@ -3434,10 +3761,15 @@ const CollaborativeDocumentEditor = ({
 
       // 3. Firestore 문서 업데이트
       const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+      // 기존 문서 소유자 정보 유지
+      const existingDoc = await getDoc(docRef);
+      const existingOwner = existingDoc.exists() ? existingDoc.data().lastEditedBy : currentUserId;
+      const existingOwnerName = existingDoc.exists() ? existingDoc.data().lastEditedByName : currentUserName;
+
       await setDoc(docRef, {
         content: updatedContent,
-        lastEditedBy: currentUserId,
-        lastEditedByName: currentUserName,
+        lastEditedBy: existingOwner,
+        lastEditedByName: existingOwnerName,
         lastEditedAt: serverTimestamp(),
       }, { merge: true });
 
@@ -3523,6 +3855,31 @@ const CollaborativeDocumentEditor = ({
     showToast?.('문서가 비워졌습니다');
   }, [currentDocId, chatRoomId, currentUserId, currentUserName, showToast]);
 
+  // 제안 철회 핸들러
+  const handleWithdrawProposal = useCallback(async (editId) => {
+    try {
+      // 댓글이 있는지 확인
+      const commentsRef = collection(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', editId, 'comments');
+      const commentsSnapshot = await getDocs(commentsRef);
+
+      if (!commentsSnapshot.empty) {
+        showToast?.('의견 제시가 달린 제안은 철회할 수 없습니다');
+        return;
+      }
+
+      if (!window.confirm('이 제안을 철회하시겠습니까?')) return;
+
+      const editRef = doc(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', editId);
+      await deleteDoc(editRef);
+
+      showToast?.('제안이 철회되었습니다');
+      setShowEditModal(false); // 모달 닫기
+    } catch (error) {
+      console.error('제안 철회 실패:', error);
+      showToast?.('제안 철회에 실패했습니다');
+    }
+  }, [chatRoomId, currentDocId, showToast]);
+
   // 마커 클릭 이벤트 핸들러 (상세 정보 모달 표시)
   useEffect(() => {
     const handleMarkerClick = async (e) => {
@@ -3544,6 +3901,11 @@ const CollaborativeDocumentEditor = ({
           if (editSnap.exists()) {
             const editData = editSnap.data();
 
+            // 댓글 개수 조회
+            const commentsRef = collection(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', editId, 'comments');
+            const commentsSnapshot = await getDocs(commentsRef);
+            const commentCount = commentsSnapshot.size;
+
             // 제안자의 WS 코드 조회
             let wsCode = null;
             if (editData.editedBy) {
@@ -3563,6 +3925,7 @@ const CollaborativeDocumentEditor = ({
               id: editId,
               ...editData,
               wsCode: wsCode, // WS 코드 추가
+              commentCount: commentCount, // 댓글 개수 추가
               markerType: target.classList.contains('strikethrough') ? 'strikethrough' : 'highlight'
             });
             setShowMarkerDetailModal(true);
@@ -3705,52 +4068,40 @@ const CollaborativeDocumentEditor = ({
             </button>
           </div>
         ) : documentOwner && currentDocId && !currentDocId.startsWith('temp_') ? (
-          <>
-            <div
-              onClick={() => setShowOwnerModal(true)}
-              style={{
-                padding: '8px 16px',
-                background: 'rgba(74, 144, 226, 0.1)',
-                borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                fontSize: '12px',
-                color: '#4a90e2',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px'
-              }}
-              title="클릭하여 고유 ID 확인"
-            >
-              <Users size={14} />
-              문서 소유자: {documentOwner.nickname}{documentOwner.userId === currentUserId ? ' (나)' : ''}
-            </div>
-            {/* 원본 작성자 표시 (현재 소유자와 다른 경우만) */}
-            {originalOwner && originalOwner.userId !== documentOwner.userId && (
-              <div
-                style={{
-                  padding: '6px 16px',
-                  background: 'rgba(128, 128, 128, 0.1)',
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                  fontSize: '11px',
-                  color: '#999',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
-                }}
-              >
-                <FileText size={12} />
-                원본 작성자: {originalOwner.nickname} {originalOwner.wsCode ? `(WS-${originalOwner.wsCode})` : ''}
-              </div>
-            )}
-          </>
+          <div
+            onClick={() => setShowOwnerModal(true)}
+            style={{
+              padding: '8px 16px',
+              background: 'rgba(74, 144, 226, 0.1)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+              fontSize: '12px',
+              color: '#4a90e2',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+            title="클릭하여 사용자 ID 확인"
+          >
+            <Users size={14} />
+            문서 소유자: {documentOwner.nickname}{documentOwner.userId === currentUserId ? ' (나)' : ''}
+          </div>
         ) : null}
 
         {/* 도구 모음 */}
         <Toolbar>
           {/* 첫 번째 줄: 불러오기(아이콘만), 편집(아이콘만), 전체승인, 전체리셋 */}
           <ToolbarRow key="toolbar-row-1">
-            {onLoadFromShared && (actualIsManager || actualIsSubManager) && (
-              <LoadButton onClick={handleLoadClick} title="공유 폴더에서 불러오기">
+            {onLoadFromShared && (
+              <LoadButton
+                onClick={(actualIsManager || actualIsSubManager) ? handleLoadClick : undefined}
+                title={(actualIsManager || actualIsSubManager) ? "공유 폴더에서 불러오기" : "권한 없음"}
+                disabled={!(actualIsManager || actualIsSubManager)}
+                style={{
+                  opacity: (actualIsManager || actualIsSubManager) ? 1 : 0.5,
+                  cursor: (actualIsManager || actualIsSubManager) ? 'pointer' : 'not-allowed'
+                }}
+              >
                 📂
               </LoadButton>
             )}
@@ -3775,48 +4126,32 @@ const CollaborativeDocumentEditor = ({
               </EditButton>
             )}
 
-            {actualCanEdit && (
-              <ClearButton onClick={handleClearDocument} title="문서 비우기">
-                🧹
-              </ClearButton>
-            )}
+            <ClearButton
+              onClick={actualCanEdit ? handleClearDocument : undefined}
+              title={actualCanEdit ? "문서 비우기" : "권한 없음"}
+              disabled={!actualCanEdit}
+              style={{ opacity: actualCanEdit ? 1 : 0.5, cursor: actualCanEdit ? 'pointer' : 'not-allowed' }}
+            >
+              🧹
+            </ClearButton>
 
-            {actualIsManager && (
-              <>
-                <FinalApplyButton
-                  onClick={handleFinalApply}
-                  disabled={saving || !title.trim() || pendingEdits.length === 0}
-                  title="전체 승인 (모든 수정 제안 승인)"
-                >
-                  전체승인
-                </FinalApplyButton>
+            <FinalApplyButton
+              onClick={actualIsManager ? handleFinalApply : undefined}
+              disabled={!actualIsManager || saving || !title.trim() || pendingEdits.length === 0}
+              title={actualIsManager ? "전체 승인 (모든 수정 제안 승인)" : "권한 없음"}
+              style={{ opacity: (actualIsManager && !saving && title.trim() && pendingEdits.length > 0) ? 1 : 0.5 }}
+            >
+              전체승인
+            </FinalApplyButton>
 
-                <ResetButton
-                  onClick={handleResetAll}
-                  disabled={saving || pendingEdits.length === 0}
-                  title="모든 수정 표시 삭제"
-                >
-                  전체리셋
-                </ResetButton>
-              </>
-            )}
-
-            {!actualIsManager && !actualIsSubManager && (
-              <SaveButton
-                onClick={handleDownloadToShared}
-                disabled={saving || !title.trim()}
-                title="공유 폴더에 다운로드"
-              >
-                <Download size={14} />
-                {saving ? '다운로드 중...' : '다운로드'}
-              </SaveButton>
-            )}
-
-            {!actualCanEdit && (
-              <span style={{ color: '#888', fontSize: '12px' }}>
-                • 읽기 전용 모드
-              </span>
-            )}
+            <ResetButton
+              onClick={actualIsManager ? handleResetAll : undefined}
+              disabled={!actualIsManager || saving || pendingEdits.length === 0}
+              title={actualIsManager ? "모든 수정 표시 삭제" : "권한 없음"}
+              style={{ opacity: (actualIsManager && !saving && pendingEdits.length > 0) ? 1 : 0.5 }}
+            >
+              전체리셋
+            </ResetButton>
           </ToolbarRow>
 
           {/* 두 번째 줄: 수정 대기중 표시, 위치찾기, 권한 관리 */}
@@ -3967,22 +4302,42 @@ const CollaborativeDocumentEditor = ({
               {selectedEdits.map((edit, index) => (
                 <div key={edit.id} style={{ marginBottom: index < selectedEdits.length - 1 ? '20px' : '0' }}>
                   <EditInfo>
-                    <InfoRow>
-                      <strong>수정자:</strong>{' '}
-                      <span
-                        onClick={() => handleNicknameClick(edit.editedBy, editNicknames[edit.editedBy] || '익명')}
-                        style={{
-                          cursor: 'pointer',
-                          color: '#4a90e2',
-                          textDecoration: 'underline',
-                          fontWeight: '600'
-                        }}
-                      >
-                        {editNicknames[edit.editedBy] || '익명'}
-                      </span>
+                    <InfoRow style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div>
+                        <strong>제안자:</strong>{' '}
+                        <span
+                          onClick={() => handleNicknameClick(edit.editedBy, editNicknames[edit.editedBy] || '익명')}
+                          style={{
+                            cursor: 'pointer',
+                            color: '#4a90e2',
+                            textDecoration: 'underline',
+                            fontWeight: '600'
+                          }}
+                        >
+                          {editNicknames[edit.editedBy] || '익명'}
+                        </span>
+                      </div>
+                      {edit.editedBy === currentUserId && (
+                        <button
+                          onClick={() => handleWithdrawProposal(edit.id)}
+                          disabled={edit.commentCount > 0}
+                          style={{
+                            background: edit.commentCount > 0 ? 'rgba(255, 107, 107, 0.2)' : 'rgba(255, 107, 107, 0.1)',
+                            border: `1px solid ${edit.commentCount > 0 ? 'rgba(255, 107, 107, 0.3)' : 'rgba(255, 107, 107, 0.4)'}`,
+                            color: edit.commentCount > 0 ? '#999' : '#ff6b6b',
+                            fontSize: '11px',
+                            padding: '4px 12px',
+                            borderRadius: '6px',
+                            cursor: edit.commentCount > 0 ? 'not-allowed' : 'pointer',
+                            fontWeight: '500'
+                          }}
+                        >
+                          제안 철회
+                        </button>
+                      )}
                     </InfoRow>
                     <InfoRow>
-                      <strong>수정 시각:</strong> {edit.editedAt?.toDate?.().toLocaleString('ko-KR')}
+                      <strong>제안 시각:</strong> {edit.editedAt?.toDate?.().toLocaleString('ko-KR')}
                     </InfoRow>
                     {edit.type && (
                       <InfoRow>
@@ -4059,26 +4414,71 @@ const CollaborativeDocumentEditor = ({
                     </TextComparison>
                   )}
 
-                  <div style={{ marginTop: '12px', display: 'flex', gap: '8px' }}>
-                    {actualIsManager && (
-                      <ConfirmButton onClick={() => handleApproveEdit(edit.id)}>
-                        <Check size={18} />
-                        이 편집 승인
-                      </ConfirmButton>
+                  <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {/* 의견 제시 버튼 - 취소선 또는 형광펜 타입만 */}
+                    {(edit.type === 'strikethrough' || edit.type === 'highlight') && (
+                      <button
+                        onClick={() => {
+                          setSelectedMarkerForComments({
+                            chatRoomId,
+                            memoId: currentDocId,
+                            editId: edit.id,
+                            markerData: {
+                              originalText: edit.oldText,
+                              newText: edit.newText || '',
+                              description: edit.description || edit.reason || ''
+                            }
+                          });
+                          setShowMarkerCommentsModal(true);
+                        }}
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          background: 'rgba(74, 144, 226, 0.15)',
+                          border: '1px solid rgba(74, 144, 226, 0.3)',
+                          borderRadius: '8px',
+                          color: '#4a90e2',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          transition: 'all 0.2s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(74, 144, 226, 0.25)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(74, 144, 226, 0.15)';
+                        }}
+                      >
+                        <MessageCircle size={16} />
+                        의견 제시 ({edit.commentCount || 0})
+                      </button>
                     )}
-                    {actualCanEdit && (
-                      <RejectButton onClick={async () => {
-                        try {
-                          await handleCancelEdit(edit.id);
-                          showToast?.('수정 표시가 취소되었습니다');
-                        } catch (error) {
-                          console.error('취소 실패:', error);
-                        }
-                      }}>
-                        <X size={18} />
-                        이 편집 취소
-                      </RejectButton>
-                    )}
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      {actualIsManager && (
+                        <ConfirmButton onClick={() => handleApproveEdit(edit.id)}>
+                          <Check size={18} />
+                          이 편집 승인
+                        </ConfirmButton>
+                      )}
+                      {actualCanEdit && (
+                        <RejectButton onClick={async () => {
+                          try {
+                            await handleCancelEdit(edit.id);
+                            showToast?.('수정 표시가 취소되었습니다');
+                          } catch (error) {
+                            console.error('취소 실패:', error);
+                          }
+                        }}>
+                          <X size={18} />
+                          이 편집 취소
+                        </RejectButton>
+                      )}
+                    </div>
                   </div>
 
                   {index < selectedEdits.length - 1 && (
@@ -4189,6 +4589,114 @@ const CollaborativeDocumentEditor = ({
                 <X size={20} />
               </IconButton>
             </ModalHeader>
+
+            {pendingMarker.editData && (
+              <ModalSubtitle>
+                <SubtitleRow style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <strong>제안자:</strong>
+                    <span
+                      onClick={() => {
+                        if (pendingMarker.editData.wsCode) {
+                          setSelectedUserId(pendingMarker.editData.wsCode);
+                          setShowUserIdModal(true);
+                        }
+                      }}
+                      style={{ cursor: 'pointer', textDecoration: 'underline', marginLeft: '8px' }}
+                      title="클릭하여 사용자 ID 확인"
+                    >
+                      {editNicknames[pendingMarker.editData.editedBy] || '알 수 없음'}
+                    </span>
+                  </div>
+                  {pendingMarker.editData.editedBy === currentUserId && (
+                    <button
+                      onClick={async () => {
+                        // 댓글 개수 확인
+                        try {
+                          const commentsRef = collection(
+                            db,
+                            'chatRooms',
+                            chatRoomId,
+                            'documents',
+                            currentDocId,
+                            'editHistory',
+                            pendingMarker.id,
+                            'comments'
+                          );
+                          const commentsSnap = await getDocs(commentsRef);
+
+                          if (commentsSnap.size > 0) {
+                            showToast?.('의견이 달린 제안은 철회할 수 없습니다');
+                            return;
+                          }
+
+                          if (!window.confirm('이 제안을 철회하시겠습니까?')) return;
+
+                          // 1. DOM에서 마커 제거
+                          const container = activeRef.current;
+                          if (container) {
+                            const markerClass = pendingMarker.type === 'strikethrough' ? 'strikethrough' : 'highlight';
+                            const markers = container.querySelectorAll(`.${markerClass}[data-edit-id="${pendingMarker.id}"]`);
+                            markers.forEach(marker => {
+                              const parent = marker.parentNode;
+                              const textNode = document.createTextNode(marker.textContent);
+                              parent.replaceChild(textNode, marker);
+                              parent.normalize();
+                            });
+                          }
+
+                          // 2. Firestore에서 제안 삭제
+                          const editRef = doc(
+                            db,
+                            'chatRooms',
+                            chatRoomId,
+                            'documents',
+                            currentDocId,
+                            'editHistory',
+                            pendingMarker.id
+                          );
+                          await deleteDoc(editRef);
+
+                          showToast?.('제안이 철회되었습니다');
+                          setShowEditInputModal(false);
+                          setPendingMarker(null);
+                        } catch (error) {
+                          console.error('제안 철회 실패:', error);
+                          showToast?.('제안 철회에 실패했습니다');
+                        }
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        background: 'rgba(255, 107, 107, 0.15)',
+                        border: '1px solid rgba(255, 107, 107, 0.3)',
+                        borderRadius: '6px',
+                        color: '#ff6b6b',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        fontWeight: '500'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = 'rgba(255, 107, 107, 0.25)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = 'rgba(255, 107, 107, 0.15)';
+                      }}
+                    >
+                      제안 철회
+                    </button>
+                  )}
+                </SubtitleRow>
+                <SubtitleRow>
+                  <strong>제안 시각:</strong>
+                  <span style={{ marginLeft: '8px' }}>
+                    {pendingMarker.editData.editedAt?.toDate
+                      ? pendingMarker.editData.editedAt.toDate().toLocaleString('ko-KR')
+                      : '알 수 없음'}
+                  </span>
+                </SubtitleRow>
+              </ModalSubtitle>
+            )}
 
             <ModalBody>
               {pendingMarker.text && pendingMarker.type !== 'comment' && (
@@ -4302,6 +4810,46 @@ const CollaborativeDocumentEditor = ({
                       fontFamily: 'inherit'
                     }}
                   />
+                </div>
+              )}
+
+              {/* 의견 제시 버튼 (기존 마커를 클릭한 경우만 표시) */}
+              {pendingMarker.editData && (
+                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                  <button
+                    onClick={() => {
+                      setSelectedMarkerForComments({
+                        chatRoomId,
+                        memoId: currentDocId,
+                        editId: pendingMarker.id,
+                        markerData: {
+                          originalText: pendingMarker.text,
+                          newText: pendingMarker.editData.newText,
+                          description: pendingMarker.editData.description || pendingMarker.editData.reason
+                        }
+                      });
+                      setShowMarkerCommentsModal(true);
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      background: 'rgba(74, 144, 226, 0.15)',
+                      border: '1px solid rgba(74, 144, 226, 0.3)',
+                      borderRadius: '8px',
+                      color: '#4a90e2',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <MessageCircle size={16} />
+                    의견 제시 ({pendingMarker.commentCount || 0})
+                  </button>
                 </div>
               )}
 
@@ -4747,7 +5295,7 @@ const CollaborativeDocumentEditor = ({
                 </div>
                 {documentOwner.wsCode ? (
                   <div style={{ marginBottom: '12px', color: '#e0e0e0' }}>
-                    <strong>고유 ID:</strong>
+                    <strong>쉐어노트 ID:</strong>
                     <div style={{
                       marginTop: '8px',
                       padding: '12px',
@@ -4765,7 +5313,7 @@ const CollaborativeDocumentEditor = ({
                     </div>
                   </div>
                 ) : (
-                  <div style={{ color: '#999' }}>고유 ID를 찾을 수 없습니다</div>
+                  <div style={{ color: '#999' }}>쉐어노트 ID를 찾을 수 없습니다</div>
                 )}
               </div>
 
@@ -4778,7 +5326,7 @@ const CollaborativeDocumentEditor = ({
                   <ConfirmButton
                     onClick={() => {
                       navigator.clipboard.writeText(documentOwner.wsCode.replace('WS-', ''));
-                      showToast?.('고유 ID가 복사되었습니다');
+                      showToast?.('쉐어노트 ID가 복사되었습니다');
                       setShowOwnerModal(false);
                     }}
                     style={{ background: 'linear-gradient(135deg, #4a90e2, #357abd)' }}
@@ -5141,20 +5689,83 @@ const CollaborativeDocumentEditor = ({
 
             <ModalBody>
               <EditInfo>
-                <InfoRow>
-                  <strong>제안자:</strong>{' '}
-                  <span
-                    onClick={() => {
-                      if (selectedMarkerDetail.wsCode) {
-                        setSelectedUserId(selectedMarkerDetail.wsCode);
-                        setShowUserIdModal(true);
-                      }
-                    }}
-                    style={{ cursor: 'pointer', textDecoration: 'underline' }}
-                    title="클릭하여 사용자 ID 확인"
-                  >
-                    {editNicknames[selectedMarkerDetail.editedBy] || '알 수 없음'}
-                  </span>
+                <InfoRow style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <strong>제안자:</strong>{' '}
+                    <span
+                      onClick={() => {
+                        if (selectedMarkerDetail.wsCode) {
+                          setSelectedUserId(selectedMarkerDetail.wsCode);
+                          setShowUserIdModal(true);
+                        }
+                      }}
+                      style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                      title="클릭하여 사용자 ID 확인"
+                    >
+                      {editNicknames[selectedMarkerDetail.editedBy] || '알 수 없음'}
+                    </span>
+                  </div>
+                  {selectedMarkerDetail.editedBy === currentUserId && (
+                    <button
+                      disabled={selectedMarkerDetail.commentCount > 0}
+                      onClick={async () => {
+                        // 댓글이 있으면 철회 불가 (비활성화 버튼 클릭 시)
+                        if (selectedMarkerDetail.commentCount > 0) {
+                          showToast?.('의견 제시가 달린 제안은 철회할 수 없습니다');
+                          return;
+                        }
+
+                        if (!window.confirm('이 제안을 철회하시겠습니까?')) return;
+
+                        try {
+                          // 1. DOM에서 마커 제거
+                          const container = showFullScreenEdit ? fullScreenContentRef.current : contentRef.current;
+                          if (container) {
+                            const markerClass = selectedMarkerDetail.markerType === 'strikethrough' ? 'strikethrough' : 'highlight';
+                            const markers = container.querySelectorAll(`.${markerClass}[data-edit-id="${selectedMarkerDetail.id}"]`);
+                            markers.forEach(marker => {
+                              const parent = marker.parentNode;
+                              const textNode = document.createTextNode(marker.textContent);
+                              parent.replaceChild(textNode, marker);
+                              parent.normalize();
+                            });
+                          }
+
+                          // 2. Firestore에서 제안 삭제
+                          const editRef = doc(
+                            db,
+                            'chatRooms',
+                            chatRoomId,
+                            'documents',
+                            currentDocId,
+                            'editHistory',
+                            selectedMarkerDetail.id
+                          );
+                          await deleteDoc(editRef);
+
+                          showToast?.('제안이 철회되었습니다');
+                          setShowMarkerDetailModal(false);
+                          setSelectedMarkerDetail(null);
+                        } catch (error) {
+                          console.error('제안 철회 실패:', error);
+                          showToast?.('제안 철회에 실패했습니다');
+                        }
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        background: selectedMarkerDetail.commentCount > 0 ? 'rgba(255, 107, 107, 0.2)' : 'rgba(255, 107, 107, 0.1)',
+                        border: `1px solid ${selectedMarkerDetail.commentCount > 0 ? 'rgba(255, 107, 107, 0.3)' : 'rgba(255, 107, 107, 0.4)'}`,
+                        borderRadius: '6px',
+                        color: selectedMarkerDetail.commentCount > 0 ? '#999' : '#ff6b6b',
+                        fontSize: '11px',
+                        cursor: selectedMarkerDetail.commentCount > 0 ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s',
+                        fontWeight: '500'
+                      }}
+                    >
+                      제안 철회
+                    </button>
+                  )}
                 </InfoRow>
                 <InfoRow>
                   <strong>제안 시각:</strong>{' '}
@@ -5191,7 +5802,7 @@ const CollaborativeDocumentEditor = ({
                 )}
               </EditInfo>
 
-              {actualCanEdit && (
+              {actualIsManager && (
                 <ModalActions>
                   <RejectButton onClick={() => {
                     // 거부 확인 모달 표시
@@ -5227,7 +5838,7 @@ const CollaborativeDocumentEditor = ({
         <Modal onClick={() => setShowUserIdModal(false)}>
           <ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
             <ModalHeader>
-              <ModalTitle>사용자 고유 ID</ModalTitle>
+              <ModalTitle>사용자 ID</ModalTitle>
               <IconButton onClick={() => setShowUserIdModal(false)}>
                 <X size={20} />
               </IconButton>
@@ -5247,7 +5858,7 @@ const CollaborativeDocumentEditor = ({
                   color: '#888',
                   marginBottom: '8px'
                 }}>
-                  6자리 고유 ID
+                  쉐어노트 ID
                 </div>
                 <div style={{
                   fontSize: '24px',
@@ -5314,99 +5925,77 @@ const CollaborativeDocumentEditor = ({
                 새 문서(임시 문서)
               </div>
             ) : documentOwner && currentDocId && !currentDocId.startsWith('temp_') ? (
-              <>
-                <div
-                  onClick={() => setShowOwnerModal(true)}
-                  style={{
-                    padding: '8px 16px',
-                    background: 'rgba(74, 144, 226, 0.1)',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                    fontSize: '11px',
-                    color: '#4a90e2',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                  title="클릭하여 고유 ID 확인"
-                >
-                  <Users size={12} />
-                  문서 소유자: {documentOwner.nickname}{documentOwner.userId === currentUserId ? ' (나)' : ''}
-                </div>
-                {/* 원본 작성자 표시 (현재 소유자와 다른 경우만) */}
-                {originalOwner && originalOwner.userId !== documentOwner.userId && (
-                  <div
-                    style={{
-                      padding: '5px 16px',
-                      background: 'rgba(128, 128, 128, 0.1)',
-                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                      fontSize: '10px',
-                      color: '#999',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <FileText size={11} />
-                    원본 작성자: {originalOwner.nickname} {originalOwner.wsCode ? `(WS-${originalOwner.wsCode})` : ''}
-                  </div>
-                )}
-              </>
+              <div
+                onClick={() => setShowOwnerModal(true)}
+                style={{
+                  padding: '8px 16px',
+                  background: 'rgba(74, 144, 226, 0.1)',
+                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+                  fontSize: '11px',
+                  color: '#4a90e2',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                title="클릭하여 사용자 ID 확인"
+              >
+                <Users size={12} />
+                문서 소유자: {documentOwner.nickname}{documentOwner.userId === currentUserId ? ' (나)' : ''}
+              </div>
             ) : null}
 
-            {/* 툴바 - 2줄 레이아웃 */}
-            {actualCanEdit && (
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                {/* 첫 번째 줄: 취소선, 형광펜 */}
-                <FullScreenToolbar style={{ borderBottom: 'none', paddingBottom: '7px' }}>
-                  <ToolbarButton onClick={handleApplyStrikethrough} title="선택한 텍스트에 취소선 적용">
-                    <Strikethrough size={16} />
-                    취소선
-                  </ToolbarButton>
+            {/* 툴바 - 2줄 레이아웃 (모든 사용자에게 표시) */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {/* 첫 번째 줄: 취소선, 형광펜 */}
+              <FullScreenToolbar style={{ borderBottom: 'none', paddingBottom: '7px' }}>
+                <ToolbarButton onClick={handleApplyStrikethrough} title="선택한 텍스트에 취소선 적용">
+                  <Strikethrough size={16} />
+                  취소선
+                </ToolbarButton>
 
-                  <ToolbarButton onClick={handleApplyHighlighter} title="선택한 텍스트에 형광펜 적용">
-                    <Highlighter size={16} />
-                    형광펜
-                  </ToolbarButton>
+                <ToolbarButton onClick={handleApplyHighlighter} title="선택한 텍스트에 형광펜 적용">
+                  <Highlighter size={16} />
+                  형광펜
+                </ToolbarButton>
+              </FullScreenToolbar>
+
+              {/* 두 번째 줄: 수정 대기중, 위치 찾기 */}
+              {pendingEdits.length > 0 && (
+                <FullScreenToolbar style={{ paddingTop: '7px' }}>
+                  <PendingEditsCount title="대기 중인 수정 사항">
+                    <Info size={16} />
+                    {pendingEdits.length}개 수정 대기중
+                  </PendingEditsCount>
+
+                  <EditNavigationGroup>
+                    <EditNavigationButton
+                      onClick={handlePrevEdit}
+                      disabled={pendingEdits.length === 0}
+                      title="이전 수정 영역"
+                    >
+                      <ChevronLeft size={14} />
+                    </EditNavigationButton>
+
+                    <EditNavigationButton
+                      style={{ minWidth: '40px' }}
+                      disabled
+                      title={`${currentEditIndex + 1} / ${pendingEdits.length}`}
+                    >
+                      {currentEditIndex + 1}/{pendingEdits.length}
+                    </EditNavigationButton>
+
+                    <EditNavigationButton
+                      onClick={handleNextEdit}
+                      disabled={pendingEdits.length === 0}
+                      title="다음 수정 영역"
+                    >
+                      <ChevronRight size={14} />
+                    </EditNavigationButton>
+                  </EditNavigationGroup>
                 </FullScreenToolbar>
-
-                {/* 두 번째 줄: 수정 대기중, 위치 찾기 */}
-                {pendingEdits.length > 0 && (
-                  <FullScreenToolbar style={{ paddingTop: '7px' }}>
-                    <PendingEditsCount title="대기 중인 수정 사항">
-                      <Info size={16} />
-                      {pendingEdits.length}개 수정 대기중
-                    </PendingEditsCount>
-
-                    <EditNavigationGroup>
-                      <EditNavigationButton
-                        onClick={handlePrevEdit}
-                        disabled={pendingEdits.length === 0}
-                        title="이전 수정 영역"
-                      >
-                        <ChevronLeft size={14} />
-                      </EditNavigationButton>
-
-                      <EditNavigationButton
-                        style={{ minWidth: '40px' }}
-                        disabled
-                        title={`${currentEditIndex + 1} / ${pendingEdits.length}`}
-                      >
-                        {currentEditIndex + 1}/{pendingEdits.length}
-                      </EditNavigationButton>
-
-                      <EditNavigationButton
-                        onClick={handleNextEdit}
-                        disabled={pendingEdits.length === 0}
-                        title="다음 수정 영역"
-                      >
-                        <ChevronRight size={14} />
-                      </EditNavigationButton>
-                    </EditNavigationGroup>
-                  </FullScreenToolbar>
-                )}
-              </div>
-            )}
+              )}
+            </div>
 
             {/* 편집 영역 */}
             <FullScreenContent>
@@ -5459,6 +6048,23 @@ const CollaborativeDocumentEditor = ({
             </FullScreenFooter>
           </FullScreenEditorContainer>
         </FullScreenModal>
+      )}
+
+      {/* 마커 의견 제시 모달 */}
+      {showMarkerCommentsModal && selectedMarkerForComments && (
+        <MarkerCommentsModal
+          onClose={() => {
+            setShowMarkerCommentsModal(false);
+            setSelectedMarkerForComments(null);
+          }}
+          chatRoomId={selectedMarkerForComments.chatRoomId}
+          memoId={selectedMarkerForComments.memoId}
+          editId={selectedMarkerForComments.editId}
+          markerData={selectedMarkerForComments.markerData}
+          currentUserId={currentUserId}
+          currentUserName={currentUserName}
+          showToast={showToast}
+        />
       )}
     </EditorContainer>
   );

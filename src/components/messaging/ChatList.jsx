@@ -9,6 +9,7 @@ import { Search, Pin, Users, Mail } from 'lucide-react';
 import CreateGroupModal from './CreateGroupModal';
 import JoinGroupModal from './JoinGroupModal';
 import ChatRoom from './ChatRoom';
+import { avatarList } from '../avatars/AvatarIcons';
 
 // 컨테이너
 const Container = styled.div`
@@ -296,7 +297,7 @@ const EmptyDescription = styled.div`
   line-height: 1.5;
 `;
 
-const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag }) => {
+const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag, onUnreadCountChange }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [chatRooms, setChatRooms] = useState([]);
   const [groupChats, setGroupChats] = useState([]);
@@ -307,6 +308,7 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
   const [userNicknames, setUserNicknames] = useState({}); // userId -> 앱 닉네임 매핑
   const [nicknamesLoaded, setNicknamesLoaded] = useState(false); // 닉네임 로딩 완료 여부
   const [userProfilePictures, setUserProfilePictures] = useState({}); // userId -> profilePictureUrl 매핑
+  const [userAvatarSettings, setUserAvatarSettings] = useState({}); // userId -> {selectedAvatarId, avatarBgColor} 매핑
 
   // 이전 읽지 않은 메시지 개수 추적 (알림음 재생 여부 판단)
   const prevUnreadCountRef = useRef({});
@@ -429,9 +431,31 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
     };
   }, []);
 
-  // 🆕 사용자 프로필 사진 실시간 구독
+  // 읽지 않은 메시지 총 개수 계산 및 부모로 전달
   useEffect(() => {
-    // 1:1 대화방 및 그룹 채팅방의 모든 참여자 ID 수집
+    if (!onUnreadCountChange) return;
+
+    const currentUserId = localStorage.getItem('firebaseUserId');
+    if (!currentUserId) return;
+
+    let totalUnread = 0;
+
+    // 1:1 대화방의 읽지 않은 메시지 수 합산
+    chatRooms.forEach(room => {
+      totalUnread += room.unreadCount?.[currentUserId] || 0;
+    });
+
+    // 그룹 채팅방의 읽지 않은 메시지 수 합산
+    groupChats.forEach(group => {
+      totalUnread += group.unreadCount?.[currentUserId] || 0;
+    });
+
+    onUnreadCountChange(totalUnread);
+  }, [chatRooms, groupChats, onUnreadCountChange]);
+
+  // 채팅방 참여자 프로필 사진 로드 (페이지 로드 시 1회만)
+  useEffect(() => {
+    // 1:1 대화방 및 그룹 채팅방의 참여자 ID 수집
     const userIds = new Set();
 
     // 1:1 대화방 참여자
@@ -439,7 +463,7 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
       room.participants?.forEach(userId => userIds.add(userId));
     });
 
-    // 그룹 채팅방 참여자
+    // 그룹 채팅방 활성 멤버
     groupChats.forEach(group => {
       Object.keys(group.membersInfo || {}).forEach(userId => {
         if (group.membersInfo[userId]?.status === 'active') {
@@ -448,59 +472,59 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
       });
     });
 
-    // Firestore 리스너 배열
-    const unsubscribers = [];
-
-    // 각 사용자의 프로필 설정 구독
-    userIds.forEach(async (userId) => {
-      const { doc, onSnapshot } = await import('firebase/firestore');
+    // 각 참여자의 프로필 설정 로드 (1회만)
+    const loadProfiles = async () => {
+      const { doc, getDoc } = await import('firebase/firestore');
       const { db } = await import('../../firebase/config');
-      const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+      const { getProfileImageUrl } = await import('../../utils/storageService');
 
-      const unsubscribe = onSnapshot(settingsRef, async (docSnap) => {
-        if (docSnap.exists()) {
-          const settings = docSnap.data();
-          const imageType = settings.profileImageType || 'avatar';
+      for (const userId of userIds) {
+        try {
+          const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+          const docSnap = await getDoc(settingsRef);
 
-          // 'photo' 모드면 버전 기반 URL 사용
-          if (imageType === 'photo') {
-            const { getProfileImageUrl } = await import('../../utils/storageService');
+          if (docSnap.exists()) {
+            const settings = docSnap.data();
+            const imageType = settings.profileImageType || 'avatar';
             const version = settings.profileImageVersion || null;
-            const imageUrl = getProfileImageUrl(userId, version);
-            setUserProfilePictures(prev => ({
-              ...prev,
-              [userId]: imageUrl
-            }));
-          } else {
-            // 아바타 모드면 프로필 사진 제거
-            setUserProfilePictures(prev => {
-              const newState = { ...prev };
-              delete newState[userId];
-              return newState;
-            });
+            const selectedAvatarId = settings.selectedAvatarId || null;
+            const avatarBgColor = settings.avatarBgColor || 'none';
+
+            // 'photo' 모드면 버전 기반 URL 사용
+            if (imageType === 'photo') {
+              const imageUrl = getProfileImageUrl(userId, version);
+              setUserProfilePictures(prev => ({
+                ...prev,
+                [userId]: imageUrl
+              }));
+              // 아바타 설정 제거
+              setUserAvatarSettings(prev => {
+                const newState = { ...prev };
+                delete newState[userId];
+                return newState;
+              });
+            } else {
+              // 아바타 모드면 프로필 사진 제거, 아바타 설정 저장
+              setUserProfilePictures(prev => {
+                const newState = { ...prev };
+                delete newState[userId];
+                return newState;
+              });
+              if (selectedAvatarId) {
+                setUserAvatarSettings(prev => ({
+                  ...prev,
+                  [userId]: { selectedAvatarId, avatarBgColor }
+                }));
+              }
+            }
           }
-        } else {
-          // Firestore에 데이터가 없으면 프로필 사진 제거
-          setUserProfilePictures(prev => {
-            const newState = { ...prev };
-            delete newState[userId];
-            return newState;
-          });
+        } catch (error) {
+          console.error(`프로필 로드 실패 (${userId}):`, error);
         }
-      }, (error) => {
-        console.error(`❌ Firestore 리스너 오류 (${userId}):`, error);
-      });
-
-      unsubscribers.push(unsubscribe);
-    });
-
-    return () => {
-      unsubscribers.forEach(unsubscribe => {
-        if (typeof unsubscribe === 'function') {
-          unsubscribe();
-        }
-      });
+      }
     };
+
+    loadProfiles();
   }, [chatRooms, groupChats]);
 
   // 1:1 대화 검색 필터링
@@ -612,6 +636,49 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
     return '#5f6368';
   };
 
+  // 아바타 배경색 매핑
+  const BACKGROUND_COLORS = {
+    'none': 'transparent',
+    'lavender': 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+    'peach': 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+    'mint': 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+    'sunset': 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+    'ocean': 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+    'pink': '#FF69B4',
+    'blue': '#4169E1',
+    'yellow': '#FFD700',
+    'green': '#32CD32',
+    'purple': '#9370DB',
+  };
+
+  // 아바타 아이콘 렌더링
+  const renderAvatarIcon = (userId) => {
+    const avatarSettings = userAvatarSettings[userId];
+    if (!avatarSettings?.selectedAvatarId) return null;
+
+    const avatar = avatarList.find(a => a.id === avatarSettings.selectedAvatarId);
+    if (!avatar) return null;
+
+    const AvatarComponent = avatar.component;
+    const bgColor = BACKGROUND_COLORS[avatarSettings.avatarBgColor] || BACKGROUND_COLORS['none'];
+
+    return (
+      <div style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: bgColor,
+        borderRadius: '50%'
+      }}>
+        <div style={{ width: '70%', height: '70%' }}>
+          <AvatarComponent />
+        </div>
+      </div>
+    );
+  };
+
   if (loading || !nicknamesLoaded) {
     return (
       <Container>
@@ -701,7 +768,8 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
                             $color={getAvatarColor(displayUserId)}
                             style={userProfilePictures[displayUserId] ? { backgroundImage: `url(${userProfilePictures[displayUserId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                           >
-                            {!userProfilePictures[displayUserId] && displayName.charAt(0).toUpperCase()}
+                            {!userProfilePictures[displayUserId] && userAvatarSettings[displayUserId] && renderAvatarIcon(displayUserId)}
+                            {!userProfilePictures[displayUserId] && !userAvatarSettings[displayUserId] && displayName.charAt(0).toUpperCase()}
                           </Avatar>
                           <ChatInfo>
                             <ChatHeader>
@@ -799,7 +867,8 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag 
                             $color={getAvatarColor(displayUserId)}
                             style={userProfilePictures[displayUserId] ? { backgroundImage: `url(${userProfilePictures[displayUserId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                           >
-                            {!userProfilePictures[displayUserId] && displayName.charAt(0).toUpperCase()}
+                            {!userProfilePictures[displayUserId] && userAvatarSettings[displayUserId] && renderAvatarIcon(displayUserId)}
+                            {!userProfilePictures[displayUserId] && !userAvatarSettings[displayUserId] && displayName.charAt(0).toUpperCase()}
                           </Avatar>
                           <ChatInfo>
                             <ChatHeader>

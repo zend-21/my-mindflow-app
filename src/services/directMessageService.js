@@ -317,14 +317,19 @@ export const sendMessage = async (roomId, text, roomData = null) => {
     const otherUserId = actualRoomData?.participants?.find(id => id !== auth.currentUser.uid);
     const isOtherUserInRoom = otherUserId && actualRoomData?.inRoom?.[otherUserId] === true;
 
+    // 나와의 대화인 경우 항상 read: true (상대방이 없으므로)
+    const isSelfChat = !otherUserId;
+    const shouldMarkAsRead = isSelfChat || isOtherUserInRoom;
+
     console.log('📤 메시지 전송:', {
       roomId,
       senderId: auth.currentUser.uid,
       currentUnreadCount,
       otherUserId,
+      isSelfChat,
       inRoom: actualRoomData?.inRoom,
       isOtherUserInRoom,
-      willBeRead: isOtherUserInRoom
+      willBeRead: shouldMarkAsRead
     });
 
     // 메시지 데이터
@@ -333,7 +338,7 @@ export const sendMessage = async (roomId, text, roomData = null) => {
       senderId: auth.currentUser.uid,
       senderName: auth.currentUser.displayName || '익명',
       createdAt: serverTimestamp(),
-      read: isOtherUserInRoom  // 상대방이 방에 있으면 즉시 read: true
+      read: shouldMarkAsRead  // 나와의 대화 또는 상대방이 방에 있으면 즉시 read: true
     };
 
     // 메시지 추가

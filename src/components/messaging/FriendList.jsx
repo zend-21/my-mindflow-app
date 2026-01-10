@@ -1,7 +1,7 @@
 // 👥 친구 탭 - 친구 관리 (카카오톡 스타일)
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Search, UserPlus, MessageCircle, UserMinus, /* Shield, */ ChevronRight, X, UserCheck, MoreHorizontal, Copy, Ban } from 'lucide-react'; // Shield는 MVP에서 본인인증 제외로 미사용
+import { Search, UserPlus, MessageCircle, UserMinus, /* Shield, */ ChevronRight, X, UserCheck, MoreHorizontal, Copy, Ban, EyeOff } from 'lucide-react'; // Shield는 MVP에서 본인인증 제외로 미사용
 import { getMyFriends, removeFriend, getFriendRequests, acceptFriendRequest, rejectFriendRequest } from '../../services/friendService';
 // import { checkVerificationStatus, checkVerificationStatusBatch } from '../../services/verificationService';
 import { createOrGetDMRoom } from '../../services/directMessageService';
@@ -10,6 +10,8 @@ import ChatRoom from './ChatRoom';
 import AddFriendModal from './AddFriendModal';
 import DeletedFriendsModal from './DeletedFriendsModal';
 import BlockedUsersModal from './BlockedUsersModal';
+import HiddenRequestsModal from './HiddenRequestsModal';
+import { avatarList } from '../avatars/AvatarIcons';
 
 // 컨테이너
 const Container = styled.div`
@@ -564,7 +566,7 @@ const ConfirmButton = styled.button`
   }
 `;
 
-const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
+const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountChange }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [friends, setFriends] = useState([]);
   const [friendRequests, setFriendRequests] = useState([]);
@@ -582,12 +584,103 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
   const [showMyProfileMenu, setShowMyProfileMenu] = useState(false); // 내 프로필 메뉴
   const [showDeletedFriendsModal, setShowDeletedFriendsModal] = useState(false); // 친구삭제 목록 모달
   const [showBlockedUsersModal, setShowBlockedUsersModal] = useState(false); // 차단 목록 모달
+  const [showHiddenRequestsModal, setShowHiddenRequestsModal] = useState(false); // 숨긴 요청 목록 모달
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, request: null }); // 친구 요청 확인 모달
+  const [userProfilePictures, setUserProfilePictures] = useState({}); // 친구 프로필 사진
+  const [userAvatarSettings, setUserAvatarSettings] = useState({}); // 친구 아바타 설정
 
   useEffect(() => {
     loadMyProfile();
     loadFriends();
     loadFriendRequests();
   }, []);
+
+  // 친구 요청 수를 부모로 전달
+  useEffect(() => {
+    if (onFriendRequestCountChange) {
+      onFriendRequestCountChange(friendRequests.length);
+    }
+  }, [friendRequests, onFriendRequestCountChange]);
+
+  // 본인 + 친구들 + 친구 요청자들의 프로필 사진 실시간 구독
+  // 친구 목록은 실시간 업데이트가 중요하므로 onSnapshot 사용
+  useEffect(() => {
+    const myUserId = localStorage.getItem('firebaseUserId');
+    const friendIds = friends.map(f => f.friendId);
+    const requesterIds = friendRequests.map(r => r.requesterId);
+
+    // 본인 ID + 친구 ID + 요청자 ID 모두 포함
+    const allUserIds = myUserId ? [myUserId, ...friendIds, ...requesterIds] : [...friendIds, ...requesterIds];
+    if (allUserIds.length === 0) {
+      return;
+    }
+
+    const unsubscribers = [];
+
+    // 각 유저의 프로필 설정 실시간 구독
+    const setupListeners = async () => {
+      const { doc, onSnapshot } = await import('firebase/firestore');
+      const { db } = await import('../../firebase/config');
+      const { getProfileImageUrl } = await import('../../utils/storageService');
+
+      for (const userId of allUserIds) {
+        try {
+          const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+
+          const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
+            if (docSnap.exists()) {
+              const settings = docSnap.data();
+              const imageType = settings.profileImageType || 'avatar';
+              const version = settings.profileImageVersion || null;
+              const selectedAvatarId = settings.selectedAvatarId || null;
+              const avatarBgColor = settings.avatarBgColor || 'none';
+
+              if (imageType === 'photo') {
+                const imageUrl = getProfileImageUrl(userId, version);
+                setUserProfilePictures(prev => ({
+                  ...prev,
+                  [userId]: imageUrl
+                }));
+                // 아바타 설정 제거
+                setUserAvatarSettings(prev => {
+                  const newState = { ...prev };
+                  delete newState[userId];
+                  return newState;
+                });
+              } else {
+                // 아바타 모드면 프로필 사진 제거, 아바타 설정 저장
+                setUserProfilePictures(prev => {
+                  const newState = { ...prev };
+                  delete newState[userId];
+                  return newState;
+                });
+                if (selectedAvatarId) {
+                  setUserAvatarSettings(prev => ({
+                    ...prev,
+                    [userId]: { selectedAvatarId, avatarBgColor }
+                  }));
+                }
+              }
+            }
+          });
+
+          unsubscribers.push(unsubscribe);
+        } catch (error) {
+          console.error(`프로필 리스너 설정 실패 (${userId}):`, error);
+        }
+      }
+    };
+
+    setupListeners();
+
+    return () => {
+      unsubscribers.forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      });
+    };
+  }, [friends, friendRequests]);
 
   // 드롭다운 메뉴 외부 클릭 시 닫기
   useEffect(() => {
@@ -680,7 +773,10 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
       console.log('📬 [DEBUG] 친구 요청 목록:', requestsList);
       console.log('📬 [DEBUG] Firebase 경로: users/' + userId + '/friendRequests');
 
-      setFriendRequests(requestsList);
+      // hidden이 true인 요청은 제외 (숨긴 요청)
+      const visibleRequests = requestsList.filter(request => request.hidden !== true);
+
+      setFriendRequests(visibleRequests);
     } catch (error) {
       console.error('친구 요청 목록 조회 오류:', error);
       setFriendRequests([]);
@@ -753,14 +849,25 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
     }
   };
 
-  const handleAcceptFriendRequest = async (request) => {
+  // 친구 추가 확인 모달 열기
+  const handleAcceptFriendRequest = (request) => {
+    setConfirmModal({ isOpen: true, type: 'accept', request });
+  };
+
+  // 친구 거절 확인 모달 열기
+  const handleRejectFriendRequest = (request) => {
+    setConfirmModal({ isOpen: true, type: 'reject', request });
+  };
+
+  // 친구 추가 실행
+  const confirmAcceptFriend = async () => {
     try {
+      const { request } = confirmModal;
       const userId = localStorage.getItem('firebaseUserId');
       const result = await acceptFriendRequest(userId, request.requesterId);
 
       if (result.success) {
         showToast?.(`${request.requesterName}님을 친구로 추가했습니다`);
-        // 친구 목록 및 요청 목록 새로고침
         await loadFriends();
         await loadFriendRequests();
       } else {
@@ -769,29 +876,37 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
     } catch (error) {
       console.error('친구 요청 수락 오류:', error);
       showToast?.('친구 추가에 실패했습니다');
+    } finally {
+      setConfirmModal({ isOpen: false, type: null, request: null });
     }
   };
 
-  const handleRejectFriendRequest = async (request) => {
+  // 친구 거절 실행
+  const confirmRejectFriend = async () => {
     try {
+      const { request } = confirmModal;
       const userId = localStorage.getItem('firebaseUserId');
       const result = await rejectFriendRequest(userId, request.requesterId);
 
       if (result.success) {
-        showToast?.('친구 요청을 숨겼습니다');
+        showToast?.('친구 요청을 거절했습니다');
         await loadFriendRequests();
       } else {
-        showToast?.(result.error || '요청 숨기기에 실패했습니다');
+        showToast?.(result.error || '요청 거절에 실패했습니다');
       }
     } catch (error) {
       console.error('친구 요청 거절 오류:', error);
-      showToast?.('요청 숨기기에 실패했습니다');
+      showToast?.('요청 거절에 실패했습니다');
+    } finally {
+      setConfirmModal({ isOpen: false, type: null, request: null });
     }
   };
 
   const handleCopyWorkspaceCode = async (workspaceCode, friendName) => {
     try {
-      await navigator.clipboard.writeText(workspaceCode);
+      // WS- 접두사 제거
+      const cleanCode = workspaceCode?.replace('WS-', '') || workspaceCode;
+      await navigator.clipboard.writeText(cleanCode);
       showToast?.(`${friendName}님의 아이디를 복사했습니다`);
       setOpenMenuId(null);
     } catch (error) {
@@ -856,34 +971,53 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
     setShowMyProfileMenu(!showMyProfileMenu);
   };
 
-  // 전체 친구 삭제 (데이터 초기화)
-  const handleClearAllFriends = async () => {
-    if (!window.confirm('정말로 모든 친구를 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.')) {
-      return;
-    }
-
-    try {
-      const userId = localStorage.getItem('firebaseUserId');
-      showToast?.('친구 목록을 초기화하는 중...');
-
-      // 모든 친구 삭제
-      for (const friend of friends) {
-        await removeFriend(userId, friend.friendId);
-      }
-
-      showToast?.('✅ 모든 친구가 삭제되었습니다');
-      await loadFriends();
-      setShowMyProfileMenu(false);
-    } catch (error) {
-      console.error('친구 목록 초기화 오류:', error);
-      showToast?.('❌ 초기화 중 오류가 발생했습니다');
-    }
-  };
-
   // 아바타 색상 생성 - 모던하고 심플한 단색 사용 (기본값)
   const getAvatarColor = () => {
     // 모던한 회색 계열 단색 (사용자가 색상을 지정하지 않은 경우의 기본값)
     return '#5f6368';
+  };
+
+  // 아바타 배경색 매핑
+  const BACKGROUND_COLORS = {
+    'none': 'transparent',
+    'lavender': 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+    'peach': 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+    'mint': 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+    'sunset': 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)',
+    'ocean': 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+    'pink': '#FF69B4',
+    'blue': '#4169E1',
+    'yellow': '#FFD700',
+    'green': '#32CD32',
+    'purple': '#9370DB',
+  };
+
+  // 아바타 아이콘 렌더링
+  const renderAvatarIcon = (userId) => {
+    const avatarSettings = userAvatarSettings[userId];
+    if (!avatarSettings?.selectedAvatarId) return null;
+
+    const avatar = avatarList.find(a => a.id === avatarSettings.selectedAvatarId);
+    if (!avatar) return null;
+
+    const AvatarComponent = avatar.component;
+    const bgColor = BACKGROUND_COLORS[avatarSettings.avatarBgColor] || BACKGROUND_COLORS['none'];
+
+    return (
+      <div style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: bgColor,
+        borderRadius: '50%'
+      }}>
+        <div style={{ width: '70%', height: '70%' }}>
+          <AvatarComponent />
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -919,8 +1053,16 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
       {myProfile && (
         <MyProfileSection style={{ position: 'relative' }}>
           <MyProfileContent onClick={handleOpenMeChat} style={{ cursor: 'pointer' }}>
-            <MyAvatar $color={getAvatarColor(myProfile.userId)}>
-              {myProfile.nickname?.charAt(0).toUpperCase() || '나'}
+            <MyAvatar
+              $color={getAvatarColor(myProfile.userId)}
+              style={userProfilePictures[myProfile.userId] ? {
+                backgroundImage: `url(${userProfilePictures[myProfile.userId]})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              } : {}}
+            >
+              {!userProfilePictures[myProfile.userId] && userAvatarSettings[myProfile.userId] && renderAvatarIcon(myProfile.userId)}
+              {!userProfilePictures[myProfile.userId] && !userAvatarSettings[myProfile.userId] && (myProfile.nickname?.charAt(0).toUpperCase() || '나')}
             </MyAvatar>
             <MyInfo>
               <MyName>{myProfile.nickname} (나)</MyName>
@@ -941,10 +1083,10 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
             >
               <DropdownItem onClick={() => {
                 setShowMyProfileMenu(false);
-                handleClearAllFriends();
+                setShowHiddenRequestsModal(true);
               }}>
-                <UserMinus size={16} />
-                전체 친구 삭제
+                <EyeOff size={16} />
+                친구 거절 목록
               </DropdownItem>
               <DropdownItem onClick={() => {
                 setShowMyProfileMenu(false);
@@ -984,8 +1126,16 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
 
             {friendRequests.map(request => (
               <FriendItem key={request.id}>
-                <Avatar $color={getAvatarColor(request.requesterId)}>
-                  {request.requesterName?.charAt(0).toUpperCase() || '?'}
+                <Avatar
+                  $color={getAvatarColor(request.requesterId)}
+                  style={userProfilePictures[request.requesterId] ? {
+                    backgroundImage: `url(${userProfilePictures[request.requesterId]})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  } : {}}
+                >
+                  {!userProfilePictures[request.requesterId] && userAvatarSettings[request.requesterId] && renderAvatarIcon(request.requesterId)}
+                  {!userProfilePictures[request.requesterId] && !userAvatarSettings[request.requesterId] && (request.requesterName?.charAt(0).toUpperCase() || '?')}
                 </Avatar>
 
                 <FriendInfo>
@@ -1049,8 +1199,16 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
                 onClick={() => handleStartChat(friend)}
                 style={{ cursor: 'pointer' }}
               >
-                <Avatar $color={getAvatarColor(friend.friendId)}>
-                  {friend.friendName?.charAt(0).toUpperCase() || '?'}
+                <Avatar
+                  $color={getAvatarColor(friend.friendId)}
+                  style={userProfilePictures[friend.friendId] ? {
+                    backgroundImage: `url(${userProfilePictures[friend.friendId]})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                  } : {}}
+                >
+                  {!userProfilePictures[friend.friendId] && userAvatarSettings[friend.friendId] && renderAvatarIcon(friend.friendId)}
+                  {!userProfilePictures[friend.friendId] && !userAvatarSettings[friend.friendId] && (friend.friendName?.charAt(0).toUpperCase() || '?')}
                 </Avatar>
 
                 <FriendInfo>
@@ -1185,6 +1343,14 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
         </ModalOverlay>
       )}
 
+      {/* 숨긴 친구 요청 모달 */}
+      <HiddenRequestsModal
+        isOpen={showHiddenRequestsModal}
+        onClose={() => setShowHiddenRequestsModal(false)}
+        showToast={showToast}
+        onRequestsUpdated={loadFriendRequests}
+      />
+
       {/* 친구삭제 목록 모달 */}
       <DeletedFriendsModal
         isOpen={showDeletedFriendsModal}
@@ -1200,6 +1366,44 @@ const FriendList = ({ showToast, memos, requirePhoneAuth }) => {
         showToast={showToast}
         onFriendAdded={loadFriends}
       />
+
+      {/* 친구 요청 확인 모달 */}
+      {confirmModal.isOpen && (
+        <ModalOverlay onClick={() => setConfirmModal({ isOpen: false, type: null, request: null })}>
+          <ModalContainer onClick={(e) => e.stopPropagation()}>
+            <ModalHeader>
+              <ModalTitle>
+                {confirmModal.type === 'accept' ? '친구 추가' : '친구 거절'}
+              </ModalTitle>
+            </ModalHeader>
+            <ModalBody style={{ padding: '24px', textAlign: 'center' }}>
+              <p style={{ fontSize: '15px', color: '#333', marginBottom: '8px' }}>
+                {confirmModal.request?.requesterName || '익명'}님을
+              </p>
+              <p style={{ fontSize: '15px', color: '#333' }}>
+                {confirmModal.type === 'accept' ? '친구로 추가하시겠습니까?' : '거절하시겠습니까?'}
+              </p>
+            </ModalBody>
+            <ModalFooter>
+              <Button
+                onClick={() => setConfirmModal({ isOpen: false, type: null, request: null })}
+                style={{ background: '#e0e0e0', color: '#666' }}
+              >
+                취소
+              </Button>
+              <Button
+                onClick={confirmModal.type === 'accept' ? confirmAcceptFriend : confirmRejectFriend}
+                style={{
+                  background: confirmModal.type === 'accept' ? '#667eea' : '#ff4757',
+                  color: 'white'
+                }}
+              >
+                {confirmModal.type === 'accept' ? '추가' : '거절'}
+              </Button>
+            </ModalFooter>
+          </ModalContainer>
+        </ModalOverlay>
+      )}
     </Container>
   );
 };

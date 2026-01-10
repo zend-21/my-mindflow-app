@@ -265,6 +265,20 @@ service cloud.firestore {
         // 편집 이력 서브컬렉션
         match /editHistory/{editId} {
           allow read, write: if isSignedIn();
+
+          // 마커 의견 제시 (댓글) - 간단한 한줄 게시판 형태
+          match /comments/{commentId} {
+            // 로그인한 사용자는 모두 읽기 가능
+            allow read: if isSignedIn();
+
+            // 로그인한 사용자는 댓글 작성 가능
+            allow create: if isSignedIn() &&
+              request.resource.data.userId == request.auth.uid;
+
+            // 본인이 작성한 댓글만 수정/삭제 가능
+            allow update, delete: if isSignedIn() &&
+              resource.data.userId == request.auth.uid;
+          }
         }
       }
     }
