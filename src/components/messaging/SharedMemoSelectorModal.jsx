@@ -280,9 +280,12 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
   const [frozenMemoIds, setFrozenMemoIds] = useState(new Set());
   const [frozenMemoInfo, setFrozenMemoInfo] = useState({});
 
-  // allMemos에서 folderId === 'shared'인 메모만 필터링 (useMemo로 메모이제이션)
+  // allMemos에서 folderId === 'shared'이고 동결되지 않은 메모만 필터링 (useMemo로 메모이제이션)
   const sharedMemos = useMemo(() => {
-    return allMemos?.filter(memo => memo.folderId === 'shared') || [];
+    return allMemos?.filter(memo =>
+      memo.folderId === 'shared' &&
+      !memo.hasPendingEdits // 다른 대화방에서 작업 중인 문서 제외
+    ) || [];
   }, [allMemos]);
 
   // 프리즌 상태 체크

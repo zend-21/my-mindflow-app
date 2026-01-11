@@ -4160,10 +4160,10 @@ const CollaborativeDocumentEditor = ({
             )}
 
             <ClearButton
-              onClick={actualCanEdit ? handleClearDocument : undefined}
-              title={actualCanEdit ? "문서 비우기" : "권한 없음"}
-              disabled={!actualCanEdit}
-              style={{ opacity: actualCanEdit ? 1 : 0.5, cursor: actualCanEdit ? 'pointer' : 'not-allowed' }}
+              onClick={(actualCanEdit && (content || title)) ? handleClearDocument : undefined}
+              title={(actualCanEdit && (content || title)) ? "문서 비우기" : (!actualCanEdit ? "권한 없음" : "문서가 비어있습니다")}
+              disabled={!actualCanEdit || (!content && !title)}
+              style={{ opacity: (actualCanEdit && (content || title)) ? 1 : 0.5, cursor: (actualCanEdit && (content || title)) ? 'pointer' : 'not-allowed' }}
             >
               🧹
             </ClearButton>
