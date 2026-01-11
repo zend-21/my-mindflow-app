@@ -46,6 +46,7 @@ import ProfilePage from './components/ProfilePage.jsx';
 import Timer from './components/Timer.jsx';
 import MacroModal from './components/MacroModal.jsx';
 import { TrashProvider, useTrashContext } from './contexts/TrashContext';
+import { UserProvider } from './contexts/UserContext';
 import TrashPage from './components/TrashPage.jsx';
 import AppContent from './components/AppContent.jsx';
 import SecretPage from './components/secret/SecretPage.jsx';
@@ -2948,8 +2949,9 @@ function App() {
 
     return (
         <AppRouter>
-            <TrashProvider autoDeleteDays={30} trashedItems={trash} setTrashedItems={syncTrash}>
-                <AppContent>
+            <UserProvider>
+                <TrashProvider autoDeleteDays={30} trashedItems={trash} setTrashedItems={syncTrash}>
+                    <AppContent>
                     <GlobalStyle />
                 <Screen>
                 {/* ★★★ 더 이상 로그인 여부로 화면을 막지 않고, 항상 메인 앱을 보여줍니다. ★★★ */}
@@ -3302,6 +3304,7 @@ function App() {
 
             </AppContent>
         </TrashProvider>
+            </UserProvider>
         </AppRouter>
     );
 }
