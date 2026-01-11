@@ -1640,7 +1640,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       if (!isMounted) return;
 
       // 🆕 통합 메시지 구독 (1:1과 그룹 모두 지원)
-      unsubscribe = subscribeToUnifiedMessages(chat.id, chat.type, currentUserId, (newMessages) => {
+      unsubscribe = subscribeToUnifiedMessages(chat.id, chat.type, currentUserId, async (newMessages) => {
         if (!isMounted) return;
 
         // 새 메시지가 추가되었고, 내가 보낸 메시지가 아니면 효과음 재생
@@ -1659,6 +1659,26 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
 
         prevMessageCount = newMessages.length;
         setMessages(newMessages);
+
+        // 🆕 메시지 발신자들의 닉네임 동적 로드
+        const senderIds = new Set(newMessages.map(msg => msg.senderId).filter(Boolean));
+        for (const senderId of senderIds) {
+          // 이미 로드된 사용자는 스킵
+          if (userNicknames[senderId] !== undefined || userDisplayNames[senderId] !== undefined) continue;
+
+          try {
+            const settingsRef = doc(db, 'mindflowUsers', senderId, 'userData', 'settings');
+            const settingsSnap = await getDoc(settingsRef);
+
+            if (settingsSnap.exists()) {
+              const data = settingsSnap.data();
+              setUserNicknames(prev => ({ ...prev, [senderId]: data.nickname || null }));
+              setUserDisplayNames(prev => ({ ...prev, [senderId]: data.displayName || null }));
+            }
+          } catch (error) {
+            console.error(`메시지 발신자 닉네임 로드 실패 (${senderId}):`, error);
+          }
+        }
 
         // 스크롤을 맨 아래로
         setTimeout(() => {
@@ -1685,7 +1705,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
         }
       }
     };
-  }, [chat.id, currentUserId]);
+  }, [chat.id, currentUserId, userNicknames, userDisplayNames]);
 
   // 채팅방 참여자 프로필 사진 로드 (페이지 로드 시 1회만)
   useEffect(() => {
