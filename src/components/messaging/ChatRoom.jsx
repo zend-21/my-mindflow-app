@@ -1,7 +1,6 @@
 // 전체화면 채팅방 컴포넌트
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useUserContext } from '../../contexts/UserContext';
 import styled from 'styled-components';
 import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Settings, X, UserCog, UserPlus, Trash2, Mail, Copy, Shield } from 'lucide-react';
 // 🆕 통합 채팅 서비스 (1:1 + 그룹)
@@ -1564,20 +1563,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     loadFriends();
   }, [showInviteMembersModal, currentUserId, showToast]);
 
-  // 🌐 UserContext에서 사용자 정보 가져오기
-  const {
-    getUserDisplayName,
-    getUserProfilePicture,
-    getUserAvatarSetting,
-    loadUsers,
-    userNicknames,
-    userDisplayNames,
-    userProfilePictures,
-    userAvatarSettings
-  } = useUserContext();
-
   // 1:1 채팅방 데이터 실시간 구독 (lastAccessTime 업데이트 감지)
   const [chatRoomData, setChatRoomData] = useState(chat);
+  const [userProfilePictures, setUserProfilePictures] = useState({}); // userId -> profilePictureUrl 매핑
+  const [userAvatarSettings, setUserAvatarSettings] = useState({}); // userId -> {selectedAvatarId, avatarBgColor} 매핑
+  const [userNicknames, setUserNicknames] = useState({}); // userId -> 닉네임 매핑
+  const [userDisplayNames, setUserDisplayNames] = useState({}); // userId -> 구글 displayName 매핑 (fallback용)
 
   // 상대방 정보 가져오기 (useMemo로 닉네임 로드 후 재계산)
   const otherUser = useMemo(() => {
