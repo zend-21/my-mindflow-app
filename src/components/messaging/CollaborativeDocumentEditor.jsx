@@ -1,7 +1,6 @@
 // 📝 실시간 협업 문서 편집기 (모바일 최적화)
 // 드래그 선택 → 입력 → 자동 형광표시 → 매니저 컨펌 시스템
 import { useState, useEffect, useRef, useCallback } from 'react';
-import styled from 'styled-components';
 import { ChevronDown, ChevronUp, Save, X, Users, Lock, FolderOpen, Info, Strikethrough, Highlighter, Maximize2, Eye, Download, Check, FileText, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, UserCog, HelpCircle, MessageCircle } from 'lucide-react';
 import {
   doc,
@@ -20,949 +19,14 @@ import {
 } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { getUserNickname } from '../../services/nicknameService';
+import { getAbsoluteOffset, getNodeAndOffset, rangeToAbsoluteOffset, absoluteOffsetToRange } from '../../utils/rangeUtils';
 import MarkerCommentsModal from './MarkerCommentsModal';
 import CollaborationMemoModal from './CollaborationMemoModal';
+import * as S from './CollaborativeDocumentEditor.styles';
 
 // ===== 전역 문서 캐시 (컴포넌트 인스턴스 간 공유) =====
 // 컴포넌트가 언마운트되어도 캐시가 유지되도록 전역으로 관리
 const globalDocumentCache = new Map();
-
-// ===== Range 관련 유틸리티 함수들 (컴포넌트 외부) =====
-// 컨테이너 기준 절대 오프셋 계산
-function getAbsoluteOffset(container, node, offset) {
-  let absoluteOffset = 0;
-  const walker = document.createTreeWalker(
-    container,
-    NodeFilter.SHOW_TEXT,
-    null
-  );
-
-  let currentNode;
-  while ((currentNode = walker.nextNode())) {
-    if (currentNode === node) {
-      return absoluteOffset + offset;
-    }
-    absoluteOffset += currentNode.nodeValue.length;
-  }
-
-  return absoluteOffset;
-}
-
-// 절대 오프셋에서 노드와 오프셋 찾기
-function getNodeAndOffset(container, absoluteOffset) {
-  const walker = document.createTreeWalker(
-    container,
-    NodeFilter.SHOW_TEXT,
-    null
-  );
-
-  let currentOffset = 0;
-  let currentNode;
-
-  while ((currentNode = walker.nextNode())) {
-    const nodeLength = currentNode.nodeValue.length;
-    console.log('🔍 노드 탐색:', {
-      nodeText: currentNode.nodeValue.substring(0, 30),
-      nodeLength,
-      currentOffset,
-      targetOffset: absoluteOffset,
-      rangeEnd: currentOffset + nodeLength
-    });
-    if (currentOffset + nodeLength > absoluteOffset) {
-      console.log('✅ 노드 찾음:', {
-        node: currentNode,
-        nodeText: currentNode.nodeValue,
-        offset: absoluteOffset - currentOffset
-      });
-      return {
-        node: currentNode,
-        offset: absoluteOffset - currentOffset
-      };
-    }
-    currentOffset += nodeLength;
-  }
-
-  return null;
-}
-
-// Range를 절대 오프셋으로 변환
-function rangeToAbsoluteOffset(range, container) {
-  const startOffset = getAbsoluteOffset(container, range.startContainer, range.startOffset);
-  const endOffset = getAbsoluteOffset(container, range.endContainer, range.endOffset);
-  return { startOffset, endOffset };
-}
-
-// 절대 오프셋을 Range로 복원
-function absoluteOffsetToRange(container, startOffset, endOffset) {
-  const range = document.createRange();
-  const startPoint = getNodeAndOffset(container, startOffset);
-  const endPoint = getNodeAndOffset(container, endOffset);
-
-  if (startPoint && endPoint) {
-    range.setStart(startPoint.node, startPoint.offset);
-    range.setEnd(endPoint.node, endPoint.offset);
-  }
-
-  return range;
-}
-
-// 스타일 컴포넌트들 (기존과 유사하지만 contentEditable용으로 수정)
-const EditorContainer = styled.div`
-  position: relative;
-  background: linear-gradient(180deg, #2a2d35, #1f2128);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  margin-bottom: 12px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  height: ${props => props.$collapsed ? '56px' : 'auto'};
-`;
-
-const EditorHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  cursor: pointer;
-  transition: background 0.2s;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.05);
-  }
-`;
-
-const HeaderLeft = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-`;
-
-const DocumentIcon = styled.div`
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #4a90e2, #357abd);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  flex-shrink: 0;
-`;
-
-const TitleInput = styled.input`
-  flex: 1;
-  max-width: 300px;
-  background: transparent;
-  border: none;
-  color: #ffffff;
-  font-size: 15px;
-  font-weight: 600;
-  padding: 4px 8px;
-  border-radius: 6px;
-  transition: background 0.2s;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.05);
-  }
-
-  &:focus {
-    outline: none;
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-`;
-
-const HeaderRight = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-`;
-
-const PermissionBadge = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  background: ${props => {
-    if (props.$type === 'manager') return 'rgba(46, 213, 115, 0.15)';
-    if (props.$type === 'editor') return 'rgba(74, 144, 226, 0.15)';
-    return 'rgba(255, 255, 255, 0.05)';
-  }};
-  border-radius: 6px;
-  color: ${props => {
-    if (props.$type === 'manager') return '#2ed573';
-    if (props.$type === 'editor') return '#4a90e2';
-    return '#888';
-  }};
-  font-size: 12px;
-  font-weight: 600;
-`;
-
-const IconButton = styled.button`
-  background: transparent;
-  border: none;
-  color: #888;
-  padding: 6px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const ToggleButton = styled(IconButton)`
-  color: #4a90e2;
-
-  &:hover {
-    background: rgba(74, 144, 226, 0.15);
-  }
-`;
-
-const EditorContent = styled.div`
-  display: ${props => props.$collapsed ? 'none' : 'flex'};
-  flex-direction: column;
-  height: calc(100% - 56px);
-  padding: 16px;
-  gap: 12px;
-  overflow-y: auto;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
-  }
-`;
-
-const Toolbar = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-`;
-
-const ToolbarRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-`;
-
-const ToolbarButton = styled.button`
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #e0e0e0;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const SaveButton = styled(ToolbarButton)`
-  background: linear-gradient(135deg, #2ed573, #26bf62);
-  border: none;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(46, 213, 115, 0.3);
-  }
-`;
-
-const LoadButton = styled(ToolbarButton)`
-  background: rgba(74, 144, 226, 0.15);
-  border: 1px solid rgba(74, 144, 226, 0.3);
-  color: #4a90e2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 36px;
-  padding: 8px;
-  font-size: 16px;
-
-  &:hover:not(:disabled) {
-    background: rgba(74, 144, 226, 0.25);
-  }
-`;
-
-// contentEditable 영역 (형광펜 표시 포함)
-const ContentEditableArea = styled.div`
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #e0e0e0;
-  padding: 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  line-height: 1.8;
-  height: 400px;
-  overflow-y: auto;
-  cursor: default;
-  transition: all 0.2s;
-  user-select: text;
-
-  /* Placeholder 스타일 (빈 상태일 때) */
-  &:empty::before {
-    content: '문서가 비어 있습니다...';
-    color: #666;
-    pointer-events: none;
-  }
-
-  /* 형광펜 스타일 (pending 상태) */
-  .highlight {
-    background: linear-gradient(180deg, rgba(255, 235, 59, 0.35), rgba(255, 193, 7, 0.35));
-    border-bottom: 2px solid #ffc107;
-    cursor: pointer;
-    position: relative;
-    padding: 2px 4px;
-    border-radius: 3px;
-    transition: all 0.2s;
-
-    &:hover {
-      background: linear-gradient(180deg, rgba(255, 235, 59, 0.5), rgba(255, 193, 7, 0.5));
-    }
-
-  }
-
-  /* 컨펌된 수정 (형광펜 제거) */
-  .highlight-confirmed {
-    background: none;
-    border-bottom: none;
-    padding: 0;
-  }
-
-  /* 취소선 스타일 (삭제 표시) */
-  .strikethrough {
-    text-decoration: line-through;
-    text-decoration-color: #ff5757;
-    text-decoration-thickness: 2px;
-    background: rgba(255, 87, 87, 0.1);
-    padding: 2px 4px;
-    border-radius: 3px;
-    cursor: pointer;
-    position: relative;
-    opacity: 0.7;
-    transition: all 0.2s;
-
-    &:hover {
-      background: rgba(255, 87, 87, 0.2);
-      opacity: 1;
-    }
-  }
-
-  /* 주석 표시 스타일 */
-  .comment {
-    display: inline-block;
-    background: rgba(139, 92, 246, 0.2);
-    border: 1px solid rgba(139, 92, 246, 0.4);
-    padding: 2px 6px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 16px;
-    line-height: 1;
-    transition: all 0.2s;
-    vertical-align: middle;
-    margin: 0 2px;
-
-    &:hover {
-      background: rgba(139, 92, 246, 0.35);
-      border-color: rgba(139, 92, 246, 0.6);
-      transform: scale(1.1);
-    }
-  }
-
-  /* 스크롤바 */
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-  }
-`;
-
-const Footer = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 8px;
-  font-size: 12px;
-  color: #888;
-  gap: 12px;
-  flex-wrap: wrap;
-`;
-
-const PendingEditsCount = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  background: rgba(255, 193, 7, 0.15);
-  border-radius: 6px;
-  color: #ffc107;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background: rgba(255, 193, 7, 0.25);
-  }
-`;
-
-const EditNavigationButton = styled.button`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px 8px;
-  background: rgba(255, 193, 7, 0.15);
-  border: 1px solid rgba(255, 193, 7, 0.3);
-  border-radius: 6px;
-  color: #ffc107;
-  font-weight: 600;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-
-  &:hover {
-    background: rgba(255, 193, 7, 0.25);
-    border-color: rgba(255, 193, 7, 0.5);
-  }
-
-  &:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-`;
-
-const EditNavigationGroup = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 4px;
-`;
-
-// 수정 이력 모달 (전체 화면 편집 모달보다 위에 표시)
-const Modal = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(10px);
-  z-index: 400000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-`;
-
-const ModalContent = styled.div`
-  background: linear-gradient(180deg, #2a2d35, #1f2128);
-  border-radius: 16px;
-  padding: 24px;
-  max-width: 500px;
-  width: 100%;
-  max-height: 80vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
-  }
-`;
-
-const ModalHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-`;
-
-const ModalTitle = styled.h3`
-  font-size: 18px;
-  font-weight: 600;
-  color: #ffffff;
-  margin: 0;
-`;
-
-const ModalSubtitle = styled.div`
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  margin-bottom: 20px;
-`;
-
-const SubtitleRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: #888;
-  margin-bottom: 6px;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  strong {
-    color: #aaa;
-    font-weight: 600;
-  }
-
-  span {
-    color: #e0e0e0;
-  }
-`;
-
-const ModalBody = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`;
-
-const EditInfo = styled.div`
-  background: rgba(255, 255, 255, 0.05);
-  padding: 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-`;
-
-const InfoRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: #888;
-
-  &:last-child {
-    margin-bottom: 0;
-  }
-
-  strong {
-    color: #ffffff;
-    font-weight: 600;
-  }
-`;
-
-const TextComparison = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-`;
-
-const ComparisonBox = styled.div`
-  padding: 12px;
-  border-radius: 8px;
-  background: ${props => props.$type === 'old'
-    ? 'rgba(255, 87, 87, 0.1)'
-    : 'rgba(46, 213, 115, 0.1)'};
-  border: 1px solid ${props => props.$type === 'old'
-    ? 'rgba(255, 87, 87, 0.3)'
-    : 'rgba(46, 213, 115, 0.3)'};
-`;
-
-const ComparisonLabel = styled.div`
-  font-size: 12px;
-  font-weight: 600;
-  color: ${props => props.$type === 'old' ? '#ff5757' : '#2ed573'};
-  margin-bottom: 8px;
-`;
-
-const ComparisonText = styled.div`
-  color: #e0e0e0;
-  line-height: 1.6;
-  word-break: break-word;
-`;
-
-// 전체 화면 편집 모달
-const FullScreenModal = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.95);
-  backdrop-filter: blur(10px);
-  z-index: 300000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1vh;
-`;
-
-const FullScreenEditorContainer = styled.div`
-  width: 98%;
-  height: 98%;
-  background: linear-gradient(180deg, #2a2d35, #1f2128);
-  border-radius: 16px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-`;
-
-const FullScreenHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  flex-shrink: 0;
-`;
-
-const FullScreenTitle = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex: 1;
-  min-width: 0;
-`;
-
-const FullScreenTitleInput = styled.input`
-  flex: 1;
-  max-width: 400px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #ffffff;
-  font-size: 18px;
-  font-weight: 600;
-  padding: 8px 16px;
-  border-radius: 8px;
-  transition: all 0.2s;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  &:focus {
-    outline: none;
-    background: rgba(255, 255, 255, 0.1);
-    border-color: #4a90e2;
-  }
-
-  &:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
-  }
-`;
-
-const FullScreenToolbar = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 24px;
-  background: rgba(255, 255, 255, 0.02);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  flex-wrap: wrap;
-  flex-shrink: 0;
-`;
-
-const FullScreenContent = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-`;
-
-const FullScreenEditArea = styled.div`
-  flex: 1;
-  background: rgba(0, 0, 0, 0.2);
-  color: #e0e0e0;
-  padding: 24px;
-  font-size: 16px;
-  line-height: 1.8;
-  overflow-y: auto;
-  cursor: text;
-  user-select: text;
-  -webkit-user-select: text;
-  -moz-user-select: text;
-  -ms-user-select: text;
-
-  &:focus {
-    outline: none;
-  }
-
-  /* Placeholder 스타일 */
-  &:empty::before {
-    content: '문서 내용을 입력하세요...';
-    color: #666;
-    pointer-events: none;
-  }
-
-  /* 취소선 스타일 */
-  .strikethrough {
-    text-decoration: line-through;
-    text-decoration-color: #ff5757;
-    text-decoration-thickness: 2px;
-    background: rgba(255, 87, 87, 0.1);
-    padding: 2px 4px;
-    border-radius: 3px;
-    cursor: pointer;
-    position: relative;
-    opacity: 0.7;
-    transition: all 0.2s;
-
-    &:hover {
-      background: rgba(255, 87, 87, 0.2);
-      opacity: 1;
-    }
-  }
-
-  /* 형광펜 스타일 */
-  .highlight {
-    background: linear-gradient(180deg, rgba(255, 235, 59, 0.35), rgba(255, 193, 7, 0.35));
-    border-bottom: 2px solid #ffc107;
-    cursor: pointer;
-    position: relative;
-    padding: 2px 4px;
-    border-radius: 3px;
-    transition: all 0.2s;
-
-    &:hover {
-      background: linear-gradient(180deg, rgba(255, 235, 59, 0.5), rgba(255, 193, 7, 0.5));
-    }
-
-  }
-
-  .highlight-confirmed {
-    background: none;
-    border-bottom: none;
-    padding: 0;
-  }
-
-  /* 주석 스타일 */
-  .comment {
-    background: rgba(139, 92, 246, 0.15);
-    border-bottom: 2px dotted #8b5cf6;
-    padding: 2px 4px;
-    border-radius: 3px;
-    cursor: pointer;
-    position: relative;
-    transition: all 0.2s;
-
-    &:hover {
-      background: rgba(139, 92, 246, 0.25);
-    }
-
-    &::after {
-      content: '💬';
-      font-size: 12px;
-      margin-left: 4px;
-      vertical-align: super;
-    }
-  }
-
-  /* 스크롤바 */
-  &::-webkit-scrollbar {
-    width: 10px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 5px;
-  }
-`;
-
-const FullScreenFooter = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 24px;
-  background: rgba(255, 255, 255, 0.02);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 13px;
-  color: #888;
-  flex-shrink: 0;
-`;
-
-const EditButton = styled(ToolbarButton)`
-  background: rgba(74, 144, 226, 0.15);
-  border: 1px solid rgba(74, 144, 226, 0.3);
-  color: #4a90e2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 36px;
-  padding: 8px;
-  font-size: 16px;
-
-  &:hover:not(:disabled) {
-    background: rgba(74, 144, 226, 0.25);
-  }
-`;
-
-const ClearButton = styled(ToolbarButton)`
-  background: rgba(156, 39, 176, 0.15);
-  border: 1px solid rgba(156, 39, 176, 0.3);
-  color: #9c27b0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 36px;
-  padding: 8px;
-  font-size: 16px;
-
-  &:hover:not(:disabled) {
-    background: rgba(156, 39, 176, 0.25);
-  }
-`;
-
-const ModalActions = styled.div`
-  display: flex;
-  gap: 12px;
-  margin-top: 16px;
-`;
-
-const ConfirmButton = styled.button`
-  flex: 1;
-  background: linear-gradient(135deg, #2ed573, #26bf62);
-  border: none;
-  border-radius: 8px;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 12px 16px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: all 0.2s;
-
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(46, 213, 115, 0.3);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const RejectButton = styled.button`
-  flex: 1;
-  background: rgba(255, 87, 87, 0.15);
-  border: 1px solid rgba(255, 87, 87, 0.3);
-  border-radius: 8px;
-  color: #ff5757;
-  font-size: 14px;
-  font-weight: 600;
-  padding: 12px 16px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  transition: all 0.2s;
-
-  &:hover {
-    background: rgba(255, 87, 87, 0.25);
-  }
-`;
-
-const PartialApplyButton = styled(ToolbarButton)`
-  background: rgba(255, 193, 7, 0.15);
-  border: 1px solid rgba(255, 193, 7, 0.3);
-  color: #ffc107;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  &:hover:not(:disabled) {
-    background: rgba(255, 193, 7, 0.25);
-  }
-`;
-
-const FinalApplyButton = styled(ToolbarButton)`
-  background: linear-gradient(135deg, #2ed573, #26bf62);
-  border: none;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(46, 213, 115, 0.3);
-  }
-`;
-
-const ResetButton = styled(ToolbarButton)`
-  background: linear-gradient(135deg, #ff6b6b, #ee5a52);
-  border: none;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
-  }
-`;
 
 const CollaborativeDocumentEditor = ({
   chatRoomId,
@@ -4068,11 +3132,11 @@ const CollaborativeDocumentEditor = ({
   const PermissionIcon = actualIsManager ? Lock : actualCanEdit ? Users : Info;
 
   return (
-    <EditorContainer $collapsed={collapsed}>
+    <S.EditorContainer $collapsed={collapsed}>
       {/* 헤더 */}
-      <EditorHeader onClick={() => !collapsed && setCollapsed(false)}>
-        <HeaderLeft>
-          <DocumentIcon>📄</DocumentIcon>
+      <S.EditorHeader onClick={() => !collapsed && setCollapsed(false)}>
+        <S.HeaderLeft>
+          <S.DocumentIcon>📄</S.DocumentIcon>
           {!content && !title && !currentDocId ? (
             <button
               onClick={(e) => {
@@ -4095,7 +3159,7 @@ const CollaborativeDocumentEditor = ({
               + 새 문서 작성
             </button>
           ) : !content && !title ? null : (
-            <TitleInput
+            <S.TitleInput
               value={title}
               disabled
               readOnly
@@ -4103,16 +3167,16 @@ const CollaborativeDocumentEditor = ({
               style={{ cursor: 'default' }}
             />
           )}
-        </HeaderLeft>
+        </S.HeaderLeft>
 
-        <HeaderRight onClick={(e) => e.stopPropagation()}>
+        <S.HeaderRight onClick={(e) => e.stopPropagation()}>
           {onClose && (
-            <IconButton onClick={onClose} title="닫기">
+            <S.IconButton onClick={onClose} title="닫기">
               <X size={18} />
-            </IconButton>
+            </S.IconButton>
           )}
 
-          <ToggleButton
+          <S.ToggleButton
             onClick={(e) => {
               e.stopPropagation();
               setCollapsed(!collapsed);
@@ -4120,12 +3184,12 @@ const CollaborativeDocumentEditor = ({
             title={collapsed ? '펼치기' : '접기'}
           >
             {collapsed ? <ChevronDown size={20} /> : <ChevronUp size={20} />}
-          </ToggleButton>
-        </HeaderRight>
-      </EditorHeader>
+          </S.ToggleButton>
+        </S.HeaderRight>
+      </S.EditorHeader>
 
       {/* 콘텐츠 */}
-      <EditorContent $collapsed={collapsed}>
+      <S.EditorContent $collapsed={collapsed}>
         {/* 문서 소유자 정보 또는 임시 문서 표시 */}
         {currentDocId && currentDocId.startsWith('temp_') && content && content.trim() ? (
           <div
@@ -4193,11 +3257,11 @@ const CollaborativeDocumentEditor = ({
         ) : null}
 
         {/* 도구 모음 */}
-        <Toolbar>
+        <S.Toolbar>
           {/* 첫 번째 줄: 불러오기(아이콘만), 편집(아이콘만), 전체승인, 전체리셋 */}
-          <ToolbarRow key="toolbar-row-1">
+          <S.ToolbarRow key="toolbar-row-1">
             {onLoadFromShared && (
-              <LoadButton
+              <S.LoadButton
                 onClick={((actualIsManager || actualIsSubManager) || (!content && !title)) ? handleLoadClick : undefined}
                 title={((actualIsManager || actualIsSubManager) || (!content && !title)) ? "공유 폴더에서 불러오기" : "권한 없음"}
                 disabled={!((actualIsManager || actualIsSubManager) || (!content && !title))}
@@ -4207,94 +3271,94 @@ const CollaborativeDocumentEditor = ({
                 }}
               >
                 📂
-              </LoadButton>
+              </S.LoadButton>
             )}
 
             {actualCanEdit ? (
-              <EditButton
+              <S.EditButton
                 onClick={() => setShowFullScreenEdit(true)}
                 title="큰 화면에서 편집하기"
                 disabled={!content && !title}
                 style={{ opacity: (!content && !title) ? 0.5 : 1, cursor: (!content && !title) ? 'not-allowed' : 'pointer' }}
               >
                 📝
-              </EditButton>
+              </S.EditButton>
             ) : (
-              <EditButton
+              <S.EditButton
                 onClick={() => setShowFullScreenEdit(true)}
                 title="큰 화면에서 보기"
                 disabled={!content && !title}
                 style={{ opacity: (!content && !title) ? 0.5 : 1, cursor: (!content && !title) ? 'not-allowed' : 'pointer' }}
               >
                 📝
-              </EditButton>
+              </S.EditButton>
             )}
 
-            <ClearButton
+            <S.ClearButton
               onClick={(actualCanEdit && (content || title)) ? handleClearDocument : undefined}
               title={(actualCanEdit && (content || title)) ? "문서 비우기" : (!actualCanEdit ? "권한 없음" : "문서가 비어있습니다")}
               disabled={!actualCanEdit || (!content && !title)}
               style={{ opacity: (actualCanEdit && (content || title)) ? 1 : 0.5, cursor: (actualCanEdit && (content || title)) ? 'pointer' : 'not-allowed' }}
             >
               🧹
-            </ClearButton>
+            </S.ClearButton>
 
-            <FinalApplyButton
+            <S.FinalApplyButton
               onClick={actualIsManager ? handleFinalApply : undefined}
               disabled={!actualIsManager || saving || !title.trim() || pendingEdits.length === 0}
               title={actualIsManager ? "전체 승인 (모든 수정 제안 승인)" : "권한 없음"}
               style={{ opacity: (actualIsManager && !saving && title.trim() && pendingEdits.length > 0) ? 1 : 0.5 }}
             >
               전체승인
-            </FinalApplyButton>
+            </S.FinalApplyButton>
 
-            <ResetButton
+            <S.ResetButton
               onClick={actualIsManager ? handleResetAll : undefined}
               disabled={!actualIsManager || saving || pendingEdits.length === 0}
               title={actualIsManager ? "모든 수정 표시 삭제" : "권한 없음"}
               style={{ opacity: (actualIsManager && !saving && pendingEdits.length > 0) ? 1 : 0.5 }}
             >
               전체리셋
-            </ResetButton>
-          </ToolbarRow>
+            </S.ResetButton>
+          </S.ToolbarRow>
 
           {/* 두 번째 줄: 수정 대기중 표시, 위치찾기, 권한 관리 */}
           {(pendingEdits.length > 0 || actualIsManager || actualIsSubManager) && (
-            <ToolbarRow key="toolbar-row-2">
+            <S.ToolbarRow key="toolbar-row-2">
               {pendingEdits.length > 0 ? (
                 <>
-                  <PendingEditsCount title="대기 중인 수정 사항">
+                  <S.PendingEditsCount title="대기 중인 수정 사항">
                     <Info size={14} />
                     {pendingEdits.length}개 수정 대기중
-                  </PendingEditsCount>
+                  </S.PendingEditsCount>
 
-                  <EditNavigationGroup>
-                    <EditNavigationButton
+                  <S.EditNavigationGroup>
+                    <S.EditNavigationButton
                       onClick={handlePrevEdit}
                       disabled={pendingEdits.length === 0}
                       title="이전 수정 영역"
                     >
                       <ChevronLeft size={14} />
-                    </EditNavigationButton>
+                    </S.EditNavigationButton>
 
-                    <EditNavigationButton
+                    <S.EditNavigationButton
                       style={{ minWidth: '40px' }}
                       disabled
                       title={`${currentEditIndex + 1} / ${pendingEdits.length}`}
                     >
                       {currentEditIndex + 1}/{pendingEdits.length}
-                    </EditNavigationButton>
+                    </S.EditNavigationButton>
 
-                    <EditNavigationButton
+                    <S.EditNavigationButton
                       onClick={handleNextEdit}
                       disabled={pendingEdits.length === 0}
                       title="다음 수정 영역"
                     >
                       <ChevronRight size={14} />
-                    </EditNavigationButton>
+                    </S.EditNavigationButton>
 
                     {(actualIsManager || actualIsSubManager) && !isOneOnOneChat && (
-                      <EditNavigationButton
+                      <S.EditNavigationButton
                         onClick={() => {
                           setShowPermissionModal(true);
                           loadParticipants();
@@ -4307,13 +3371,13 @@ const CollaborativeDocumentEditor = ({
                         }}
                       >
                         <UserCog size={14} />
-                      </EditNavigationButton>
+                      </S.EditNavigationButton>
                     )}
-                  </EditNavigationGroup>
+                  </S.EditNavigationGroup>
                 </>
               ) : (actualIsManager || actualIsSubManager) && !isOneOnOneChat ? (
-                <EditNavigationGroup>
-                  <EditNavigationButton
+                <S.EditNavigationGroup>
+                  <S.EditNavigationButton
                     onClick={() => {
                       setShowPermissionModal(true);
                       loadParticipants();
@@ -4326,15 +3390,15 @@ const CollaborativeDocumentEditor = ({
                     }}
                   >
                     <UserCog size={14} />
-                  </EditNavigationButton>
-                </EditNavigationGroup>
+                  </S.EditNavigationButton>
+                </S.EditNavigationGroup>
               ) : null}
-            </ToolbarRow>
+            </S.ToolbarRow>
           )}
-        </Toolbar>
+        </S.Toolbar>
 
         {/* contentEditable 영역 - 미리보기에서는 읽기 전용 */}
-        <ContentEditableArea
+        <S.ContentEditableArea
           ref={contentRef}
           contentEditable={false}
           suppressContentEditableWarning
@@ -4378,35 +3442,35 @@ const CollaborativeDocumentEditor = ({
         {/* Placeholder는 CSS ::before로 처리 */}
 
         {/* 하단 정보 */}
-        <Footer>
+        <S.Footer>
           <span>{content.replace(/<[^>]*>/g, '').length} 글자</span>
           <span>실시간 협업 활성화</span>
-        </Footer>
-      </EditorContent>
+        </S.Footer>
+      </S.EditorContent>
 
       {/* 수정 이력 모달 - 여러 편집 표시 */}
       {showEditModal && selectedEdits.length > 0 && (
-        <Modal onClick={() => setShowEditModal(false)}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>
+        <S.Modal onClick={() => setShowEditModal(false)}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>
                 수정 내용 확인
                 {selectedEdits.length > 1 && (
                   <span style={{ marginLeft: '8px', fontSize: '14px', color: '#ffc107' }}>
                     ({selectedEdits.length}명의 편집)
                   </span>
                 )}
-              </ModalTitle>
-              <IconButton onClick={() => setShowEditModal(false)}>
+              </S.ModalTitle>
+              <S.IconButton onClick={() => setShowEditModal(false)}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
+            <S.ModalBody>
               {selectedEdits.map((edit, index) => (
                 <div key={edit.id} style={{ marginBottom: index < selectedEdits.length - 1 ? '20px' : '0' }}>
-                  <EditInfo>
-                    <InfoRow style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <S.EditInfo>
+                    <S.InfoRow style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div>
                         <strong>제안자:</strong>{' '}
                         <span
@@ -4439,30 +3503,30 @@ const CollaborativeDocumentEditor = ({
                           제안 철회
                         </button>
                       )}
-                    </InfoRow>
-                    <InfoRow>
+                    </S.InfoRow>
+                    <S.InfoRow>
                       <strong>제안 시각:</strong> {edit.editedAt?.toDate?.().toLocaleString('ko-KR')}
-                    </InfoRow>
+                    </S.InfoRow>
                     {edit.type && (
-                      <InfoRow>
+                      <S.InfoRow>
                         <strong>타입:</strong> {
                           edit.type === 'strikethrough' ? '취소선' :
                           edit.type === 'highlight' ? '형광펜' :
                           edit.type === 'comment' ? '주석' : '일반 수정'
                         }
-                      </InfoRow>
+                      </S.InfoRow>
                     )}
-                  </EditInfo>
+                  </S.EditInfo>
 
                   {/* 취소선: 원본 텍스트 + 삭제 이유 */}
                   {edit.type === 'strikethrough' && (
                     <>
-                      <TextComparison>
-                        <ComparisonBox $type="old">
-                          <ComparisonLabel $type="old">삭제할 텍스트</ComparisonLabel>
-                          <ComparisonText>{edit.oldText || '(없음)'}</ComparisonText>
-                        </ComparisonBox>
-                      </TextComparison>
+                      <S.TextComparison>
+                        <S.ComparisonBox $type="old">
+                          <S.ComparisonLabel $type="old">삭제할 텍스트</S.ComparisonLabel>
+                          <S.ComparisonText>{edit.oldText || '(없음)'}</S.ComparisonText>
+                        </S.ComparisonBox>
+                      </S.TextComparison>
                       {edit.reason && (
                         <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(255, 193, 7, 0.1)', borderRadius: '8px', borderLeft: '3px solid #ffc107' }}>
                           <div style={{ fontSize: '12px', color: '#ffc107', marginBottom: '4px', fontWeight: '600' }}>삭제 이유</div>
@@ -4475,17 +3539,17 @@ const CollaborativeDocumentEditor = ({
                   {/* 형광펜: 원본 텍스트 → 대체 텍스트 + 설명 */}
                   {edit.type === 'highlight' && (
                     <>
-                      <TextComparison>
-                        <ComparisonBox $type="old">
-                          <ComparisonLabel $type="old">수정 전</ComparisonLabel>
-                          <ComparisonText>{edit.oldText || '(없음)'}</ComparisonText>
-                        </ComparisonBox>
+                      <S.TextComparison>
+                        <S.ComparisonBox $type="old">
+                          <S.ComparisonLabel $type="old">수정 전</S.ComparisonLabel>
+                          <S.ComparisonText>{edit.oldText || '(없음)'}</S.ComparisonText>
+                        </S.ComparisonBox>
 
-                        <ComparisonBox $type="new">
-                          <ComparisonLabel $type="new">수정 후</ComparisonLabel>
-                          <ComparisonText>{edit.newText || '(없음)'}</ComparisonText>
-                        </ComparisonBox>
-                      </TextComparison>
+                        <S.ComparisonBox $type="new">
+                          <S.ComparisonLabel $type="new">수정 후</S.ComparisonLabel>
+                          <S.ComparisonText>{edit.newText || '(없음)'}</S.ComparisonText>
+                        </S.ComparisonBox>
+                      </S.TextComparison>
                       {edit.description && (
                         <div style={{ marginTop: '12px', padding: '12px', background: 'rgba(76, 175, 80, 0.1)', borderRadius: '8px', borderLeft: '3px solid #4caf50' }}>
                           <div style={{ fontSize: '12px', color: '#4caf50', marginBottom: '4px', fontWeight: '600' }}>설명</div>
@@ -4505,17 +3569,17 @@ const CollaborativeDocumentEditor = ({
 
                   {/* 기타 타입 (하위 호환성) */}
                   {!edit.type && (
-                    <TextComparison>
-                      <ComparisonBox $type="old">
-                        <ComparisonLabel $type="old">수정 전</ComparisonLabel>
-                        <ComparisonText>{edit.oldText || edit.text || '(없음)'}</ComparisonText>
-                      </ComparisonBox>
+                    <S.TextComparison>
+                      <S.ComparisonBox $type="old">
+                        <S.ComparisonLabel $type="old">수정 전</S.ComparisonLabel>
+                        <S.ComparisonText>{edit.oldText || edit.text || '(없음)'}</S.ComparisonText>
+                      </S.ComparisonBox>
 
-                      <ComparisonBox $type="new">
-                        <ComparisonLabel $type="new">수정 후</ComparisonLabel>
-                        <ComparisonText>{edit.newText || edit.text}</ComparisonText>
-                      </ComparisonBox>
-                    </TextComparison>
+                      <S.ComparisonBox $type="new">
+                        <S.ComparisonLabel $type="new">수정 후</S.ComparisonLabel>
+                        <S.ComparisonText>{edit.newText || edit.text}</S.ComparisonText>
+                      </S.ComparisonBox>
+                    </S.TextComparison>
                   )}
 
                   <div style={{ marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -4564,13 +3628,13 @@ const CollaborativeDocumentEditor = ({
                     )}
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                       {actualIsManager && (
-                        <ConfirmButton onClick={() => handleApproveEdit(edit.id)}>
+                        <S.ConfirmButton onClick={() => handleApproveEdit(edit.id)}>
                           <Check size={18} />
                           이 편집 승인
-                        </ConfirmButton>
+                        </S.ConfirmButton>
                       )}
                       {actualCanEdit && (
-                        <RejectButton onClick={async () => {
+                        <S.RejectButton onClick={async () => {
                           try {
                             await handleCancelEdit(edit.id);
                             showToast?.('수정 표시가 취소되었습니다');
@@ -4580,7 +3644,7 @@ const CollaborativeDocumentEditor = ({
                         }}>
                           <X size={18} />
                           이 편집 취소
-                        </RejectButton>
+                        </S.RejectButton>
                       )}
                     </div>
                   </div>
@@ -4599,32 +3663,32 @@ const CollaborativeDocumentEditor = ({
                   </span>
                 </div>
               )}
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 주석 입력 모달 */}
       {showCommentModal && (
-        <Modal onClick={() => setShowCommentModal(false)}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>주석 입력</ModalTitle>
-              <IconButton onClick={() => {
+        <S.Modal onClick={() => setShowCommentModal(false)}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>주석 입력</S.ModalTitle>
+              <S.IconButton onClick={() => {
                 setShowCommentModal(false);
                 setCommentText('');
                 setSelectedCommentRange(null);
               }}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
-              <EditInfo>
-                <InfoRow>
+            <S.ModalBody>
+              <S.EditInfo>
+                <S.InfoRow>
                   <strong>선택한 텍스트:</strong> {selectedCommentRange?.text}
-                </InfoRow>
-              </EditInfo>
+                </S.InfoRow>
+              </S.EditInfo>
 
               <div style={{ marginTop: '16px' }}>
                 <label style={{ display: 'block', marginBottom: '8px', color: '#e0e0e0', fontSize: '14px', fontWeight: '600' }}>
@@ -4650,53 +3714,53 @@ const CollaborativeDocumentEditor = ({
                 />
               </div>
 
-              <ModalActions>
-                <ConfirmButton onClick={handleSaveComment} disabled={!commentText.trim()}>
+              <S.ModalActions>
+                <S.ConfirmButton onClick={handleSaveComment} disabled={!commentText.trim()}>
                   <Check size={18} />
                   주석 추가
-                </ConfirmButton>
-                <RejectButton onClick={() => {
+                </S.ConfirmButton>
+                <S.RejectButton onClick={() => {
                   setShowCommentModal(false);
                   setCommentText('');
                   setSelectedCommentRange(null);
                 }}>
                   <X size={18} />
                   취소
-                </RejectButton>
-              </ModalActions>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+                </S.RejectButton>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 편집 내용 입력 모달 (키보드 기반 편집용) */}
       {showEditInputModal && pendingMarker && (
-        <Modal onClick={() => {
+        <S.Modal onClick={() => {
           setShowEditInputModal(false);
           setPendingMarker(null);
           setEditInputText('');
           setEditReasonText('');
         }}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>
+          <S.ModalContent onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>
                 {pendingMarker.type === 'strikethrough' && '취소선 - 수정 내용 입력'}
                 {pendingMarker.type === 'highlight' && '형광펜 - 수정 내용 입력'}
                 {pendingMarker.type === 'comment' && '주석 입력'}
-              </ModalTitle>
-              <IconButton onClick={() => {
+              </S.ModalTitle>
+              <S.IconButton onClick={() => {
                 setShowEditInputModal(false);
                 setPendingMarker(null);
                 setEditInputText('');
                 setEditReasonText('');
               }}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
             {pendingMarker.editData && (
-              <ModalSubtitle>
-                <SubtitleRow style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <S.ModalSubtitle>
+                <S.SubtitleRow style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <strong>제안자:</strong>
                     <span
@@ -4790,25 +3854,25 @@ const CollaborativeDocumentEditor = ({
                       제안 철회
                     </button>
                   )}
-                </SubtitleRow>
-                <SubtitleRow>
+                </S.SubtitleRow>
+                <S.SubtitleRow>
                   <strong>제안 시각:</strong>
                   <span style={{ marginLeft: '8px' }}>
                     {pendingMarker.editData.editedAt?.toDate
                       ? pendingMarker.editData.editedAt.toDate().toLocaleString('ko-KR')
                       : '알 수 없음'}
                   </span>
-                </SubtitleRow>
-              </ModalSubtitle>
+                </S.SubtitleRow>
+              </S.ModalSubtitle>
             )}
 
-            <ModalBody>
+            <S.ModalBody>
               {pendingMarker.text && pendingMarker.type !== 'comment' && (
-                <EditInfo>
-                  <InfoRow>
+                <S.EditInfo>
+                  <S.InfoRow>
                     <strong>원본 텍스트:</strong> {pendingMarker.text}
-                  </InfoRow>
-                </EditInfo>
+                  </S.InfoRow>
+                </S.EditInfo>
               )}
 
               {/* 취소선 - 삭제 이유만 입력 */}
@@ -4957,12 +4021,12 @@ const CollaborativeDocumentEditor = ({
                 </div>
               )}
 
-              <ModalActions>
-                <ConfirmButton onClick={handleConfirmEditInput}>
+              <S.ModalActions>
+                <S.ConfirmButton onClick={handleConfirmEditInput}>
                   <Check size={18} />
                   확인
-                </ConfirmButton>
-                <RejectButton onClick={() => {
+                </S.ConfirmButton>
+                <S.RejectButton onClick={() => {
                   setShowEditInputModal(false);
                   setPendingMarker(null);
                   setEditInputText('');
@@ -4970,25 +4034,25 @@ const CollaborativeDocumentEditor = ({
                 }}>
                   <X size={18} />
                   취소
-                </RejectButton>
-              </ModalActions>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+                </S.RejectButton>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 문서 불러오기 확인 모달 */}
       {showLoadConfirmModal && pendingLoadMemo && (
-        <Modal onClick={handleCancelLoad}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>문서 불러오기 확인</ModalTitle>
-              <IconButton onClick={handleCancelLoad}>
+        <S.Modal onClick={handleCancelLoad}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>문서 불러오기 확인</S.ModalTitle>
+              <S.IconButton onClick={handleCancelLoad}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
+            <S.ModalBody>
               <div style={{ marginBottom: '16px', color: '#ffc107' }}>
                 ⚠️ 현재 열린 문서에 수정 대기 중인 내용이 있습니다.
               </div>
@@ -5029,33 +4093,33 @@ const CollaborativeDocumentEditor = ({
                 </div>
               </div>
 
-              <ModalActions>
-                <ConfirmButton onClick={handleKeepAndLoad}>
+              <S.ModalActions>
+                <S.ConfirmButton onClick={handleKeepAndLoad}>
                   <Check size={18} />
                   기존 문서 유지하고 새 문서 열기
-                </ConfirmButton>
-                <RejectButton onClick={handleCancelLoad}>
+                </S.ConfirmButton>
+                <S.RejectButton onClick={handleCancelLoad}>
                   <X size={18} />
                   취소
-                </RejectButton>
-              </ModalActions>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+                </S.RejectButton>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 전체 승인 확인 모달 */}
       {showApproveAllModal && (
-        <Modal onClick={() => setShowApproveAllModal(false)}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>✨ 전체 승인 확인</ModalTitle>
-              <IconButton onClick={() => setShowApproveAllModal(false)}>
+        <S.Modal onClick={() => setShowApproveAllModal(false)}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>✨ 전체 승인 확인</S.ModalTitle>
+              <S.IconButton onClick={() => setShowApproveAllModal(false)}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
+            <S.ModalBody>
               <div style={{
                 marginBottom: '20px',
                 fontSize: '15px',
@@ -5110,33 +4174,33 @@ const CollaborativeDocumentEditor = ({
                 </div>
               </div>
 
-              <ModalActions>
-                <RejectButton onClick={() => setShowApproveAllModal(false)}>
+              <S.ModalActions>
+                <S.RejectButton onClick={() => setShowApproveAllModal(false)}>
                   <X size={18} />
                   취소
-                </RejectButton>
-                <ConfirmButton onClick={performApproveAll}>
+                </S.RejectButton>
+                <S.ConfirmButton onClick={performApproveAll}>
                   <CheckCircle size={18} />
                   실행
-                </ConfirmButton>
-              </ModalActions>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+                </S.ConfirmButton>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 전체 리셋 확인 모달 */}
       {showResetConfirmModal && (
-        <Modal onClick={() => setShowResetConfirmModal(false)}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>전체 리셋 확인</ModalTitle>
-              <IconButton onClick={() => setShowResetConfirmModal(false)}>
+        <S.Modal onClick={() => setShowResetConfirmModal(false)}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>전체 리셋 확인</S.ModalTitle>
+              <S.IconButton onClick={() => setShowResetConfirmModal(false)}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
+            <S.ModalBody>
               <div style={{ marginBottom: '16px', color: '#ff5757' }}>
                 ⚠️ 모든 수정 표시를 삭제하고 원본 상태로 되돌립니다.
               </div>
@@ -5174,36 +4238,36 @@ const CollaborativeDocumentEditor = ({
                 </div>
               </div>
 
-              <ModalActions>
-                <RejectButton onClick={() => setShowResetConfirmModal(false)}>
+              <S.ModalActions>
+                <S.RejectButton onClick={() => setShowResetConfirmModal(false)}>
                   <X size={18} />
                   취소
-                </RejectButton>
-                <ConfirmButton
+                </S.RejectButton>
+                <S.ConfirmButton
                   onClick={performResetAll}
                   style={{ background: 'linear-gradient(135deg, #ff6b6b, #ee5a52)' }}
                 >
                   <RotateCcw size={18} />
                   실행
-                </ConfirmButton>
-              </ModalActions>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+                </S.ConfirmButton>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 문서 비우기 확인 모달 */}
       {showClearConfirmModal && (
-        <Modal onClick={() => setShowClearConfirmModal(false)}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>문서 비우기</ModalTitle>
-              <IconButton onClick={() => setShowClearConfirmModal(false)}>
+        <S.Modal onClick={() => setShowClearConfirmModal(false)}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>문서 비우기</S.ModalTitle>
+              <S.IconButton onClick={() => setShowClearConfirmModal(false)}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
+            <S.ModalBody>
               {currentDocId && currentDocId.startsWith('temp_') ? (
                 <>
                   {/* 임시 문서인 경우 */}
@@ -5300,36 +4364,36 @@ const CollaborativeDocumentEditor = ({
                 </>
               )}
 
-              <ModalActions>
-                <RejectButton onClick={() => setShowClearConfirmModal(false)}>
+              <S.ModalActions>
+                <S.RejectButton onClick={() => setShowClearConfirmModal(false)}>
                   <X size={18} />
                   취소
-                </RejectButton>
-                <ConfirmButton
+                </S.RejectButton>
+                <S.ConfirmButton
                   onClick={performClearDocument}
                   style={{ background: 'linear-gradient(135deg, #9c27b0, #7b1fa2)' }}
                 >
                   🧹
                   비우기
-                </ConfirmButton>
-              </ModalActions>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+                </S.ConfirmButton>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 임시 문서 불러오기 경고 모달 */}
       {showTempDocLoadWarningModal && (
-        <Modal onClick={() => setShowTempDocLoadWarningModal(false)}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>문서 불러오기</ModalTitle>
-              <IconButton onClick={() => setShowTempDocLoadWarningModal(false)}>
+        <S.Modal onClick={() => setShowTempDocLoadWarningModal(false)}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>문서 불러오기</S.ModalTitle>
+              <S.IconButton onClick={() => setShowTempDocLoadWarningModal(false)}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
+            <S.ModalBody>
               <div style={{ marginBottom: '16px', lineHeight: '1.6' }}>
                 <div style={{ marginBottom: '12px', color: '#e0e0e0' }}>
                   저장하지 않은 임시 문서가 있습니다. 다른 문서를 불러오시겠습니까?
@@ -5360,39 +4424,39 @@ const CollaborativeDocumentEditor = ({
                 </div>
               </div>
 
-              <ModalActions>
-                <RejectButton onClick={() => setShowTempDocLoadWarningModal(false)}>
+              <S.ModalActions>
+                <S.RejectButton onClick={() => setShowTempDocLoadWarningModal(false)}>
                   <X size={18} />
                   취소
-                </RejectButton>
-                <ConfirmButton
+                </S.RejectButton>
+                <S.ConfirmButton
                   onClick={proceedLoadFromShared}
                   style={{ background: 'linear-gradient(135deg, #4a90e2, #357abd)' }}
                 >
                   <FolderOpen size={18} />
                   불러오기
-                </ConfirmButton>
-              </ModalActions>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+                </S.ConfirmButton>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 문서 소유자 ID 모달 */}
       {showOwnerModal && documentOwner && (
-        <Modal onClick={() => setShowOwnerModal(false)}>
-          <ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <ModalHeader>
-              <ModalTitle>
+        <S.Modal onClick={() => setShowOwnerModal(false)}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>
                 <Users size={18} color="#4a90e2" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
                 문서 소유자 정보
-              </ModalTitle>
-              <IconButton onClick={() => setShowOwnerModal(false)}>
+              </S.ModalTitle>
+              <S.IconButton onClick={() => setShowOwnerModal(false)}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
+            <S.ModalBody>
               <div style={{ marginBottom: '20px' }}>
                 <div style={{ marginBottom: '12px', color: '#e0e0e0' }}>
                   <strong>닉네임:</strong> {documentOwner.nickname}
@@ -5421,13 +4485,13 @@ const CollaborativeDocumentEditor = ({
                 )}
               </div>
 
-              <ModalActions>
-                <RejectButton onClick={() => setShowOwnerModal(false)}>
+              <S.ModalActions>
+                <S.RejectButton onClick={() => setShowOwnerModal(false)}>
                   <X size={18} />
                   닫기
-                </RejectButton>
+                </S.RejectButton>
                 {documentOwner.wsCode && (
-                  <ConfirmButton
+                  <S.ConfirmButton
                     onClick={() => {
                       navigator.clipboard.writeText(documentOwner.wsCode.replace('WS-', ''));
                       showToast?.('쉐어노트 ID가 복사되었습니다');
@@ -5437,29 +4501,29 @@ const CollaborativeDocumentEditor = ({
                   >
                     📋
                     ID 복사
-                  </ConfirmButton>
+                  </S.ConfirmButton>
                 )}
-              </ModalActions>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 거부 확인 모달 */}
       {showRejectConfirmModal && (
-        <Modal onClick={() => setShowRejectConfirmModal(false)} style={{ zIndex: 500000 }}>
-          <ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <ModalHeader>
-              <ModalTitle>
+        <S.Modal onClick={() => setShowRejectConfirmModal(false)} style={{ zIndex: 500000 }}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>
                 <X size={18} color="#ff5757" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
                 수정 제안 거부
-              </ModalTitle>
-              <IconButton onClick={() => setShowRejectConfirmModal(false)}>
+              </S.ModalTitle>
+              <S.IconButton onClick={() => setShowRejectConfirmModal(false)}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
+            <S.ModalBody>
               <div style={{ marginBottom: '12px', color: '#e0e0e0', lineHeight: '1.6' }}>
                 수정 제안을 거부하고 원본을 유지하겠습니까?
               </div>
@@ -5467,11 +4531,11 @@ const CollaborativeDocumentEditor = ({
                 ⚠️ 이 작업은 되돌릴 수 없습니다
               </div>
 
-              <ModalActions>
-                <RejectButton onClick={() => setShowRejectConfirmModal(false)}>
+              <S.ModalActions>
+                <S.RejectButton onClick={() => setShowRejectConfirmModal(false)}>
                   취소
-                </RejectButton>
-                <ConfirmButton
+                </S.RejectButton>
+                <S.ConfirmButton
                   onClick={async () => {
                     try {
                       await handleCancelEdit(pendingAction.editId);
@@ -5487,28 +4551,28 @@ const CollaborativeDocumentEditor = ({
                   style={{ background: 'linear-gradient(135deg, #ff5757, #cc4545)' }}
                 >
                   거부
-                </ConfirmButton>
-              </ModalActions>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+                </S.ConfirmButton>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 승인 확인 모달 */}
       {showApproveConfirmModal && (
-        <Modal onClick={() => setShowApproveConfirmModal(false)} style={{ zIndex: 500000 }}>
-          <ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <ModalHeader>
-              <ModalTitle>
+        <S.Modal onClick={() => setShowApproveConfirmModal(false)} style={{ zIndex: 500000 }}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>
                 <Check size={18} color="#4a90e2" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
                 수정 승인
-              </ModalTitle>
-              <IconButton onClick={() => setShowApproveConfirmModal(false)}>
+              </S.ModalTitle>
+              <S.IconButton onClick={() => setShowApproveConfirmModal(false)}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
+            <S.ModalBody>
               <div style={{ marginBottom: '12px', color: '#e0e0e0', lineHeight: '1.6' }}>
                 수정을 받아들여 문구를 수정하시겠습니까?
               </div>
@@ -5516,11 +4580,11 @@ const CollaborativeDocumentEditor = ({
                 ⚠️ 이 작업은 되돌릴 수 없습니다
               </div>
 
-              <ModalActions>
-                <RejectButton onClick={() => setShowApproveConfirmModal(false)}>
+              <S.ModalActions>
+                <S.RejectButton onClick={() => setShowApproveConfirmModal(false)}>
                   취소
-                </RejectButton>
-                <ConfirmButton
+                </S.RejectButton>
+                <S.ConfirmButton
                   onClick={async () => {
                     try {
                       await handleApproveEdit(pendingAction.editId);
@@ -5536,24 +4600,24 @@ const CollaborativeDocumentEditor = ({
                   style={{ background: 'linear-gradient(135deg, #4a90e2, #357abd)' }}
                 >
                   승인
-                </ConfirmButton>
-              </ModalActions>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+                </S.ConfirmButton>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 권한 관리 모달 */}
       {showPermissionModal && (
-        <Modal onClick={() => setShowPermissionModal(false)}>
-          <ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-            <ModalHeader>
+        <S.Modal onClick={() => setShowPermissionModal(false)}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <S.ModalHeader>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ModalTitle>
+                <S.ModalTitle>
                   <Users size={18} color="#4a90e2" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
                   권한 관리
-                </ModalTitle>
-                <IconButton
+                </S.ModalTitle>
+                <S.IconButton
                   onClick={() => setShowPermissionGuideModal(true)}
                   title="권한 안내"
                   style={{
@@ -5563,16 +4627,16 @@ const CollaborativeDocumentEditor = ({
                   }}
                 >
                   <HelpCircle size={16} color="#4a90e2" />
-                </IconButton>
+                </S.IconButton>
               </div>
-              <IconButton onClick={() => {
+              <S.IconButton onClick={() => {
                 setShowPermissionModal(false);
               }}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
+            <S.ModalBody>
               <div style={{ marginBottom: '16px', fontSize: '13px', color: '#888' }}>
                 참여자의 권한을 관리할 수 있습니다
               </div>
@@ -5683,23 +4747,23 @@ const CollaborativeDocumentEditor = ({
                   </select>
                 </div>
               )}
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 권한 안내 모달 */}
       {showPermissionGuideModal && (
-        <Modal onClick={() => setShowPermissionGuideModal(false)}>
-          <ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-            <ModalHeader>
-              <ModalTitle>ℹ️ 권한 안내</ModalTitle>
-              <IconButton onClick={() => setShowPermissionGuideModal(false)}>
+        <S.Modal onClick={() => setShowPermissionGuideModal(false)}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>ℹ️ 권한 안내</S.ModalTitle>
+              <S.IconButton onClick={() => setShowPermissionGuideModal(false)}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
+            <S.ModalBody>
               <div style={{
                 background: 'rgba(74, 144, 226, 0.1)',
                 border: '1px solid rgba(74, 144, 226, 0.3)',
@@ -5767,33 +4831,33 @@ const CollaborativeDocumentEditor = ({
                   권한 관리 기능은 단체방에서만 사용할 수 있습니다.
                 </div>
               </div>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 마커 상세 정보 모달 */}
       {showMarkerDetailModal && selectedMarkerDetail && (
-        <Modal onClick={() => {
+        <S.Modal onClick={() => {
           setShowMarkerDetailModal(false);
           setSelectedMarkerDetail(null);
         }}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>
+          <S.ModalContent onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>
                 {selectedMarkerDetail.markerType === 'strikethrough' ? '✏️ 취소선 수정 제안' : '💡 형광펜 수정 제안'}
-              </ModalTitle>
-              <IconButton onClick={() => {
+              </S.ModalTitle>
+              <S.IconButton onClick={() => {
                 setShowMarkerDetailModal(false);
                 setSelectedMarkerDetail(null);
               }}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
-              <EditInfo>
-                <InfoRow style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <S.ModalBody>
+              <S.EditInfo>
+                <S.InfoRow style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <strong>제안자:</strong>{' '}
                     <span
@@ -5870,45 +4934,45 @@ const CollaborativeDocumentEditor = ({
                       제안 철회
                     </button>
                   )}
-                </InfoRow>
-                <InfoRow>
+                </S.InfoRow>
+                <S.InfoRow>
                   <strong>제안 시각:</strong>{' '}
                   {selectedMarkerDetail.editedAt?.toDate
                     ? selectedMarkerDetail.editedAt.toDate().toLocaleString('ko-KR')
                     : '알 수 없음'}
-                </InfoRow>
-                <InfoRow>
+                </S.InfoRow>
+                <S.InfoRow>
                   <strong>
                     {selectedMarkerDetail.markerType === 'strikethrough'
                       ? '원본 텍스트(삭제할 텍스트):'
                       : '원본 텍스트:'}
                   </strong>{' '}
                   {selectedMarkerDetail.oldText || '(없음)'}
-                </InfoRow>
+                </S.InfoRow>
 
                 {selectedMarkerDetail.markerType === 'strikethrough' && (
-                  <InfoRow>
+                  <S.InfoRow>
                     <strong>삭제 이유:</strong> {selectedMarkerDetail.reason || '(이유 없음)'}
-                  </InfoRow>
+                  </S.InfoRow>
                 )}
 
                 {selectedMarkerDetail.markerType === 'highlight' && (
                   <>
-                    <InfoRow>
+                    <S.InfoRow>
                       <strong>대체 텍스트:</strong> {selectedMarkerDetail.newText || '(공란)'}
-                    </InfoRow>
+                    </S.InfoRow>
                     {selectedMarkerDetail.description && (
-                      <InfoRow>
+                      <S.InfoRow>
                         <strong>설명:</strong> {selectedMarkerDetail.description}
-                      </InfoRow>
+                      </S.InfoRow>
                     )}
                   </>
                 )}
-              </EditInfo>
+              </S.EditInfo>
 
               {actualIsManager && (
-                <ModalActions>
-                  <RejectButton onClick={() => {
+                <S.ModalActions>
+                  <S.RejectButton onClick={() => {
                     // 거부 확인 모달 표시
                     setPendingAction({
                       type: 'reject',
@@ -5918,8 +4982,8 @@ const CollaborativeDocumentEditor = ({
                   }}>
                     <X size={18} />
                     거부
-                  </RejectButton>
-                  <ConfirmButton onClick={() => {
+                  </S.RejectButton>
+                  <S.ConfirmButton onClick={() => {
                     // 승인 확인 모달 표시
                     setPendingAction({
                       type: 'approve',
@@ -5929,26 +4993,26 @@ const CollaborativeDocumentEditor = ({
                   }}>
                     <Check size={18} />
                     승인
-                  </ConfirmButton>
-                </ModalActions>
+                  </S.ConfirmButton>
+                </S.ModalActions>
               )}
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 사용자 ID 복사 모달 */}
       {showUserIdModal && selectedUserId && (
-        <Modal onClick={() => setShowUserIdModal(false)}>
-          <ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <ModalHeader>
-              <ModalTitle>사용자 ID</ModalTitle>
-              <IconButton onClick={() => setShowUserIdModal(false)}>
+        <S.Modal onClick={() => setShowUserIdModal(false)}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>사용자 ID</S.ModalTitle>
+              <S.IconButton onClick={() => setShowUserIdModal(false)}>
                 <X size={20} />
-              </IconButton>
-            </ModalHeader>
+              </S.IconButton>
+            </S.ModalHeader>
 
-            <ModalBody>
+            <S.ModalBody>
               <div style={{
                 background: 'rgba(0, 0, 0, 0.3)',
                 border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -5975,41 +5039,41 @@ const CollaborativeDocumentEditor = ({
                 </div>
               </div>
 
-              <ModalActions>
-                <ConfirmButton onClick={() => {
+              <S.ModalActions>
+                <S.ConfirmButton onClick={() => {
                   const shortId = (selectedUserId.split('-')[1] || selectedUserId.slice(0, 6)).toUpperCase();
                   navigator.clipboard.writeText(shortId);
                   showToast?.(`ID 복사됨: ${shortId}`);
                   setShowUserIdModal(false);
                 }}>
                   복사
-                </ConfirmButton>
-              </ModalActions>
-            </ModalBody>
-          </ModalContent>
-        </Modal>
+                </S.ConfirmButton>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
       )}
 
       {/* 전체 화면 편집 모달 */}
       {showFullScreenEdit && (
-        <FullScreenModal onClick={handleCloseFullScreenEdit}>
-          <FullScreenEditorContainer onClick={(e) => e.stopPropagation()}>
+        <S.FullScreenModal onClick={handleCloseFullScreenEdit}>
+          <S.FullScreenEditorContainer onClick={(e) => e.stopPropagation()}>
             {/* 헤더 */}
-            <FullScreenHeader>
-              <FullScreenTitle>
-                <DocumentIcon>📄</DocumentIcon>
-                <FullScreenTitleInput
+            <S.FullScreenHeader>
+              <S.FullScreenTitle>
+                <S.DocumentIcon>📄</S.DocumentIcon>
+                <S.FullScreenTitleInput
                   value={title}
                   disabled
                   readOnly
                   style={{ cursor: 'default' }}
                 />
-              </FullScreenTitle>
+              </S.FullScreenTitle>
 
-              <IconButton onClick={handleCloseFullScreenEdit} title="닫기" style={{ position: 'relative', right: '-15px' }}>
+              <S.IconButton onClick={handleCloseFullScreenEdit} title="닫기" style={{ position: 'relative', right: '-15px' }}>
                 <X size={24} />
-              </IconButton>
-            </FullScreenHeader>
+              </S.IconButton>
+            </S.FullScreenHeader>
 
             {/* 문서 소유자 정보 또는 임시 문서 표시 */}
             {currentDocId && currentDocId.startsWith('temp_') && content && content.trim() ? (
@@ -6052,58 +5116,58 @@ const CollaborativeDocumentEditor = ({
             {/* 툴바 - 2줄 레이아웃 (모든 사용자에게 표시) */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               {/* 첫 번째 줄: 취소선, 형광펜 */}
-              <FullScreenToolbar style={{ borderBottom: 'none', paddingBottom: '7px' }}>
-                <ToolbarButton onClick={handleApplyStrikethrough} title="선택한 텍스트에 취소선 적용">
+              <S.FullScreenToolbar style={{ borderBottom: 'none', paddingBottom: '7px' }}>
+                <S.ToolbarButton onClick={handleApplyStrikethrough} title="선택한 텍스트에 취소선 적용">
                   <Strikethrough size={16} />
                   취소선
-                </ToolbarButton>
+                </S.ToolbarButton>
 
-                <ToolbarButton onClick={handleApplyHighlighter} title="선택한 텍스트에 형광펜 적용">
+                <S.ToolbarButton onClick={handleApplyHighlighter} title="선택한 텍스트에 형광펜 적용">
                   <Highlighter size={16} />
                   형광펜
-                </ToolbarButton>
-              </FullScreenToolbar>
+                </S.ToolbarButton>
+              </S.FullScreenToolbar>
 
               {/* 두 번째 줄: 수정 대기중, 위치 찾기 */}
               {pendingEdits.length > 0 && (
-                <FullScreenToolbar style={{ paddingTop: '7px' }}>
-                  <PendingEditsCount title="대기 중인 수정 사항">
+                <S.FullScreenToolbar style={{ paddingTop: '7px' }}>
+                  <S.PendingEditsCount title="대기 중인 수정 사항">
                     <Info size={16} />
                     {pendingEdits.length}개 수정 대기중
-                  </PendingEditsCount>
+                  </S.PendingEditsCount>
 
-                  <EditNavigationGroup>
-                    <EditNavigationButton
+                  <S.EditNavigationGroup>
+                    <S.EditNavigationButton
                       onClick={handlePrevEdit}
                       disabled={pendingEdits.length === 0}
                       title="이전 수정 영역"
                     >
                       <ChevronLeft size={14} />
-                    </EditNavigationButton>
+                    </S.EditNavigationButton>
 
-                    <EditNavigationButton
+                    <S.EditNavigationButton
                       style={{ minWidth: '40px' }}
                       disabled
                       title={`${currentEditIndex + 1} / ${pendingEdits.length}`}
                     >
                       {currentEditIndex + 1}/{pendingEdits.length}
-                    </EditNavigationButton>
+                    </S.EditNavigationButton>
 
-                    <EditNavigationButton
+                    <S.EditNavigationButton
                       onClick={handleNextEdit}
                       disabled={pendingEdits.length === 0}
                       title="다음 수정 영역"
                     >
                       <ChevronRight size={14} />
-                    </EditNavigationButton>
-                  </EditNavigationGroup>
-                </FullScreenToolbar>
+                    </S.EditNavigationButton>
+                  </S.EditNavigationGroup>
+                </S.FullScreenToolbar>
               )}
             </div>
 
             {/* 편집 영역 */}
-            <FullScreenContent>
-              <FullScreenEditArea
+            <S.FullScreenContent>
+              <S.FullScreenEditArea
                 ref={fullScreenContentRef}
                 contentEditable={false}
                 suppressContentEditableWarning
@@ -6139,19 +5203,19 @@ const CollaborativeDocumentEditor = ({
                 }}
                 dangerouslySetInnerHTML={{ __html: content }}
               />
-            </FullScreenContent>
+            </S.FullScreenContent>
 
             {/* 하단 정보 */}
-            <FullScreenFooter>
+            <S.FullScreenFooter>
               <span>{content.replace(/<[^>]*>/g, '').length} 글자</span>
               <span>
                 {actualCanEdit ? '편집 모드' : '읽기 전용 모드'}
                 {' • '}
                 실시간 협업 활성화
               </span>
-            </FullScreenFooter>
-          </FullScreenEditorContainer>
-        </FullScreenModal>
+            </S.FullScreenFooter>
+          </S.FullScreenEditorContainer>
+        </S.FullScreenModal>
       )}
 
       {/* 마커 의견 제시 모달 */}
@@ -6177,7 +5241,7 @@ const CollaborativeDocumentEditor = ({
         onSave={handleSaveNewMemo}
         onCancel={() => setShowNewMemoModal(false)}
       />
-    </EditorContainer>
+    </S.EditorContainer>
   );
 };
 

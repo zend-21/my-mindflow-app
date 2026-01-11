@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import styled from 'styled-components';
+import * as S from './SecretPage.styles';
 import PinInput from './PinInput';
 import SecretDocCard from './SecretDocCard';
 import SecretDocEditor from './SecretDocEditor';
@@ -34,566 +34,6 @@ import {
 } from '../../utils/secretStorage';
 import { sendTempPinEmail } from '../../utils/emailService';
 import { fetchSecretDocsMetadata } from '../../services/userDataService';
-
-const Container = styled.div`
-    width: 100%;
-    height: 100%;
-    padding: 0;
-    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
-    overflow-y: auto;
-    overflow-x: hidden;
-    position: relative;
-    /* 터치 스크롤 최적화 */
-    -webkit-overflow-scrolling: touch;
-    overscroll-behavior: contain;
-`;
-
-const InnerContent = styled.div`
-    padding: 0px 24px 15px 24px;
-    box-sizing: border-box;
-    margin-top: -5px;
-`;
-
-const TitleWrapper = styled.div`
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-`;
-
-const PageTitle = styled.div`
-    font-size: 16px;
-    color: rgba(255, 255, 255, 0.6);
-    font-weight: 500;
-    letter-spacing: 0.3px;
-`;
-
-const AddDocButton = styled.button`
-    background-color: transparent;
-    border: none;
-    font-size: 28px;
-    cursor: pointer;
-    color: #f093fb;
-    transition: transform 0.2s ease;
-    &:hover {
-        transform: rotate(90deg);
-    }
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-`;
-
-const SearchBar = styled.div`
-    margin-bottom: 16px;
-    width: 100%;
-    position: relative;
-`;
-
-const SearchIcon = styled.div`
-    position: absolute;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: #808080;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-`;
-
-const SearchInput = styled.input`
-    width: 100%;
-    padding: 12px 16px 12px 44px;
-    border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
-    color: #ffffff;
-    font-size: 14px;
-    transition: all 0.2s;
-    box-sizing: border-box;
-
-    &:focus {
-        outline: none;
-        border-color: rgba(240, 147, 251, 0.5);
-        background: rgba(255, 255, 255, 0.08);
-        box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
-    }
-
-    &::placeholder {
-        color: #808080;
-    }
-`;
-
-const FilterBar = styled.div`
-    display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
-    width: 100%;
-`;
-
-const SortBar = styled.div`
-    display: flex;
-    gap: 8px;
-    margin-bottom: 20px;
-    width: 100%;
-`;
-
-const SortButton = styled.button`
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 1px solid ${props => props.$active ? 'rgba(240, 147, 251, 0.5)' : 'rgba(255, 255, 255, 0.15)'};
-    background: ${props => props.$active ? 'rgba(240, 147, 251, 0.2)' : 'rgba(255, 255, 255, 0.05)'};
-    color: ${props => props.$active ? '#f093fb' : '#b0b0b0'};
-    font-size: 13px;
-    font-weight: ${props => props.$active ? '600' : '500'};
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-
-    &:hover {
-        background: ${props => props.$active ? 'rgba(240, 147, 251, 0.25)' : 'rgba(255, 255, 255, 0.08)'};
-        border-color: ${props => props.$active ? 'rgba(240, 147, 251, 0.6)' : 'rgba(255, 255, 255, 0.25)'};
-    }
-`;
-
-const FilterButton = styled.button`
-    padding: 8px 4px;
-    border-radius: 6px;
-    border: 1px solid ${props => {
-        if (!props.$active) return 'rgba(255, 255, 255, 0.15)';
-        switch(props.$category) {
-            case 'all': return '#7fa3ff';
-            case 'financial': return 'rgba(255, 215, 0, 0.5)';
-            case 'personal': return 'rgba(167, 139, 250, 0.5)';
-            case 'work': return 'rgba(96, 165, 250, 0.5)';
-            case 'diary': return 'rgba(244, 114, 182, 0.5)';
-            default: return 'rgba(255, 255, 255, 0.15)';
-        }
-    }};
-    background: ${props => {
-        if (!props.$active) return 'rgba(255, 255, 255, 0.05)';
-        switch(props.$category) {
-            case 'all': return '#7fa3ff';
-            case 'financial': return 'rgba(255, 215, 0, 0.2)';
-            case 'personal': return 'rgba(167, 139, 250, 0.2)';
-            case 'work': return 'rgba(96, 165, 250, 0.2)';
-            case 'diary': return 'rgba(244, 114, 182, 0.2)';
-            default: return 'rgba(255, 255, 255, 0.05)';
-        }
-    }};
-    color: ${props => {
-        if (!props.$active) return '#b0b0b0';
-        switch(props.$category) {
-            case 'all': return '#ffffff';
-            case 'financial': return '#FFD700';
-            case 'personal': return '#A78BFA';
-            case 'work': return '#60A5FA';
-            case 'diary': return '#F472B6';
-            default: return '#ffffff';
-        }
-    }};
-    font-size: 13px;
-    font-weight: ${props => props.$active ? '700' : '500'};
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &:hover {
-        background: ${props => {
-            if (props.$active) {
-                switch(props.$category) {
-                    case 'all': return '#7fa3ff';
-                    case 'financial': return 'rgba(255, 215, 0, 0.3)';
-                    case 'personal': return 'rgba(167, 139, 250, 0.3)';
-                    case 'work': return 'rgba(96, 165, 250, 0.3)';
-                    case 'diary': return 'rgba(244, 114, 182, 0.3)';
-                    default: return 'rgba(255, 255, 255, 0.05)';
-                }
-            }
-            return 'rgba(255, 255, 255, 0.08)';
-        }};
-        border-color: ${props => {
-            if (props.$active) {
-                switch(props.$category) {
-                    case 'all': return '#7fa3ff';
-                    case 'financial': return 'rgba(255, 215, 0, 0.6)';
-                    case 'personal': return 'rgba(167, 139, 250, 0.6)';
-                    case 'work': return 'rgba(96, 165, 250, 0.6)';
-                    case 'diary': return 'rgba(244, 114, 182, 0.6)';
-                    default: return 'rgba(255, 255, 255, 0.15)';
-                }
-            }
-            return 'rgba(255, 255, 255, 0.25)';
-        }};
-    }
-`;
-
-const DocsGrid = styled.div`
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 16px;
-    padding-bottom: ${props => props.$selectionMode ? '80px' : '20px'};
-
-    @media (max-width: 768px) {
-        grid-template-columns: 1fr;
-    }
-`;
-
-const EmptyState = styled.div`
-    text-align: center;
-    padding: 60px 20px;
-    color: #808080;
-`;
-
-const EmptyIcon = styled.div`
-    font-size: 64px;
-    margin-bottom: 16px;
-    opacity: 0.5;
-`;
-
-const EmptyText = styled.p`
-    font-size: 16px;
-    margin: 0 0 24px 0;
-`;
-
-const GuidanceMessage = styled.div`
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(240, 147, 251, 0.3);
-    padding: 10px 24px;
-    text-align: center;
-    margin-top: -10px;
-    margin-bottom: 10px;
-    border-radius: 8px;
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 12px;
-    font-weight: 300;
-`;
-
-const SelectionModeBar = styled.div`
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    padding: 12px 24px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 16px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(240, 147, 251, 0.3);
-`;
-
-const SelectionInfo = styled.div`
-    color: white;
-    font-size: 15px;
-    font-weight: 600;
-`;
-
-const SelectionActions = styled.div`
-    display: flex;
-    gap: 8px;
-`;
-
-const SelectionButton = styled.button`
-    background: rgba(255, 255, 255, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    color: white;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
-
-    &:hover {
-        background: rgba(255, 255, 255, 0.3);
-        border-color: rgba(255, 255, 255, 0.5);
-    }
-
-    &:active {
-        transform: scale(0.95);
-    }
-`;
-
-const BulkActionBar = styled.div`
-    position: fixed;
-    bottom: 86px;
-    left: 0;
-    right: 0;
-    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 8px 24px;
-    display: flex;
-    gap: 8px;
-    justify-content: space-around;
-    align-items: center;
-    z-index: 9999;
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
-    touch-action: none;
-    pointer-events: auto;
-`;
-
-const BulkActionButton = styled.button`
-    flex: 1;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid ${props => {
-        switch(props.$type) {
-            case 'delete': return 'rgba(255, 107, 107, 0.3)';
-            case 'category': return 'rgba(100, 181, 246, 0.3)';
-            case 'importance': return 'rgba(255, 193, 7, 0.3)';
-            default: return 'rgba(255, 255, 255, 0.15)';
-        }
-    }};
-    background: ${props => {
-        switch(props.$type) {
-            case 'delete': return 'rgba(255, 107, 107, 0.1)';
-            case 'category': return 'rgba(100, 181, 246, 0.1)';
-            case 'importance': return 'rgba(255, 193, 7, 0.1)';
-            default: return 'rgba(255, 255, 255, 0.05)';
-        }
-    }};
-    color: ${props => {
-        switch(props.$type) {
-            case 'delete': return '#ff6b6b';
-            case 'category': return '#64b5f6';
-            case 'importance': return '#ffc107';
-            default: return '#ffffff';
-        }
-    }};
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-
-    &:hover {
-        background: ${props => {
-            switch(props.$type) {
-                case 'delete': return 'rgba(255, 107, 107, 0.2)';
-                case 'category': return 'rgba(100, 181, 246, 0.2)';
-                case 'importance': return 'rgba(255, 193, 7, 0.2)';
-                default: return 'rgba(255, 255, 255, 0.08)';
-            }
-        }};
-        border-color: ${props => {
-            switch(props.$type) {
-                case 'delete': return 'rgba(255, 107, 107, 0.5)';
-                case 'category': return 'rgba(100, 181, 246, 0.5)';
-                case 'importance': return 'rgba(255, 193, 7, 0.5)';
-                default: return 'rgba(255, 255, 255, 0.25)';
-            }
-        }};
-    }
-
-    &:active {
-        transform: scale(0.95);
-    }
-`;
-
-const CategoryModal = styled.div`
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10001;
-    padding: 20px;
-`;
-
-const CategoryModalContent = styled.div`
-    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
-    border-radius: 16px;
-    padding: 24px;
-    max-width: 400px;
-    width: 100%;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-`;
-
-const CategoryModalTitle = styled.h3`
-    color: #ffffff;
-    font-size: 18px;
-    font-weight: 600;
-    margin: 0 0 20px 0;
-    text-align: center;
-`;
-
-const CategoryGrid = styled.div`
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 16px;
-`;
-
-const CategoryOption = styled.button`
-    padding: 16px;
-    border-radius: 12px;
-    border: 2px solid ${props => {
-        switch(props.$category) {
-            case 'financial': return 'rgba(255, 215, 0, 0.5)';
-            case 'personal': return 'rgba(167, 139, 250, 0.5)';
-            case 'work': return 'rgba(96, 165, 250, 0.5)';
-            case 'diary': return 'rgba(244, 114, 182, 0.5)';
-            default: return 'rgba(255, 255, 255, 0.15)';
-        }
-    }};
-    background: ${props => {
-        switch(props.$category) {
-            case 'financial': return 'rgba(255, 215, 0, 0.1)';
-            case 'personal': return 'rgba(167, 139, 250, 0.1)';
-            case 'work': return 'rgba(96, 165, 250, 0.1)';
-            case 'diary': return 'rgba(244, 114, 182, 0.1)';
-            default: return 'rgba(255, 255, 255, 0.05)';
-        }
-    }};
-    color: ${props => {
-        switch(props.$category) {
-            case 'financial': return '#FFD700';
-            case 'personal': return '#A78BFA';
-            case 'work': return '#60A5FA';
-            case 'diary': return '#F472B6';
-            default: return '#ffffff';
-        }
-    }};
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 8px;
-
-    &:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-
-    &:active {
-        transform: scale(0.95);
-    }
-`;
-
-const ModalCancelButton = styled.button`
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    background: rgba(255, 255, 255, 0.05);
-    color: #d0d0d0;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-
-    &:hover {
-        background: rgba(255, 255, 255, 0.08);
-        border-color: rgba(255, 255, 255, 0.25);
-    }
-
-    &:active {
-        transform: scale(0.98);
-    }
-`;
-
-const AddButton = styled.div`
-    width: 70px;
-    height: 70px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: grab;
-    border: none;
-
-    position: fixed;
-    bottom: 109px;
-    right: 29px;
-    z-index: 10000;
-
-    user-select: none;
-    touch-action: none;
-    pointer-events: auto;
-    isolation: isolate;
-
-    ${props => props.$isDragging && `
-        animation: none !important;
-        transform: translateY(${props.$offsetY}px) !important;
-        cursor: grabbing;
-    `}
-
-    ${props => !props.$isDragging && props.$hasBeenDragged && `
-        animation: none !important;
-        transform: translateY(${props.$offsetY}px);
-        transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
-    `}
-
-    &:active {
-        cursor: grabbing;
-    }
-`;
-
-const MaskImage = styled.img`
-    width: 70px;
-    height: 70px;
-    object-fit: contain;
-    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.3)) drop-shadow(0 0 0 2px #8B0000);
-    transition: all 0.2s;
-
-    &:hover {
-        filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.4)) drop-shadow(0 0 0 2px #8B0000);
-        transform: scale(1.05);
-    }
-`;
-
-const PlusIcon = styled.div`
-    position: absolute;
-    bottom: 5px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #f093fb, #f5576c);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &::before,
-    &::after {
-        content: '';
-        position: absolute;
-        background: white;
-    }
-
-    &::before {
-        width: 12px;
-        height: 2px;
-    }
-
-    &::after {
-        width: 2px;
-        height: 12px;
-    }
-`;
 
 const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
     const [isUnlocked, setIsUnlocked] = useState(false);
@@ -1931,13 +1371,13 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
 
     return (
         <>
-        <Container ref={containerRef}>
-            <InnerContent>
-            <TitleWrapper>
-                <PageTitle>
+        <S.Container ref={containerRef}>
+            <S.InnerContent>
+            <S.TitleWrapper>
+                <S.PageTitle>
                     시크릿 문서 ({isLoadingDocs && docs.length === 0 ? `${docCount}개 로딩 중...` : docs.length})
-                </PageTitle>
-                <AddDocButton
+                </S.PageTitle>
+                <S.AddDocButton
                     onClick={() => {
                         setEditingDoc(null);
                         setIsEditorOpen(true);
@@ -1945,25 +1385,25 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                     title="새 문서 작성"
                 >
                     +
-                </AddDocButton>
-            </TitleWrapper>
-            <SearchBar>
-                <SearchIcon>
+                </S.AddDocButton>
+            </S.TitleWrapper>
+            <S.SearchBar>
+                <S.SearchIcon>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="11" cy="11" r="8"/>
                         <path d="m21 21-4.35-4.35"/>
                     </svg>
-                </SearchIcon>
-                <SearchInput
+                </S.SearchIcon>
+                <S.SearchInput
                     type="text"
                     placeholder="검색..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                 />
-            </SearchBar>
+            </S.SearchBar>
 
-            <FilterBar>
-                <FilterButton
+            <S.FilterBar>
+                <S.FilterButton
                     $active={selectedCategory === 'all'}
                     $category="all"
                     onClick={() => setSelectedCategory('all')}
@@ -1972,8 +1412,8 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                         <circle cx="12" cy="12" r="10"/>
                     </svg>
                     전체
-                </FilterButton>
-                <FilterButton
+                </S.FilterButton>
+                <S.FilterButton
                     $active={selectedCategory === 'financial'}
                     $category="financial"
                     onClick={() => setSelectedCategory('financial')}
@@ -1986,8 +1426,8 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                         <path d={getCategoryIconPath('financial')}/>
                     </svg>
                     {settings.categoryNames.financial}
-                </FilterButton>
-                <FilterButton
+                </S.FilterButton>
+                <S.FilterButton
                     $active={selectedCategory === 'personal'}
                     $category="personal"
                     onClick={() => setSelectedCategory('personal')}
@@ -2000,8 +1440,8 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                         <path d={getCategoryIconPath('personal')}/>
                     </svg>
                     {settings.categoryNames.personal}
-                </FilterButton>
-                <FilterButton
+                </S.FilterButton>
+                <S.FilterButton
                     $active={selectedCategory === 'work'}
                     $category="work"
                     onClick={() => setSelectedCategory('work')}
@@ -2014,8 +1454,8 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                         <path d={getCategoryIconPath('work')}/>
                     </svg>
                     {settings.categoryNames.work}
-                </FilterButton>
-                <FilterButton
+                </S.FilterButton>
+                <S.FilterButton
                     $active={selectedCategory === 'diary'}
                     $category="diary"
                     onClick={() => setSelectedCategory('diary')}
@@ -2028,59 +1468,59 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                         <path d={getCategoryIconPath('diary')}/>
                     </svg>
                     {settings.categoryNames.diary}
-                </FilterButton>
-            </FilterBar>
+                </S.FilterButton>
+            </S.FilterBar>
 
-            <SortBar>
-                <SortButton
+            <S.SortBar>
+                <S.SortButton
                     $active={sortBy === 'date'}
                     onClick={() => handleSortClick('date')}
                 >
                     등록순 {sortBy === 'date' && (sortOrder === 'desc' ? '↓' : '↑')}
-                </SortButton>
-                <SortButton
+                </S.SortButton>
+                <S.SortButton
                     $active={sortBy === 'importance'}
                     onClick={() => handleSortClick('importance')}
                 >
                     중요도순 {sortBy === 'importance' && (sortOrder === 'desc' ? '↓' : '↑')}
-                </SortButton>
-            </SortBar>
+                </S.SortButton>
+            </S.SortBar>
 
             {!selectionMode && docs.length > 0 && (
-                <GuidanceMessage>
+                <S.GuidanceMessage>
                     하단의 카드를 길게 누르면 다중 선택 모드가 활성화됩니다
-                </GuidanceMessage>
+                </S.GuidanceMessage>
             )}
 
             {selectionMode && (
-                <SelectionModeBar>
-                    <SelectionInfo>
+                <S.SelectionModeBar>
+                    <S.SelectionInfo>
                         {selectedDocs.length}개 선택됨
-                    </SelectionInfo>
-                    <SelectionActions>
-                        <SelectionButton onClick={toggleSelectAll}>
+                    </S.SelectionInfo>
+                    <S.SelectionActions>
+                        <S.SelectionButton onClick={toggleSelectAll}>
                             {filteredDocs.length > 0 && filteredDocs.every(doc => selectedDocs.includes(doc.id))
                                 ? '전체해제'
                                 : '전체선택'}
-                        </SelectionButton>
-                        <SelectionButton onClick={exitSelectionMode}>
+                        </S.SelectionButton>
+                        <S.SelectionButton onClick={exitSelectionMode}>
                             취소
-                        </SelectionButton>
-                    </SelectionActions>
-                </SelectionModeBar>
+                        </S.SelectionButton>
+                    </S.SelectionActions>
+                </S.SelectionModeBar>
             )}
 
                 {filteredDocs.length === 0 ? (
-                    <EmptyState>
-                        <EmptyIcon>🔒</EmptyIcon>
-                        <EmptyText>
+                    <S.EmptyState>
+                        <S.EmptyIcon>🔒</S.EmptyIcon>
+                        <S.EmptyText>
                             {docs.length === 0
                                 ? '시크릿 문서가 없습니다.\n+ 버튼을 눌러 새 문서를 작성하세요.'
                                 : '검색 결과가 없습니다.'}
-                        </EmptyText>
-                    </EmptyState>
+                        </S.EmptyText>
+                    </S.EmptyState>
                 ) : (
-                    <DocsGrid $selectionMode={selectionMode}>
+                    <S.DocsGrid $selectionMode={selectionMode}>
                         {filteredDocs.map(doc => (
                             <SecretDocCard
                                 key={doc.id}
@@ -2096,9 +1536,9 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                                 setOpenCategoryDropdownId={setOpenCategoryDropdownId}
                             />
                         ))}
-                    </DocsGrid>
+                    </S.DocsGrid>
                 )}
-            </InnerContent>
+            </S.InnerContent>
 
             {isViewerOpen && viewingDoc && !isEditorOpen && (
                 <SecretDocViewer
@@ -2181,14 +1621,14 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
             )}
 
             {selectionMode && selectedDocs.length > 0 && (
-                <BulkActionBar>
-                    <BulkActionButton $type="category" onClick={() => setShowCategoryModal(true)}>
+                <S.BulkActionBar>
+                    <S.BulkActionButton $type="category" onClick={() => setShowCategoryModal(true)}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
                         <span>카테고리 이동</span>
-                    </BulkActionButton>
-                    <BulkActionButton $type="importance" onClick={handleBulkImportanceToggle}>
+                    </S.BulkActionButton>
+                    <S.BulkActionButton $type="importance" onClick={handleBulkImportanceToggle}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                         </svg>
@@ -2199,8 +1639,8 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                                 return allImportant ? '중요도 해제' : '중요도 지정';
                             })()}
                         </span>
-                    </BulkActionButton>
-                    <BulkActionButton $type="delete" onClick={handleBulkDelete}>
+                    </S.BulkActionButton>
+                    <S.BulkActionButton $type="delete" onClick={handleBulkDelete}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="3 6 5 6 21 6"/>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -2208,16 +1648,16 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                             <line x1="14" y1="11" x2="14" y2="17"/>
                         </svg>
                         <span>일괄 삭제</span>
-                    </BulkActionButton>
-                </BulkActionBar>
+                    </S.BulkActionButton>
+                </S.BulkActionBar>
             )}
 
             {showCategoryModal && (
-                <CategoryModal onClick={() => setShowCategoryModal(false)}>
-                    <CategoryModalContent onClick={(e) => e.stopPropagation()}>
-                        <CategoryModalTitle>카테고리 선택</CategoryModalTitle>
-                        <CategoryGrid>
-                            <CategoryOption
+                <S.CategoryModal onClick={() => setShowCategoryModal(false)}>
+                    <S.CategoryModalContent onClick={(e) => e.stopPropagation()}>
+                        <S.CategoryModalTitle>카테고리 선택</S.CategoryModalTitle>
+                        <S.CategoryGrid>
+                            <S.CategoryOption
                                 $category="financial"
                                 onClick={() => {
                                     handleBulkCategoryChange('financial');
@@ -2226,8 +1666,8 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                             >
                                 💰
                                 <span>{settings.categoryNames.financial}</span>
-                            </CategoryOption>
-                            <CategoryOption
+                            </S.CategoryOption>
+                            <S.CategoryOption
                                 $category="personal"
                                 onClick={() => {
                                     handleBulkCategoryChange('personal');
@@ -2236,8 +1676,8 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                             >
                                 👤
                                 <span>{settings.categoryNames.personal}</span>
-                            </CategoryOption>
-                            <CategoryOption
+                            </S.CategoryOption>
+                            <S.CategoryOption
                                 $category="work"
                                 onClick={() => {
                                     handleBulkCategoryChange('work');
@@ -2246,8 +1686,8 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                             >
                                 💼
                                 <span>{settings.categoryNames.work}</span>
-                            </CategoryOption>
-                            <CategoryOption
+                            </S.CategoryOption>
+                            <S.CategoryOption
                                 $category="diary"
                                 onClick={() => {
                                     handleBulkCategoryChange('diary');
@@ -2256,13 +1696,13 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                             >
                                 📔
                                 <span>{settings.categoryNames.diary}</span>
-                            </CategoryOption>
-                        </CategoryGrid>
-                        <ModalCancelButton onClick={() => setShowCategoryModal(false)}>
+                            </S.CategoryOption>
+                        </S.CategoryGrid>
+                        <S.ModalCancelButton onClick={() => setShowCategoryModal(false)}>
                             취소
-                        </ModalCancelButton>
-                    </CategoryModalContent>
-                </CategoryModal>
+                        </S.ModalCancelButton>
+                    </S.CategoryModalContent>
+                </S.CategoryModal>
             )}
 
             {showCategoryNameEdit && editingCategory && (
@@ -2279,9 +1719,9 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
             )}
 
             {showDeleteModal && (
-                <CategoryModal onClick={() => setShowDeleteModal(false)}>
-                    <CategoryModalContent onClick={(e) => e.stopPropagation()}>
-                        <CategoryModalTitle>일괄 삭제</CategoryModalTitle>
+                <S.CategoryModal onClick={() => setShowDeleteModal(false)}>
+                    <S.CategoryModalContent onClick={(e) => e.stopPropagation()}>
+                        <S.CategoryModalTitle>일괄 삭제</S.CategoryModalTitle>
                         <div style={{
                             color: '#d0d0d0',
                             fontSize: '14px',
@@ -2293,10 +1733,10 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                             삭제하시겠습니까?
                         </div>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                            <ModalCancelButton onClick={() => setShowDeleteModal(false)}>
+                            <S.ModalCancelButton onClick={() => setShowDeleteModal(false)}>
                                 취소
-                            </ModalCancelButton>
-                            <ModalCancelButton
+                            </S.ModalCancelButton>
+                            <S.ModalCancelButton
                                 onClick={confirmBulkDelete}
                                 style={{
                                     background: 'rgba(255, 107, 107, 0.2)',
@@ -2305,15 +1745,15 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                                 }}
                             >
                                 삭제
-                            </ModalCancelButton>
+                            </S.ModalCancelButton>
                         </div>
-                    </CategoryModalContent>
-                </CategoryModal>
+                    </S.CategoryModalContent>
+                </S.CategoryModal>
             )}
-        </Container>
+        </S.Container>
 
         {!isEditorOpen && !showPasswordInputPage && !isViewerOpen && createPortal(
-            <AddButton
+            <S.AddButton
                 ref={addButtonRef}
                 role="button"
                 tabIndex="0"
@@ -2327,12 +1767,12 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
                 onContextMenu={(e) => e.preventDefault()}
                 draggable="false"
             >
-                <MaskImage
+                <S.MaskImage
                     src="/images/secret/mask-gray.svg"
                     alt="Add Secret Document"
                 />
-                <PlusIcon />
-            </AddButton>,
+                <S.PlusIcon />
+            </S.AddButton>,
             document.body
         )}
         </>

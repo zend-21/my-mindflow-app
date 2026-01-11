@@ -2,613 +2,9 @@
 // 시크릿 문서 작성/편집 모달
 
 import React, { useState, useEffect, useRef } from 'react';
-import styled from 'styled-components';
 import Portal from '../Portal';
 import { ALL_ICONS } from './categoryIcons';
-
-const Overlay = styled.div`
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    z-index: 10000;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    touch-action: none;
-    overscroll-behavior: contain;
-`;
-
-const Modal = styled.div`
-    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
-    border-radius: 16px;
-    width: 90vw;
-    max-width: 600px;
-    max-height: 85vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-`;
-
-const Header = styled.div`
-    padding: 20px 24px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-`;
-
-const Title = styled.h2`
-    font-size: 20px;
-    font-weight: 600;
-    color: #ffffff;
-    margin: 0;
-    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-`;
-
-const CloseButton = styled.button`
-    background: none;
-    border: none;
-    font-size: 28px;
-    color: #ffffff;
-    cursor: pointer;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-    padding: 0;
-    width: 32px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &:hover {
-        opacity: 1;
-    }
-`;
-
-const Body = styled.div`
-    padding: 24px;
-    overflow-y: auto;
-    flex: 1;
-
-    &::-webkit-scrollbar {
-        width: 8px;
-    }
-
-    &::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 4px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-        background: rgba(240, 147, 251, 0.3);
-        border-radius: 4px;
-    }
-`;
-
-const FormGroup = styled.div`
-    margin-bottom: 20px;
-`;
-
-const Label = styled.label`
-    display: block;
-    font-size: 14px;
-    font-weight: 600;
-    color: #d0d0d0;
-    margin-bottom: 8px;
-`;
-
-const LabelRow = styled.div`
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-`;
-
-const ImportanceCheckbox = styled.div`
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: #ff6b6b;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-
-    input[type="checkbox"] {
-        width: 16px;
-        height: 16px;
-        cursor: pointer;
-        accent-color: #ff6b6b;
-    }
-`;
-
-const Input = styled.input`
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
-    color: #ffffff;
-    font-size: 14px;
-    transition: all 0.2s;
-
-    &:focus {
-        outline: none;
-        border-color: rgba(240, 147, 251, 0.5);
-        background: rgba(255, 255, 255, 0.08);
-        box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
-    }
-
-    &::placeholder {
-        color: #808080;
-    }
-`;
-
-// ✨ HTML 서식 지원을 위한 contentEditable div
-const ContentEditor = styled.div`
-    width: 100%;
-    min-height: 200px;
-    max-height: 400px;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
-    color: #ffffff;
-    font-size: 14px;
-    font-family: inherit;
-    transition: all 0.2s;
-    overflow-y: auto;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-
-    &:focus {
-        outline: none;
-        border-color: rgba(240, 147, 251, 0.5);
-        background: rgba(255, 255, 255, 0.08);
-        box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
-    }
-
-    /* HTML 서식 지원 - 기본 스타일 */
-    h1, h2, h3, h4, h5, h6 {
-        margin: 0.8em 0 0.4em 0;
-        color: #ffffff;
-    }
-
-    p {
-        margin: 0.5em 0;
-    }
-
-    ul, ol {
-        margin: 0.5em 0;
-        padding-left: 1.5em;
-    }
-
-    li {
-        margin: 0.3em 0;
-    }
-
-    a {
-        color: #4a90e2;
-        text-decoration: underline;
-    }
-
-    blockquote {
-        border-left: 3px solid rgba(74, 144, 226, 0.5);
-        padding-left: 1em;
-        margin: 1em 0;
-        color: #b0b0b0;
-    }
-
-    code {
-        background: rgba(255, 255, 255, 0.1);
-        padding: 2px 6px;
-        border-radius: 4px;
-        font-family: 'Consolas', 'Monaco', monospace;
-        font-size: 0.9em;
-    }
-
-    pre {
-        background: rgba(0, 0, 0, 0.3);
-        padding: 1em;
-        border-radius: 8px;
-        overflow-x: auto;
-        margin: 1em 0;
-    }
-
-    pre code {
-        background: none;
-        padding: 0;
-    }
-
-    img {
-        max-width: 100%;
-        height: auto;
-        border-radius: 8px;
-        margin: 0.5em 0;
-    }
-
-    iframe {
-        width: 100%;
-        max-width: 100%;
-        height: auto;
-        aspect-ratio: 16 / 9;
-        border-radius: 8px;
-        margin: 1em 0;
-    }
-
-    table {
-        border-collapse: collapse;
-        width: 100%;
-        margin: 1em 0;
-    }
-
-    th, td {
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        padding: 8px;
-        text-align: left;
-    }
-
-    th {
-        background: rgba(255, 255, 255, 0.1);
-        font-weight: 600;
-    }
-
-    strong, b {
-        font-weight: 600;
-        color: #ffffff;
-    }
-
-    em, i {
-        font-style: italic;
-    }
-
-    /* 스크롤바 스타일링 */
-    &::-webkit-scrollbar {
-        width: 8px;
-    }
-
-    &::-webkit-scrollbar-track {
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 4px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-        background: rgba(240, 147, 251, 0.4);
-        border-radius: 4px;
-
-        &:hover {
-            background: rgba(240, 147, 251, 0.6);
-        }
-    }
-
-    /* 빈 상태 플레이스홀더 */
-    &[data-placeholder]:empty:before {
-        content: attr(data-placeholder);
-        color: #808080;
-        pointer-events: none;
-    }
-`;
-
-// 기존 TextArea는 제거하고 ContentEditor 사용
-
-const Select = styled.select`
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
-    color: #ffffff;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.2s;
-
-    &:focus {
-        outline: none;
-        border-color: rgba(240, 147, 251, 0.5);
-        box-shadow: 0 0 0 3px rgba(240, 147, 251, 0.1);
-    }
-
-    option {
-        background: #1a1d24;
-        color: #ffffff;
-    }
-`;
-
-const TagsInput = styled.div`
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding: 8px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.05);
-    min-height: 44px;
-`;
-
-const Tag = styled.div`
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 6px;
-    background: rgba(240, 147, 251, 0.2);
-    border: 1px solid rgba(240, 147, 251, 0.3);
-    color: #ffffff;
-    font-size: 13px;
-`;
-
-const RemoveTagButton = styled.button`
-    background: none;
-    border: none;
-    color: #ffffff;
-    cursor: pointer;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-
-    &:hover {
-        opacity: 1;
-    }
-`;
-
-const TagInput = styled.input`
-    flex: 1;
-    min-width: 100px;
-    padding: 4px;
-    border: none;
-    background: transparent;
-    color: #ffffff;
-    font-size: 13px;
-
-    &:focus {
-        outline: none;
-    }
-
-    &::placeholder {
-        color: #808080;
-    }
-`;
-
-const CheckboxGroup = styled.div`
-    display: flex;
-    align-items: center;
-    gap: 8px;
-`;
-
-const Checkbox = styled.input`
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-`;
-
-const ErrorText = styled.div`
-    color: #ff6b6b;
-    font-size: 13px;
-    margin-top: 6px;
-    font-weight: 500;
-`;
-
-const PasswordInputWrapper = styled.div`
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-top: 12px;
-`;
-
-const PasswordInput = styled(Input)`
-    flex: 1;
-    margin-top: 0 !important;
-`;
-
-const ShowPasswordButton = styled.button`
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    color: #d0d0d0;
-    font-size: 20px;
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
-    cursor: pointer;
-    transition: all 0.2s;
-    flex-shrink: 0;
-
-    &:hover {
-        background: rgba(255, 255, 255, 0.08);
-        border-color: rgba(255, 255, 255, 0.2);
-    }
-`;
-
-const CategoryButtons = styled.div`
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    width: 100%;
-`;
-
-const CategoryButton = styled.button`
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid ${props => {
-        if (!props.$active) return 'rgba(255, 255, 255, 0.1)';
-        switch(props.$category) {
-            case 'financial': return 'rgba(255, 215, 0, 0.5)';
-            case 'personal': return 'rgba(167, 139, 250, 0.5)';
-            case 'work': return 'rgba(96, 165, 250, 0.5)';
-            case 'diary': return 'rgba(244, 114, 182, 0.5)';
-            default: return 'rgba(255, 255, 255, 0.1)';
-        }
-    }};
-    background: ${props => {
-        if (!props.$active) return 'rgba(255, 255, 255, 0.05)';
-        switch(props.$category) {
-            case 'financial': return 'rgba(255, 215, 0, 0.2)';
-            case 'personal': return 'rgba(167, 139, 250, 0.2)';
-            case 'work': return 'rgba(96, 165, 250, 0.2)';
-            case 'diary': return 'rgba(244, 114, 182, 0.2)';
-            default: return 'rgba(255, 255, 255, 0.05)';
-        }
-    }};
-    color: ${props => {
-        if (!props.$active) return '#d0d0d0';
-        switch(props.$category) {
-            case 'financial': return '#FFD700';
-            case 'personal': return '#A78BFA';
-            case 'work': return '#60A5FA';
-            case 'diary': return '#F472B6';
-            default: return '#ffffff';
-        }
-    }};
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 4px;
-
-    &:hover {
-        background: ${props => {
-            if (!props.$active) return 'rgba(255, 255, 255, 0.08)';
-            switch(props.$category) {
-                case 'financial': return 'rgba(255, 215, 0, 0.3)';
-                case 'personal': return 'rgba(167, 139, 250, 0.3)';
-                case 'work': return 'rgba(96, 165, 250, 0.3)';
-                case 'diary': return 'rgba(244, 114, 182, 0.3)';
-                default: return 'rgba(255, 255, 255, 0.08)';
-            }
-        }};
-        border-color: ${props => {
-            if (!props.$active) return 'rgba(255, 255, 255, 0.2)';
-            switch(props.$category) {
-                case 'financial': return 'rgba(255, 215, 0, 0.6)';
-                case 'personal': return 'rgba(167, 139, 250, 0.6)';
-                case 'work': return 'rgba(96, 165, 250, 0.6)';
-                case 'diary': return 'rgba(244, 114, 182, 0.6)';
-                default: return 'rgba(255, 255, 255, 0.2)';
-            }
-        }};
-    }
-`;
-
-const Footer = styled.div`
-    padding: 20px 24px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    display: flex;
-    gap: 12px;
-    justify-content: flex-end;
-`;
-
-const Button = styled.button`
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: none;
-
-    ${props => props.$primary ? `
-        background: linear-gradient(135deg, rgba(240, 147, 251, 0.3), rgba(245, 87, 108, 0.3));
-        color: white;
-        border: 1px solid rgba(240, 147, 251, 0.5);
-        box-shadow: 0 2px 8px rgba(240, 147, 251, 0.2);
-
-        &:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(240, 147, 251, 0.4);
-            background: linear-gradient(135deg, rgba(240, 147, 251, 0.4), rgba(245, 87, 108, 0.4));
-        }
-    ` : `
-        background: rgba(255, 255, 255, 0.05);
-        color: #d0d0d0;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-
-        &:hover:not(:disabled) {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.2);
-        }
-    `}
-
-    &:active:not(:disabled) {
-        transform: translateY(0);
-    }
-
-    &:disabled {
-        opacity: 0.3;
-        cursor: not-allowed;
-        background: rgba(255, 255, 255, 0.03);
-        color: #606060;
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        box-shadow: none;
-    }
-`;
-
-const ErrorModal = styled.div`
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: linear-gradient(180deg, #1a1d24 0%, #2a2d35 100%);
-    border: 1px solid rgba(255, 107, 107, 0.3);
-    border-radius: 12px;
-    padding: 24px;
-    z-index: 10001;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-    min-width: 280px;
-    max-width: 90vw;
-`;
-
-const ErrorModalTitle = styled.div`
-    font-size: 16px;
-    font-weight: 600;
-    color: #ff6b6b;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-`;
-
-const ErrorModalMessage = styled.div`
-    font-size: 14px;
-    color: #d0d0d0;
-    margin-bottom: 20px;
-    line-height: 1.5;
-`;
-
-const ErrorModalButton = styled.button`
-    width: 100%;
-    padding: 10px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: none;
-    background: linear-gradient(135deg, rgba(240, 147, 251, 0.3), rgba(245, 87, 108, 0.3));
-    color: white;
-    border: 1px solid rgba(240, 147, 251, 0.5);
-
-    &:hover {
-        background: linear-gradient(135deg, rgba(240, 147, 251, 0.4), rgba(245, 87, 108, 0.4));
-    }
-
-    &:active {
-        transform: translateY(0);
-    }
-`;
+import * as S from './SecretDocEditor.styles';
 
 const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], settings }) => {
     const [formData, setFormData] = useState({
@@ -907,17 +303,17 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
 
     return (
         <Portal>
-            <Overlay>
-                <Modal onClick={(e) => e.stopPropagation()}>
-                    <Header>
-                        <Title>{doc ? '문서 수정' : '새 비밀글 작성'}</Title>
-                        <CloseButton onClick={onClose}>&times;</CloseButton>
-                    </Header>
+            <S.Overlay>
+                <S.Modal onClick={(e) => e.stopPropagation()}>
+                    <S.Header>
+                        <S.Title>{doc ? '문서 수정' : '새 비밀글 작성'}</S.Title>
+                        <S.CloseButton onClick={onClose}>&times;</S.CloseButton>
+                    </S.Header>
 
-                <Body>
-                    <FormGroup>
-                        <Label>제목</Label>
-                        <Input
+                <S.Body>
+                    <S.FormGroup>
+                        <S.Label>제목</S.Label>
+                        <S.Input
                             type="text"
                             placeholder="미입력시 '제목없음'으로 저장됩니다"
                             value={formData.title}
@@ -931,12 +327,12 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                             autoFocus={false}
                             style={{ pointerEvents: isInputEnabled ? 'auto' : 'none' }}
                         />
-                    </FormGroup>
+                    </S.FormGroup>
 
-                    <FormGroup>
-                        <LabelRow>
-                            <Label style={{ marginBottom: 0 }}>내용 (필수)</Label>
-                            <ImportanceCheckbox>
+                    <S.FormGroup>
+                        <S.LabelRow>
+                            <S.Label style={{ marginBottom: 0 }}>내용 (필수)</S.Label>
+                            <S.ImportanceCheckbox>
                                 <input
                                     type="checkbox"
                                     id="isImportant"
@@ -944,9 +340,9 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                     onChange={(e) => handleChange('isImportant', e.target.checked)}
                                 />
                                 <label htmlFor="isImportant" style={{ cursor: 'pointer' }}>중요</label>
-                            </ImportanceCheckbox>
-                        </LabelRow>
-                        <ContentEditor
+                            </S.ImportanceCheckbox>
+                        </S.LabelRow>
+                        <S.ContentEditor
                             ref={contentEditorRef}
                             contentEditable={isInputEnabled}
                             data-placeholder="내용을 입력하세요"
@@ -974,12 +370,12 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                             style={{ pointerEvents: isInputEnabled ? 'auto' : 'none' }}
                             suppressContentEditableWarning
                         />
-                    </FormGroup>
+                    </S.FormGroup>
 
-                    <FormGroup>
-                        <Label>카테고리</Label>
-                        <CategoryButtons>
-                            <CategoryButton
+                    <S.FormGroup>
+                        <S.Label>카테고리</S.Label>
+                        <S.CategoryButtons>
+                            <S.CategoryButton
                                 type="button"
                                 $active={formData.category === 'financial'}
                                 $category="financial"
@@ -989,8 +385,8 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                     <path d={getCategoryIconPath('financial')}/>
                                 </svg>
                                 {settings?.categoryNames?.financial || '금융'}
-                            </CategoryButton>
-                            <CategoryButton
+                            </S.CategoryButton>
+                            <S.CategoryButton
                                 type="button"
                                 $active={formData.category === 'personal'}
                                 $category="personal"
@@ -1000,8 +396,8 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                     <path d={getCategoryIconPath('personal')}/>
                                 </svg>
                                 {settings?.categoryNames?.personal || '개인'}
-                            </CategoryButton>
-                            <CategoryButton
+                            </S.CategoryButton>
+                            <S.CategoryButton
                                 type="button"
                                 $active={formData.category === 'work'}
                                 $category="work"
@@ -1011,8 +407,8 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                     <path d={getCategoryIconPath('work')}/>
                                 </svg>
                                 {settings?.categoryNames?.work || '업무'}
-                            </CategoryButton>
-                            <CategoryButton
+                            </S.CategoryButton>
+                            <S.CategoryButton
                                 type="button"
                                 $active={formData.category === 'diary'}
                                 $category="diary"
@@ -1022,22 +418,22 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                     <path d={getCategoryIconPath('diary')}/>
                                 </svg>
                                 {settings?.categoryNames?.diary || '일기'}
-                            </CategoryButton>
-                        </CategoryButtons>
-                    </FormGroup>
+                            </S.CategoryButton>
+                        </S.CategoryButtons>
+                    </S.FormGroup>
 
-                    <FormGroup>
-                        <Label>태그</Label>
-                        <TagsInput>
+                    <S.FormGroup>
+                        <S.Label>태그</S.Label>
+                        <S.TagsInput>
                             {formData.tags.map((tag, index) => (
-                                <Tag key={index}>
+                                <S.Tag key={index}>
                                     {tag}
-                                    <RemoveTagButton onClick={() => handleRemoveTag(tag)}>
+                                    <S.RemoveTagButton onClick={() => handleRemoveTag(tag)}>
                                         ✕
-                                    </RemoveTagButton>
-                                </Tag>
+                                    </S.RemoveTagButton>
+                                </S.Tag>
                             ))}
-                            <TagInput
+                            <S.TagInput
                                 type="text"
                                 placeholder="태그 입력 후 Enter"
                                 value={tagInput}
@@ -1045,31 +441,31 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                 onKeyDown={handleAddTag}
                                 onBlur={handleTagInputBlur}
                             />
-                        </TagsInput>
-                    </FormGroup>
+                        </S.TagsInput>
+                    </S.FormGroup>
 
-                    <FormGroup>
-                        <CheckboxGroup>
-                            <Checkbox
+                    <S.FormGroup>
+                        <S.CheckboxGroup>
+                            <S.Checkbox
                                 type="checkbox"
                                 id="hasPassword"
                                 checked={formData.hasPassword}
                                 onChange={(e) => handleChange('hasPassword', e.target.checked)}
                             />
-                            <Label htmlFor="hasPassword" style={{ marginBottom: 0, cursor: 'pointer' }}>
+                            <S.Label htmlFor="hasPassword" style={{ marginBottom: 0, cursor: 'pointer' }}>
                                 개별 비밀번호 설정 (이중 보안)
-                            </Label>
-                        </CheckboxGroup>
+                            </S.Label>
+                        </S.CheckboxGroup>
                         {formData.hasPassword && (
                             <>
-                                <PasswordInputWrapper ref={passwordSectionRef}>
-                                    <PasswordInput
+                                <S.PasswordInputWrapper ref={passwordSectionRef}>
+                                    <S.PasswordInput
                                         type={showPassword ? "text" : "password"}
                                         placeholder="문서 비밀번호 (4-20자)"
                                         value={formData.password}
                                         onChange={(e) => handleChange('password', e.target.value)}
                                     />
-                                    <ShowPasswordButton
+                                    <S.ShowPasswordButton
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
                                     >
@@ -1084,17 +480,17 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                                 <line x1="1" y1="1" x2="23" y2="23"/>
                                             </svg>
                                         )}
-                                    </ShowPasswordButton>
-                                </PasswordInputWrapper>
-                                <PasswordInputWrapper>
-                                    <PasswordInput
+                                    </S.ShowPasswordButton>
+                                </S.PasswordInputWrapper>
+                                <S.PasswordInputWrapper>
+                                    <S.PasswordInput
                                         type={showPasswordConfirm ? "text" : "password"}
                                         placeholder="비밀번호 확인"
                                         value={passwordConfirm}
                                         onChange={(e) => handlePasswordConfirmChange(e.target.value)}
                                         onBlur={handlePasswordConfirmBlur}
                                     />
-                                    <ShowPasswordButton
+                                    <S.ShowPasswordButton
                                         type="button"
                                         onClick={() => setShowPasswordConfirm(!showPasswordConfirm)}
                                     >
@@ -1109,17 +505,17 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                                 <line x1="1" y1="1" x2="23" y2="23"/>
                                             </svg>
                                         )}
-                                    </ShowPasswordButton>
-                                </PasswordInputWrapper>
-                                {passwordError && <ErrorText>{passwordError}</ErrorText>}
+                                    </S.ShowPasswordButton>
+                                </S.PasswordInputWrapper>
+                                {passwordError && <S.ErrorText>{passwordError}</S.ErrorText>}
                             </>
                         )}
-                    </FormGroup>
-                </Body>
+                    </S.FormGroup>
+                </S.Body>
 
-                <Footer>
+                <S.Footer>
                     {doc && onDelete && (
-                        <Button
+                        <S.Button
                             onClick={() => {
                                 // 입력이 활성화되지 않았으면 무시 (의도치 않은 클릭 방지)
                                 if (!isInputEnabled) return;
@@ -1128,39 +524,39 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                             style={{ marginRight: 'auto', borderColor: '#ff6b6b', color: '#ff6b6b' }}
                         >
                             삭제
-                        </Button>
+                        </S.Button>
                     )}
-                    <Button onClick={onClose}>취소</Button>
-                    <Button
+                    <S.Button onClick={onClose}>취소</S.Button>
+                    <S.Button
                         $primary
                         onClick={handleSaveClick}
                         disabled={doc && !hasChanges()}
                     >
                         {doc ? '수정' : '저장'}
-                    </Button>
-                </Footer>
-                </Modal>
+                    </S.Button>
+                </S.Footer>
+                </S.Modal>
 
                 {validationError && (
-                    <ErrorModal onClick={(e) => e.stopPropagation()}>
-                        <ErrorModalTitle>
+                    <S.ErrorModal onClick={(e) => e.stopPropagation()}>
+                        <S.ErrorModalTitle>
                             ⚠️ 입력 오류
-                        </ErrorModalTitle>
-                        <ErrorModalMessage>{validationError}</ErrorModalMessage>
-                        <ErrorModalButton onClick={() => setValidationError('')}>
+                        </S.ErrorModalTitle>
+                        <S.ErrorModalMessage>{validationError}</S.ErrorModalMessage>
+                        <S.ErrorModalButton onClick={() => setValidationError('')}>
                             확인
-                        </ErrorModalButton>
-                    </ErrorModal>
+                        </S.ErrorModalButton>
+                    </S.ErrorModal>
                 )}
 
                 {showSaveConfirm && (
-                    <ErrorModal onClick={(e) => e.stopPropagation()}>
-                        <ErrorModalTitle>
+                    <S.ErrorModal onClick={(e) => e.stopPropagation()}>
+                        <S.ErrorModalTitle>
                             ✏️ 문서 수정
-                        </ErrorModalTitle>
-                        <ErrorModalMessage>변경된 내용대로 수정할까요?</ErrorModalMessage>
+                        </S.ErrorModalTitle>
+                        <S.ErrorModalMessage>변경된 내용대로 수정할까요?</S.ErrorModalMessage>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                            <ErrorModalButton
+                            <S.ErrorModalButton
                                 onClick={() => setShowSaveConfirm(false)}
                                 style={{
                                     background: 'rgba(255, 255, 255, 0.1)',
@@ -1168,8 +564,8 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                 }}
                             >
                                 취소
-                            </ErrorModalButton>
-                            <ErrorModalButton
+                            </S.ErrorModalButton>
+                            <S.ErrorModalButton
                                 onClick={handleSave}
                                 style={{
                                     background: 'linear-gradient(135deg, rgba(240, 147, 251, 0.3), rgba(245, 87, 108, 0.5))',
@@ -1177,19 +573,19 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                 }}
                             >
                                 수정
-                            </ErrorModalButton>
+                            </S.ErrorModalButton>
                         </div>
-                    </ErrorModal>
+                    </S.ErrorModal>
                 )}
 
                 {showDeleteConfirm && (
-                    <ErrorModal onClick={(e) => e.stopPropagation()}>
-                        <ErrorModalTitle>
+                    <S.ErrorModal onClick={(e) => e.stopPropagation()}>
+                        <S.ErrorModalTitle>
                             🗑️ 문서 삭제
-                        </ErrorModalTitle>
-                        <ErrorModalMessage>이 문서를 삭제하시겠습니까?</ErrorModalMessage>
+                        </S.ErrorModalTitle>
+                        <S.ErrorModalMessage>이 문서를 삭제하시겠습니까?</S.ErrorModalMessage>
                         <div style={{ display: 'flex', gap: '8px' }}>
-                            <ErrorModalButton
+                            <S.ErrorModalButton
                                 onClick={() => setShowDeleteConfirm(false)}
                                 style={{
                                     background: 'rgba(255, 255, 255, 0.1)',
@@ -1197,8 +593,8 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                 }}
                             >
                                 취소
-                            </ErrorModalButton>
-                            <ErrorModalButton
+                            </S.ErrorModalButton>
+                            <S.ErrorModalButton
                                 onClick={() => {
                                     setShowDeleteConfirm(false);
                                     // 🗑️ Draft 삭제 (문서 삭제 시)
@@ -1216,11 +612,11 @@ const SecretDocEditor = ({ doc, onClose, onSave, onDelete, existingDocs = [], se
                                 }}
                             >
                                 삭제
-                            </ErrorModalButton>
+                            </S.ErrorModalButton>
                         </div>
-                    </ErrorModal>
+                    </S.ErrorModal>
                 )}
-            </Overlay>
+            </S.Overlay>
         </Portal>
     );
 };

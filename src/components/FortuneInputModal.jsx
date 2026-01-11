@@ -1,597 +1,11 @@
 // src/components/FortuneInputModal.jsx
 
 import { useState, useEffect } from 'react';
-import styled from 'styled-components';
 import { getCountries, getCities } from '../utils/timeZoneData';
 import { convertSolarToLunar, formatLunarDate } from '../utils/lunarConverter';
 import { searchCity, getTimezoneFromCoords } from '../utils/geocoding';
 import { calculateZodiacAnimal, calculateZodiacSign } from '../utils/fortuneLogic';
-
-// 🎨 Styled Components
-
-const Overlay = styled.div`
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 10000;
-`;
-
-const Container = styled.div`
-    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
-    width: 90%;
-    max-width: 500px;
-    max-height: 85vh;
-    border-radius: 20px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-`;
-
-const Header = styled.div`
-    padding: 24px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    text-align: center;
-    position: relative;
-`;
-
-const Title = styled.h2`
-    margin: 0;
-    font-size: 24px;
-    font-weight: 700;
-`;
-
-const Subtitle = styled.p`
-    margin: 8px 0 0 0;
-    font-size: 14px;
-    opacity: 0.9;
-`;
-
-const CloseButton = styled.button`
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    font-size: 24px;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s;
-
-    &:hover {
-        background: rgba(255, 255, 255, 0.3);
-    }
-`;
-
-const Content = styled.div`
-    padding: 24px;
-    flex: 1;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-`;
-
-const InputSection = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-`;
-
-const Label = styled.label`
-    font-size: 16px;
-    font-weight: 600;
-    color: #e0e0e0;
-`;
-
-const Input = styled.input`
-    padding: 12px 16px;
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    font-size: 16px;
-    transition: border-color 0.2s;
-    background: #333842;
-    color: #e0e0e0;
-
-    &:focus {
-        outline: none;
-        border-color: #667eea;
-        background: #3a3f4a;
-    }
-
-    &::placeholder {
-        color: #999999;
-    }
-`;
-
-const Select = styled.select`
-    padding: 12px 16px;
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    font-size: 16px;
-    background: #333842;
-    color: #e0e0e0;
-    cursor: pointer;
-    transition: border-color 0.2s;
-
-    &:focus {
-        outline: none;
-        border-color: #667eea;
-        background: #3a3f4a;
-    }
-
-    option {
-        background: #333842;
-        color: #e0e0e0;
-    }
-`;
-
-const RadioGroup = styled.div`
-    display: flex;
-    gap: 16px;
-    margin-top: 8px;
-`;
-
-const RadioLabel = styled.label`
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    font-size: 16px;
-    color: #d0d0d0;
-    transition: color 0.2s;
-
-    &:hover {
-        color: #667eea;
-    }
-
-    input[type="radio"] {
-        width: 20px;
-        height: 20px;
-        cursor: pointer;
-        accent-color: #667eea;
-    }
-`;
-
-const CheckboxLabel = styled.label`
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    color: #555;
-
-    input[type="checkbox"] {
-        width: 18px;
-        height: 18px;
-        cursor: pointer;
-        accent-color: #667eea;
-    }
-`;
-
-const TimeInputGroup = styled.div`
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-`;
-
-const ButtonGroup = styled.div`
-    display: flex;
-    gap: 12px;
-    padding: 20px 24px;
-    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-`;
-
-const Button = styled.button`
-    flex: 1;
-    padding: 14px;
-    border: none;
-    border-radius: 10px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-
-    ${props => props.$primary ? `
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        &:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-    ` : `
-        background: #e2e8f0;
-        color: #666;
-        &:hover {
-            background: #cbd5e0;
-        }
-    `}
-
-    &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-        &:hover {
-            transform: none;
-            box-shadow: none;
-        }
-    }
-`;
-
-const InfoText = styled.p`
-    font-size: 12px;
-    color: #b0b0b0;
-    margin: 4px 0 0 0;
-    line-height: 1.4;
-`;
-
-const LunarDateDisplay = styled.div`
-    font-size: 13px;
-    color: #667eea;
-    font-weight: 600;
-    margin-top: 4px;
-    padding: 4px 8px;
-    background: transparent;
-    border-radius: 4px;
-    min-height: 21px; /* 공간 미리 확보 */
-    display: flex;
-    align-items: center;
-`;
-
-const LunarConvertButton = styled.button`
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    color: #667eea;
-    background: white;
-    border: 1.5px solid #667eea;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-
-    &:hover {
-        background: #667eea;
-        color: white;
-    }
-
-    &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-`;
-
-const LunarContainer = styled.div`
-    margin-top: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-left: 60px;
-    padding-right: 40px;
-    max-width: 100%;
-
-    /* 모바일 세로 모드 (기본) */
-    @media (max-width: 767px) {
-        padding-left: 50px;
-        padding-right: 30px;
-    }
-
-    /* 모바일 가로 모드 및 태블릿 */
-    @media (min-width: 768px) {
-        padding-left: 70px;
-        padding-right: 52px;
-    }
-
-    /* 데스크탑 */
-    @media (min-width: 1024px) {
-        padding-left: 80px;
-        padding-right: 60px;
-    }
-
-    /* 대형 데스크탑 */
-    @media (min-width: 1440px) {
-        padding-left: 90px;
-        padding-right: 70px;
-    }
-
-    /* 초대형 화면 */
-    @media (min-width: 1900px) {
-        padding-left: 100px;
-        padding-right: 80px;
-    }
-`;
-
-const UserNameDisplay = styled.div`
-    padding: 12px 16px;
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    font-size: 16px;
-    background: rgba(255, 255, 255, 0.05);
-    color: #d0d0d0;
-`;
-
-// 도시 검색 모달 오버레이
-const CitySearchModalOverlay = styled.div`
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 10001;
-`;
-
-// 도시 검색 모달 컨테이너
-const CitySearchModalContainer = styled.div`
-    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
-    width: 90%;
-    max-width: 500px;
-    max-height: 70vh;
-    border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-`;
-
-// 도시 검색 모달 헤더
-const CitySearchModalHeader = styled.div`
-    padding: 20px 24px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-`;
-
-const CitySearchModalTitle = styled.h3`
-    margin: 0;
-    font-size: 20px;
-    font-weight: 700;
-`;
-
-// 도시 검색 모달 바디
-const CitySearchModalBody = styled.div`
-    padding: 20px 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    flex: 1;
-    overflow: hidden;
-`;
-
-// 도시 검색 인풋
-const CitySearchInput = styled.input`
-    padding: 14px 16px;
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    font-size: 16px;
-    transition: border-color 0.2s;
-    background: #333842;
-    color: #e0e0e0;
-
-    &:focus {
-        outline: none;
-        border-color: #667eea;
-        background: #3a3f4a;
-    }
-
-    &::placeholder {
-        color: #808080;
-    }
-`;
-
-// 도시 검색 결과 리스트
-const CitySearchResultsList = styled.div`
-    flex: 1;
-    overflow-y: auto;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 10px;
-    padding: 8px;
-
-    &::-webkit-scrollbar {
-        width: 8px;
-    }
-
-    &::-webkit-scrollbar-track {
-        background: rgba(255, 255, 255, 0.05);
-        border-radius: 4px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-        background: rgba(240, 147, 251, 0.3);
-        border-radius: 4px;
-    }
-`;
-
-// 도시 검색 헬퍼 텍스트
-const CitySearchHelperText = styled.div`
-    padding: 16px;
-    text-align: center;
-    color: #b0b0b0;
-    font-size: 14px;
-    line-height: 1.6;
-`;
-
-const CitySearchItem = styled.div`
-    padding: 14px 16px;
-    cursor: pointer;
-    transition: background 0.2s;
-    border-radius: 8px;
-    margin-bottom: 4px;
-    background: rgba(255, 255, 255, 0.05);
-
-    &:last-child {
-        margin-bottom: 0;
-    }
-
-    &:hover {
-        background: rgba(255, 255, 255, 0.1);
-    }
-
-    &:active {
-        background: rgba(255, 255, 255, 0.08);
-    }
-`;
-
-const CitySearchItemPrimary = styled.div`
-    font-size: 16px;
-    font-weight: 600;
-    color: #e0e0e0;
-    margin-bottom: 4px;
-`;
-
-const CitySearchItemSecondary = styled.div`
-    font-size: 13px;
-    color: #b0b0b0;
-    line-height: 1.4;
-`;
-
-const CitySearchLoading = styled.div`
-    padding: 32px 16px;
-    text-align: center;
-    color: #b0b0b0;
-    font-size: 14px;
-`;
-
-const CitySearchEmpty = styled.div`
-    padding: 32px 16px;
-    text-align: center;
-    color: #b0b0b0;
-    font-size: 14px;
-`;
-
-const ConfirmSection = styled.div`
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 20px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-`;
-
-const ConfirmTitle = styled.h3`
-    margin: 0 0 16px 0;
-    font-size: 18px;
-    color: #667eea;
-`;
-
-const ConfirmItem = styled.div`
-    display: flex;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-
-    &:last-child {
-        border-bottom: none;
-    }
-`;
-
-const ConfirmLabel = styled.span`
-    color: #b0b0b0;
-    font-size: 14px;
-`;
-
-const ConfirmValue = styled.span`
-    color: #e0e0e0;
-    font-size: 14px;
-    font-weight: 600;
-`;
-
-// 음력 경고 모달
-const WarningOverlay = styled.div`
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 20000;
-`;
-
-const WarningBox = styled.div`
-    background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
-    border-radius: 16px;
-    padding: 32px 24px;
-    width: 90%;
-    max-width: 400px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-`;
-
-const WarningIcon = styled.div`
-    font-size: 48px;
-    margin-bottom: 16px;
-`;
-
-const WarningTitle = styled.h3`
-    font-size: 20px;
-    font-weight: 700;
-    color: #e0e0e0;
-    margin: 0 0 12px 0;
-`;
-
-const WarningMessage = styled.p`
-    font-size: 15px;
-    color: #b0b0b0;
-    line-height: 1.6;
-    margin: 0 0 24px 0;
-    white-space: pre-line;
-`;
-
-const WarningButtonGroup = styled.div`
-    display: flex;
-    gap: 12px;
-`;
-
-const WarningButton = styled.button`
-    flex: 1;
-    padding: 14px 24px;
-    border: none;
-    border-radius: 8px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-
-    ${props => props.$primary ? `
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-
-        &:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-    ` : `
-        background: #f0f2f5;
-        color: #666;
-
-        &:hover {
-            background: #e1e4e8;
-        }
-    `}
-`;
+import * as S from './FortuneInputModal.styles';
 
 // 🎯 Main Component
 
@@ -922,41 +336,41 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
     };
 
     return (
-        <Overlay>
-            <Container>
-                <Header>
-                    <Title>
+        <S.Overlay>
+            <S.Container>
+                <S.Header>
+                    <S.Title>
                         {step === 'input' ? '운세 프로필 입력' : '운세 프로필 정보 확인'}
-                    </Title>
-                    <Subtitle>
+                    </S.Title>
+                    <S.Subtitle>
                         {step === 'input'
                             ? '정확한 운세를 위해 정보를 입력해주세요'
                             : '입력하신 정보가 맞는지 확인하세요'}
-                    </Subtitle>
-                    <CloseButton onClick={onClose}>&times;</CloseButton>
-                </Header>
+                    </S.Subtitle>
+                    <S.CloseButton onClick={onClose}>&times;</S.CloseButton>
+                </S.Header>
 
-                <Content>
+                <S.Content>
                     {step === 'input' && (
-                        <InputSection>
+                        <S.InputSection>
                             {/* 이름 (표시만, 수정 불가) */}
                             <div>
-                                <Label>이름</Label>
-                                <UserNameDisplay>{userName}</UserNameDisplay>
-                                <InfoText>
+                                <S.Label>이름</S.Label>
+                                <S.UserNameDisplay>{userName}</S.UserNameDisplay>
+                                <S.InfoText>
                                     {profile
                                         ? '👤 로그인 계정 또는 닉네임이 자동으로 표시됩니다'
                                         : '👤 로그인하지 않으면 매번 정보를 입력해야 합니다'}
-                                </InfoText>
+                                </S.InfoText>
                             </div>
 
                             {/* 생년월일 입력 그룹 */}
                             <div>
                                 {/* 출생 년 */}
                                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <Label>출생 </Label>
+                                    <S.Label>출생 </S.Label>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <Input
+                                        <S.Input
                                             type="number"
                                             placeholder="예: 1995"
                                             value={birthYear}
@@ -976,7 +390,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 {/* 월 / 일 */}
                                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '24px', marginTop: '12px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <Input
+                                        <S.Input
                                             type="number"
                                             placeholder="1-12"
                                             value={birthMonth}
@@ -990,7 +404,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                         <span style={{ fontSize: '16px', fontWeight: '600', color: '#b0b0b0', minWidth: '24px' }}>월</span>
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                        <Input
+                                        <S.Input
                                             type="number"
                                             placeholder="1-31"
                                             value={birthDay}
@@ -1006,8 +420,8 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                 </div>
 
                                 {/* 음력 날짜 표시 및 변환 버튼 */}
-                                <LunarContainer>
-                                    <LunarConvertButton
+                                <S.LunarContainer>
+                                    <S.LunarConvertButton
                                         onClick={handleConvertToLunar}
                                         disabled={
                                             isLoadingLunar ||
@@ -1019,18 +433,18 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                         }
                                     >
                                         음력변환
-                                    </LunarConvertButton>
-                                    <LunarDateDisplay style={{ margin: 0, padding: '4px 0 4px 5px', flex: 1, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                    </S.LunarConvertButton>
+                                    <S.LunarDateDisplay style={{ margin: 0, padding: '4px 0 4px 5px', flex: 1, textAlign: 'right', whiteSpace: 'nowrap' }}>
                                         {isLoadingLunar ? '⏳ 계산 중...' : (lunarDate ? `(${lunarDate})` : '')}
-                                    </LunarDateDisplay>
-                                </LunarContainer>
+                                    </S.LunarDateDisplay>
+                                </S.LunarContainer>
                             </div>
 
                             {/* 성별 */}
                             <div>
-                                <Label>성별 </Label>
-                                <RadioGroup style={{ justifyContent: 'center', gap: '40px' }}>
-                                    <RadioLabel>
+                                <S.Label>성별 </S.Label>
+                                <S.RadioGroup style={{ justifyContent: 'center', gap: '40px' }}>
+                                    <S.RadioLabel>
                                         <input
                                             type="radio"
                                             name="gender"
@@ -1039,8 +453,8 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                             onChange={(e) => setGender(e.target.value)}
                                         />
                                         여성
-                                    </RadioLabel>
-                                    <RadioLabel>
+                                    </S.RadioLabel>
+                                    <S.RadioLabel>
                                         <input
                                             type="radio"
                                             name="gender"
@@ -1049,17 +463,17 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                             onChange={(e) => setGender(e.target.value)}
                                         />
                                         남성
-                                    </RadioLabel>
-                                </RadioGroup>
+                                    </S.RadioLabel>
+                                </S.RadioGroup>
                             </div>
 
                             {/* 출생 시간 (선택사항) */}
                             <div>
-                                <Label>출생 시간 (선택사항)</Label>
-                                <InfoText style={{ marginTop: '4px', marginBottom: '8px' }}>더 정확한 사주 분석을 위해 입력하세요</InfoText>
-                                <TimeInputGroup>
+                                <S.Label>출생 시간 (선택사항)</S.Label>
+                                <S.InfoText style={{ marginTop: '4px', marginBottom: '8px' }}>더 정확한 사주 분석을 위해 입력하세요</S.InfoText>
+                                <S.TimeInputGroup>
                                     <div>
-                                        <Input
+                                        <S.Input
                                             type="number"
                                             placeholder="00-23"
                                             value={birthHour}
@@ -1072,7 +486,7 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                         <span style={{ fontSize: '14px', fontWeight: '600', color: '#666', marginLeft: '8px' }}>시</span>
                                     </div>
                                     <div>
-                                        <Input
+                                        <S.Input
                                             type="number"
                                             placeholder="00-59"
                                             value={birthMinute}
@@ -1084,16 +498,16 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                         />
                                         <span style={{ fontSize: '14px', fontWeight: '600', color: '#666', marginLeft: '8px' }}>분</span>
                                     </div>
-                                </TimeInputGroup>
+                                </S.TimeInputGroup>
                             </div>
 
                             {/* 출생 도시 (선택사항) */}
                             <div>
-                                <Label>출생 도시 (선택사항)</Label>
-                                <InfoText style={{ marginTop: '8px', marginBottom: '8px' }}>
+                                <S.Label>출생 도시 (선택사항)</S.Label>
+                                <S.InfoText style={{ marginTop: '8px', marginBottom: '8px' }}>
                                     태양시 보정을 위해 출생 도시를 입력하세요
-                                </InfoText>
-                                <Input
+                                </S.InfoText>
+                                <S.Input
                                     type="text"
                                     placeholder="예: 서울, Paris, つくば"
                                     value={cityQuery}
@@ -1102,154 +516,154 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                     style={{ cursor: 'pointer', background: '#333842' }}
                                 />
                                 {city && country && (
-                                    <InfoText style={{ marginTop: '4px', color: '#667eea' }}>
+                                    <S.InfoText style={{ marginTop: '4px', color: '#667eea' }}>
                                         ✓ 선택됨: {city}, {country}
-                                    </InfoText>
+                                    </S.InfoText>
                                 )}
                             </div>
-                        </InputSection>
+                        </S.InputSection>
                     )}
 
                     {step === 'confirm' && (
-                        <ConfirmSection>
-                            <ConfirmTitle>운세 프로필 정보</ConfirmTitle>
+                        <S.ConfirmSection>
+                            <S.ConfirmTitle>운세 프로필 정보</S.ConfirmTitle>
 
-                            <ConfirmItem>
-                                <ConfirmLabel>이름</ConfirmLabel>
-                                <ConfirmValue>{userName}</ConfirmValue>
-                            </ConfirmItem>
+                            <S.ConfirmItem>
+                                <S.ConfirmLabel>이름</S.ConfirmLabel>
+                                <S.ConfirmValue>{userName}</S.ConfirmValue>
+                            </S.ConfirmItem>
 
-                            <ConfirmItem>
-                                <ConfirmLabel>생년월일 (양력)</ConfirmLabel>
-                                <ConfirmValue>
+                            <S.ConfirmItem>
+                                <S.ConfirmLabel>생년월일 (양력)</S.ConfirmLabel>
+                                <S.ConfirmValue>
                                     {birthYear}년 {birthMonth}월 {birthDay}일
-                                </ConfirmValue>
-                            </ConfirmItem>
+                                </S.ConfirmValue>
+                            </S.ConfirmItem>
 
                             {lunarDate && (
-                                <ConfirmItem>
-                                    <ConfirmLabel>음력</ConfirmLabel>
-                                    <ConfirmValue style={{ fontSize: '13px', color: '#667eea' }}>
+                                <S.ConfirmItem>
+                                    <S.ConfirmLabel>음력</S.ConfirmLabel>
+                                    <S.ConfirmValue style={{ fontSize: '13px', color: '#667eea' }}>
                                         {(() => {
                                             // 음력 날짜 문자열에서 연도 추출 (예: "1969년 12월 17일" -> 1969)
                                             const yearMatch = lunarDate.match(/(\d{4})년/);
                                             const lunarYear = yearMatch ? parseInt(yearMatch[1]) : birthYear;
                                             return `(${calculateZodiacAnimal(lunarYear)}띠)`;
                                         })()} {lunarDate}
-                                    </ConfirmValue>
-                                </ConfirmItem>
+                                    </S.ConfirmValue>
+                                </S.ConfirmItem>
                             )}
 
-                            <ConfirmItem>
-                                <ConfirmLabel>성별</ConfirmLabel>
-                                <ConfirmValue>{gender}</ConfirmValue>
-                            </ConfirmItem>
+                            <S.ConfirmItem>
+                                <S.ConfirmLabel>성별</S.ConfirmLabel>
+                                <S.ConfirmValue>{gender}</S.ConfirmValue>
+                            </S.ConfirmItem>
 
-                            <ConfirmItem>
-                                <ConfirmLabel>출생 시간</ConfirmLabel>
-                                <ConfirmValue>
+                            <S.ConfirmItem>
+                                <S.ConfirmLabel>출생 시간</S.ConfirmLabel>
+                                <S.ConfirmValue>
                                     {birthHour && birthMinute
                                         ? `${birthHour}시 ${birthMinute}분`
                                         : '선택하지 않음'}
-                                </ConfirmValue>
-                            </ConfirmItem>
+                                </S.ConfirmValue>
+                            </S.ConfirmItem>
 
-                            <ConfirmItem>
-                                <ConfirmLabel>출생 장소</ConfirmLabel>
-                                <ConfirmValue>
+                            <S.ConfirmItem>
+                                <S.ConfirmLabel>출생 장소</S.ConfirmLabel>
+                                <S.ConfirmValue>
                                     {country && city
                                         ? `${country}, ${city}`
                                         : '선택하지 않음'}
-                                </ConfirmValue>
-                            </ConfirmItem>
-                        </ConfirmSection>
+                                </S.ConfirmValue>
+                            </S.ConfirmItem>
+                        </S.ConfirmSection>
                     )}
-                </Content>
+                </S.Content>
 
-                <ButtonGroup>
+                <S.ButtonGroup>
                     {step === 'input' ? (
                         <>
-                            <Button onClick={onClose}>취소</Button>
-                            <Button $primary onClick={handleNext}>
+                            <S.Button onClick={onClose}>취소</S.Button>
+                            <S.Button $primary onClick={handleNext}>
                                 다음
-                            </Button>
+                            </S.Button>
                         </>
                     ) : (
                         <>
-                            <Button onClick={handleEdit}>수정하기</Button>
-                            <Button $primary onClick={handleSubmit}>
+                            <S.Button onClick={handleEdit}>수정하기</S.Button>
+                            <S.Button $primary onClick={handleSubmit}>
                                 확인
-                            </Button>
+                            </S.Button>
                         </>
                     )}
-                </ButtonGroup>
-            </Container>
+                </S.ButtonGroup>
+            </S.Container>
 
             {/* 음력 경고 모달 */}
             {showLunarWarning && (
-                <WarningOverlay onClick={(e) => e.stopPropagation()}>
-                    <WarningBox onClick={(e) => e.stopPropagation()}>
-                        <WarningIcon>⚠️</WarningIcon>
-                        <WarningTitle>음력 변환이 완료되지 않았습니다</WarningTitle>
-                        <WarningMessage>
+                <S.WarningOverlay onClick={(e) => e.stopPropagation()}>
+                    <S.WarningBox onClick={(e) => e.stopPropagation()}>
+                        <S.WarningIcon>⚠️</S.WarningIcon>
+                        <S.WarningTitle>음력 변환이 완료되지 않았습니다</S.WarningTitle>
+                        <S.WarningMessage>
                             음력 정보가 없으면 사주 내용은 표시되지 않습니다.{'\n'}
                             이대로 진행하시겠습니까?{'\n\n'}
                             (별자리, 타로 등은 정상 출력됩니다)
-                        </WarningMessage>
-                        <WarningButtonGroup>
-                            <WarningButton onClick={handleCancelLunarWarning}>
+                        </S.WarningMessage>
+                        <S.WarningButtonGroup>
+                            <S.WarningButton onClick={handleCancelLunarWarning}>
                                 취소
-                            </WarningButton>
-                            <WarningButton $primary onClick={handleProceedWithoutLunar}>
+                            </S.WarningButton>
+                            <S.WarningButton $primary onClick={handleProceedWithoutLunar}>
                                 진행
-                            </WarningButton>
-                        </WarningButtonGroup>
-                    </WarningBox>
-                </WarningOverlay>
+                            </S.WarningButton>
+                        </S.WarningButtonGroup>
+                    </S.WarningBox>
+                </S.WarningOverlay>
             )}
 
             {/* 에러 모달 */}
             {showErrorModal && (
-                <WarningOverlay onClick={(e) => e.stopPropagation()}>
-                    <WarningBox onClick={(e) => e.stopPropagation()}>
-                        <WarningIcon>⚠️</WarningIcon>
-                        <WarningTitle>입력 오류</WarningTitle>
-                        <WarningMessage>
+                <S.WarningOverlay onClick={(e) => e.stopPropagation()}>
+                    <S.WarningBox onClick={(e) => e.stopPropagation()}>
+                        <S.WarningIcon>⚠️</S.WarningIcon>
+                        <S.WarningTitle>입력 오류</S.WarningTitle>
+                        <S.WarningMessage>
                             {errorMessage}
-                        </WarningMessage>
-                        <WarningButtonGroup>
-                            <WarningButton $primary onClick={() => setShowErrorModal(false)}>
+                        </S.WarningMessage>
+                        <S.WarningButtonGroup>
+                            <S.WarningButton $primary onClick={() => setShowErrorModal(false)}>
                                 확인
-                            </WarningButton>
-                        </WarningButtonGroup>
-                    </WarningBox>
-                </WarningOverlay>
+                            </S.WarningButton>
+                        </S.WarningButtonGroup>
+                    </S.WarningBox>
+                </S.WarningOverlay>
             )}
 
             {/* 도시 검색 모달 */}
             {showCitySearchModal && (
-                <CitySearchModalOverlay onClick={() => setShowCitySearchModal(false)}>
-                    <CitySearchModalContainer onClick={(e) => e.stopPropagation()}>
-                        <CitySearchModalHeader>
-                            <CitySearchModalTitle>출생 도시 검색</CitySearchModalTitle>
-                            <CloseButton onClick={() => setShowCitySearchModal(false)}>&times;</CloseButton>
-                        </CitySearchModalHeader>
-                        <CitySearchModalBody>
-                            <CitySearchInput
+                <S.CitySearchModalOverlay onClick={() => setShowCitySearchModal(false)}>
+                    <S.CitySearchModalContainer onClick={(e) => e.stopPropagation()}>
+                        <S.CitySearchModalHeader>
+                            <S.CitySearchModalTitle>출생 도시 검색</S.CitySearchModalTitle>
+                            <S.CloseButton onClick={() => setShowCitySearchModal(false)}>&times;</S.CloseButton>
+                        </S.CitySearchModalHeader>
+                        <S.CitySearchModalBody>
+                            <S.CitySearchInput
                                 type="text"
                                 placeholder="예: 서울, Paris, つくば"
                                 value={modalCityQuery}
                                 onChange={(e) => setModalCityQuery(e.target.value)}
                                 autoComplete="off"
                             />
-                            <CitySearchResultsList>
+                            <S.CitySearchResultsList>
                                 {!modalCityQuery || modalCityQuery.trim().length < 2 ? (
-                                    <CitySearchHelperText>
+                                    <S.CitySearchHelperText>
                                         태어난 도시를 모르시는 경우<br />
                                         태어난 국가의 수도를 입력하세요.
-                                    </CitySearchHelperText>
+                                    </S.CitySearchHelperText>
                                 ) : isSearchingCity ? (
-                                    <CitySearchLoading>🔍 검색 중...</CitySearchLoading>
+                                    <S.CitySearchLoading>🔍 검색 중...</S.CitySearchLoading>
                                 ) : citySuggestions.length > 0 ? (
                                     citySuggestions.map((suggestion, index) => {
                                         // 주요 지명 (첫 줄)
@@ -1263,26 +677,26 @@ const FortuneInputModal = ({ onClose, onSubmit, initialData = null, userName = '
                                         const secondary = secondaryParts.join(', ');
 
                                         return (
-                                            <CitySearchItem
+                                            <S.CitySearchItem
                                                 key={index}
                                                 onClick={() => handleCitySelect(suggestion)}
                                             >
-                                                <CitySearchItemPrimary>{primary}</CitySearchItemPrimary>
+                                                <S.CitySearchItemPrimary>{primary}</S.CitySearchItemPrimary>
                                                 {secondary && (
-                                                    <CitySearchItemSecondary>{secondary}</CitySearchItemSecondary>
+                                                    <S.CitySearchItemSecondary>{secondary}</S.CitySearchItemSecondary>
                                                 )}
-                                            </CitySearchItem>
+                                            </S.CitySearchItem>
                                         );
                                     })
                                 ) : (
-                                    <CitySearchEmpty>검색 결과가 없습니다</CitySearchEmpty>
+                                    <S.CitySearchEmpty>검색 결과가 없습니다</S.CitySearchEmpty>
                                 )}
-                            </CitySearchResultsList>
-                        </CitySearchModalBody>
-                    </CitySearchModalContainer>
-                </CitySearchModalOverlay>
+                            </S.CitySearchResultsList>
+                        </S.CitySearchModalBody>
+                    </S.CitySearchModalContainer>
+                </S.CitySearchModalOverlay>
             )}
-        </Overlay>
+        </S.Overlay>
     );
 };
 

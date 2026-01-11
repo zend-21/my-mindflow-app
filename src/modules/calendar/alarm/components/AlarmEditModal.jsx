@@ -2,8 +2,8 @@
 // 알람 수정 모달 컴포넌트
 
 import React, { useState, useRef, useEffect } from 'react';
-import styled from 'styled-components';
 import Portal from '../../../../components/Portal';
+import * as S from './AlarmEditModal.styles';
 import {
   ALARM_COLORS,
   ADVANCE_NOTICE_CONFIG,
@@ -29,229 +29,6 @@ import {
 import { saveAudioFile, loadAudioFile } from '../../../../utils/audioStorage';
 import { Toast } from './Toast';
 import AlarmToast from '../../AlarmToast';
-
-const Overlay = styled.div`
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 12000;
-  touch-action: none;
-  overscroll-behavior: contain;
-`;
-
-const ModalContent = styled.div`
-  background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
-  border-radius: 16px;
-  width: 95vw;
-  max-width: 480px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-`;
-
-const Header = styled.div`
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`;
-
-const HeaderTitle = styled.h2`
-  font-size: 18px;
-  font-weight: 600;
-  color: #e0e0e0;
-  margin: 0;
-  flex: 1;
-  text-align: center;
-`;
-
-const CloseButton = styled.button`
-  background: none;
-  border: none;
-  font-size: 24px;
-  color: ${ALARM_COLORS.muted};
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: background-color 0.2s;
-
-  &:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-  }
-`;
-
-const FormArea = styled.div`
-  padding: 20px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-`;
-
-const Section = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-`;
-
-const SectionTitle = styled.h3`
-  font-size: 16px;
-  font-weight: 600;
-  color: #e0e0e0;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  svg {
-    color: ${ALARM_COLORS.primary};
-  }
-`;
-
-const Input = styled.input`
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 14px;
-  background: #333842;
-  color: #e0e0e0;
-
-  &::placeholder {
-    color: #808080;
-  }
-
-  &:focus {
-    outline: 2px solid ${ALARM_COLORS.primary};
-    border-color: transparent;
-  }
-`;
-
-const TimeInput = styled.input`
-  width: 60px;
-  padding: 14px 10px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 16px;
-  text-align: center;
-  background: #333842;
-  color: #e0e0e0;
-
-  &::placeholder {
-    color: #808080;
-  }
-
-  &:focus {
-    outline: 2px solid ${ALARM_COLORS.primary};
-    border-color: transparent;
-  }
-`;
-
-const Select = styled.select`
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 14px;
-  background: #333842;
-  color: #e0e0e0;
-
-  &:focus {
-    outline: 2px solid ${ALARM_COLORS.primary};
-    border-color: transparent;
-  }
-`;
-
-const ToggleButton = styled.button`
-  width: 100%;
-  padding: 12px;
-  background: #333842;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #e0e0e0;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: all 0.2s;
-
-  &:hover {
-    background: #3d424d;
-  }
-`;
-
-const Footer = styled.div`
-  padding: 16px 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-`;
-
-const Button = styled.button`
-  padding: 10px 20px;
-  border-radius: 8px;
-  border: none;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  ${props => props.$variant === 'primary' && `
-    background: ${ALARM_COLORS.primary};
-    color: white;
-
-    &:hover {
-      background: #0056b3;
-    }
-  `}
-
-  ${props => props.$variant === 'secondary' && `
-    background: #6c757d;
-    color: white;
-
-    &:hover {
-      background: #5a6268;
-    }
-  `}
-`;
-
-const PreviewButton = styled.button`
-  width: 100%;
-  padding: 12px 16px;
-  border-radius: 8px;
-  border: 1px solid ${ALARM_COLORS.primary};
-  background: rgba(74, 144, 226, 0.1);
-  color: ${ALARM_COLORS.primary};
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-
-  &:hover {
-    background: rgba(74, 144, 226, 0.2);
-    border-color: #0056b3;
-  }
-
-  &:active {
-    transform: scale(0.98);
-  }
-`;
 
 export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
   const [editTitle, setEditTitle] = useState('');
@@ -517,23 +294,23 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
 
   return (
     <Portal>
-      <Overlay>
-        <ModalContent>
-          <Header>
+      <S.Overlay>
+        <S.ModalContent>
+          <S.Header>
             <div style={{ width: '32px' }}></div>
-            <HeaderTitle>알람 수정</HeaderTitle>
-            <CloseButton onClick={onClose}>×</CloseButton>
-          </Header>
+            <S.HeaderTitle>알람 수정</S.HeaderTitle>
+            <S.CloseButton onClick={onClose}>×</S.CloseButton>
+          </S.Header>
 
-          <FormArea>
+          <S.FormArea>
             {/* 1. 알람 타이틀 */}
-            <Section>
-              <SectionTitle>
+            <S.Section>
+              <S.SectionTitle>
                 <TitleIcon />
                 알람 타이틀<span style={{ color: ALARM_COLORS.danger, fontWeight: 'normal' }}>(필수항목)</span>
-              </SectionTitle>
+              </S.SectionTitle>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Input
+                <S.Input
                   type="text"
                   placeholder="예: 수빈이 생일"
                   value={editTitle}
@@ -550,10 +327,10 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                   {calculateByteLength(editTitle)}/20
                 </div>
               </div>
-            </Section>
+            </S.Section>
 
             {/* 2. 기념일 체크박스 + 설정 */}
-            <Section style={{ marginTop: '-8px' }}>
+            <S.Section style={{ marginTop: '-8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: editIsAnniversary ? '16px' : '0' }}>
                 <input
                   type="checkbox"
@@ -633,7 +410,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                           style={{ width: '18px', height: '18px', cursor: 'pointer' }}
                         />
                         <label htmlFor="edit-timing-before" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '14px', color: '#e0e0e0', cursor: 'pointer' }}>
-                          <TimeInput
+                          <S.TimeInput
                             ref={editAnniversaryDaysInputRef}
                             type="number"
                             min="1"
@@ -663,16 +440,16 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                   </div>
                 </div>
               )}
-            </Section>
+            </S.Section>
 
             {/* 3. 알람 시간 */}
-            <Section>
-              <SectionTitle>
+            <S.Section>
+              <S.SectionTitle>
                 <ClockIcon />
                 알람 시간<span style={{ color: ALARM_COLORS.danger, fontWeight: 'normal' }}>(필수항목)</span>
-              </SectionTitle>
+              </S.SectionTitle>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <TimeInput
+                <S.TimeInput
                   type="number"
                   min="0"
                   max="23"
@@ -692,7 +469,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                   onFocus={(e) => e.target.select()}
                 />
                 <span style={{ fontSize: '16px', color: '#e0e0e0' }}>시</span>
-                <TimeInput
+                <S.TimeInput
                   type="number"
                   min="0"
                   max="59"
@@ -713,11 +490,11 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                 />
                 <span style={{ fontSize: '16px', color: '#e0e0e0' }}>분</span>
               </div>
-            </Section>
+            </S.Section>
 
             {/* 개별 알람옵션 Toggle Button */}
-            <Section>
-              <ToggleButton
+            <S.Section>
+              <S.ToggleButton
                 onClick={() => {
                   const newShowOptions = !showCustomOptions;
                   setShowCustomOptions(newShowOptions);
@@ -727,8 +504,8 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                 <span style={{ transform: showCustomOptions ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                   ▼
                 </span>
-              </ToggleButton>
-            </Section>
+              </S.ToggleButton>
+            </S.Section>
 
             {/* 개별 알람옵션 설명 및 초기화 버튼 */}
             {showCustomOptions && (
@@ -782,12 +559,12 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
 
             {/* 개별 알람 소리 */}
             {showCustomOptions && (
-              <Section style={{ marginTop: '-12px' }}>
-                <SectionTitle>
+              <S.Section style={{ marginTop: '-12px' }}>
+                <S.SectionTitle>
                   <VolumeIcon />
                   알람 소리
-                </SectionTitle>
-                <Select
+                </S.SectionTitle>
+                <S.Select
                   value={editCustomSound === 'default' ? 'default' : 'custom'}
                   onChange={(e) => {
                     if (e.target.value === 'default') {
@@ -803,7 +580,7 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                 >
                   <option value="default">기본 알림음</option>
                   <option value="custom">사용자 지정</option>
-                </Select>
+                </S.Select>
                 {/* 항상 렌더링하되, 필요할 때만 보이도록 */}
                 <HiddenFileInput
                   ref={editSoundFileInputRef}
@@ -854,16 +631,16 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                     미리듣기
                   </span>
                 </SoundPreview>
-              </Section>
+              </S.Section>
             )}
 
             {/* 개별 알람 볼륨 */}
             {showCustomOptions && (
-              <Section>
-                <SectionTitle>
+              <S.Section>
+                <S.SectionTitle>
                   <VolumeIcon />
                   알람 볼륨
-                </SectionTitle>
+                </S.SectionTitle>
                 <VolumeContainer>
                   <VolumeSlider
                     type="range"
@@ -874,16 +651,16 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                   />
                   <VolumeLabel>{editCustomVolume !== null ? editCustomVolume : volume}%</VolumeLabel>
                 </VolumeContainer>
-              </Section>
+              </S.Section>
             )}
 
             {/* 개별 알림 유형 */}
             {showCustomOptions && (
-              <Section>
-                <SectionTitle>
+              <S.Section>
+                <S.SectionTitle>
                   <VibrateIcon />
                   알림 유형
-                </SectionTitle>
+                </S.SectionTitle>
                 <RadioGroup style={{ flexDirection: 'column' }}>
                   <RadioOption $checked={(editCustomNotificationType !== null ? editCustomNotificationType : notificationType) === 'sound'}>
                     <input
@@ -916,34 +693,34 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                     <span>소리 + 진동</span>
                   </RadioOption>
                 </RadioGroup>
-              </Section>
+              </S.Section>
             )}
 
             {/* 개별 미리 알림 */}
             {showCustomOptions && (
-              <Section>
-                <SectionTitle>
+              <S.Section>
+                <S.SectionTitle>
                   <ClockIcon />
                   미리 알림 <span style={{ fontSize: '11px', color: '#868e96', fontWeight: 'normal', marginLeft: '4px' }}>(알람 시간 전에 미리 한 번 더 울립니다)</span>
-                </SectionTitle>
-                <Select
+                </S.SectionTitle>
+                <S.Select
                   value={editCustomAdvanceNotice !== null ? editCustomAdvanceNotice : 0}
                   onChange={(e) => setEditCustomAdvanceNotice(parseInt(e.target.value, 10))}
                 >
                   {Object.entries(ADVANCE_NOTICE_CONFIG.options).map(([value, label]) => (
                     <option key={value} value={value}>{label}</option>
                   ))}
-                </Select>
-              </Section>
+                </S.Select>
+              </S.Section>
             )}
 
             {/* 개별 반복 횟수 */}
             {showCustomOptions && (
-              <Section>
-                <SectionTitle>
+              <S.Section>
+                <S.SectionTitle>
                   <AlertIcon />
                   반복 횟수 <span style={{ fontSize: '11px', color: '#868e96', fontWeight: 'normal', marginLeft: '4px' }}>(특정 간격으로 알람을 반복하여 울립니다)</span>
-                </SectionTitle>
+                </S.SectionTitle>
                 <RadioGroup style={{ flexDirection: 'row', gap: '16px' }}>
                   {Object.entries(ALARM_REPEAT_CONFIG.counts).map(([value, label]) => (
                     <RadioOption key={value} $checked={(editCustomRepeatCount !== null ? editCustomRepeatCount : ALARM_REPEAT_CONFIG.defaultCount) === parseInt(value, 10)}>
@@ -958,16 +735,16 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                     </RadioOption>
                   ))}
                 </RadioGroup>
-              </Section>
+              </S.Section>
             )}
 
             {/* 개별 반복 간격 - 반복 횟수가 3회일 때만 표시 */}
             {showCustomOptions && (editCustomRepeatCount !== null ? editCustomRepeatCount : ALARM_REPEAT_CONFIG.defaultCount) === 3 && (
-              <Section>
-                <SectionTitle>
+              <S.Section>
+                <S.SectionTitle>
                   <BellIcon />
                   반복 간격
-                </SectionTitle>
+                </S.SectionTitle>
                 <RadioGroup style={{ flexDirection: 'row', gap: '16px' }}>
                   {Object.entries(ALARM_REPEAT_CONFIG.intervals).map(([value, label]) => (
                     <RadioOption key={value} $checked={(editCustomRepeatInterval !== null ? editCustomRepeatInterval : ALARM_REPEAT_CONFIG.defaultInterval) === parseInt(value, 10)}>
@@ -982,36 +759,36 @@ export const AlarmEditModal = ({ isOpen, alarm, onSave, onClose }) => {
                     </RadioOption>
                   ))}
                 </RadioGroup>
-              </Section>
+              </S.Section>
             )}
 
             {/* 알람 미리보기 버튼 */}
             {showCustomOptions && (
-              <Section>
-                <PreviewButton onClick={handlePreview}>
+              <S.Section>
+                <S.PreviewButton onClick={handlePreview}>
                   ⏰
                   알람 미리보기
-                </PreviewButton>
+                </S.PreviewButton>
                 <div style={{ fontSize: '11px', color: '#868e96', textAlign: 'center', marginTop: '8px' }}>
                   미리 알림은 5초 후 시뮬레이션됩니다
                 </div>
-              </Section>
+              </S.Section>
             )}
-          </FormArea>
+          </S.FormArea>
 
           {/* Hidden audio element for sound preview */}
           <audio ref={audioRef} />
 
-          <Footer>
-            <Button $variant="secondary" onClick={onClose}>
+          <S.Footer>
+            <S.Button $variant="secondary" onClick={onClose}>
               취소
-            </Button>
-            <Button $variant="primary" onClick={handleSave}>
+            </S.Button>
+            <S.Button $variant="primary" onClick={handleSave}>
               저장
-            </Button>
-          </Footer>
-        </ModalContent>
-      </Overlay>
+            </S.Button>
+          </S.Footer>
+        </S.ModalContent>
+      </S.Overlay>
       <Toast
         message={toastMessage}
         isOpen={showToast}

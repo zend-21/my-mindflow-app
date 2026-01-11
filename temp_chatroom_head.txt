@@ -1,0 +1,31 @@
+// 전체화면 채팅방 컴포넌트
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import styled from 'styled-components';
+import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Settings, X, UserCog, UserPlus, Trash2, Mail, Copy, Shield } from 'lucide-react';
+// 🆕 통합 채팅 서비스 (1:1 + 그룹)
+import {
+  sendMessage as sendUnifiedMessage,
+  subscribeToMessages as subscribeToUnifiedMessages,
+  markAsRead as markUnifiedAsRead,
+  markAllMessagesAsRead as markAllUnifiedMessagesAsRead,
+  enterChatRoom as enterUnifiedChatRoom,
+  exitChatRoom as exitUnifiedChatRoom
+} from '../../services/unifiedChatService';
+// 개별 서비스 (그룹 관리 기능용)
+import { subscribeToDMRoom } from '../../services/directMessageService';
+import { acceptInvitation, rejectInvitation, inviteMembersToGroup, transferRoomOwnership, removeMemberFromGroup, deleteGroupChat, cancelInvitation, updateGroupRoomType, appointSubManager, updateGroupImage } from '../../services/groupChatService';
+import { getMyFriends, getUserByWorkspaceCode } from '../../services/friendService';
+import { getUserNickname } from '../../services/nicknameService';
+import { isUserBlocked } from '../../services/userManagementService';
+import { playChatMessageSound, notificationSettings } from '../../utils/notificationSounds';
+import CollaborativeDocumentEditor from './CollaborativeDocumentEditor';
+import SharedMemoSelectorModal from './SharedMemoSelectorModal';
+import PermissionManagementModal from './PermissionManagementModal';
+import AppointSubManagerModal from './AppointSubManagerModal';
+import { db } from '../../firebase/config';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
+import { getCurrentUserId, getCurrentUserData } from '../../utils/userStorage';
+import { avatarList } from '../avatars/AvatarIcons';
+
+// 전체화면 컨테이너

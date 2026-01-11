@@ -35,7 +35,15 @@
       "Bash(firebase firestore:indexes:*)",
       "Bash(git stash:*)",
       "Bash(git pull:*)",
-      "Bash(firebase hosting:releases:list:*)"
+      "Bash(firebase hosting:releases:list:*)",
+      "Bash(ls:*)",
+      "Bash(node scripts/check-file-sizes.js:*)",
+      "Bash(powershell -Command \"\\(Get-Content ''src/components/AvatarSelector.styles.js'' | Measure-Object -Line\\).Lines\")",
+      "Bash(find:*)",
+      "Bash(echo:*)",
+      "Bash(git status:*)",
+      "Bash(wc:*)",
+      "Bash(pkill:*)"
     ],
     "deny": [],
     "ask": []

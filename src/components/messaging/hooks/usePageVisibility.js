@@ -1,0 +1,49 @@
+import { useState, useEffect } from 'react';
+import {
+  enterUnifiedChatRoom,
+  exitUnifiedChatRoom,
+  markUnifiedAsRead,
+  markAllUnifiedMessagesAsRead
+} from '../../../services/unifiedChatService';
+
+/**
+ * 페이지 가시성 감지 및 채팅방 입/퇴장 관리
+ */
+export function usePageVisibility(chatId, chatType, currentUserId) {
+  const [isPageVisible, setIsPageVisible] = useState(!document.hidden);
+
+  // Page Visibility API - 페이지 가시성 감지
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      const visible = !document.hidden;
+      setIsPageVisible(visible);
+      console.log(`📱 페이지 가시성 변경: ${visible ? '보임' : '숨김'}`);
+
+      if (visible) {
+        // 페이지가 다시 보이면: inRoom = true로 설정 + 읽음 처리
+        await enterUnifiedChatRoom(chatId, chatType, currentUserId);
+        markUnifiedAsRead(chatId, chatType, currentUserId, true);
+        markAllUnifiedMessagesAsRead(chatId, chatType, currentUserId, true);
+      } else {
+        // 페이지가 숨겨지면: inRoom = false로 설정
+        await exitUnifiedChatRoom(chatId, chatType, currentUserId);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [chatId, chatType, currentUserId]);
+
+  // 채팅방 입장/퇴장 처리 (통합)
+  useEffect(() => {
+    enterUnifiedChatRoom(chatId, chatType, currentUserId);
+    return () => {
+      exitUnifiedChatRoom(chatId, chatType, currentUserId);
+    };
+  }, [chatId, chatType, currentUserId]);
+
+  return {
+    isPageVisible,
+    setIsPageVisible
+  };
+}

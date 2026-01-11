@@ -1,7 +1,7 @@
 // 전체화면 채팅방 컴포넌트
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import styled from 'styled-components';
+import * as S from './ChatRoom.styles';
 import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Settings, X, UserCog, UserPlus, Trash2, Mail, Copy, Shield } from 'lucide-react';
 // 🆕 통합 채팅 서비스 (1:1 + 그룹)
 import {
@@ -28,1245 +28,6 @@ import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { getCurrentUserId, getCurrentUserData } from '../../utils/userStorage';
 import { avatarList } from '../avatars/AvatarIcons';
 
-// 전체화면 컨테이너
-const FullScreenContainer = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
-  z-index: 100000; /* 모든 요소보다 높게 - 전체화면 채팅 */
-  display: flex;
-  flex-direction: column;
-`;
-
-// 헤더
-const Header = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  background: rgba(26, 26, 26, 0.95);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-`;
-
-const HeaderLeft = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-`;
-
-const HeaderRight = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-`;
-
-const BackButton = styled.button`
-  background: transparent;
-  border: none;
-  color: #4a90e2;
-  padding: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  transition: all 0.2s;
-
-  &:hover {
-    background: rgba(74, 144, 226, 0.1);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-const Avatar = styled.div`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: ${props => props.$color || 'linear-gradient(135deg, #667eea, #764ba2)'};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: 600;
-  color: #ffffff;
-  flex-shrink: 0;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  position: relative;
-  cursor: ${props => props.$clickable ? 'pointer' : 'default'};
-  transition: all 0.2s;
-
-  &:hover {
-    ${props => props.$clickable && `
-      transform: scale(1.05);
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-    `}
-  }
-`;
-
-const AvatarBadge = styled.div`
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 18px;
-  height: 18px;
-  background: rgba(26, 26, 26, 0.95);
-  border: 1.5px solid rgba(255, 255, 255, 0.15);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-`;
-
-const ChatInfo = styled.div`
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-`;
-
-const ChatName = styled.div`
-  font-size: 16px;
-  font-weight: 600;
-  color: #ffffff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-`;
-
-const ChatStatus = styled.div`
-  font-size: 12px;
-  color: #888;
-`;
-
-const MenuButton = styled.button`
-  background: transparent;
-  border: none;
-  color: #888;
-  padding: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  transition: all 0.2s;
-  position: relative;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #ffffff;
-  }
-`;
-
-// 드롭다운 메뉴
-const DropdownMenu = styled.div`
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  background: linear-gradient(180deg, #2a2a2a 0%, #1f1f1f 100%);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-  min-width: 180px;
-  z-index: 1000;
-  overflow: hidden;
-`;
-
-const DropdownItem = styled.button`
-  width: 100%;
-  padding: 12px 16px;
-  background: transparent;
-  border: none;
-  color: #e0e0e0;
-  font-size: 14px;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #ffffff;
-  }
-
-  &:not(:last-child) {
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  }
-`;
-
-// 메시지 영역
-const MessagesContainer = styled.div`
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  padding-bottom: 80px;  /* 🔥 나가기 버튼 영역 확보 */
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-  }
-
-  &::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
-  }
-`;
-
-// 날짜 구분선
-const DateSeparator = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 16px 0;
-
-  &::before,
-  &::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: rgba(255, 255, 255, 0.1);
-  }
-`;
-
-const DateText = styled.span`
-  font-size: 12px;
-  color: #666;
-  font-weight: 500;
-  white-space: nowrap;
-`;
-
-// 그룹 삭제 알림 박스
-const DeletionNotice = styled.div`
-  position: sticky;
-  top: 20px;
-  margin: 20px auto;
-  max-width: 500px;
-  padding: 24px;
-  background: rgba(220, 38, 38, 0.1);
-  border: 2px solid #dc2626;
-  border-radius: 12px;
-  text-align: center;
-  z-index: 50;
-`;
-
-const DeletionTitle = styled.div`
-  font-size: 16px;
-  font-weight: 700;
-  color: #ef4444;
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-`;
-
-const DeletionMessage = styled.div`
-  font-size: 14px;
-  color: #fca5a5;
-  line-height: 1.6;
-  margin-bottom: 16px;
-`;
-
-const DeletionCountdown = styled.div`
-  font-size: 24px;
-  font-weight: 800;
-  color: #ffffff;
-  background: #dc2626;
-  padding: 12px 24px;
-  border-radius: 8px;
-  display: inline-block;
-`;
-
-// 메시지 아이템
-const MessageItem = styled.div`
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  flex-direction: ${props => props.$isMine ? 'row-reverse' : 'row'};
-`;
-
-const MessageAvatar = styled(Avatar)`
-  width: 32px;
-  height: 32px;
-  font-size: 14px;
-  position: relative;
-`;
-
-const RoleBadge = styled.div`
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: rgba(26, 26, 26, 0.95);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  border: 1.5px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-`;
-
-const MessageContent = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  align-items: ${props => props.$isMine ? 'flex-end' : 'flex-start'};
-  max-width: 70%;
-`;
-
-const SenderName = styled.div`
-  font-size: 12px;
-  color: #888;
-  padding: 0 8px;
-`;
-
-const MessageBubble = styled.div`
-  background: ${props => props.$isMine
-    ? 'linear-gradient(135deg, #4a90e2, #357abd)'
-    : 'rgba(255, 255, 255, 0.08)'};
-  color: #ffffff;
-  padding: 10px 14px;
-  border-radius: ${props => props.$isMine
-    ? '16px 16px 4px 16px'
-    : '16px 16px 16px 4px'};
-  font-size: 14px;
-  line-height: 1.5;
-  word-break: break-word;
-  box-shadow: ${props => props.$isMine
-    ? '0 2px 8px rgba(74, 144, 226, 0.3)'
-    : 'none'};
-`;
-
-const MessageMeta = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
-  gap: 2px;
-`;
-
-const MessageTime = styled.div`
-  font-size: 11px;
-  color: #666;
-  padding: 0 4px;
-`;
-
-const UnreadBadge = styled.div`
-  font-size: 11px;
-  color: #4a90e2;
-  font-weight: 700;
-  padding: 0 4px;
-  min-width: 16px;
-  text-align: center;
-`;
-
-// 입력 영역
-const InputContainer = styled.div`
-  padding: 16px 20px;
-  background: rgba(26, 26, 26, 0.95);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(10px);
-  position: sticky;
-  bottom: 0;
-`;
-
-const InputWrapper = styled.div`
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-`;
-
-const BlockedMessage = styled.div`
-  padding: 16px;
-  text-align: center;
-  color: #999;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-`;
-
-const InputGroup = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const TextInputWrapper = styled.div`
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 24px;
-  padding: 8px 12px;
-  transition: all 0.2s;
-
-  &:focus-within {
-    border-color: #4a90e2;
-    background: rgba(255, 255, 255, 0.08);
-  }
-`;
-
-const IconButton = styled.button`
-  background: transparent;
-  border: none;
-  color: #888;
-  padding: 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  transition: all 0.2s;
-  flex-shrink: 0;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #4a90e2;
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-const TextInput = styled.textarea`
-  flex: 1;
-  background: transparent;
-  border: none;
-  color: #e0e0e0;
-  padding: 8px 4px;
-  font-size: 15px;
-  font-family: inherit;
-  resize: none;
-  max-height: 120px;
-  min-height: 48px;
-  line-height: 1.5;
-  transition: all 0.2s;
-
-  &::placeholder {
-    color: #666;
-  }
-
-  &:focus {
-    outline: none;
-  }
-
-  &::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 2px;
-  }
-`;
-
-// 이모티콘 선택기
-const EmojiPicker = styled.div`
-  position: absolute;
-  bottom: 80px;
-  left: 20px;
-  right: 20px;
-  background: rgba(26, 26, 26, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 16px;
-  padding: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(20px);
-  z-index: 100;
-  max-height: 300px;
-  overflow-y: auto;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
-  }
-`;
-
-const EmojiHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-`;
-
-const EmojiTitle = styled.div`
-  font-size: 14px;
-  font-weight: 600;
-  color: #ffffff;
-`;
-
-const EmojiCategoryTabs = styled.div`
-  display: flex;
-  gap: 4px;
-  margin-bottom: 12px;
-  overflow-x: auto;
-  padding-bottom: 4px;
-
-  &::-webkit-scrollbar {
-    height: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 2px;
-  }
-`;
-
-const CategoryTab = styled.button`
-  flex-shrink: 0;
-  background: ${props => props.$active ? 'rgba(74, 144, 226, 0.2)' : 'rgba(255, 255, 255, 0.05)'};
-  border: 1px solid ${props => props.$active ? 'rgba(74, 144, 226, 0.4)' : 'rgba(255, 255, 255, 0.1)'};
-  color: ${props => props.$active ? '#4a90e2' : '#888'};
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 18px;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background: ${props => props.$active ? 'rgba(74, 144, 226, 0.3)' : 'rgba(255, 255, 255, 0.08)'};
-    border-color: ${props => props.$active ? 'rgba(74, 144, 226, 0.5)' : 'rgba(255, 255, 255, 0.15)'};
-  }
-`;
-
-const EmojiGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 6px;
-  max-height: 200px;
-  overflow-y: auto;
-  overflow-x: hidden; /* 가로 스크롤 방지 */
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 3px;
-  }
-
-  @media (max-width: 400px) {
-    grid-template-columns: repeat(5, 1fr);
-  }
-`;
-
-const EmojiButton = styled.button`
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 24px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  aspect-ratio: 1;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: scale(1.1);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-const SendButton = styled.button`
-  background: ${props => props.disabled
-    ? 'rgba(74, 144, 226, 0.3)'
-    : 'linear-gradient(135deg, #4a90e2, #357abd)'};
-  border: none;
-  color: #ffffff;
-  padding: 12px;
-  border-radius: 50%;
-  cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s;
-  box-shadow: ${props => props.disabled
-    ? 'none'
-    : '0 4px 12px rgba(74, 144, 226, 0.3)'};
-
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(74, 144, 226, 0.4);
-  }
-
-  &:active:not(:disabled) {
-    transform: translateY(0);
-  }
-`;
-
-// 초대 수락/거부 배너
-const InvitationBanner = styled.div`
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
-  border: 1px solid rgba(102, 126, 234, 0.3);
-  border-radius: 12px;
-  padding: 16px 20px;
-  margin: 12px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-`;
-
-const InvitationText = styled.div`
-  color: #e0e0e0;
-  font-size: 14px;
-  line-height: 1.5;
-
-  strong {
-    color: #ffffff;
-    font-weight: 600;
-  }
-`;
-
-const InvitationActions = styled.div`
-  display: flex;
-  gap: 12px;
-`;
-
-const InvitationButton = styled.button`
-  flex: 1;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const AcceptButton = styled(InvitationButton)`
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: #ffffff;
-  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
-
-  &:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-  }
-`;
-
-const RejectButton = styled(InvitationButton)`
-  background: rgba(255, 255, 255, 0.05);
-  color: #e0e0e0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-
-  &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.08);
-  }
-`;
-
-// 모달 스타일
-const ModalOverlay = styled.div`
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100000;
-  padding: 20px;
-`;
-
-const ModalContainer = styled.div`
-  background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
-  border-radius: 20px;
-  width: 100%;
-  max-width: 500px;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-`;
-
-const ModalHeader = styled.div`
-  padding: 24px 24px 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-`;
-
-const ModalTitle = styled.h2`
-  font-size: 20px;
-  font-weight: 700;
-  color: #ffffff;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-`;
-
-const CloseButton = styled.button`
-  background: rgba(255, 255, 255, 0.05);
-  border: none;
-  color: #888;
-  padding: 8px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #ffffff;
-  }
-`;
-
-const ModalContent = styled.div`
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-  }
-`;
-
-const MemberItem = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  margin-bottom: 8px;
-  transition: all 0.2s;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.2);
-  }
-`;
-
-const MemberAvatar = styled.div`
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: ${props => props.$color || 'linear-gradient(135deg, #667eea, #764ba2)'};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: 600;
-  color: #ffffff;
-  flex-shrink: 0;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-`;
-
-const MemberInfo = styled.div`
-  flex: 1;
-  min-width: 0;
-`;
-
-const MemberName = styled.div`
-  font-size: 15px;
-  font-weight: 600;
-  color: #ffffff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-`;
-
-const MemberStatus = styled.span`
-  font-size: 11px;
-  color: ${props => props.$status === 'active' ? '#4ade80' : props.$status === 'pending' ? '#fbbf24' : '#888'};
-  background: ${props => props.$status === 'active' ? 'rgba(74, 222, 128, 0.1)' : props.$status === 'pending' ? 'rgba(251, 191, 36, 0.1)' : 'rgba(136, 136, 136, 0.1)'};
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-weight: 500;
-`;
-
-const OwnerBadge = styled.span`
-  font-size: 11px;
-  color: #667eea;
-  background: rgba(102, 126, 234, 0.15);
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-weight: 600;
-`;
-
-const RemoveButton = styled.button`
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.3);
-  color: #ef4444;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-
-  &:hover {
-    background: rgba(239, 68, 68, 0.2);
-    border-color: rgba(239, 68, 68, 0.5);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-const CancelInviteButton = styled.button`
-  background: rgba(250, 204, 21, 0.1);
-  border: 1px solid rgba(250, 204, 21, 0.3);
-  color: #facc15;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-
-  &:hover {
-    background: rgba(250, 204, 21, 0.2);
-    border-color: rgba(250, 204, 21, 0.5);
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-`;
-
-// 빈 상태
-const EmptyState = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-  text-align: center;
-  color: #666;
-`;
-
-const EmptyIcon = styled.div`
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-`;
-
-const EmptyTitle = styled.div`
-  font-size: 16px;
-  font-weight: 600;
-  color: #888;
-  margin-bottom: 8px;
-`;
-
-const EmptyDescription = styled.div`
-  font-size: 14px;
-  color: #666;
-  line-height: 1.5;
-`;
-
-// 멤버 초대/위임 모달 추가 스타일
-const TabContainer = styled.div`
-  display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-`;
-
-const TabButton = styled.button`
-  flex: 1;
-  padding: 12px;
-  background: ${props => props.$active ? 'rgba(102, 126, 234, 0.2)' : 'transparent'};
-  border: none;
-  border-bottom: 2px solid ${props => props.$active ? '#667eea' : 'transparent'};
-  color: ${props => props.$active ? '#667eea' : '#888'};
-  font-size: 14px;
-  font-weight: ${props => props.$active ? '600' : '400'};
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background: rgba(102, 126, 234, 0.1);
-    color: #667eea;
-  }
-`;
-
-const SearchBarWrapper = styled.div`
-  margin-bottom: 16px;
-`;
-
-const SearchByIdContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-`;
-
-const IdInputWrapper = styled.div`
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  padding: 0 20px;
-`;
-
-const IdInput = styled.input`
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #e0e0e0;
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-size: 14px;
-  text-transform: uppercase;
-  width: 240px;
-  transition: all 0.2s;
-
-  &::placeholder {
-    color: #666;
-    text-transform: none;
-  }
-
-  &:focus {
-    outline: none;
-    border-color: #667eea;
-    background: rgba(255, 255, 255, 0.08);
-  }
-`;
-
-const SearchButton = styled.button`
-  background: #667eea;
-  border: none;
-  color: white;
-  padding: 12px 24px;
-  border-radius: 12px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-  min-width: 100px;
-
-  &:hover:not(:disabled) {
-    background: #5568d3;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const UserCardContainer = styled.div`
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-`;
-
-const InviteButton = styled.button`
-  background: #667eea;
-  border: none;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 14px;
-  cursor: pointer;
-  margin-left: auto;
-  white-space: nowrap;
-  transition: all 0.2s;
-
-  &:hover:not(:disabled) {
-    background: #5568d3;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const SearchInput = styled.input`
-  width: 100%;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #e0e0e0;
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-size: 14px;
-  transition: all 0.2s;
-
-  &::placeholder {
-    color: #666;
-  }
-
-  &:focus {
-    outline: none;
-    border-color: #667eea;
-    background: rgba(255, 255, 255, 0.08);
-  }
-`;
-
-const FriendListWrapper = styled.div`
-  max-height: 400px;
-  overflow-y: auto;
-  margin-bottom: 16px;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 3px;
-  }
-`;
-
-const SelectableMemberItem = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: ${props => props.$selected ? 'rgba(102, 126, 234, 0.15)' : 'rgba(255, 255, 255, 0.03)'};
-  border: 1px solid ${props => props.$selected ? 'rgba(102, 126, 234, 0.4)' : 'rgba(255, 255, 255, 0.1)'};
-  border-radius: 12px;
-  margin-bottom: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-
-  &:hover {
-    background: ${props => props.$selected ? 'rgba(102, 126, 234, 0.2)' : 'rgba(255, 255, 255, 0.05)'};
-    border-color: ${props => props.$selected ? 'rgba(102, 126, 234, 0.5)' : 'rgba(255, 255, 255, 0.2)'};
-  }
-`;
-
-const CheckMark = styled.span`
-  color: #667eea;
-  font-size: 20px;
-  font-weight: bold;
-  flex-shrink: 0;
-`;
-
-const SelectedInfo = styled.div`
-  font-size: 13px;
-  color: #888;
-  text-align: center;
-  margin-top: 12px;
-`;
-
-const ModalFooter = styled.div`
-  padding: 20px 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  display: flex;
-  gap: 12px;
-`;
-
-const CancelButton = styled.button`
-  flex: 1;
-  padding: 14px 24px;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-  background: rgba(255, 255, 255, 0.05);
-  color: #e0e0e0;
-
-  &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const ConfirmButton = styled.button`
-  flex: 1;
-  padding: 14px 24px;
-  border-radius: 12px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: #ffffff;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
-  }
-
-  &:active:not(:disabled) {
-    transform: translateY(0);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const EmptyStateContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  text-align: center;
-`;
-
-const WarningMessage = styled.div`
-  background: rgba(251, 191, 36, 0.1);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  color: #fbbf24;
-  padding: 12px 16px;
-  border-radius: 12px;
-  font-size: 13px;
-  margin-bottom: 20px;
-  text-align: center;
-`;
-
-const InviteCodeContainer = styled.div`
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  padding: 20px;
-  margin: 20px 0;
-  text-align: center;
-`;
-
-const InviteCodeLabel = styled.div`
-  font-size: 13px;
-  color: #999;
-  margin-bottom: 12px;
-`;
-
-const InviteCodeDisplay = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  padding: 16px 20px;
-  margin-bottom: 16px;
-`;
-
-const InviteCodeText = styled.div`
-  font-size: 24px;
-  font-weight: 700;
-  color: #4a90e2;
-  letter-spacing: 2px;
-  font-family: 'Courier New', monospace;
-`;
-
-const CopyButton = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  border: none;
-  border-radius: 8px;
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
-  }
-
-  &:active {
-    transform: translateY(0);
-  }
-`;
-
-const InviteCodeDescription = styled.div`
-  font-size: 13px;
-  color: #999;
-  line-height: 1.6;
-`;
 
 const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, syncMemo }) => {
   const [messages, setMessages] = useState([]);
@@ -2620,14 +1381,14 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   };
 
   return createPortal(
-    <FullScreenContainer>
+    <S.FullScreenContainer>
       {/* 헤더 */}
-      <Header>
-        <HeaderLeft>
-          <BackButton onClick={onClose}>
+      <S.Header>
+        <S.HeaderLeft>
+          <S.BackButton onClick={onClose}>
             <ArrowLeft size={24} />
-          </BackButton>
-          <Avatar
+          </S.BackButton>
+          <S.Avatar
             $color={otherUser.isGroup ? 'linear-gradient(135deg, #667eea, #764ba2)' : getAvatarColor(otherUser.userId)}
             $clickable={otherUser.isGroup && isRoomOwner}
             onClick={handleAvatarClick}
@@ -2643,52 +1404,52 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
             {!chat.groupImage && !userProfilePictures[otherUser.userId] && !otherUser.isGroup && userAvatarSettings[otherUser.userId] && renderAvatarIcon(otherUser.userId)}
             {!chat.groupImage && !userProfilePictures[otherUser.userId] && !userAvatarSettings[otherUser.userId] && (otherUser.isGroup ? <Users size={20} /> : (nicknamesLoaded ? otherUser.name.charAt(0).toUpperCase() : '...'))}
             {otherUser.isGroup && (
-              <AvatarBadge title={chat.isPublic ? '공개방' : '비공개방'}>
+              <S.AvatarBadge title={chat.isPublic ? '공개방' : '비공개방'}>
                 {chat.isPublic ? '🌐' : '🔒'}
-              </AvatarBadge>
+              </S.AvatarBadge>
             )}
-          </Avatar>
-          <ChatInfo>
-            <ChatName>
+          </S.Avatar>
+          <S.ChatInfo>
+            <S.ChatName>
               {nicknamesLoaded
                 ? (otherUser.name.length > 10 ? otherUser.name.substring(0, 10) + '...' : otherUser.name)
                 : '로딩 중...'}
-            </ChatName>
-            <ChatStatus>
+            </S.ChatName>
+            <S.ChatStatus>
               {otherUser.isGroup ? `멤버 ${otherUser.memberCount}명` : ''}
-            </ChatStatus>
-          </ChatInfo>
-        </HeaderLeft>
-        <HeaderRight>
+            </S.ChatStatus>
+          </S.ChatInfo>
+        </S.HeaderLeft>
+        <S.HeaderRight>
           {chat.type === 'group' && !chat.isPublic && (
-            <MenuButton onClick={() => setShowMemberListModal(true)} title="참여자 목록">
+            <S.MenuButton onClick={() => setShowMemberListModal(true)} title="참여자 목록">
               <Users size={20} />
-            </MenuButton>
+            </S.MenuButton>
           )}
           {!otherUser.isSelfChat && (
-            <MenuButton onClick={handleToggleDocument} title="공유 문서">
+            <S.MenuButton onClick={handleToggleDocument} title="공유 문서">
               <FileText size={20} />
-            </MenuButton>
+            </S.MenuButton>
           )}
           {chat.type === 'group' && (
             <div style={{ position: 'relative' }}>
-              <MenuButton
+              <S.MenuButton
                 onClick={() => {
                   setShowMenuDropdown(!showMenuDropdown);
                 }}
                 title="메뉴"
               >
                 <MoreVertical size={20} />
-              </MenuButton>
+              </S.MenuButton>
               {/* 드롭다운 메뉴 */}
               {showMenuDropdown && (
-                <DropdownMenu onClick={(e) => e.stopPropagation()}>
+                <S.DropdownMenu onClick={(e) => e.stopPropagation()}>
                   {/* 방장 전용 메뉴 */}
                   {isRoomOwner && (
                     <>
                       {/* 비공개방일 때만 멤버 초대 메뉴 표시 */}
                       {!chat.isPublic && (
-                        <DropdownItem
+                        <S.DropdownItem
                           onClick={() => {
                             setShowInviteMembersModal(true);
                             setShowMenuDropdown(false);
@@ -2696,11 +1457,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                         >
                           <Users size={16} />
                           멤버 초대
-                        </DropdownItem>
+                        </S.DropdownItem>
                       )}
                       {/* 공개방일 때만 초대 코드 보기 메뉴 표시 */}
                       {chat.isPublic && (
-                        <DropdownItem
+                        <S.DropdownItem
                           onClick={() => {
                             setShowInviteCodeModal(true);
                             setShowMenuDropdown(false);
@@ -2708,10 +1469,10 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                         >
                           <Mail size={16} />
                           초대 코드 보기
-                        </DropdownItem>
+                        </S.DropdownItem>
                       )}
                       {/* 🆕 방 공개 설정 변경 메뉴 */}
-                      <DropdownItem
+                      <S.DropdownItem
                         onClick={() => {
                           setSelectedRoomType(chat.isPublic); // 현재 방 타입으로 초기화
                           setShowRoomTypeModal(true);
@@ -2720,8 +1481,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                       >
                         <Settings size={16} />
                         방 공개 설정
-                      </DropdownItem>
-                      <DropdownItem
+                      </S.DropdownItem>
+                      <S.DropdownItem
                         onClick={() => {
                           setShowAppointSubManagerModal(true);
                           setShowMenuDropdown(false);
@@ -2729,8 +1490,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                       >
                         <Shield size={16} />
                         부방장 임명
-                      </DropdownItem>
-                      <DropdownItem
+                      </S.DropdownItem>
+                      <S.DropdownItem
                         onClick={() => {
                           setShowTransferOwnerModal(true);
                           setShowMenuDropdown(false);
@@ -2738,8 +1499,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                       >
                         <UserCog size={16} />
                         방장 위임
-                      </DropdownItem>
-                      <DropdownItem
+                      </S.DropdownItem>
+                      <S.DropdownItem
                         onClick={() => {
                           setShowMenuDropdown(false);
                           handleDeleteGroup();
@@ -2748,13 +1509,13 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                       >
                         <Trash2 size={16} />
                         단체방 삭제
-                      </DropdownItem>
+                      </S.DropdownItem>
                     </>
                   )}
 
                   {/* 일반 참여자용 메뉴 */}
                   {!isRoomOwner && (
-                    <DropdownItem
+                    <S.DropdownItem
                       onClick={() => {
                         setShowMenuDropdown(false);
                         handleLeaveGroup();
@@ -2763,37 +1524,37 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                     >
                       <Trash2 size={16} />
                       현재 단체방 탈퇴
-                    </DropdownItem>
+                    </S.DropdownItem>
                   )}
-                </DropdownMenu>
+                </S.DropdownMenu>
               )}
             </div>
           )}
-        </HeaderRight>
-      </Header>
+        </S.HeaderRight>
+      </S.Header>
 
       {/* 초대 수락/거부 배너 (pending 상태일 때만 표시) */}
       {chat.type === 'group' && myMemberStatus === 'pending' && (
-        <InvitationBanner>
-          <InvitationText>
+        <S.InvitationBanner>
+          <S.InvitationText>
             <strong>{chat.groupName}</strong> 단체방에 초대되었습니다.<br />
             참여하시겠습니까?
-          </InvitationText>
-          <InvitationActions>
-            <RejectButton
+          </S.InvitationText>
+          <S.InvitationActions>
+            <S.RejectButton
               onClick={handleRejectInvitation}
               disabled={processingInvitation}
             >
               {processingInvitation ? '처리 중...' : '거부'}
-            </RejectButton>
-            <AcceptButton
+            </S.RejectButton>
+            <S.AcceptButton
               onClick={handleAcceptInvitation}
               disabled={processingInvitation}
             >
               {processingInvitation ? '처리 중...' : '수락'}
-            </AcceptButton>
-          </InvitationActions>
-        </InvitationBanner>
+            </S.AcceptButton>
+          </S.InvitationActions>
+        </S.InvitationBanner>
       )}
 
       {/* 협업 문서 (펼쳤을 때만 표시) */}
@@ -2820,31 +1581,31 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       )}
 
       {/* 메시지 목록 */}
-      <MessagesContainer>
+      <S.MessagesContainer>
         {/* 그룹 삭제 알림 (카운트다운) */}
         {groupDeletionInfo && (
-          <DeletionNotice>
-            <DeletionTitle>
+          <S.DeletionNotice>
+            <S.DeletionTitle>
               ⚠️ 단체방 삭제 안내
-            </DeletionTitle>
-            <DeletionMessage>
+            </S.DeletionTitle>
+            <S.DeletionMessage>
               {groupDeletionInfo.deleterName}님에 의해<br />
               대화방이 삭제되었습니다.
-            </DeletionMessage>
-            <DeletionCountdown>
+            </S.DeletionMessage>
+            <S.DeletionCountdown>
               {groupDeletionInfo.countdown}초 후 방이 사라집니다
-            </DeletionCountdown>
-          </DeletionNotice>
+            </S.DeletionCountdown>
+          </S.DeletionNotice>
         )}
 
         {messages.length === 0 ? (
-          <EmptyState>
-            <EmptyIcon>💬</EmptyIcon>
-            <EmptyTitle>대화를 시작해보세요</EmptyTitle>
-            <EmptyDescription>
+          <S.EmptyState>
+            <S.EmptyIcon>💬</S.EmptyIcon>
+            <S.EmptyTitle>대화를 시작해보세요</S.EmptyTitle>
+            <S.EmptyDescription>
               첫 메시지를 보내고<br />대화를 시작해보세요
-            </EmptyDescription>
-          </EmptyState>
+            </S.EmptyDescription>
+          </S.EmptyState>
         ) : (
           <>
             {messages.map((message, index) => {
@@ -2893,9 +1654,9 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                 return (
                   <div key={message.id}>
                     {showDate && (
-                      <DateSeparator>
-                        <DateText>{formatDate(message.createdAt)}</DateText>
-                      </DateSeparator>
+                      <S.DateSeparator>
+                        <S.DateText>{formatDate(message.createdAt)}</S.DateText>
+                      </S.DateSeparator>
                     )}
                     <div style={{
                       display: 'flex',
@@ -2930,106 +1691,106 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
               return (
                 <div key={message.id}>
                   {showDate && (
-                    <DateSeparator>
-                      <DateText>{formatDate(message.createdAt)}</DateText>
-                    </DateSeparator>
+                    <S.DateSeparator>
+                      <S.DateText>{formatDate(message.createdAt)}</S.DateText>
+                    </S.DateSeparator>
                   )}
-                  <MessageItem $isMine={isMine}>
+                  <S.MessageItem $isMine={isMine}>
                     {!isMine && showAvatar && (
-                      <MessageAvatar
+                      <S.MessageAvatar
                         $color={getAvatarColor(message.senderId)}
                         style={userProfilePictures[message.senderId] ? { backgroundImage: `url(${userProfilePictures[message.senderId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                       >
                         {!userProfilePictures[message.senderId] && userAvatarSettings[message.senderId] && renderAvatarIcon(message.senderId)}
                         {!userProfilePictures[message.senderId] && !userAvatarSettings[message.senderId] && (userNicknames[message.senderId] || userDisplayNames[message.senderId] || '사').charAt(0).toUpperCase()}
                         {userRole && (
-                          <RoleBadge title={userRole.label}>
+                          <S.RoleBadge title={userRole.label}>
                             {userRole.icon}
-                          </RoleBadge>
+                          </S.RoleBadge>
                         )}
-                      </MessageAvatar>
+                      </S.MessageAvatar>
                     )}
                     {!isMine && !showAvatar && <div style={{ width: '32px' }} />}
-                    <MessageContent $isMine={isMine}>
-                      {!isMine && showAvatar && <SenderName>{userNicknames[message.senderId] || userDisplayNames[message.senderId] || '사용자'}</SenderName>}
-                      <MessageBubble $isMine={isMine}>
+                    <S.MessageContent $isMine={isMine}>
+                      {!isMine && showAvatar && <S.SenderName>{userNicknames[message.senderId] || userDisplayNames[message.senderId] || '사용자'}</S.SenderName>}
+                      <S.MessageBubble $isMine={isMine}>
                         {message.text || message.content}
-                      </MessageBubble>
-                    </MessageContent>
-                    <MessageMeta>
+                      </S.MessageBubble>
+                    </S.MessageContent>
+                    <S.MessageMeta>
                       {/* 내가 보낸 메시지 중 읽지 않은 사람이 있는 경우 표시 */}
                       {isUnreadByOther && (
-                        <UnreadBadge>
+                        <S.UnreadBadge>
                           {chat.type === 'group' ? unreadCount : 1}
-                        </UnreadBadge>
+                        </S.UnreadBadge>
                       )}
-                      <MessageTime>{formatMessageTime(message.createdAt)}</MessageTime>
-                    </MessageMeta>
-                  </MessageItem>
+                      <S.MessageTime>{formatMessageTime(message.createdAt)}</S.MessageTime>
+                    </S.MessageMeta>
+                  </S.MessageItem>
                 </div>
               );
             })}
             <div ref={messagesEndRef} />
           </>
         )}
-      </MessagesContainer>
+      </S.MessagesContainer>
 
       {/* 입력 영역 */}
-      <InputContainer>
+      <S.InputContainer>
         {/* 차단된 경우 메시지 표시 (DM 전용) */}
         {chat.type !== 'group' && isOtherUserBlocked ? (
-          <BlockedMessage>
+          <S.BlockedMessage>
             🚫 차단된 사용자와는 메시지를 주고받을 수 없습니다
-          </BlockedMessage>
+          </S.BlockedMessage>
         ) : (
           <>
             {/* 이모티콘 선택기 */}
             {showEmojiPicker && (
-              <EmojiPicker>
-                <EmojiHeader>
-                  <EmojiTitle>이모티콘 선택</EmojiTitle>
-                  <IconButton onClick={() => setShowEmojiPicker(false)}>
+              <S.EmojiPicker>
+                <S.EmojiHeader>
+                  <S.EmojiTitle>이모티콘 선택</S.EmojiTitle>
+                  <S.IconButton onClick={() => setShowEmojiPicker(false)}>
                     <X size={18} />
-                  </IconButton>
-                </EmojiHeader>
+                  </S.IconButton>
+                </S.EmojiHeader>
 
                 {/* 카테고리 탭 */}
-                <EmojiCategoryTabs>
+                <S.EmojiCategoryTabs>
                   {Object.keys(emojiCategories).map((category) => (
-                    <CategoryTab
+                    <S.CategoryTab
                       key={category}
                       $active={selectedEmojiCategory === category}
                       onClick={() => setSelectedEmojiCategory(category)}
                     >
                       {category.split(' ')[0]}
-                    </CategoryTab>
+                    </S.CategoryTab>
                   ))}
-                </EmojiCategoryTabs>
+                </S.EmojiCategoryTabs>
 
                 {/* 선택된 카테고리의 이모지 그리드 */}
-                <EmojiGrid>
+                <S.EmojiGrid>
                   {emojiCategories[selectedEmojiCategory].map((emoji, index) => (
-                    <EmojiButton
+                    <S.EmojiButton
                       key={index}
                       onClick={() => handleEmojiSelect(emoji)}
                     >
                       {emoji}
-                    </EmojiButton>
+                    </S.EmojiButton>
                   ))}
-                </EmojiGrid>
-              </EmojiPicker>
+                </S.EmojiGrid>
+              </S.EmojiPicker>
             )}
 
-            <InputWrapper>
-              <InputGroup>
-                <TextInputWrapper>
-                  <IconButton
+            <S.InputWrapper>
+              <S.InputGroup>
+                <S.TextInputWrapper>
+                  <S.IconButton
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                     title="이모티콘"
                   >
                     <Smile size={20} />
-                  </IconButton>
-                  <TextInput
+                  </S.IconButton>
+                  <S.TextInput
                     ref={inputRef}
                     value={inputText}
                     onChange={(e) => setInputText(e.target.value)}
@@ -3038,18 +1799,18 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                     rows={1}
                     disabled={sending}
                   />
-                </TextInputWrapper>
-              </InputGroup>
-              <SendButton
+                </S.TextInputWrapper>
+              </S.InputGroup>
+              <S.SendButton
                 onClick={handleSendMessage}
                 disabled={!inputText.trim() || sending}
               >
                 <Send size={20} />
-              </SendButton>
-            </InputWrapper>
+              </S.SendButton>
+            </S.InputWrapper>
           </>
         )}
-      </InputContainer>
+      </S.InputContainer>
 
       {/* 공유 폴더 메모 선택 모달 */}
       {showSharedMemoSelector && (
@@ -3077,18 +1838,18 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
 
       {/* 참여자 목록 모달 */}
       {showMemberListModal && chat.type === 'group' && (
-        <ModalOverlay onClick={() => setShowMemberListModal(false)}>
-          <ModalContainer onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>
+        <S.ModalOverlay onClick={() => setShowMemberListModal(false)}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>
                 <Users size={24} />
                 참여자 목록 ({chat.membersInfo ? Object.values(chat.membersInfo).filter(m => m.status === 'active').length : 0})
-              </ModalTitle>
-              <CloseButton onClick={() => setShowMemberListModal(false)}>
+              </S.ModalTitle>
+              <S.CloseButton onClick={() => setShowMemberListModal(false)}>
                 <X size={20} />
-              </CloseButton>
-            </ModalHeader>
-            <ModalContent>
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent>
               {/* 방장 먼저 표시 */}
               {chat.membersInfo && Object.entries(chat.membersInfo).map(([memberId, memberInfo]) => {
                 if (memberId !== chat.creatorId) return null;
@@ -3105,26 +1866,26 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                 // 'active' 상태는 상태 텍스트 없음
 
                 return (
-                  <MemberItem key={memberId} onClick={() => handleShowMemberDetail(memberId, displayName)} style={{ cursor: 'pointer' }}>
-                    <MemberAvatar
+                  <S.MemberItem key={memberId} onClick={() => handleShowMemberDetail(memberId, displayName)} style={{ cursor: 'pointer' }}>
+                    <S.MemberAvatar
                       $color={getAvatarColor(memberId)}
                       style={userProfilePictures[memberId] ? { backgroundImage: `url(${userProfilePictures[memberId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                     >
                       {!userProfilePictures[memberId] && userAvatarSettings[memberId] && renderAvatarIcon(memberId)}
                       {!userProfilePictures[memberId] && !userAvatarSettings[memberId] && displayName.charAt(0).toUpperCase()}
-                    </MemberAvatar>
-                    <MemberInfo>
-                      <MemberName>
+                    </S.MemberAvatar>
+                    <S.MemberInfo>
+                      <S.MemberName>
                         {displayName}
-                        {isOwner && <OwnerBadge>방장</OwnerBadge>}
-                      </MemberName>
+                        {isOwner && <S.OwnerBadge>방장</S.OwnerBadge>}
+                      </S.MemberName>
                       {statusText && (
-                        <MemberStatus $status={memberInfo.status || 'active'}>
+                        <S.MemberStatus $status={memberInfo.status || 'active'}>
                           {statusText}
-                        </MemberStatus>
+                        </S.MemberStatus>
                       )}
-                    </MemberInfo>
-                  </MemberItem>
+                    </S.MemberInfo>
+                  </S.MemberItem>
                 );
               })}
 
@@ -3152,7 +1913,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                 // 'active' 상태는 상태 텍스트 없음
 
                 return (
-                  <MemberItem
+                  <S.MemberItem
                     key={memberId}
                     style={{ opacity: hasLeftAfterKick ? 0.5 : 1, cursor: 'pointer' }}
                     onClick={(e) => {
@@ -3161,7 +1922,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                       handleShowMemberDetail(memberId, displayName);
                     }}
                   >
-                    <MemberAvatar
+                    <S.MemberAvatar
                       $color={getAvatarColor(memberId)}
                       style={{
                         opacity: hasLeftAfterKick ? 0.6 : 1,
@@ -3170,45 +1931,45 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                     >
                       {!userProfilePictures[memberId] && userAvatarSettings[memberId] && renderAvatarIcon(memberId)}
                       {!userProfilePictures[memberId] && !userAvatarSettings[memberId] && displayName.charAt(0).toUpperCase()}
-                    </MemberAvatar>
-                    <MemberInfo>
-                      <MemberName style={{ opacity: hasLeftAfterKick ? 0.7 : 1 }}>
+                    </S.MemberAvatar>
+                    <S.MemberInfo>
+                      <S.MemberName style={{ opacity: hasLeftAfterKick ? 0.7 : 1 }}>
                         {displayName}
-                        {isKicked && <OwnerBadge style={{ background: '#e53e3e', marginLeft: '6px' }}>강퇴됨</OwnerBadge>}
-                      </MemberName>
+                        {isKicked && <S.OwnerBadge style={{ background: '#e53e3e', marginLeft: '6px' }}>강퇴됨</S.OwnerBadge>}
+                      </S.MemberName>
                       {(hasLeftAfterKick || statusText) && (
-                        <MemberStatus $status={hasLeftAfterKick ? 'rejected' : memberStatus}>
+                        <S.MemberStatus $status={hasLeftAfterKick ? 'rejected' : memberStatus}>
                           {hasLeftAfterKick ? '퇴장함' : statusText}
-                        </MemberStatus>
+                        </S.MemberStatus>
                       )}
-                    </MemberInfo>
+                    </S.MemberInfo>
                     {isRoomOwner && memberStatus === 'active' && !isKicked && (
-                      <RemoveButton onClick={(e) => {
+                      <S.RemoveButton onClick={(e) => {
                         e.stopPropagation();
                         handleRemoveMember(memberId, displayName);
                       }}>
                         강퇴
-                      </RemoveButton>
+                      </S.RemoveButton>
                     )}
                     {isRoomOwner && (memberStatus === 'pending' || memberStatus === 'rejected') && (
-                      <CancelInviteButton onClick={(e) => {
+                      <S.CancelInviteButton onClick={(e) => {
                         e.stopPropagation();
                         handleCancelInvitation(memberId, displayName);
                       }}>
                         초대 취소
-                      </CancelInviteButton>
+                      </S.CancelInviteButton>
                     )}
-                  </MemberItem>
+                  </S.MemberItem>
                 );
               })}
-            </ModalContent>
-          </ModalContainer>
-        </ModalOverlay>
+            </S.ModalContent>
+          </S.ModalContainer>
+        </S.ModalOverlay>
       )}
 
       {/* 멤버 초대 모달 */}
       {showInviteMembersModal && (
-        <ModalOverlay onClick={() => {
+        <S.ModalOverlay onClick={() => {
           setShowInviteMembersModal(false);
           setSelectedFriendsToInvite([]);
           setSearchQueryInvite('');
@@ -3216,13 +1977,13 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
           setSearchedUser(null);
           setInviteTab('friends');
         }}>
-          <ModalContainer onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>
                 <UserPlus size={24} />
                 멤버 초대
-              </ModalTitle>
-              <CloseButton onClick={() => {
+              </S.ModalTitle>
+              <S.CloseButton onClick={() => {
                 setShowInviteMembersModal(false);
                 setSelectedFriendsToInvite([]);
                 setSearchQueryInvite('');
@@ -3231,36 +1992,36 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                 setInviteTab('friends');
               }}>
                 <X size={20} />
-              </CloseButton>
-            </ModalHeader>
+              </S.CloseButton>
+            </S.ModalHeader>
 
             {/* 탭 버튼 */}
-            <TabContainer>
-              <TabButton $active={inviteTab === 'friends'} onClick={() => setInviteTab('friends')}>
+            <S.TabContainer>
+              <S.TabButton $active={inviteTab === 'friends'} onClick={() => setInviteTab('friends')}>
                 친구 목록
-              </TabButton>
-              <TabButton $active={inviteTab === 'search'} onClick={() => setInviteTab('search')}>
+              </S.TabButton>
+              <S.TabButton $active={inviteTab === 'search'} onClick={() => setInviteTab('search')}>
                 아이디로 검색
-              </TabButton>
-            </TabContainer>
+              </S.TabButton>
+            </S.TabContainer>
 
-            <ModalContent>
+            <S.ModalContent>
               {/* 친구 목록 탭 */}
               {inviteTab === 'friends' && (
                 friends.length > 0 ? (
                   <>
                     {/* 검색 바 */}
-                    <SearchBarWrapper>
-                      <SearchInput
+                    <S.SearchBarWrapper>
+                      <S.SearchInput
                         type="text"
                         placeholder="친구의 아이디나 닉네임으로 검색..."
                         value={searchQueryInvite}
                         onChange={(e) => setSearchQueryInvite(e.target.value)}
                       />
-                    </SearchBarWrapper>
+                    </S.SearchBarWrapper>
 
                     {/* 친구 목록 */}
-                    <FriendListWrapper>
+                    <S.FriendListWrapper>
                       {friends
                         .filter(friend => {
                           if (!searchQueryInvite) return true;
@@ -3281,7 +2042,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                           const wsCode = friend.friendWorkspaceCode || friend.wsCode || '';
 
                           return (
-                            <SelectableMemberItem
+                            <S.SelectableMemberItem
                               key={friendId}
                               $selected={isSelected}
                               onClick={() => {
@@ -3292,43 +2053,43 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                                 );
                               }}
                             >
-                              <MemberAvatar
+                              <S.MemberAvatar
                                 $color={getAvatarColor(friendId)}
                                 style={userProfilePictures[friendId] ? { backgroundImage: `url(${userProfilePictures[friendId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                               >
                                 {!userProfilePictures[friendId] && userAvatarSettings[friendId] && renderAvatarIcon(friendId)}
                                 {!userProfilePictures[friendId] && !userAvatarSettings[friendId] && displayName.charAt(0).toUpperCase()}
-                              </MemberAvatar>
-                              <MemberInfo>
-                                <MemberName>{displayName}</MemberName>
-                                <MemberStatus>@{wsCode.replace('WS-', '')}</MemberStatus>
-                              </MemberInfo>
-                              {isSelected && <CheckMark>✓</CheckMark>}
-                            </SelectableMemberItem>
+                              </S.MemberAvatar>
+                              <S.MemberInfo>
+                                <S.MemberName>{displayName}</S.MemberName>
+                                <S.MemberStatus>@{wsCode.replace('WS-', '')}</S.MemberStatus>
+                              </S.MemberInfo>
+                              {isSelected && <S.CheckMark>✓</S.CheckMark>}
+                            </S.SelectableMemberItem>
                           );
                         })}
-                    </FriendListWrapper>
+                    </S.FriendListWrapper>
 
                     {selectedFriendsToInvite.length > 0 && (
-                      <SelectedInfo>{selectedFriendsToInvite.length}명 선택됨</SelectedInfo>
+                      <S.SelectedInfo>{selectedFriendsToInvite.length}명 선택됨</S.SelectedInfo>
                     )}
                   </>
                 ) : (
-                  <EmptyStateContainer>
-                    <EmptyIcon>👥</EmptyIcon>
-                    <EmptyTitle>친구가 없습니다</EmptyTitle>
-                    <EmptyDescription>
+                  <S.EmptyStateContainer>
+                    <S.EmptyIcon>👥</S.EmptyIcon>
+                    <S.EmptyTitle>친구가 없습니다</S.EmptyTitle>
+                    <S.EmptyDescription>
                       친구 탭에서 친구를 추가해보세요
-                    </EmptyDescription>
-                  </EmptyStateContainer>
+                    </S.EmptyDescription>
+                  </S.EmptyStateContainer>
                 )
               )}
 
               {/* 아이디로 검색 탭 */}
               {inviteTab === 'search' && (
-                <SearchByIdContainer>
-                  <IdInputWrapper>
-                    <IdInput
+                <S.SearchByIdContainer>
+                  <S.IdInputWrapper>
+                    <S.IdInput
                       type="text"
                       placeholder="아이디 (6자리)"
                       value={workspaceIdInput}
@@ -3341,90 +2102,90 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                       onKeyPress={(e) => e.key === 'Enter' && handleSearchUserById()}
                       maxLength={6}
                     />
-                    <SearchButton
+                    <S.SearchButton
                       onClick={handleSearchUserById}
                       disabled={searchingUser || workspaceIdInput.trim().length !== 6}
                     >
                       {searchingUser ? '검색 중...' : '검색'}
-                    </SearchButton>
-                  </IdInputWrapper>
+                    </S.SearchButton>
+                  </S.IdInputWrapper>
 
                   {searchedUser && (
-                    <UserCardContainer>
-                      <MemberAvatar
+                    <S.UserCardContainer>
+                      <S.MemberAvatar
                         $color={getAvatarColor(searchedUser.id)}
                         style={userProfilePictures[searchedUser.id] ? { backgroundImage: `url(${userProfilePictures[searchedUser.id]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                       >
                         {!userProfilePictures[searchedUser.id] && userAvatarSettings[searchedUser.id] && renderAvatarIcon(searchedUser.id)}
                         {!userProfilePictures[searchedUser.id] && !userAvatarSettings[searchedUser.id] && (searchedUser.displayName || '익명').charAt(0).toUpperCase()}
-                      </MemberAvatar>
-                      <MemberInfo>
-                        <MemberName>{searchedUser.displayName || '익명'}</MemberName>
-                        <MemberStatus>@{searchedUser.workspaceCode?.replace('WS-', '')}</MemberStatus>
-                      </MemberInfo>
-                      <InviteButton
+                      </S.MemberAvatar>
+                      <S.MemberInfo>
+                        <S.MemberName>{searchedUser.displayName || '익명'}</S.MemberName>
+                        <S.MemberStatus>@{searchedUser.workspaceCode?.replace('WS-', '')}</S.MemberStatus>
+                      </S.MemberInfo>
+                      <S.InviteButton
                         onClick={handleInviteSearchedUser}
                         disabled={loadingInvite}
                       >
                         {loadingInvite ? '초대 중...' : '초대'}
-                      </InviteButton>
-                    </UserCardContainer>
+                      </S.InviteButton>
+                    </S.UserCardContainer>
                   )}
-                </SearchByIdContainer>
+                </S.SearchByIdContainer>
               )}
-            </ModalContent>
+            </S.ModalContent>
             {inviteTab === 'friends' && (
-              <ModalFooter>
-                <CancelButton onClick={() => {
+              <S.ModalFooter>
+                <S.CancelButton onClick={() => {
                   setShowInviteMembersModal(false);
                   setSelectedFriendsToInvite([]);
                   setSearchQueryInvite('');
                   setInviteTab('friends');
                 }}>
                   취소
-                </CancelButton>
-                <ConfirmButton
+                </S.CancelButton>
+                <S.ConfirmButton
                   onClick={handleInviteMembers}
                   disabled={loadingInvite || selectedFriendsToInvite.length === 0}
                 >
                   {loadingInvite ? '초대 중...' : '초대하기'}
-                </ConfirmButton>
-              </ModalFooter>
+                </S.ConfirmButton>
+              </S.ModalFooter>
             )}
-          </ModalContainer>
-        </ModalOverlay>
+          </S.ModalContainer>
+        </S.ModalOverlay>
       )}
 
       {/* 방장 위임 모달 */}
       {showTransferOwnerModal && (
-        <ModalOverlay onClick={() => {
+        <S.ModalOverlay onClick={() => {
           setShowTransferOwnerModal(false);
           setSelectedMemberToTransfer(null);
           setLeaveAfterTransfer(false);
         }}>
-          <ModalContainer onClick={(e) => e.stopPropagation()}>
-            <ModalHeader>
-              <ModalTitle>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>
                 <UserCog size={24} />
                 방장 위임
-              </ModalTitle>
-              <CloseButton onClick={() => {
+              </S.ModalTitle>
+              <S.CloseButton onClick={() => {
                 setShowTransferOwnerModal(false);
                 setSelectedMemberToTransfer(null);
                 setLeaveAfterTransfer(false);
               }}>
                 <X size={20} />
-              </CloseButton>
-            </ModalHeader>
-            <ModalContent>
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent>
               {leaveAfterTransfer && (
-                <WarningMessage>
+                <S.WarningMessage>
                   💡 방장 위임 후 자동으로 채팅방을 나갑니다
-                </WarningMessage>
+                </S.WarningMessage>
               )}
 
               {/* 멤버 목록 (방장 제외, active 상태만) */}
-              <FriendListWrapper>
+              <S.FriendListWrapper>
                 {chat.membersInfo && Object.entries(chat.membersInfo)
                   .filter(([memberId, memberInfo]) => {
                     // 방장 본인 제외, active 상태만
@@ -3438,105 +2199,105 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                     const displayName = userNicknames[memberId] || userDisplayNames[memberId] || memberInfo.displayName || '익명';
 
                     return (
-                      <SelectableMemberItem
+                      <S.SelectableMemberItem
                         key={memberId}
                         $selected={isSelected}
                         onClick={() => setSelectedMemberToTransfer(memberId)}
                       >
-                        <MemberAvatar
+                        <S.MemberAvatar
                           $color={getAvatarColor(memberId)}
                           style={userProfilePictures[memberId] ? { backgroundImage: `url(${userProfilePictures[memberId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
                         >
                           {!userProfilePictures[memberId] && userAvatarSettings[memberId] && renderAvatarIcon(memberId)}
                           {!userProfilePictures[memberId] && !userAvatarSettings[memberId] && displayName.charAt(0).toUpperCase()}
-                        </MemberAvatar>
-                        <MemberInfo>
-                          <MemberName>{displayName}</MemberName>
-                          <MemberStatus $status="active">
+                        </S.MemberAvatar>
+                        <S.MemberInfo>
+                          <S.MemberName>{displayName}</S.MemberName>
+                          <S.MemberStatus $status="active">
                             {memberInfo.status === 'pending' ? '초대 대기중' : '참여중'}
-                          </MemberStatus>
-                        </MemberInfo>
-                        {isSelected && <CheckMark>✓</CheckMark>}
-                      </SelectableMemberItem>
+                          </S.MemberStatus>
+                        </S.MemberInfo>
+                        {isSelected && <S.CheckMark>✓</S.CheckMark>}
+                      </S.SelectableMemberItem>
                     );
                   })}
-              </FriendListWrapper>
+              </S.FriendListWrapper>
 
               {selectedMemberToTransfer && (
-                <SelectedInfo>
+                <S.SelectedInfo>
                   {userNicknames[selectedMemberToTransfer] || userDisplayNames[selectedMemberToTransfer] || chat.membersInfo?.[selectedMemberToTransfer]?.displayName || '사용자'}님을 새 방장으로 선택했습니다
-                </SelectedInfo>
+                </S.SelectedInfo>
               )}
-            </ModalContent>
-            <ModalFooter>
-              <CancelButton onClick={() => {
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton onClick={() => {
                 setShowTransferOwnerModal(false);
                 setSelectedMemberToTransfer(null);
                 setLeaveAfterTransfer(false);
               }}>
                 취소
-              </CancelButton>
-              <ConfirmButton
+              </S.CancelButton>
+              <S.ConfirmButton
                 onClick={handleTransferOwnership}
                 disabled={loadingTransfer || !selectedMemberToTransfer}
               >
                 {loadingTransfer ? '위임 중...' : leaveAfterTransfer ? '위임 후 나가기' : '위임하기'}
-              </ConfirmButton>
-            </ModalFooter>
-          </ModalContainer>
-        </ModalOverlay>
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
       )}
 
       {/* 초대 코드 보기 모달 */}
       {showInviteCodeModal && (
-        <ModalOverlay onClick={() => setShowInviteCodeModal(false)}>
-          <ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-            <ModalHeader>
-              <ModalTitle>
+        <S.ModalOverlay onClick={() => setShowInviteCodeModal(false)}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>
                 <Mail size={24} />
                 초대 코드
-              </ModalTitle>
-              <CloseButton onClick={() => setShowInviteCodeModal(false)}>
+              </S.ModalTitle>
+              <S.CloseButton onClick={() => setShowInviteCodeModal(false)}>
                 <X size={20} />
-              </CloseButton>
-            </ModalHeader>
-            <ModalContent>
-              <InviteCodeContainer>
-                <InviteCodeLabel>단체방 초대 코드</InviteCodeLabel>
-                <InviteCodeDisplay>
-                  <InviteCodeText>{chat.inviteCode || 'INV-XXXXXX'}</InviteCodeText>
-                </InviteCodeDisplay>
-                <CopyButton onClick={handleCopyInviteCode}>
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent>
+              <S.InviteCodeContainer>
+                <S.InviteCodeLabel>단체방 초대 코드</S.InviteCodeLabel>
+                <S.InviteCodeDisplay>
+                  <S.InviteCodeText>{chat.inviteCode || 'INV-XXXXXX'}</S.InviteCodeText>
+                </S.InviteCodeDisplay>
+                <S.CopyButton onClick={handleCopyInviteCode}>
                   <Copy size={16} />
                   코드 복사
-                </CopyButton>
-              </InviteCodeContainer>
-              <InviteCodeDescription>
+                </S.CopyButton>
+              </S.InviteCodeContainer>
+              <S.InviteCodeDescription>
                 이 코드를 친구에게 공유하면 단체방에 참여할 수 있습니다.<br />
                 친구는 채팅 탭에서 "초대 코드로 참여" 버튼을 눌러 코드를 입력하면 됩니다.
-              </InviteCodeDescription>
-            </ModalContent>
-          </ModalContainer>
-        </ModalOverlay>
+              </S.InviteCodeDescription>
+            </S.ModalContent>
+          </S.ModalContainer>
+        </S.ModalOverlay>
       )}
 
       {/* 멤버 강퇴 확인 모달 */}
       {showRemoveMemberModal && memberToRemove && (
-        <ModalOverlay onClick={() => {
+        <S.ModalOverlay onClick={() => {
           setShowRemoveMemberModal(false);
           setMemberToRemove(null);
         }}>
-          <ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <ModalHeader>
-              <ModalTitle>멤버 강퇴</ModalTitle>
-              <CloseButton onClick={() => {
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>멤버 강퇴</S.ModalTitle>
+              <S.CloseButton onClick={() => {
                 setShowRemoveMemberModal(false);
                 setMemberToRemove(null);
               }}>
                 <X size={20} />
-              </CloseButton>
-            </ModalHeader>
-            <ModalContent style={{ padding: '24px' }}>
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent style={{ padding: '24px' }}>
               <div style={{
                 textAlign: 'center',
                 fontSize: '15px',
@@ -3556,15 +2317,15 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   강퇴된 멤버는 초대 코드로 다시 참여할 수 있습니다.
                 </div>
               </div>
-            </ModalContent>
-            <ModalFooter>
-              <CancelButton onClick={() => {
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton onClick={() => {
                 setShowRemoveMemberModal(false);
                 setMemberToRemove(null);
               }}>
                 취소
-              </CancelButton>
-              <ConfirmButton
+              </S.CancelButton>
+              <S.ConfirmButton
                 onClick={handleConfirmRemoveMember}
                 style={{
                   background: 'linear-gradient(135deg, #f56565, #e53e3e)',
@@ -3572,29 +2333,29 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                 }}
               >
                 강퇴하기
-              </ConfirmButton>
-            </ModalFooter>
-          </ModalContainer>
-        </ModalOverlay>
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
       )}
 
       {/* 멤버 상세 정보 모달 */}
       {showMemberDetailModal && selectedMemberDetail && (
-        <ModalOverlay onClick={() => {
+        <S.ModalOverlay onClick={() => {
           setShowMemberDetailModal(false);
           setSelectedMemberDetail(null);
         }}>
-          <ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <ModalHeader>
-              <ModalTitle>멤버 정보</ModalTitle>
-              <CloseButton onClick={() => {
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>멤버 정보</S.ModalTitle>
+              <S.CloseButton onClick={() => {
                 setShowMemberDetailModal(false);
                 setSelectedMemberDetail(null);
               }}>
                 <X size={20} />
-              </CloseButton>
-            </ModalHeader>
-            <ModalContent style={{ padding: '24px' }}>
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent style={{ padding: '24px' }}>
               <div style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -3687,30 +2448,30 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   </div>
                 )}
               </div>
-            </ModalContent>
-            <ModalFooter>
-              <ConfirmButton onClick={() => {
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.ConfirmButton onClick={() => {
                 setShowMemberDetailModal(false);
                 setSelectedMemberDetail(null);
               }}>
                 확인
-              </ConfirmButton>
-            </ModalFooter>
-          </ModalContainer>
-        </ModalOverlay>
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
       )}
 
       {/* 단체방 삭제 확인 모달 */}
       {showDeleteGroupModal && (
-        <ModalOverlay onClick={() => setShowDeleteGroupModal(false)}>
-          <ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <ModalHeader>
-              <ModalTitle>단체방 삭제</ModalTitle>
-              <CloseButton onClick={() => setShowDeleteGroupModal(false)}>
+        <S.ModalOverlay onClick={() => setShowDeleteGroupModal(false)}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>단체방 삭제</S.ModalTitle>
+              <S.CloseButton onClick={() => setShowDeleteGroupModal(false)}>
                 <X size={20} />
-              </CloseButton>
-            </ModalHeader>
-            <ModalContent style={{ padding: '24px' }}>
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent style={{ padding: '24px' }}>
               <div style={{
                 textAlign: 'center',
                 fontSize: '15px',
@@ -3730,12 +2491,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   ⚠️ 삭제하면 모든 대화 내용을 다시 볼 수 없습니다
                 </div>
               </div>
-            </ModalContent>
-            <ModalFooter>
-              <CancelButton onClick={() => setShowDeleteGroupModal(false)}>
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton onClick={() => setShowDeleteGroupModal(false)}>
                 취소
-              </CancelButton>
-              <ConfirmButton
+              </S.CancelButton>
+              <S.ConfirmButton
                 onClick={handleConfirmDeleteGroup}
                 style={{
                   background: 'linear-gradient(135deg, #f56565, #e53e3e)',
@@ -3743,23 +2504,23 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                 }}
               >
                 삭제하기
-              </ConfirmButton>
-            </ModalFooter>
-          </ModalContainer>
-        </ModalOverlay>
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
       )}
 
       {/* 단체방 삭제 최종 확인 모달 (2단계) */}
       {showDeleteGroupFinalModal && (
-        <ModalOverlay onClick={() => setShowDeleteGroupFinalModal(false)}>
-          <ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-            <ModalHeader>
-              <ModalTitle>⚠️ 최종 확인</ModalTitle>
-              <CloseButton onClick={() => setShowDeleteGroupFinalModal(false)}>
+        <S.ModalOverlay onClick={() => setShowDeleteGroupFinalModal(false)}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>⚠️ 최종 확인</S.ModalTitle>
+              <S.CloseButton onClick={() => setShowDeleteGroupFinalModal(false)}>
                 <X size={20} />
-              </CloseButton>
-            </ModalHeader>
-            <ModalContent style={{ padding: '24px' }}>
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent style={{ padding: '24px' }}>
               <div style={{
                 fontSize: '15px',
                 lineHeight: '1.8',
@@ -3811,12 +2572,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   ⚠️ 삭제 후에는 모든 대화 내용을 복구할 수 없습니다
                 </div>
               </div>
-            </ModalContent>
-            <ModalFooter>
-              <CancelButton onClick={() => setShowDeleteGroupFinalModal(false)}>
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton onClick={() => setShowDeleteGroupFinalModal(false)}>
                 취소
-              </CancelButton>
-              <ConfirmButton
+              </S.CancelButton>
+              <S.ConfirmButton
                 onClick={handleFinalConfirmDeleteGroup}
                 style={{
                   background: 'linear-gradient(135deg, #f56565, #e53e3e)',
@@ -3824,26 +2585,26 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                 }}
               >
                 확인
-              </ConfirmButton>
-            </ModalFooter>
-          </ModalContainer>
-        </ModalOverlay>
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
       )}
 
       {/* 🆕 방 공개 설정 변경 모달 (1단계: 선택) */}
       {showRoomTypeModal && (
-        <ModalOverlay onClick={() => { setShowRoomTypeModal(false); setSelectedRoomType(null); }}>
-          <ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
-            <ModalHeader>
-              <ModalTitle>
+        <S.ModalOverlay onClick={() => { setShowRoomTypeModal(false); setSelectedRoomType(null); }}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>
                 <Settings size={24} />
                 방 공개 설정
-              </ModalTitle>
-              <CloseButton onClick={() => { setShowRoomTypeModal(false); setSelectedRoomType(null); }}>
+              </S.ModalTitle>
+              <S.CloseButton onClick={() => { setShowRoomTypeModal(false); setSelectedRoomType(null); }}>
                 <X size={20} />
-              </CloseButton>
-            </ModalHeader>
-            <ModalContent style={{ padding: '24px' }}>
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent style={{ padding: '24px' }}>
               <div style={{ marginBottom: '20px', fontSize: '14px', color: '#aaa', lineHeight: '1.6' }}>
                 현재: <strong style={{ color: '#4a90e2' }}>{chat.isPublic ? '🌐 공개방' : '🔒 비공개방'}</strong>
               </div>
@@ -3954,36 +2715,36 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   💡 공개방에서 비공개방으로 변경하면 초대 코드가 비활성화됩니다.
                 </div>
               </div>
-            </ModalContent>
-            <ModalFooter>
-              <CancelButton onClick={() => { setShowRoomTypeModal(false); setSelectedRoomType(null); }}>
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton onClick={() => { setShowRoomTypeModal(false); setSelectedRoomType(null); }}>
                 취소
-              </CancelButton>
-              <ConfirmButton
+              </S.CancelButton>
+              <S.ConfirmButton
                 onClick={handleRoomTypeSelectConfirm}
                 disabled={selectedRoomType === null}
               >
                 확인
-              </ConfirmButton>
-            </ModalFooter>
-          </ModalContainer>
-        </ModalOverlay>
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
       )}
 
       {/* 🆕 방 공개 설정 변경 최종 확인 모달 (2단계: 최종 확인) */}
       {showRoomTypeConfirmModal && (
-        <ModalOverlay onClick={() => { setShowRoomTypeConfirmModal(false); setSelectedRoomType(null); }}>
-          <ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <ModalHeader>
-              <ModalTitle>
+        <S.ModalOverlay onClick={() => { setShowRoomTypeConfirmModal(false); setSelectedRoomType(null); }}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>
                 <Settings size={24} />
                 방 설정 변경 확인
-              </ModalTitle>
-              <CloseButton onClick={() => { setShowRoomTypeConfirmModal(false); setSelectedRoomType(null); }}>
+              </S.ModalTitle>
+              <S.CloseButton onClick={() => { setShowRoomTypeConfirmModal(false); setSelectedRoomType(null); }}>
                 <X size={20} />
-              </CloseButton>
-            </ModalHeader>
-            <ModalContent style={{ padding: '24px' }}>
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent style={{ padding: '24px' }}>
               <div style={{
                 textAlign: 'center',
                 fontSize: '15px',
@@ -4022,30 +2783,30 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   초대 코드가 비활성화됩니다
                 </div>
               )}
-            </ModalContent>
-            <ModalFooter>
-              <CancelButton onClick={() => { setShowRoomTypeConfirmModal(false); setSelectedRoomType(null); }}>
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton onClick={() => { setShowRoomTypeConfirmModal(false); setSelectedRoomType(null); }}>
                 취소
-              </CancelButton>
-              <ConfirmButton onClick={handleFinalConfirmRoomTypeChange}>
+              </S.CancelButton>
+              <S.ConfirmButton onClick={handleFinalConfirmRoomTypeChange}>
                 확인
-              </ConfirmButton>
-            </ModalFooter>
-          </ModalContainer>
-        </ModalOverlay>
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
       )}
 
       {/* 방장 나가기 안내 모달 */}
       {showOwnerLeaveGuideModal && (
-        <ModalOverlay onClick={() => setShowOwnerLeaveGuideModal(false)}>
-          <ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <ModalHeader>
-              <ModalTitle>채팅방 나가기</ModalTitle>
-              <CloseButton onClick={() => setShowOwnerLeaveGuideModal(false)}>
+        <S.ModalOverlay onClick={() => setShowOwnerLeaveGuideModal(false)}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>채팅방 나가기</S.ModalTitle>
+              <S.CloseButton onClick={() => setShowOwnerLeaveGuideModal(false)}>
                 <X size={20} />
-              </CloseButton>
-            </ModalHeader>
-            <ModalContent style={{ padding: '24px' }}>
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent style={{ padding: '24px' }}>
               <div style={{
                 textAlign: 'center',
                 fontSize: '15px',
@@ -4055,30 +2816,30 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                 방장은 다른 참여자에게 방장권한을 위임한 후<br />
                 단체방에서 나갈 수 있습니다
               </div>
-            </ModalContent>
-            <ModalFooter>
-              <CancelButton onClick={() => setShowOwnerLeaveGuideModal(false)}>
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton onClick={() => setShowOwnerLeaveGuideModal(false)}>
                 취소
-              </CancelButton>
-              <ConfirmButton onClick={handleStartTransferForLeave}>
+              </S.CancelButton>
+              <S.ConfirmButton onClick={handleStartTransferForLeave}>
                 위임하기
-              </ConfirmButton>
-            </ModalFooter>
-          </ModalContainer>
-        </ModalOverlay>
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
       )}
 
       {/* 그룹 나가기 확인 모달 */}
       {showLeaveGroupModal && (
-        <ModalOverlay onClick={() => setShowLeaveGroupModal(false)}>
-          <ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <ModalHeader>
-              <ModalTitle>채팅방 나가기</ModalTitle>
-              <CloseButton onClick={() => setShowLeaveGroupModal(false)}>
+        <S.ModalOverlay onClick={() => setShowLeaveGroupModal(false)}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>채팅방 나가기</S.ModalTitle>
+              <S.CloseButton onClick={() => setShowLeaveGroupModal(false)}>
                 <X size={20} />
-              </CloseButton>
-            </ModalHeader>
-            <ModalContent style={{ padding: '24px' }}>
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent style={{ padding: '24px' }}>
               <div style={{
                 textAlign: 'center',
                 fontSize: '15px',
@@ -4113,12 +2874,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   </div>
                 )}
               </div>
-            </ModalContent>
-            <ModalFooter>
-              <CancelButton onClick={() => setShowLeaveGroupModal(false)}>
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton onClick={() => setShowLeaveGroupModal(false)}>
                 취소
-              </CancelButton>
-              <ConfirmButton
+              </S.CancelButton>
+              <S.ConfirmButton
                 onClick={handleConfirmLeaveGroup}
                 style={{
                   background: 'linear-gradient(135deg, #f56565, #e53e3e)',
@@ -4126,10 +2887,10 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                 }}
               >
                 나가기
-              </ConfirmButton>
-            </ModalFooter>
-          </ModalContainer>
-        </ModalOverlay>
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
       )}
 
       {/* 방장 위임 최종 확인 모달 */}
@@ -4150,15 +2911,15 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       )}
 
       {showTransferConfirmModal && selectedMemberToTransfer && (
-        <ModalOverlay onClick={() => setShowTransferConfirmModal(false)}>
-          <ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <ModalHeader>
-              <ModalTitle>방장 위임 확인</ModalTitle>
-              <CloseButton onClick={() => setShowTransferConfirmModal(false)}>
+        <S.ModalOverlay onClick={() => setShowTransferConfirmModal(false)}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>방장 위임 확인</S.ModalTitle>
+              <S.CloseButton onClick={() => setShowTransferConfirmModal(false)}>
                 <X size={20} />
-              </CloseButton>
-            </ModalHeader>
-            <ModalContent style={{ padding: '24px' }}>
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent style={{ padding: '24px' }}>
               <div style={{
                 textAlign: 'center',
                 fontSize: '15px',
@@ -4180,20 +2941,20 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   위임하면 일반 참여자가 됩니다
                 </div>
               </div>
-            </ModalContent>
-            <ModalFooter>
-              <CancelButton onClick={() => setShowTransferConfirmModal(false)}>
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton onClick={() => setShowTransferConfirmModal(false)}>
                 취소
-              </CancelButton>
-              <ConfirmButton
+              </S.CancelButton>
+              <S.ConfirmButton
                 onClick={handleConfirmTransferOwnership}
                 disabled={loadingTransfer}
               >
                 {loadingTransfer ? '위임 중...' : '위임하기'}
-              </ConfirmButton>
-            </ModalFooter>
-          </ModalContainer>
-        </ModalOverlay>
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
       )}
 
       {/* 프로필 이미지 업로드용 숨겨진 input */}
@@ -4204,7 +2965,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
         style={{ display: 'none' }}
         onChange={handleImageSelect}
       />
-    </FullScreenContainer>,
+    </S.FullScreenContainer>,
     document.body
   );
 };
