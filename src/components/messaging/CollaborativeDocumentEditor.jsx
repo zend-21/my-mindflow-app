@@ -20,7 +20,7 @@ import {
 import { db } from '../../firebase/config';
 import { getUserNickname } from '../../services/nicknameService';
 import MarkerCommentsModal from './MarkerCommentsModal';
-import NewMemoModal from '../NewMemoModal';
+import CollaborationMemoModal from './CollaborationMemoModal';
 
 // ===== 전역 문서 캐시 (컴포넌트 인스턴스 간 공유) =====
 // 컴포넌트가 언마운트되어도 캐시가 유지되도록 전역으로 관리
@@ -2793,9 +2793,12 @@ const CollaborativeDocumentEditor = ({
     setShowNewMemoModal(true);
   }, []);
 
-  // NewMemoModal에서 저장 시 공유 폴더에 저장하고 협업 문서로 로드
-  const handleSaveNewMemo = useCallback(async (memoContent, isImportant) => {
+  // CollaborationMemoModal에서 저장 시 공유 폴더에 저장하고 협업 문서로 로드
+  const handleSaveNewMemo = useCallback(async (memoContent) => {
     try {
+      console.log('💾 새 협업 문서 저장 시작');
+      console.log('📄 memoContent:', memoContent);
+
       // 새 메모 ID 생성
       const newMemoId = `m${Date.now()}`;
 
@@ -2806,10 +2809,11 @@ const CollaborativeDocumentEditor = ({
         userId: currentUserId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-        sharedFolder: true, // 공유 폴더 표시
-        isImportant: isImportant || false
+        folderId: 'shared', // 공유 폴더 표시
+        sharedFolder: true // 추가 플래그
       });
 
+      console.log('✅ 공유 폴더에 저장 완료:', newMemoId);
       showToast?.('공유 폴더에 문서가 저장되었습니다');
 
       // 저장된 문서를 현재 문서로 불러오기
@@ -2823,7 +2827,7 @@ const CollaborativeDocumentEditor = ({
       await performLoadDocument(savedMemo);
 
     } catch (error) {
-      console.error('문서 저장 실패:', error);
+      console.error('❌ 문서 저장 실패:', error);
       showToast?.('문서 저장에 실패했습니다');
     }
   }, [currentUserId, showToast, performLoadDocument]);
@@ -4117,12 +4121,12 @@ const CollaborativeDocumentEditor = ({
           <ToolbarRow key="toolbar-row-1">
             {onLoadFromShared && (
               <LoadButton
-                onClick={(actualIsManager || actualIsSubManager) ? handleLoadClick : undefined}
-                title={(actualIsManager || actualIsSubManager) ? "공유 폴더에서 불러오기" : "권한 없음"}
-                disabled={!(actualIsManager || actualIsSubManager)}
+                onClick={((actualIsManager || actualIsSubManager) || (!content && !title)) ? handleLoadClick : undefined}
+                title={((actualIsManager || actualIsSubManager) || (!content && !title)) ? "공유 폴더에서 불러오기" : "권한 없음"}
+                disabled={!((actualIsManager || actualIsSubManager) || (!content && !title))}
                 style={{
-                  opacity: (actualIsManager || actualIsSubManager) ? 1 : 0.5,
-                  cursor: (actualIsManager || actualIsSubManager) ? 'pointer' : 'not-allowed'
+                  opacity: ((actualIsManager || actualIsSubManager) || (!content && !title)) ? 1 : 0.5,
+                  cursor: ((actualIsManager || actualIsSubManager) || (!content && !title)) ? 'pointer' : 'not-allowed'
                 }}
               >
                 📂
@@ -6091,11 +6095,10 @@ const CollaborativeDocumentEditor = ({
       )}
 
       {/* 새 문서 작성 모달 */}
-      <NewMemoModal
+      <CollaborationMemoModal
         isOpen={showNewMemoModal}
         onSave={handleSaveNewMemo}
         onCancel={() => setShowNewMemoModal(false)}
-        openSource="collaboration"
       />
     </EditorContainer>
   );
