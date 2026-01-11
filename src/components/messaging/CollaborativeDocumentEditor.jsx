@@ -973,7 +973,8 @@ const CollaborativeDocumentEditor = ({
   onClose,
   onLoadFromShared,
   selectedMemo, // 외부에서 선택한 메모 (불러오기 요청)
-  onUpdateMemoPendingFlag // App.jsx에서 메모 state 업데이트
+  onUpdateMemoPendingFlag, // App.jsx에서 메모 state 업데이트
+  onCreateMemoInSharedFolder // 공유 폴더에 메모 생성 요청
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [title, setTitle] = useState('');
@@ -2772,50 +2773,70 @@ const CollaborativeDocumentEditor = ({
   }, [pendingMarker, editInputText, editReasonText, chatRoomId, currentUserId, currentUserName, showFullScreenEdit, debouncedSave, showToast, currentDocId, getEditHistoryRef, actualCanEdit]);
 
   // 전체화면 편집창 닫기 핸들러
-  const handleCloseFullScreenEdit = useCallback(() => {
+  const handleCloseFullScreenEdit = useCallback(async () => {
     // 편집창 닫기 전에 content 동기화
     if (fullScreenContentRef.current) {
       const currentContent = fullScreenContentRef.current.innerHTML;
-      setContent(currentContent);
-      // 미리보기 영역에도 반영
-      if (contentRef.current) {
-        contentRef.current.innerHTML = currentContent;
+
+      // 임시 문서(temp_로 시작)이고 내용이 있으면 공유 폴더에 저장
+      if (currentDocId && currentDocId.startsWith('temp_') && currentContent && currentContent.trim()) {
+        try {
+          // 새 메모 ID 생성
+          const newMemoId = `m${Date.now()}`;
+
+          // 공유 폴더에 저장
+          const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', newMemoId);
+          await setDoc(memoRef, {
+            content: currentContent,
+            userId: currentUserId,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            sharedFolder: true // 공유 폴더 표시
+          });
+
+          showToast?.('공유 폴더에 문서가 저장되었습니다');
+
+          // 저장된 문서를 현재 문서로 불러오기
+          const savedMemo = {
+            id: newMemoId,
+            content: currentContent,
+            userId: currentUserId
+          };
+
+          // performLoadDocument 호출하여 문서 불러오기
+          await performLoadDocument(savedMemo);
+
+        } catch (error) {
+          console.error('문서 저장 실패:', error);
+          showToast?.('문서 저장에 실패했습니다');
+        }
+      } else {
+        // 일반 문서는 content만 동기화
+        setContent(currentContent);
+        // 미리보기 영역에도 반영
+        if (contentRef.current) {
+          contentRef.current.innerHTML = currentContent;
+        }
       }
     }
     setShowFullScreenEdit(false);
-  }, []);
+  }, [currentDocId, currentUserId, showToast, performLoadDocument]);
 
-  // 새 문서 작성 시작 핸들러
-  const handleCreateNewDocument = useCallback(async () => {
+  // 새 문서 작성 시작 핸들러 - 크게보기 모드로 전환
+  const handleCreateNewDocument = useCallback(() => {
     const tempDocId = `temp_${Date.now()}`;
+    setCurrentDocId(tempDocId);
+    setShowFullScreenEdit(true);
+    setContent('');
+    setTitle('');
 
-    try {
-      // Firestore에 임시 문서 플래그 저장
-      if (chatRoomId) {
-        const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
-        await setDoc(docRef, {
-          isTemporary: true,
-          createdBy: currentUserId,
-          createdAt: serverTimestamp(),
-          tempDocId: tempDocId
-        });
+    // 편집창이 열린 후 포커스
+    setTimeout(() => {
+      if (fullScreenContentRef.current) {
+        fullScreenContentRef.current.focus();
       }
-
-      // 로컬 state 설정
-      setCurrentDocId(tempDocId);
-      setShowFullScreenEdit(true);
-
-      // 편집창이 열린 후 포커스
-      setTimeout(() => {
-        if (fullScreenContentRef.current) {
-          fullScreenContentRef.current.focus();
-        }
-      }, 100);
-    } catch (error) {
-      console.error('임시 문서 생성 실패:', error);
-      showToast?.('문서 생성에 실패했습니다');
-    }
-  }, [chatRoomId, currentUserId, showToast]);
+    }, 100);
+  }, []);
 
   // 임시 문서 저장 핸들러
   const handleSaveTempDocument = useCallback(async () => {
