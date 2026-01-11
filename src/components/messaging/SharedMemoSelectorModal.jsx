@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { X, Search, FileText, Calendar, Folder, Lock } from 'lucide-react';
 import { checkFrozenDocuments } from '../../utils/frozenDocumentUtils';
-import { collection, collectionGroup, query, where, getDocs } from 'firebase/firestore';
+import { collection, collectionGroup, query, where, getDocs, onSnapshot, doc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 
 const ModalOverlay = styled.div`
@@ -211,12 +211,12 @@ const FrozenBadge = styled.div`
   display: flex;
   align-items: center;
   gap: 4px;
-  background: rgba(255, 68, 68, 0.15);
-  border: 1px solid rgba(255, 68, 68, 0.3);
+  background: ${props => props.$active ? 'rgba(74, 144, 226, 0.15)' : 'rgba(255, 68, 68, 0.15)'};
+  border: 1px solid ${props => props.$active ? 'rgba(74, 144, 226, 0.3)' : 'rgba(255, 68, 68, 0.3)'};
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 11px;
-  color: #ff6b6b;
+  color: ${props => props.$active ? '#4a90e2' : '#ff6b6b'};
   white-space: nowrap;
   flex-shrink: 0;
   position: relative;
@@ -274,56 +274,140 @@ const LoadingState = styled.div`
   font-size: 14px;
 `;
 
-const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, chatRoomId }) => {
+const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, chatRoomId, chatType, currentUserId }) => {
   const [filteredMemos, setFilteredMemos] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [frozenMemoIds, setFrozenMemoIds] = useState(new Set());
   const [frozenMemoInfo, setFrozenMemoInfo] = useState({});
+  const [realtimeMemoData, setRealtimeMemoData] = useState({}); // 실시간 메모 데이터 (currentWorkingRoomId, hasPendingEdits)
 
-  // allMemos에서 folderId === 'shared'이고 동결되지 않은 메모만 필터링 (useMemo로 메모이제이션)
+  // allMemos에서 folderId === 'shared'인 메모만 필터링 (useMemo로 메모이제이션)
   const sharedMemos = useMemo(() => {
-    return allMemos?.filter(memo =>
-      memo.folderId === 'shared' &&
-      !memo.hasPendingEdits // 다른 대화방에서 작업 중인 문서 제외
-    ) || [];
-  }, [allMemos]);
+    const filtered = allMemos?.filter(memo => memo.folderId === 'shared') || [];
+    // 실시간 데이터와 병합
+    return filtered.map(memo => ({
+      ...memo,
+      ...(realtimeMemoData[memo.id] || {})
+    }));
+  }, [allMemos, realtimeMemoData]);
 
-  // 프리즌 상태 체크
+  // 🔥 실시간 리스너: shared 폴더 메모들의 currentWorkingRoomId와 hasPendingEdits 감시
+  useEffect(() => {
+    const sharedMemoIds = allMemos?.filter(memo => memo.folderId === 'shared').map(memo => memo.id) || [];
+
+    if (sharedMemoIds.length === 0 || !currentUserId) return;
+
+    console.log('🔥 실시간 리스너 설정 - 공유 폴더 메모:', sharedMemoIds.length, '개', 'userId:', currentUserId);
+
+    const unsubscribers = [];
+
+    sharedMemoIds.forEach((id) => {
+      if (!id) return;
+
+      // mindflowUsers/{currentUserId}/memos/{memoId} 경로의 메모 감시 (본인의 메모만)
+      const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', id);
+
+      const unsubscribe = onSnapshot(memoRef, (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const data = docSnapshot.data();
+          console.log(`🔄 실시간 업데이트 - 메모 ${id}:`, {
+            currentWorkingRoomId: data.currentWorkingRoomId,
+            hasPendingEdits: data.hasPendingEdits
+          });
+
+          setRealtimeMemoData(prev => ({
+            ...prev,
+            [id]: {
+              currentWorkingRoomId: data.currentWorkingRoomId,
+              hasPendingEdits: data.hasPendingEdits
+            }
+          }));
+        }
+      }, (error) => {
+        console.error(`실시간 리스너 오류 (메모 ${id}):`, error);
+      });
+
+      unsubscribers.push(unsubscribe);
+    });
+
+    // 클린업: 모든 리스너 해제
+    return () => {
+      console.log('🧹 실시간 리스너 해제 -', unsubscribers.length, '개');
+      unsubscribers.forEach(unsub => unsub());
+    };
+  }, [allMemos, currentUserId]); // allMemos 또는 currentUserId가 변경될 때마다 리스너 재설정
+
+  // 프리즌 상태 체크 - pending 편집 기반 판단
   useEffect(() => {
     const checkFrozenStatus = async () => {
       if (sharedMemos.length === 0) return;
 
-      const memoIds = sharedMemos.map(m => m.id);
+      const frozenSet = new Set();
+      const pendingInfo = {};
 
+      // 1. 먼저 모든 pending 편집 조회
       try {
-        // 모든 대화방에서 pending 상태인 editHistory 조회
         const editHistoryQuery = query(
           collectionGroup(db, 'editHistory'),
           where('status', '==', 'pending')
         );
         const snapshot = await getDocs(editHistoryQuery);
 
-        const frozenSet = new Set();
-        const frozenInfo = {};
+        // 메모별 pending 편집 정보 수집 (어느 방의 편집인지 포함)
+        const memoEditInfo = {}; // { memoId: { count: n, chatRoomId: 'xxx' } }
 
         snapshot.docs.forEach(doc => {
           const pathParts = doc.ref.path.split('/');
-          const roomId = pathParts[1]; // chatRooms/{chatRoomId}
-          const memoId = pathParts[3]; // documents/{memoId}
+          // 경로: chatRooms/{chatRoomId}/documents/{memoId}/editHistory/{editId}
+          const editChatRoomId = pathParts[1];
+          const memoId = pathParts[3];
 
-          // 다른 대화방에서 편집 중인 문서만 프리즌 처리
-          if (memoIds.includes(memoId) && roomId !== chatRoomId) {
-            frozenSet.add(memoId);
-            const data = doc.data();
-            frozenInfo[memoId] = {
-              chatRoomId: roomId,
-              pendingCount: (frozenInfo[memoId]?.pendingCount || 0) + 1
+          if (!memoEditInfo[memoId]) {
+            memoEditInfo[memoId] = {
+              count: 0,
+              chatRoomId: editChatRoomId
             };
+          }
+          memoEditInfo[memoId].count++;
+        });
+
+        // 2. 각 메모의 상태 판단
+        sharedMemos.forEach(memo => {
+          const editInfo = memoEditInfo[memo.id];
+
+          if (editInfo) {
+            // pending 편집이 있는 메모
+            if (editInfo.chatRoomId === chatRoomId) {
+              // 현재 방의 편집 → 파란색 배지 (활성)
+              console.log(`✅ 현재 방에서 작업 중: ${memo.id} (${editInfo.count}개 대기)`);
+              pendingInfo[memo.id] = {
+                pendingCount: editInfo.count,
+                chatRoomId: editInfo.chatRoomId
+              };
+            } else {
+              // 다른 방의 편집 → 빨간색 배지 (동결)
+              console.log(`❄️ 다른 방에서 작업 중 (frozen): ${memo.id} (${editInfo.count}개 대기, 방: ${editInfo.chatRoomId})`);
+              frozenSet.add(memo.id);
+              pendingInfo[memo.id] = {
+                pendingCount: editInfo.count,
+                chatRoomId: editInfo.chatRoomId
+              };
+            }
+          } else {
+            // pending 편집이 없는 일반 메모
+            console.log(`📄 일반 문서 (pending 편집 없음): ${memo.id}`);
           }
         });
 
+        console.log('🔍 프리즌 체크 결과 (pending 편집 기반):', {
+          chatRoomId,
+          totalMemos: sharedMemos.length,
+          frozenMemos: Array.from(frozenSet),
+          pendingInfo
+        });
+
         setFrozenMemoIds(frozenSet);
-        setFrozenMemoInfo(frozenInfo);
+        setFrozenMemoInfo(pendingInfo);
       } catch (error) {
         console.error('프리즌 상태 체크 실패:', error);
       }
@@ -348,8 +432,7 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
   const handleSelectMemo = (memo) => {
     // 다른 대화방에서 편집 중인 문서는 불러올 수 없음
     if (frozenMemoIds.has(memo.id)) {
-      const info = frozenMemoInfo[memo.id];
-      showToast?.(`다른 대화방에서 작업 중인 문서입니다 (${info?.pendingCount || 0}개 수정 대기중)`);
+      showToast?.('이 문서는 다른방에서 협업중인 문서로 불러올 수 없습니다.');
       return;
     }
 
@@ -425,6 +508,8 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
             filteredMemos.map(memo => {
               const isFrozen = frozenMemoIds.has(memo.id);
               const frozenInfo = frozenMemoInfo[memo.id];
+              const isActiveInThisRoom = frozenInfo && !isFrozen; // 현재 방에서 작업 중
+              const showBadge = isFrozen || isActiveInThisRoom; // frozen이거나 현재 방에서 작업 중이면 배지 표시
 
               return (
                 <MemoItem
@@ -434,9 +519,9 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
                 >
                   <MemoHeader>
                     <MemoTitle>{getDisplayTitle(memo)}</MemoTitle>
-                    {isFrozen && (
-                      <FrozenBadge>
-                        <Lock size={12} />
+                    {showBadge && (
+                      <FrozenBadge $active={isActiveInThisRoom}>
+                        {isFrozen && <Lock size={12} />}
                         {frozenInfo?.pendingCount || 0}개 대기
                       </FrozenBadge>
                     )}

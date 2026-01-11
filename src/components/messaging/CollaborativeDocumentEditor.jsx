@@ -9,6 +9,7 @@ import {
   getDoc,
   onSnapshot,
   collection,
+  collectionGroup,
   addDoc,
   serverTimestamp,
   updateDoc,
@@ -1741,6 +1742,21 @@ const CollaborativeDocumentEditor = ({
         lastEditedByName: docOwnerName,
         lastEditedAt: existingData.lastEditedAt || serverTimestamp()
       }, { merge: true });
+
+      // 6-1. 원본 메모에 currentWorkingRoomId 설정 (현재 대화방에서 작업 중임을 표시)
+      try {
+        // memo.userId가 없으면 currentUserId 사용 (공유 폴더 메모는 현재 사용자의 memos에 저장됨)
+        const ownerUserId = memo.userId || currentUserId;
+        const memoRef = doc(db, 'mindflowUsers', ownerUserId, 'memos', memo.id);
+
+        await setDoc(memoRef, {
+          currentWorkingRoomId: chatRoomId,
+          hasPendingEdits: edits.length > 0
+        }, { merge: true });
+        console.log('✅ 원본 메모에 currentWorkingRoomId 설정:', memo.id, '→', chatRoomId, '경로:', memoRef.path);
+      } catch (error) {
+        console.error('원본 메모 currentWorkingRoomId 설정 실패:', error);
+      }
 
       // 7. 로컬 상태 업데이트
       setTitle(titleToLoad);
@@ -3662,6 +3678,20 @@ const CollaborativeDocumentEditor = ({
         console.log('✅ 원본 메모의 hasPendingEdits 플래그 업데이트:', currentDocId, false);
       }
 
+      // ⭐ 원본 메모의 currentWorkingRoomId를 null로 설정 (일반 문서로 복원)
+      if (currentDocId) {
+        try {
+          const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', currentDocId);
+          await setDoc(memoRef, {
+            currentWorkingRoomId: null,
+            hasPendingEdits: false
+          }, { merge: true });
+          console.log('✅ 원본 메모의 currentWorkingRoomId를 null로 설정:', currentDocId);
+        } catch (error) {
+          console.error('원본 메모 currentWorkingRoomId 초기화 실패:', error);
+        }
+      }
+
       showToast?.('모든 수정 제안이 승인되었습니다');
     } catch (error) {
       console.error('전체 승인 실패:', error);
@@ -3699,15 +3729,30 @@ const CollaborativeDocumentEditor = ({
 
       const cleanContent = tempDiv.innerHTML;
 
-      // 2. Firestore의 편집 이력 모두 삭제
-      const editHistoryRef = getEditHistoryRef(currentDocId);
-      if (editHistoryRef) {
-        const editsSnap = await getDocs(query(editHistoryRef, where('status', '==', 'pending')));
-        const deletePromises = [];
-        editsSnap.forEach((doc) => {
-          deletePromises.push(deleteDoc(doc.ref));
-        });
+      // 2. Firestore의 편집 이력 모두 삭제 (모든 대화방에서)
+      // collectionGroup을 사용해 모든 대화방의 해당 문서의 editHistory를 삭제
+      const editHistoryQuery = query(
+        collectionGroup(db, 'editHistory'),
+        where('status', '==', 'pending')
+      );
+      const allEditsSnap = await getDocs(editHistoryQuery);
+
+      const deletePromises = [];
+      allEditsSnap.forEach((editDoc) => {
+        // 경로: chatRooms/{chatRoomId}/documents/{memoId}/editHistory/{editId}
+        const pathParts = editDoc.ref.path.split('/');
+        const memoId = pathParts[3];
+
+        // 현재 문서의 editHistory만 삭제
+        if (memoId === currentDocId) {
+          deletePromises.push(deleteDoc(editDoc.ref));
+          console.log('🗑️ editHistory 삭제:', editDoc.ref.path);
+        }
+      });
+
+      if (deletePromises.length > 0) {
         await Promise.all(deletePromises);
+        console.log(`✅ 총 ${deletePromises.length}개의 editHistory 삭제 완료`);
       }
 
       // 3. Firestore 문서 업데이트 (마커 제거된 내용으로)
@@ -3747,6 +3792,20 @@ const CollaborativeDocumentEditor = ({
       if (currentDocId && onUpdateMemoPendingFlag) {
         onUpdateMemoPendingFlag(currentDocId, false);
         console.log('✅ 원본 메모의 hasPendingEdits 플래그 업데이트:', currentDocId, false);
+      }
+
+      // ⭐ 원본 메모의 currentWorkingRoomId를 null로 설정 (일반 문서로 복원)
+      if (currentDocId) {
+        try {
+          const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', currentDocId);
+          await setDoc(memoRef, {
+            currentWorkingRoomId: null,
+            hasPendingEdits: false
+          }, { merge: true });
+          console.log('✅ 원본 메모의 currentWorkingRoomId를 null로 설정:', currentDocId);
+        } catch (error) {
+          console.error('원본 메모 currentWorkingRoomId 초기화 실패:', error);
+        }
       }
 
       showToast?.('모든 수정 표시가 삭제되었습니다');
@@ -3882,6 +3941,18 @@ const CollaborativeDocumentEditor = ({
     if (docIdToClose) {
       globalDocumentCache.delete(docIdToClose);
       console.log('🗑️ 캐시에서 문서 삭제:', docIdToClose);
+
+      // ⭐ 원본 메모의 currentWorkingRoomId를 null로 설정 (일반 문서로 복원)
+      try {
+        const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', docIdToClose);
+        await setDoc(memoRef, {
+          currentWorkingRoomId: null,
+          hasPendingEdits: false
+        }, { merge: true });
+        console.log('✅ 원본 메모의 currentWorkingRoomId를 null로 설정 (문서 비우기):', docIdToClose);
+      } catch (error) {
+        console.error('원본 메모 currentWorkingRoomId 초기화 실패:', error);
+      }
     }
 
     setShowClearConfirmModal(false);

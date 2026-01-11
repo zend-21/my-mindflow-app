@@ -284,6 +284,14 @@ service cloud.firestore {
     }
 
     // ========================================
+    // CollectionGroup 쿼리를 위한 규칙
+    // ========================================
+    // editHistory collectionGroup 읽기 허용 (모든 대화방의 편집 이력 검색용)
+    match /{path=**}/editHistory/{editId} {
+      allow read: if isSignedIn();
+    }
+
+    // ========================================
     // 닉네임 (Nicknames)
     // ========================================
     match /nicknames/{userId} {
@@ -320,13 +328,17 @@ service cloud.firestore {
       allow create: if isSignedIn() &&
         request.resource.data.userId == request.auth.uid;
 
-      // 읽기: 본인의 메모만
-      allow read: if isSignedIn() &&
-        resource.data.userId == request.auth.uid;
+      // 읽기: 본인의 메모 또는 공유 폴더의 메모
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.folderId == 'shared'
+      );
 
-      // 수정: 본인의 메모만
-      allow update: if isSignedIn() &&
-        resource.data.userId == request.auth.uid;
+      // 수정: 본인의 메모 또는 공유 폴더의 메모 (협업용)
+      allow update: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.folderId == 'shared'
+      );
 
       // 삭제: 본인의 메모만
       allow delete: if isSignedIn() &&
@@ -386,7 +398,18 @@ service cloud.firestore {
 
       // 🚀 개별 메모 컬렉션 (새 구조)
       match /memos/{memoId} {
-        allow read, write: if isSignedIn() && request.auth.uid == userId;
+        // 읽기: 본인 또는 공유 폴더 메모
+        allow read: if isSignedIn() && (
+          request.auth.uid == userId ||
+          resource.data.folderId == 'shared'
+        );
+        // 수정: 본인 또는 공유 폴더 메모 (currentWorkingRoomId 플래그 업데이트용)
+        allow update: if isSignedIn() && (
+          request.auth.uid == userId ||
+          resource.data.folderId == 'shared'
+        );
+        // 생성/삭제: 본인만
+        allow create, delete: if isSignedIn() && request.auth.uid == userId;
       }
 
       // 🚀 개별 폴더 컬렉션 (새 구조)

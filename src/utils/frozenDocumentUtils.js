@@ -48,13 +48,13 @@ export const checkIfMemoIsFrozen = async (memoId, userId) => {
 };
 
 /**
- * 여러 메모의 프리즈 상태를 일괄 확인
+ * 여러 메모의 프리즈 상태를 일괄 확인 (어느 대화방에서 작업 중인지 포함)
  * @param {Array} memoIds - 확인할 메모 ID 배열
  * @param {string} userId - 현재 사용자 ID
- * @returns {Promise<Set>} - 프리즈된 메모 ID Set
+ * @returns {Promise<Map>} - 메모 ID를 키로, chatRoomId를 값으로 하는 Map
  */
 export const checkFrozenDocuments = async (memoIds, userId) => {
-  const frozenSet = new Set();
+  const frozenMap = new Map(); // memoId -> chatRoomId
 
   try {
     console.log('🔍 프리즈 체크 시작 - 메모 개수:', memoIds.length);
@@ -70,23 +70,24 @@ export const checkFrozenDocuments = async (memoIds, userId) => {
 
     console.log('📊 전체 pending 편집 개수:', snapshot.docs.length);
 
-    // pending 편집 이력의 문서 경로에서 memoId 추출
+    // pending 편집 이력의 문서 경로에서 memoId와 chatRoomId 추출
     snapshot.docs.forEach(doc => {
       // 경로: chatRooms/{chatRoomId}/documents/{memoId}/editHistory/{editId}
       const pathParts = doc.ref.path.split('/');
+      const chatRoomId = pathParts[1]; // chatRooms 다음의 chatRoomId
       const memoId = pathParts[3]; // documents 다음의 memoId
 
       // 공유 폴더 메모 목록에 있는 경우만 프리즈 처리
       if (memoIds.includes(memoId)) {
-        console.log('❄️ 프리즈된 문서 발견:', memoId, '편집 ID:', doc.id);
-        frozenSet.add(memoId);
+        console.log('❄️ 프리즈된 문서 발견:', memoId, '대화방:', chatRoomId, '편집 ID:', doc.id);
+        frozenMap.set(memoId, chatRoomId);
       }
     });
 
-    console.log('✅ 프리즈 체크 완료 - 프리즈된 문서:', Array.from(frozenSet));
+    console.log('✅ 프리즈 체크 완료 - 프리즈된 문서:', Array.from(frozenMap.entries()));
   } catch (error) {
     console.error('❌ 프리즈 문서 일괄 체크 오류:', error);
   }
 
-  return frozenSet;
+  return frozenMap;
 };

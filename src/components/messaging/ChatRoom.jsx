@@ -3000,6 +3000,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
           showToast={showToast}
           allMemos={memos}
           chatRoomId={chat.id}
+          chatType={chat.type}
+          currentUserId={currentUserId}
         />
       )}
 
