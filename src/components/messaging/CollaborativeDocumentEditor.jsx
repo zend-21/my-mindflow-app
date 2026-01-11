@@ -20,6 +20,7 @@ import {
 import { db } from '../../firebase/config';
 import { getUserNickname } from '../../services/nicknameService';
 import MarkerCommentsModal from './MarkerCommentsModal';
+import NewMemoModal from '../NewMemoModal';
 
 // ===== 전역 문서 캐시 (컴포넌트 인스턴스 간 공유) =====
 // 컴포넌트가 언마운트되어도 캐시가 유지되도록 전역으로 관리
@@ -1020,6 +1021,7 @@ const CollaborativeDocumentEditor = ({
   const [showTempDocLoadWarningModal, setShowTempDocLoadWarningModal] = useState(false); // 임시 문서 불러오기 경고 모달
   const [showMarkerCommentsModal, setShowMarkerCommentsModal] = useState(false); // 마커 의견 제시 모달
   const [selectedMarkerForComments, setSelectedMarkerForComments] = useState(null); // 의견을 볼 마커 정보
+  const [showNewMemoModal, setShowNewMemoModal] = useState(false); // 새 문서 작성 모달
 
   const contentRef = useRef(null);
   const fullScreenContentRef = useRef(null);
@@ -2777,66 +2779,54 @@ const CollaborativeDocumentEditor = ({
     // 편집창 닫기 전에 content 동기화
     if (fullScreenContentRef.current) {
       const currentContent = fullScreenContentRef.current.innerHTML;
-
-      // 임시 문서(temp_로 시작)이고 내용이 있으면 공유 폴더에 저장
-      if (currentDocId && currentDocId.startsWith('temp_') && currentContent && currentContent.trim()) {
-        try {
-          // 새 메모 ID 생성
-          const newMemoId = `m${Date.now()}`;
-
-          // 공유 폴더에 저장
-          const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', newMemoId);
-          await setDoc(memoRef, {
-            content: currentContent,
-            userId: currentUserId,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-            sharedFolder: true // 공유 폴더 표시
-          });
-
-          showToast?.('공유 폴더에 문서가 저장되었습니다');
-
-          // 저장된 문서를 현재 문서로 불러오기
-          const savedMemo = {
-            id: newMemoId,
-            content: currentContent,
-            userId: currentUserId
-          };
-
-          // performLoadDocument 호출하여 문서 불러오기
-          await performLoadDocument(savedMemo);
-
-        } catch (error) {
-          console.error('문서 저장 실패:', error);
-          showToast?.('문서 저장에 실패했습니다');
-        }
-      } else {
-        // 일반 문서는 content만 동기화
-        setContent(currentContent);
-        // 미리보기 영역에도 반영
-        if (contentRef.current) {
-          contentRef.current.innerHTML = currentContent;
-        }
+      setContent(currentContent);
+      // 미리보기 영역에도 반영
+      if (contentRef.current) {
+        contentRef.current.innerHTML = currentContent;
       }
     }
     setShowFullScreenEdit(false);
-  }, [currentDocId, currentUserId, showToast, performLoadDocument]);
-
-  // 새 문서 작성 시작 핸들러 - 크게보기 모드로 전환
-  const handleCreateNewDocument = useCallback(() => {
-    const tempDocId = `temp_${Date.now()}`;
-    setCurrentDocId(tempDocId);
-    setShowFullScreenEdit(true);
-    setContent('');
-    setTitle('');
-
-    // 편집창이 열린 후 포커스
-    setTimeout(() => {
-      if (fullScreenContentRef.current) {
-        fullScreenContentRef.current.focus();
-      }
-    }, 100);
   }, []);
+
+  // 새 문서 작성 시작 핸들러 - NewMemoModal 열기
+  const handleCreateNewDocument = useCallback(() => {
+    setShowNewMemoModal(true);
+  }, []);
+
+  // NewMemoModal에서 저장 시 공유 폴더에 저장하고 협업 문서로 로드
+  const handleSaveNewMemo = useCallback(async (memoContent, isImportant) => {
+    try {
+      // 새 메모 ID 생성
+      const newMemoId = `m${Date.now()}`;
+
+      // 공유 폴더에 저장
+      const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', newMemoId);
+      await setDoc(memoRef, {
+        content: memoContent,
+        userId: currentUserId,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        sharedFolder: true, // 공유 폴더 표시
+        isImportant: isImportant || false
+      });
+
+      showToast?.('공유 폴더에 문서가 저장되었습니다');
+
+      // 저장된 문서를 현재 문서로 불러오기
+      const savedMemo = {
+        id: newMemoId,
+        content: memoContent,
+        userId: currentUserId
+      };
+
+      // performLoadDocument 호출하여 문서 불러오기
+      await performLoadDocument(savedMemo);
+
+    } catch (error) {
+      console.error('문서 저장 실패:', error);
+      showToast?.('문서 저장에 실패했습니다');
+    }
+  }, [currentUserId, showToast, performLoadDocument]);
 
   // 임시 문서 저장 핸들러
   const handleSaveTempDocument = useCallback(async () => {
@@ -6099,6 +6089,14 @@ const CollaborativeDocumentEditor = ({
           showToast={showToast}
         />
       )}
+
+      {/* 새 문서 작성 모달 */}
+      <NewMemoModal
+        isOpen={showNewMemoModal}
+        onSave={handleSaveNewMemo}
+        onCancel={() => setShowNewMemoModal(false)}
+        openSource="collaboration"
+      />
     </EditorContainer>
   );
 };
