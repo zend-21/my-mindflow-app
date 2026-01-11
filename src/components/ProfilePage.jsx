@@ -1146,9 +1146,9 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
                 return;
             }
 
-            // Firestore에 닉네임 등록/업데이트 (내부에서 중복 체크 포함)
-            const success = await updateNickname(userId, newNickname);
-            if (!success) {
+            // 🔥 nicknames 컬렉션에 저장 (중복 체크용 - 공개 읽기 가능)
+            const nicknameSuccess = await updateNickname(userId, newNickname);
+            if (!nicknameSuccess) {
                 showToast?.('⚠️ 이미 사용 중인 닉네임이거나 저장에 실패했습니다');
                 setNickname(savedNickname || '');
                 setIsEditingNickname(false);
@@ -1161,7 +1161,7 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
             // nickname state 업데이트 (즉시 UI 반영)
             setNickname(newNickname);
 
-            // 🔥 mindflowUsers/.../settings에도 닉네임 동기화
+            // 🔥 mindflowUsers/.../settings에 닉네임 동기화 (ChatRoom에서 읽는 곳)
             try {
                 const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
                 const currentSettings = await fetchSettingsFromFirestore(userId);
@@ -1172,6 +1172,7 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
                 console.log('✅ settings 닉네임 동기화 완료');
             } catch (settingsError) {
                 console.error('settings 닉네임 동기화 실패:', settingsError);
+                // 동기화 실패해도 닉네임은 저장됨 (nicknames 컬렉션에)
             }
 
             showToast?.('✅ 닉네임이 변경되었습니다');

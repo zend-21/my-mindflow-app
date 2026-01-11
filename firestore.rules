@@ -390,7 +390,9 @@ service cloud.firestore {
 
       // 사용자 데이터 서브컬렉션 (기존 배열 구조 - 하위 호환)
       match /userData/{dataType} {
-        // 본인만 읽기/쓰기 가능
+        // settings 문서: 모두 읽기 가능 (닉네임, 프로필 사진 공개), 본인만 쓰기
+        allow read: if isSignedIn() && dataType == 'settings';
+        // 다른 문서: 본인만 읽기/쓰기 가능
         allow read, write: if isSignedIn() && (
           request.auth.uid == userId
         );

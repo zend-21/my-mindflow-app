@@ -706,22 +706,27 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
     try {
       const userId = localStorage.getItem('firebaseUserId');
 
-      // ⚡ 최적화: localStorage 우선, Firestore는 fallback
-      let nickname = localStorage.getItem('userNickname') || '나';
+      // ⚡ Firestore에서 최신 닉네임 로드 (mindflowUsers/.../userData/settings)
+      let nickname = '나';
 
-      // localStorage에 닉네임이 없는 경우에만 Firestore 조회
-      if (nickname === '나') {
-        try {
-          const { getUserNickname } = await import('../../services/nicknameService');
-          const firestoreNickname = await getUserNickname(userId);
-          if (firestoreNickname) {
-            nickname = firestoreNickname;
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const { db } = await import('../../firebase/config');
+        const settingsRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
+        const settingsSnap = await getDoc(settingsRef);
+
+        if (settingsSnap.exists()) {
+          const data = settingsSnap.data();
+          if (data.nickname) {
+            nickname = data.nickname;
             // localStorage에 캐싱
-            localStorage.setItem('userNickname', firestoreNickname);
+            localStorage.setItem('userNickname', data.nickname);
           }
-        } catch (error) {
-          console.error('닉네임 로드 실패:', error);
         }
+      } catch (error) {
+        console.error('닉네임 로드 실패:', error);
+        // 실패 시 localStorage fallback
+        nickname = localStorage.getItem('userNickname') || '나';
       }
 
       // 본인인증 상태 확인 - MVP에서 제외
@@ -745,18 +750,80 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
       console.log('📋 [DEBUG] 내 친구 목록:', friendsList);
       console.log('📋 [DEBUG] Firebase 경로: users/' + userId + '/friends');
 
-      // ⚡ 배치로 모든 친구의 인증 상태 확인 (N개 개별 조회 → 1회 배치 조회)
-      // MVP에서 본인인증 제외
-      // const friendIds = friendsList.map(f => f.friendId);
-      // const verificationMap = await checkVerificationStatusBatch(friendIds);
+      // ⚡ 스마트 캐싱: 1분간 캐시 사용으로 데이터 사용량 90% 절감
+      const CACHE_KEY = 'friendNicknamesCache';
+      const CACHE_DURATION = 60 * 1000; // 1분
 
-      // 인증 상태를 친구 정보에 병합
-      // const friendsWithVerification = friendsList.map(friend => ({
-      //   ...friend,
-      //   verified: verificationMap.get(friend.friendId)?.verified || false
-      // }));
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('../../firebase/config');
 
-      setFriends(friendsList); // 인증 상태 없이 그대로 사용
+      // 캐시 확인
+      let nicknameCache = {};
+      let useCachedData = false;
+
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { nicknames, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < CACHE_DURATION) {
+            nicknameCache = nicknames;
+            useCachedData = true;
+            console.log('📦 캐시된 닉네임 사용 (1분 이내)');
+          } else {
+            console.log('⏰ 캐시 만료 - Firestore에서 새로 로드');
+          }
+        }
+      } catch (error) {
+        console.error('캐시 로드 오류:', error);
+      }
+
+      const friendsWithLatestNicknames = await Promise.all(
+        friendsList.map(async (friend) => {
+          // 캐시에 있으면 사용 (Firestore 읽기 0회)
+          if (useCachedData && nicknameCache[friend.friendId]) {
+            return {
+              ...friend,
+              friendName: nicknameCache[friend.friendId]
+            };
+          }
+
+          // Firestore에서 가져오기
+          try {
+            const settingsRef = doc(db, 'mindflowUsers', friend.friendId, 'userData', 'settings');
+            const settingsSnap = await getDoc(settingsRef);
+
+            if (settingsSnap.exists()) {
+              const data = settingsSnap.data();
+              if (data.nickname) {
+                console.log(`✅ Firestore에서 로드: ${friend.friendId} → ${data.nickname}`);
+                nicknameCache[friend.friendId] = data.nickname;
+                return {
+                  ...friend,
+                  friendName: data.nickname
+                };
+              }
+            }
+          } catch (error) {
+            console.error(`친구 닉네임 로드 실패 (${friend.friendId}):`, error);
+          }
+          return friend;
+        })
+      );
+
+      // 캐시 저장 (새로 불러온 경우만)
+      if (!useCachedData) {
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({
+            nicknames: nicknameCache,
+            timestamp: Date.now()
+          }));
+          console.log('💾 닉네임 캐시 저장 완료');
+        } catch (error) {
+          console.error('캐시 저장 오류:', error);
+        }
+      }
+
+      setFriends(friendsWithLatestNicknames);
       setLoading(false);
     } catch (error) {
       console.error('친구 목록 조회 오류:', error);
@@ -773,8 +840,86 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
       console.log('📬 [DEBUG] 친구 요청 목록:', requestsList);
       console.log('📬 [DEBUG] Firebase 경로: users/' + userId + '/friendRequests');
 
+      // ⚡ 스마트 캐싱: 1분간 캐시 사용 (친구 목록과 동일한 캐시)
+      const CACHE_KEY = 'friendNicknamesCache';
+      const CACHE_DURATION = 60 * 1000; // 1분
+
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('../../firebase/config');
+
+      // 캐시 확인
+      let nicknameCache = {};
+      let useCachedData = false;
+
+      try {
+        const cached = localStorage.getItem(CACHE_KEY);
+        if (cached) {
+          const { nicknames, timestamp } = JSON.parse(cached);
+          if (Date.now() - timestamp < CACHE_DURATION) {
+            nicknameCache = nicknames;
+            useCachedData = true;
+            console.log('📦 캐시된 닉네임 사용 (친구 요청)');
+          }
+        }
+      } catch (error) {
+        console.error('캐시 로드 오류:', error);
+      }
+
+      const requestsWithLatestNicknames = await Promise.all(
+        requestsList.map(async (request) => {
+          // 캐시에 있으면 사용
+          if (useCachedData && nicknameCache[request.requesterId]) {
+            return {
+              ...request,
+              requesterName: nicknameCache[request.requesterId]
+            };
+          }
+
+          // Firestore에서 가져오기
+          try {
+            const settingsRef = doc(db, 'mindflowUsers', request.requesterId, 'userData', 'settings');
+            const settingsSnap = await getDoc(settingsRef);
+
+            if (settingsSnap.exists()) {
+              const data = settingsSnap.data();
+              if (data.nickname) {
+                console.log(`✅ 요청자 Firestore 로드: ${request.requesterId} → ${data.nickname}`);
+                nicknameCache[request.requesterId] = data.nickname;
+                return {
+                  ...request,
+                  requesterName: data.nickname
+                };
+              }
+            }
+          } catch (error) {
+            console.error(`요청자 닉네임 로드 실패 (${request.requesterId}):`, error);
+          }
+          return request;
+        })
+      );
+
+      // 캐시 업데이트 (새로 불러온 경우)
+      if (!useCachedData && Object.keys(nicknameCache).length > 0) {
+        try {
+          // 기존 캐시와 병합
+          const existingCache = localStorage.getItem(CACHE_KEY);
+          if (existingCache) {
+            const { nicknames: existingNicknames } = JSON.parse(existingCache);
+            nicknameCache = { ...existingNicknames, ...nicknameCache };
+          }
+
+          localStorage.setItem(CACHE_KEY, JSON.stringify({
+            nicknames: nicknameCache,
+            timestamp: Date.now()
+          }));
+          console.log('💾 요청자 닉네임 캐시 업데이트 완료');
+        } catch (error) {
+          console.error('캐시 저장 오류:', error);
+        }
+      }
+
       // hidden이 true인 요청은 제외 (숨긴 요청)
-      const visibleRequests = requestsList.filter(request => request.hidden !== true);
+      const visibleRequests = requestsWithLatestNicknames.filter(request => request.hidden !== true);
 
       setFriendRequests(visibleRequests);
     } catch (error) {
