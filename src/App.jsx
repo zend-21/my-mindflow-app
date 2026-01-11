@@ -3039,7 +3039,7 @@ function App() {
                         {/* 채팅은 상태 유지를 위해 항상 렌더링하되 CSS로 숨김 (로그인한 경우만) */}
                         {profile && (
                             <div style={{ display: activeTab === 'chat' ? 'block' : 'none', height: '100%' }}>
-                                <MessagingHub showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={handleUpdateMemoPendingFlag} />
+                                <MessagingHub showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={handleUpdateMemoPendingFlag} syncMemo={syncMemo} />
                             </div>
                         )}
                     </ContentArea>

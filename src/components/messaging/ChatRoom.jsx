@@ -1268,7 +1268,7 @@ const InviteCodeDescription = styled.div`
   line-height: 1.6;
 `;
 
-const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) => {
+const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, syncMemo }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
@@ -2755,6 +2755,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag }) 
             onLoadFromShared={handleLoadFromShared}
             selectedMemo={selectedMemoToLoad}
             onUpdateMemoPendingFlag={onUpdateMemoPendingFlag}
+            syncMemo={syncMemo}
           />
         </div>
       )}

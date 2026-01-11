@@ -147,7 +147,7 @@ const TabContent = styled.div`
   height: 100%;
 `;
 
-const MessagingHub = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag }) => {
+const MessagingHub = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag, syncMemo }) => {
   const [activeTab, setActiveTab] = useState('chat'); // chat, friends
   const [showSettings, setShowSettings] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0); // 읽지 않은 채팅 수
@@ -195,7 +195,7 @@ const MessagingHub = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingF
       <Content>
         {/* 두 컴포넌트를 모두 마운트하여 실시간 구독 유지, display로 보이기/숨기기 */}
         <TabContent $active={activeTab === 'chat'}>
-          <ChatList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={onUpdateMemoPendingFlag} onUnreadCountChange={handleUnreadCountChange} />
+          <ChatList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={onUpdateMemoPendingFlag} onUnreadCountChange={handleUnreadCountChange} syncMemo={syncMemo} />
         </TabContent>
         <TabContent $active={activeTab === 'friends'}>
           <FriendList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onFriendRequestCountChange={handleFriendRequestCountChange} />

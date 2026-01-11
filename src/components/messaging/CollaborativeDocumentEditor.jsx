@@ -975,7 +975,8 @@ const CollaborativeDocumentEditor = ({
   onLoadFromShared,
   selectedMemo, // 외부에서 선택한 메모 (불러오기 요청)
   onUpdateMemoPendingFlag, // App.jsx에서 메모 state 업데이트
-  onCreateMemoInSharedFolder // 공유 폴더에 메모 생성 요청
+  onCreateMemoInSharedFolder, // 공유 폴더에 메모 생성 요청
+  syncMemo // 메모 동기화 함수
 }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [title, setTitle] = useState('');
@@ -2799,19 +2800,24 @@ const CollaborativeDocumentEditor = ({
       console.log('💾 새 협업 문서 저장 시작');
       console.log('📄 memoContent:', memoContent);
 
-      // 새 메모 ID 생성
-      const newMemoId = `m${Date.now()}`;
+      // 새 메모 ID와 타임스탬프 생성
+      const now = Date.now();
+      const newMemoId = `m${now}`;
 
-      // 공유 폴더에 저장
-      const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', newMemoId);
-      await setDoc(memoRef, {
+      // 로컬 메모 객체 생성 (App.jsx 형식에 맞춤)
+      const newMemo = {
+        id: newMemoId,
         content: memoContent,
-        userId: currentUserId,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        folderId: 'shared', // 공유 폴더 표시
-        sharedFolder: true // 추가 플래그
-      });
+        date: now,
+        createdAt: now,
+        displayDate: new Date(now).toLocaleString(),
+        folderId: 'shared' // 공유 폴더
+      };
+
+      // syncMemo로 즉시 로컬 상태 업데이트 + Firestore 저장
+      if (syncMemo) {
+        syncMemo(newMemo);
+      }
 
       console.log('✅ 공유 폴더에 저장 완료:', newMemoId);
       showToast?.('공유 폴더에 문서가 저장되었습니다');
@@ -2830,7 +2836,7 @@ const CollaborativeDocumentEditor = ({
       console.error('❌ 문서 저장 실패:', error);
       showToast?.('문서 저장에 실패했습니다');
     }
-  }, [currentUserId, showToast, performLoadDocument]);
+  }, [currentUserId, showToast, performLoadDocument, syncMemo]);
 
   // 임시 문서 저장 핸들러
   const handleSaveTempDocument = useCallback(async () => {
