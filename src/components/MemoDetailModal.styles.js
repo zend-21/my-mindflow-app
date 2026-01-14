@@ -772,3 +772,76 @@ export const ReadModeContainer = styled.div`
         box-sizing: border-box;
     }
 `;
+
+// 이미지 뷰어 모달
+export const ImageViewerOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 500000;
+    cursor: zoom-out;
+    animation: fadeIn 0.2s ease-out;
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+`;
+
+export const ImageViewerContent = styled.div`
+    max-width: 95vw;
+    max-height: 95vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+`;
+
+export const ImageViewerImage = styled.img`
+    max-width: 100%;
+    max-height: 95vh;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    cursor: zoom-in;
+    touch-action: pinch-zoom;
+    user-select: none;
+`;
+
+export const ImageViewerCloseButton = styled.button`
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    z-index: 500001;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: rotate(90deg);
+    }
+
+    &:active {
+        transform: rotate(90deg) scale(0.95);
+    }
+`;

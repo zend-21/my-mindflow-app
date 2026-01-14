@@ -247,6 +247,7 @@ export const ContentEditableArea = styled.div`
   }
 
   .highlight {
+    display: inline;
     background: linear-gradient(180deg, rgba(255, 235, 59, 0.35), rgba(255, 193, 7, 0.35));
     border-bottom: 2px solid #ffc107;
     cursor: pointer;
@@ -267,6 +268,7 @@ export const ContentEditableArea = styled.div`
   }
 
   .strikethrough {
+    display: inline;
     text-decoration: line-through;
     text-decoration-color: #ff5757;
     text-decoration-thickness: 2px;
@@ -302,6 +304,30 @@ export const ContentEditableArea = styled.div`
       border-color: rgba(139, 92, 246, 0.6);
       transform: scale(1.1);
     }
+  }
+
+  /* 이미지 자동 리사이징 */
+  img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 8px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+
+  /* 비디오 문서 너비에 맞춤 */
+  video {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 8px 0;
+    border-radius: 8px;
   }
 
   &::-webkit-scrollbar {
@@ -631,7 +657,32 @@ export const FullScreenEditArea = styled.div`
     pointer-events: none;
   }
 
+  /* 이미지 자동 리사이징 */
+  img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 8px 0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+
+    &:hover {
+      opacity: 0.9;
+    }
+  }
+
+  /* 비디오 자동 리사이징 */
+  video {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 8px 0;
+    border-radius: 8px;
+  }
+
   .strikethrough {
+    display: inline;
     text-decoration: line-through;
     text-decoration-color: #ff5757;
     text-decoration-thickness: 2px;
@@ -650,6 +701,7 @@ export const FullScreenEditArea = styled.div`
   }
 
   .highlight {
+    display: inline;
     background: linear-gradient(180deg, rgba(255, 235, 59, 0.35), rgba(255, 193, 7, 0.35));
     border-bottom: 2px solid #ffc107;
     cursor: pointer;
@@ -838,5 +890,74 @@ export const ResetButton = styled(ToolbarButton)`
   &:hover:not(:disabled) {
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3);
+  }
+`;
+
+// 이미지 뷰어 모달
+export const ImageViewerOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 400000;
+  cursor: zoom-out;
+  animation: fadeIn 0.2s ease-out;
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+`;
+
+export const ImageViewerContent = styled.div`
+  max-width: 95vw;
+  max-height: 95vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+`;
+
+export const ImageViewerImage = styled.img`
+  max-width: 100%;
+  max-height: 95vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  cursor: zoom-in;
+  touch-action: pinch-zoom;
+  user-select: none;
+`;
+
+export const ImageViewerCloseButton = styled.button`
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  backdrop-filter: blur(10px);
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: rotate(90deg);
   }
 `;

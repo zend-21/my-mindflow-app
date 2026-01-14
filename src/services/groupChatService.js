@@ -38,8 +38,10 @@ export const createGroupChat = async (creatorId, groupName, memberIds = [], grou
     const membersInfo = {};
     for (const memberId of allMembers) {
       const isCreator = memberId === creatorId;
+      // ⚠️ usersInfo[memberId]가 undefined인 경우 기본값 사용
+      const userInfo = usersInfo[memberId] || { displayName: '익명', profileImage: null };
       membersInfo[memberId] = {
-        ...usersInfo[memberId],
+        ...userInfo,
         joinedAt: serverTimestamp(),
         status: isCreator ? 'active' : 'pending', // 방장은 active, 나머지는 pending
         invitedBy: creatorId
@@ -111,6 +113,8 @@ export const subscribeToMyGroupChats = (callback) => {
   );
 
   return onSnapshot(q, (snapshot) => {
+    console.log(`📁 [그룹 목록] Firestore에서 ${snapshot.docs.length}개 그룹 조회됨`);
+
     const groups = snapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
@@ -120,17 +124,28 @@ export const subscribeToMyGroupChats = (callback) => {
     const filteredGroups = groups.filter(group => {
       const myMemberInfo = group.membersInfo?.[userId];
 
+      console.log(`🔍 [그룹 필터링] ${group.groupName} (${group.id}):`, {
+        hasMemberInfo: !!myMemberInfo,
+        memberInfo: myMemberInfo,
+        isBlocked: myMemberInfo?.isBlockedInvite === true
+      });
+
       // membersInfo에 없으면 표시 안 함
-      if (!myMemberInfo) return false;
+      if (!myMemberInfo) {
+        console.log(`⚠️ [그룹 필터링] membersInfo 없음 - 숨김: ${group.groupName}`);
+        return false;
+      }
 
       // isBlockedInvite가 true면 숨김 (차단한 사용자의 초대)
       if (myMemberInfo.isBlockedInvite === true) {
+        console.log(`⚠️ [그룹 필터링] 차단된 초대 - 숨김: ${group.groupName}`);
         return false;
       }
 
       return true;
     });
 
+    console.log(`✅ [그룹 목록] 필터링 후 ${filteredGroups.length}개 그룹 반환`);
     callback(filteredGroups);
   }, (error) => {
     console.error('❌ 그룹 목록 구독 실패:', error);

@@ -3,6 +3,7 @@
 
 import { db, auth } from '../firebase/config';
 import { collection, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { showAlert } from './alertModal';
 
 export async function cleanBase64FromCalendar() {
   const user = auth.currentUser;
@@ -40,11 +41,13 @@ export async function cleanBase64FromCalendar() {
     localStorage.removeItem('calendarSchedules_shared');
     console.log('✅ localStorage 캘린더 데이터도 정리됨');
 
-    alert(`정리 완료! ${deletedCount}개 날짜의 base64 이미지 데이터를 삭제했습니다. 페이지를 새로고침하세요.`);
+    showAlert(`정리 완료! ${deletedCount}개 날짜의 base64 이미지 데이터를 삭제했습니다. 페이지를 새로고침하세요.`, '정리 완료', () => {
+      window.location.reload();
+    });
 
   } catch (error) {
     console.error('❌ 오류:', error);
-    alert('오류가 발생했습니다: ' + error.message);
+    showAlert('오류가 발생했습니다: ' + error.message, '오류');
   }
 }
 

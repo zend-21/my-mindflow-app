@@ -18,6 +18,7 @@ import {
   FaImage, FaLink, FaQuoteLeft, FaYoutube, FaUndo, FaRedo
 } from 'react-icons/fa';
 import * as S from './RichTextEditor.styles';
+import { toast } from '../utils/toast';
 
 // 색상 프리셋
 const TEXT_COLOR_PRESETS = [
@@ -311,7 +312,7 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
 
     // 이미지 파일 검증
     if (!file.type.startsWith('image/')) {
-      alert('이미지 파일만 업로드할 수 있습니다.');
+      toast('이미지 파일만 업로드할 수 있습니다.');
       return;
     }
 
@@ -359,7 +360,7 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
         canvas.toBlob(async (blob) => {
           if (!blob) {
             console.error('이미지 Blob 생성 실패');
-            alert('이미지 처리 실패');
+            toast('이미지 처리 실패');
             setIsUploading(false);
             return;
           }
@@ -368,7 +369,7 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
           const blobSize = blob.size / (1024 * 1024);
 
           if (blobSize > 5) {
-            alert('이미지를 리사이즈했지만 여전히 5MB를 초과합니다. 더 작은 이미지를 사용해주세요.');
+            toast('이미지를 리사이즈했지만 여전히 5MB를 초과합니다. 더 작은 이미지를 사용해주세요.');
             setIsUploading(false);
             return;
           }
@@ -397,7 +398,7 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
             }
           } catch (uploadError) {
             console.error('❌ R2 업로드 실패:', uploadError);
-            alert(`이미지 업로드 실패: ${uploadError.message}`);
+            toast(`이미지 업로드 실패: ${uploadError.message}`);
             setIsUploading(false);
           }
         }, 'image/jpeg', 0.85);
@@ -405,20 +406,20 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
 
       img.onerror = () => {
         console.error('이미지 로드 실패');
-        alert('이미지 로드 실패');
+        toast('이미지 로드 실패');
         setIsUploading(false);
       };
 
       reader.onerror = () => {
         console.error('이미지 읽기 실패');
-        alert('이미지 읽기 실패');
+        toast('이미지 읽기 실패');
         setIsUploading(false);
       };
 
       reader.readAsDataURL(file);
     } catch (error) {
       console.error('이미지 처리 실패:', error);
-      alert(`이미지 처리 실패: ${error.message}`);
+      toast(`이미지 처리 실패: ${error.message}`);
       setIsUploading(false);
     }
   }, [editor]);

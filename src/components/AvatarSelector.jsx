@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { avatarList, getRecommendedAvatar } from './avatars/AvatarIcons';
 import { getUserProfile } from '../utils/fortuneLogic';
 import * as S from './AvatarSelector.styles';
+import { toast } from '../utils/toast';
 
 const BACKGROUND_COLORS = [
     // 첫 줄: 5개
@@ -177,7 +178,7 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
             window.dispatchEvent(new CustomEvent('avatarBgColorChanged', { detail: 'custom' }));
             setShowCustomColorModal(false);
         } else {
-            alert('유효한 색상 코드를 입력해주세요. (예: #FF1493)');
+            toast('유효한 색상 코드를 입력해주세요. (예: #FF1493)');
         }
     };
 

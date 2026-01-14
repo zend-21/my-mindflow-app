@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import Portal from '../Portal';
+import { toast } from '../../utils/toast';
 
 const fadeIn = keyframes`
   from { opacity: 0; }
@@ -274,7 +275,7 @@ const RoomSettingsModal = ({ isOpen, onClose, onConfirm, defaultTitle = '' }) =>
 
   const handleConfirm = () => {
     if (!roomTitle.trim()) {
-      alert('방 제목을 입력해주세요.');
+      toast('방 제목을 입력해주세요.');
       return;
     }
 

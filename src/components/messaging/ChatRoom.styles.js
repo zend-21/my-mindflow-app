@@ -66,7 +66,7 @@ export const Avatar = styled.div`
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: ${props => props.$color || 'linear-gradient(135deg, #667eea, #764ba2)'};
+  background: ${props => props.$color || '#1E90FF'};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -189,7 +189,7 @@ export const MessagesContainer = styled.div`
   padding-bottom: 80px;  /* 🔥 나가기 버튼 영역 확보 */
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 17px;
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -230,6 +230,81 @@ export const DateText = styled.span`
   color: #666;
   font-weight: 500;
   white-space: nowrap;
+`;
+
+// 안 읽은 메시지 마커 (여기까지 읽음)
+export const UnreadMarker = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #4a9eff;
+  }
+`;
+
+export const UnreadMarkerText = styled.span`
+  font-size: 12px;
+  color: #4a9eff;
+  font-weight: 600;
+  white-space: nowrap;
+`;
+
+// 이전 대화 경계 구분선
+export const OlderMessagesDivider = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.15);
+  }
+`;
+
+export const OlderMessagesDividerText = styled.span`
+  font-size: 11px;
+  color: #888;
+  font-weight: 500;
+  white-space: nowrap;
+`;
+
+// 이전 메시지 불러오기 버튼
+export const LoadMoreButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 16px auto;
+  padding: 10px 20px;
+  background: rgba(74, 158, 255, 0.1);
+  border: 1px solid #4a9eff;
+  border-radius: 20px;
+  color: #4a9eff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background: rgba(74, 158, 255, 0.2);
+    transform: translateY(-1px);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
 `;
 
 // 그룹 삭제 알림 박스
@@ -278,7 +353,7 @@ export const DeletionCountdown = styled.div`
 export const MessageItem = styled.div`
   display: flex;
   gap: 8px;
-  align-items: flex-end;
+  align-items: flex-start;
   flex-direction: ${props => props.$isMine ? 'row-reverse' : 'row'};
 `;
 
@@ -287,6 +362,7 @@ export const MessageAvatar = styled(Avatar)`
   height: 32px;
   font-size: 14px;
   position: relative;
+  margin-top: 4px;
 `;
 
 export const RoleBadge = styled.div`
@@ -310,7 +386,7 @@ export const MessageContent = styled.div`
   flex-direction: column;
   gap: 4px;
   align-items: ${props => props.$isMine ? 'flex-end' : 'flex-start'};
-  max-width: 70%;
+  max-width: calc(80% + 10px);
 `;
 
 export const SenderName = styled.div`
@@ -326,22 +402,41 @@ export const MessageBubble = styled.div`
   color: #ffffff;
   padding: 10px 14px;
   border-radius: ${props => props.$isMine
-    ? '16px 16px 4px 16px'
-    : '16px 16px 16px 4px'};
+    ? '16px 4px 16px 16px'
+    : '4px 16px 16px 16px'};
   font-size: 14px;
   line-height: 1.5;
-  word-break: break-word;
   box-shadow: ${props => props.$isMine
     ? '0 2px 8px rgba(74, 144, 226, 0.3)'
     : 'none'};
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  ${props => props.$collapsed && `
+    padding-bottom: 35px;
+  `}
+`;
+
+export const MessageTextContent = styled.div`
+  word-break: break-word;
+  white-space: pre-wrap;
+  position: relative;
+  ${props => props.$collapsed && `
+    max-height: calc(1.5em * 18);
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 1.5em), transparent 100%);
+    mask-image: linear-gradient(to bottom, black calc(100% - 1.5em), transparent 100%);
+  `}
 `;
 
 export const MessageMeta = styled.div`
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  justify-content: flex-end;
+  align-items: ${props => props.$isMine ? 'flex-end' : 'flex-start'};
   gap: 2px;
+  flex-shrink: 0;
+  min-width: 60px;
+  width: 60px;
 `;
 
 export const MessageTime = styled.div`
@@ -783,7 +878,7 @@ export const MemberAvatar = styled.div`
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: ${props => props.$color || 'linear-gradient(135deg, #667eea, #764ba2)'};
+  background: ${props => props.$color || '#1E90FF'};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1238,4 +1333,42 @@ export const InviteCodeDescription = styled.div`
   font-size: 13px;
   color: #999;
   line-height: 1.6;
+`;
+
+export const ShowMoreButton = styled.button`
+  background: transparent;
+  border: none;
+  color: ${props => props.$isMine ? 'rgba(255, 255, 255, 0.9)' : '#4a90e2'};
+  font-size: 13px;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  text-align: center;
+  width: 100%;
+
+  &:hover {
+    opacity: 0.7;
+  }
+`;
+
+export const ShowMoreOverlay = styled.div`
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: ${props => props.$isMine
+    ? 'linear-gradient(135deg, #4a90e2, #357abd)'
+    : 'rgba(255, 255, 255, 0.08)'};
+  border-top: 1px dotted ${props => props.$isMine ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.2)'};
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 14px 6px 14px;
+  border-radius: ${props => props.$isMine ? '0 0 16px 16px' : '0 0 16px 16px'};
+  pointer-events: none;
+
+  button {
+    pointer-events: all;
+  }
 `;

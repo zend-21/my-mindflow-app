@@ -1,4 +1,5 @@
 // 개선된 친구 관리 모달 (고유 ID + 초대 링크)
+import { toast } from '../../utils/toast';
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
@@ -77,18 +78,18 @@ const ImprovedFriendsModal = ({ isOpen, onClose }) => {
   const handleSendRequest = async (user) => {
     try {
       await sendFriendRequest(user.id, user.displayName);
-      alert(`${user.displayName}님에게 친구 요청을 보냈습니다`);
+      toast(`${user.displayName}님에게 친구 요청을 보냈습니다`);
       setSearchResult(null);
       setSearchTerm('');
     } catch (err) {
-      alert(err.message || '친구 요청 실패');
+      toast(err.message || '친구 요청 실패');
       console.error(err);
     }
   };
 
   const copyInviteLink = () => {
     navigator.clipboard.writeText(inviteLink);
-    alert('초대 링크가 복사되었습니다!');
+    toast('초대 링크가 복사되었습니다!');
   };
 
   const shareInviteLink = () => {

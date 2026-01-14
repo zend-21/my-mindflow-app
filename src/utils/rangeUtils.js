@@ -31,9 +31,10 @@ export function getAbsoluteOffset(container, node, offset) {
  * 절대 오프셋에서 노드와 오프셋 찾기
  * @param {HTMLElement} container - 기준 컨테이너
  * @param {number} absoluteOffset - 절대 오프셋
+ * @param {boolean} isEnd - endOffset인 경우 true (정확히 노드 끝이면 현재 노드 반환)
  * @returns {{node: Node, offset: number}|null} 노드와 오프셋 객체
  */
-export function getNodeAndOffset(container, absoluteOffset) {
+export function getNodeAndOffset(container, absoluteOffset, isEnd = false) {
   const walker = document.createTreeWalker(
     container,
     NodeFilter.SHOW_TEXT,
@@ -42,17 +43,28 @@ export function getNodeAndOffset(container, absoluteOffset) {
 
   let currentOffset = 0;
   let currentNode;
+  let lastNode = null;
 
   while ((currentNode = walker.nextNode())) {
+    lastNode = currentNode;
     const nodeLength = currentNode.nodeValue.length;
     console.log('🔍 노드 탐색:', {
       nodeText: currentNode.nodeValue.substring(0, 30),
       nodeLength,
       currentOffset,
       targetOffset: absoluteOffset,
-      rangeEnd: currentOffset + nodeLength
+      rangeEnd: currentOffset + nodeLength,
+      isEnd
     });
-    if (currentOffset + nodeLength > absoluteOffset) {
+
+    // isEnd가 true(endOffset)면 >= 사용, false(startOffset)면 > 사용
+    // startOffset: 노드 끝이면 다음 노드의 시작으로
+    // endOffset: 노드 끝이면 현재 노드의 끝으로
+    const condition = isEnd
+      ? (currentOffset + nodeLength >= absoluteOffset)
+      : (currentOffset + nodeLength > absoluteOffset);
+
+    if (condition) {
       console.log('✅ 노드 찾음:', {
         node: currentNode,
         nodeText: currentNode.nodeValue,
@@ -64,6 +76,18 @@ export function getNodeAndOffset(container, absoluteOffset) {
       };
     }
     currentOffset += nodeLength;
+  }
+
+  // 오프셋이 전체 텍스트 길이를 초과하는 경우, 마지막 노드의 끝으로 설정
+  if (lastNode) {
+    console.log('⚠️ 오프셋 초과, 마지막 노드 사용:', {
+      lastNode,
+      lastNodeLength: lastNode.nodeValue.length
+    });
+    return {
+      node: lastNode,
+      offset: lastNode.nodeValue.length
+    };
   }
 
   return null;
@@ -90,8 +114,8 @@ export function rangeToAbsoluteOffset(range, container) {
  */
 export function absoluteOffsetToRange(container, startOffset, endOffset) {
   const range = document.createRange();
-  const startPoint = getNodeAndOffset(container, startOffset);
-  const endPoint = getNodeAndOffset(container, endOffset);
+  const startPoint = getNodeAndOffset(container, startOffset, false); // startOffset
+  const endPoint = getNodeAndOffset(container, endOffset, true); // endOffset
 
   if (startPoint && endPoint) {
     range.setStart(startPoint.node, startPoint.offset);

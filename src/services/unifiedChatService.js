@@ -49,15 +49,16 @@ export const sendMessage = async (chatId, chatType, userId, message, roomData = 
  * @param {string} chatType - 채팅 타입
  * @param {string} userId - 사용자 ID (그룹 채팅 참여 시점 필터링용)
  * @param {function} callback - 메시지 콜백
+ * @param {number} messageLimit - 메시지 로드 제한 개수 (기본: 제한 없음)
  * @returns {function} unsubscribe 함수
  */
-export const subscribeToMessages = (chatId, chatType, userId, callback) => {
+export const subscribeToMessages = (chatId, chatType, userId, callback, messageLimit = null) => {
   const type = detectChatType(chatId, chatType);
 
   if (type === 'group') {
-    return subscribeToGroupMessages(chatId, userId, callback);
+    return subscribeToGroupMessages(chatId, userId, callback, messageLimit);
   } else {
-    return subscribeToDMMessages(chatId, callback);
+    return subscribeToDMMessages(chatId, callback, messageLimit);
   }
 };
 

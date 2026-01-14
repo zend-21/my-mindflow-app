@@ -1509,6 +1509,19 @@ export const FrozenWarningBody = styled.div`
     margin-bottom: 20px;
 `;
 
+export const FrozenWarningChatInfo = styled.div`
+    background: rgba(74, 144, 226, 0.15);
+    border: 1px solid rgba(74, 144, 226, 0.4);
+    border-radius: 8px;
+    padding: 14px;
+    margin: 16px 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.6;
+    color: #6bb6ff;
+    text-align: center;
+`;
+
 export const FrozenWarningInfo = styled.div`
     background: rgba(74, 144, 226, 0.1);
     border: 1px solid rgba(74, 144, 226, 0.3);

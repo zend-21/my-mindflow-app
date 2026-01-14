@@ -42,7 +42,7 @@ const FallbackAvatar = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  background: ${props => props.$bgColor || 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'};
+  background: ${props => props.$bgColor || '#1E90FF'};
   color: white;
   font-weight: 600;
   font-size: ${props => props.$fontSize || '16px'};

@@ -390,8 +390,10 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag,
     });
 
     // 그룹 채팅방 목록 실시간 구독
+    console.log('🚀 [ChatList] 그룹 채팅방 실시간 구독 시작 - userId:', currentUserId);
     const unsubscribeGroup = subscribeToMyGroupChats((groups) => {
-      console.log('📁 그룹 채팅방 목록 업데이트:', groups);
+      console.log('📁 [ChatList] 그룹 채팅방 목록 업데이트:', groups);
+      console.log('📊 [ChatList] 받은 그룹 개수:', groups.length);
 
       // 그룹 채팅도 동일하게 알림음 재생
       if (groupLoaded && notificationSettings.enabled && currentUserId) {

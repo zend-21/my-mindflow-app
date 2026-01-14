@@ -34,6 +34,9 @@ import { hasMasterPassword, setEncryptionKey, isUnlocked } from './services/keyM
 import { UserProvider } from './contexts/UserContext.jsx';
 import { TrashProvider, useTrashContext } from './contexts/TrashContext';
 import AppContent from './components/AppContent.jsx';
+import { registerToast } from './utils/toast';
+import { registerAlert } from './utils/alertModal';
+import ConfirmAlertModal from './components/ConfirmAlertModal.jsx';
 // 하위 컴포넌트들
 import Header from './components/Header.jsx';
 import StatsGrid from './components/StatsGrid.jsx';
@@ -641,6 +644,7 @@ function App() {
     const [selectedMemo, setSelectedMemo] = useState(null);
     const [memoContext, setMemoContext] = useState(null); // { activeFolder, sortOrder, sortDirection, sharedMemoInfo }
     const [toastMessage, setToastMessage] = useState(null);
+    const [alertModal, setAlertModal] = useState(null); // { message, title, onConfirm }
     const [memoOpenSource, setMemoOpenSource] = useState(null);
     const [isSelectionMode, setIsSelectionMode] = useState(false);
     const [selectedMemoIds, setSelectedMemoIds] = useState(new Set());
@@ -782,6 +786,17 @@ function App() {
         console.log('🔔 showToast 호출됨:', message);
         setToastMessage(message);
     };
+
+    const showAlertModal = (message, title = '알림', onConfirm = null) => {
+        console.log('🔔 showAlert 호출됨:', message);
+        setAlertModal({ message, title, onConfirm });
+    };
+
+    // 전역 toast 및 alert 등록
+    useEffect(() => {
+        registerToast(showToast);
+        registerAlert(showAlertModal);
+    }, []);
     
     const handleDataExport = async () => {
         // 전체 데이터 백업 (운세 제외)
@@ -938,7 +953,7 @@ function App() {
             showToast("✓ 메모가 수정되었습니다");
         };
 
-    const handleDeleteMemo = (id) => {
+    const handleDeleteMemo = async (id) => {
             const deletedMemo = memos.find(memo => memo.id === id);
             if (deletedMemo) {
                 // 휴지통으로 이동 이벤트 발생
@@ -965,11 +980,25 @@ function App() {
                 };
                 syncTrashItem(trashedItem);
 
+                // ⭐ 대화방에서 불러온 문서라면, 해당 대화방의 currentDoc 비우기
+                if (deletedMemo.currentWorkingRoomId) {
+                    try {
+                        const { doc, deleteDoc } = await import('firebase/firestore');
+                        const { db } = await import('./firebase/config');
+
+                        const currentDocRef = doc(db, 'chatRooms', deletedMemo.currentWorkingRoomId, 'sharedDocument', 'currentDoc');
+                        await deleteDoc(currentDocRef);
+                        console.log('✅ 대화방 currentDoc 자동 비우기 완료:', deletedMemo.currentWorkingRoomId);
+                    } catch (error) {
+                        console.error('❌ 대화방 currentDoc 비우기 실패:', error);
+                    }
+                }
+
                 // ✅ Firestore에서 메모 삭제
                 deleteMemo(id);
                 addActivity('메모 삭제', deletedMemo.content, id);
             }
-            return deletedMemo; 
+            return deletedMemo;
         };
     
     const handleStartSelectionMode = (memoId) => {
@@ -1058,7 +1087,23 @@ function App() {
     };
 
     // 메모 폴더 변경
-    const handleUpdateMemoFolder = (memoId, folderId, savePrevious = false) => {
+    const handleUpdateMemoFolder = async (memoId, folderId, savePrevious = false) => {
+        const targetMemo = memos.find(memo => memo.id === memoId);
+
+        // ⭐ 대화방에서 불러온 문서를 이동하면, 해당 대화방의 currentDoc 비우기
+        if (targetMemo?.currentWorkingRoomId) {
+            try {
+                const { doc, deleteDoc } = await import('firebase/firestore');
+                const { db } = await import('./firebase/config');
+
+                const currentDocRef = doc(db, 'chatRooms', targetMemo.currentWorkingRoomId, 'sharedDocument', 'currentDoc');
+                await deleteDoc(currentDocRef);
+                console.log('✅ 폴더 이동: 대화방 currentDoc 자동 비우기 완료:', targetMemo.currentWorkingRoomId);
+            } catch (error) {
+                console.error('❌ 폴더 이동: 대화방 currentDoc 비우기 실패:', error);
+            }
+        }
+
         syncMemos(
             memos.map(memo => {
                 if (memo.id === memoId) {
@@ -1076,8 +1121,28 @@ function App() {
     };
 
     // 여러 메모의 폴더 한 번에 변경
-    const handleUpdateMemoFolderBatch = (memoIds, folderId, savePrevious = false) => {
+    const handleUpdateMemoFolderBatch = async (memoIds, folderId, savePrevious = false) => {
         const memoIdSet = new Set(memoIds);
+
+        // ⭐ 대화방에서 불러온 문서들을 이동하면, 해당 대화방들의 currentDoc 비우기
+        const targetMemos = memos.filter(memo => memoIdSet.has(memo.id) && memo.currentWorkingRoomId);
+        if (targetMemos.length > 0) {
+            try {
+                const { doc, deleteDoc } = await import('firebase/firestore');
+                const { db } = await import('./firebase/config');
+
+                const deletePromises = targetMemos.map(memo => {
+                    const currentDocRef = doc(db, 'chatRooms', memo.currentWorkingRoomId, 'sharedDocument', 'currentDoc');
+                    return deleteDoc(currentDocRef);
+                });
+
+                await Promise.all(deletePromises);
+                console.log(`✅ 배치 이동: ${targetMemos.length}개 대화방 currentDoc 자동 비우기 완료`);
+            } catch (error) {
+                console.error('❌ 배치 이동: 대화방 currentDoc 비우기 실패:', error);
+            }
+        }
+
         syncMemos(
             memos.map(memo => {
                 if (memoIdSet.has(memo.id)) {
@@ -1106,57 +1171,6 @@ function App() {
         );
         // Firestore 동기화는 자동으로 됨 (useFirestoreSync의 디바운싱)
     };
-
-    // ⭐ 공유 폴더 메모들의 hasPendingEdits 플래그 자동 동기화 (공유 폴더 진입 시에만)
-    useEffect(() => {
-        if (!userId || !isAuthenticated || memoContext?.activeFolder !== 'shared') return;
-
-        const verifySharedFolderBadges = async () => {
-            const sharedMemos = memos.filter(memo => memo.folderId === 'shared');
-            if (sharedMemos.length === 0) return;
-
-            let hasChanges = false;
-            const updatedMemos = [...memos];
-
-            console.log(`🔍 공유 폴더 배지 검증 시작 (${sharedMemos.length}개 메모)`);
-
-            for (const memo of sharedMemos) {
-                try {
-                    // editHistory 컬렉션 확인
-                    const { collection, getDocs, query, where } = await import('firebase/firestore');
-                    const editHistoryRef = collection(db, 'mindflowUsers', userId, 'memos', memo.id, 'editHistory');
-                    const pendingQuery = query(editHistoryRef, where('status', '==', 'pending'));
-                    const snapshot = await getDocs(pendingQuery);
-
-                    const actualHasPending = snapshot.size > 0;
-                    const currentHasPending = memo.hasPendingEdits === true;
-
-                    // 실제 상태와 플래그가 다르면 수정
-                    if (actualHasPending !== currentHasPending) {
-                        console.log(`🔄 배지 자동 동기화: ${memo.id} - ${currentHasPending} → ${actualHasPending}`);
-                        const memoIndex = updatedMemos.findIndex(m => m.id === memo.id);
-                        if (memoIndex !== -1) {
-                            updatedMemos[memoIndex] = { ...updatedMemos[memoIndex], hasPendingEdits: actualHasPending };
-                            hasChanges = true;
-                        }
-                    }
-                } catch (error) {
-                    console.warn(`배지 검증 실패 (${memo.id}):`, error);
-                }
-            }
-
-            if (hasChanges) {
-                console.log(`✅ 배지 동기화 완료 - 변경됨`);
-                syncMemos(updatedMemos);
-            } else {
-                console.log(`✅ 배지 검증 완료 - 변경사항 없음`);
-            }
-        };
-
-        // 공유 폴더를 처음 열 때만 1회 실행 (디바운싱)
-        const timer = setTimeout(verifySharedFolderBadges, 500);
-        return () => clearTimeout(timer);
-    }, [memoContext?.activeFolder, userId, isAuthenticated]); // memos 제거 - 공유 폴더 진입 시에만 1회 실행
 
     // 숨겨진 메모 정리 (존재하지 않는 폴더에 속한 메모들을 미분류로 이동)
     const handleCleanupOrphanedMemos = () => {
@@ -2832,6 +2846,7 @@ function App() {
                                 onRequestShareSelectedMemos={requestShareSelectedMemos}
                                 onRequestUnshareSelectedMemos={requestUnshareSelectedMemos}
                                 onActiveFolderChange={handleActiveFolderChange}
+                                currentUserId={firebaseUser?.uid}
                             />
                         }
                         {activeTab === 'todo' && <div>할 일 페이지</div>}
@@ -2914,6 +2929,16 @@ function App() {
 
             {/* 모달(Modal)들은 Screen 컴포넌트 바깥에 두어 전체 화면을 덮도록 합니다. */}
             <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
+
+            {/* 알림 모달 (alert 대체) */}
+            {alertModal && (
+                <ConfirmAlertModal
+                    message={alertModal.message}
+                    title={alertModal.title}
+                    onConfirm={alertModal.onConfirm}
+                    onClose={() => setAlertModal(null)}
+                />
+            )}
 
             {/* 복원 확인 모달 */}
             {isRestoreConfirmOpen && (

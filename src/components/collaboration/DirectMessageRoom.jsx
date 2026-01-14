@@ -1,4 +1,5 @@
 // 1:1 대화방 컴포넌트
+import { toast } from '../../utils/toast';
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { X, Send, ArrowLeft } from 'lucide-react';
@@ -66,7 +67,7 @@ const DirectMessageRoom = ({ roomId, onClose }) => {
       setNewMessage('');
     } catch (error) {
       console.error('메시지 전송 실패:', error);
-      alert(error.message || '메시지 전송에 실패했습니다');
+      toast(error.message || '메시지 전송에 실패했습니다');
     }
   };
 

@@ -1,4 +1,5 @@
 // 고유 ID 변경 모달
+import { toast } from '../../utils/toast';
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
@@ -54,11 +55,11 @@ const ChangeUniqueIdModal = ({ isOpen, onClose, currentId, onSuccess }) => {
     try {
       setSaving(true);
       await setUserUniqueId(newId);
-      alert('고유 ID가 변경되었습니다!');
+      toast('고유 ID가 변경되었습니다!');
       onSuccess(newId);
       onClose();
     } catch (err) {
-      alert('변경 실패: ' + err.message);
+      toast('변경 실패: ' + err.message);
       console.error(err);
     } finally {
       setSaving(false);

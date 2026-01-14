@@ -1,4 +1,5 @@
 // 공유 메모/스케줄 뷰어 (수정 제안 + 실시간 채팅)
+import { toast } from '../../utils/toast';
 
 import React, { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
@@ -63,7 +64,7 @@ const SharedNoteViewer = ({ isOpen, onClose, noteId }) => {
       await markNoteAsRead(noteId);
     } catch (err) {
       console.error('메모 로딩 실패:', err);
-      alert('메모를 불러올 수 없습니다');
+      toast('메모를 불러올 수 없습니다');
       onClose();
     }
   };
@@ -94,14 +95,14 @@ const SharedNoteViewer = ({ isOpen, onClose, noteId }) => {
       await sendChatMessage(noteId, newMessage.trim());
       setNewMessage('');
     } catch (err) {
-      alert('메시지 전송 실패');
+      toast('메시지 전송 실패');
       console.error(err);
     }
   };
 
   const handleSubmitEdit = async () => {
     if (editedContent === note.content) {
-      alert('변경사항이 없습니다');
+      toast('변경사항이 없습니다');
       return;
     }
 
@@ -118,12 +119,12 @@ const SharedNoteViewer = ({ isOpen, onClose, noteId }) => {
 
       await createEditSuggestion(noteId, note.content, editedContent, changes);
 
-      alert('수정 제안이 제출되었습니다');
+      toast('수정 제안이 제출되었습니다');
       setIsEditing(false);
       setEditedContent(note.content);
       await loadEditSuggestions();
     } catch (err) {
-      alert('수정 제안 실패');
+      toast('수정 제안 실패');
       console.error(err);
     } finally {
       setLoading(false);
@@ -133,11 +134,11 @@ const SharedNoteViewer = ({ isOpen, onClose, noteId }) => {
   const handleApproveSuggestion = async (suggestionId) => {
     try {
       await approveEditSuggestion(suggestionId);
-      alert('수정이 승인되었습니다');
+      toast('수정이 승인되었습니다');
       await loadNote();
       await loadEditSuggestions();
     } catch (err) {
-      alert('승인 실패');
+      toast('승인 실패');
       console.error(err);
     }
   };
@@ -145,10 +146,10 @@ const SharedNoteViewer = ({ isOpen, onClose, noteId }) => {
   const handleRejectSuggestion = async (suggestionId) => {
     try {
       await rejectEditSuggestion(suggestionId);
-      alert('수정이 거절되었습니다');
+      toast('수정이 거절되었습니다');
       await loadEditSuggestions();
     } catch (err) {
-      alert('거절 실패');
+      toast('거절 실패');
       console.error(err);
     }
   };

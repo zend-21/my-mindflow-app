@@ -658,7 +658,10 @@ const MarkerCommentsModal = ({
             )}
           </ProposalTitle>
           <ProposalItem>
-            <strong>원본:</strong> {markerData?.originalText || '-'}
+            <strong>유형:</strong> {markerData?.type === 'strikethrough' ? '✂️ 취소선 (삭제 제안)' : '✨ 형광펜 (수정 제안)'}
+          </ProposalItem>
+          <ProposalItem>
+            <strong>원본:</strong> {markerData?.oldText || markerData?.originalText || '-'}
           </ProposalItem>
           {markerData?.newText && (
             <ProposalItem>

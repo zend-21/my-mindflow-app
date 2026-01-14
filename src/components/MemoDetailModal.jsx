@@ -97,6 +97,11 @@ const MemoDetailModal = ({
     const [toastMessage, setToastMessage] = useState(null);
     const textareaRef = useRef(null);
     const modalContentRef = useRef(null);
+    const readModeContainerRef = useRef(null);
+
+    // 이미지 뷰어 상태
+    const [showImageViewer, setShowImageViewer] = useState(false);
+    const [viewerImageSrc, setViewerImageSrc] = useState('');
 
     useEffect(() => {
         if (isOpen && memo) {
@@ -141,7 +146,24 @@ const MemoDetailModal = ({
             // checkSharedStatus();
         }
     }, [isOpen, memo]);
-    
+
+    // ESC 키로 이미지 뷰어 닫기
+    useEffect(() => {
+        const handleEscape = (e) => {
+            if (e.key === 'Escape' && showImageViewer) {
+                handleCloseImageViewer();
+            }
+        };
+
+        if (showImageViewer) {
+            document.addEventListener('keydown', handleEscape);
+        }
+
+        return () => {
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, [showImageViewer]);
+
     if (!isOpen || !memo) {
         return null;
     }
@@ -224,6 +246,17 @@ const MemoDetailModal = ({
     const handleConfirmAction = () => {
         confirmModalState.onConfirm();
         closeConfirmModal();
+    };
+
+    // 이미지 뷰어 핸들러
+    const handleImageClick = (imgSrc) => {
+        setViewerImageSrc(imgSrc);
+        setShowImageViewer(true);
+    };
+
+    const handleCloseImageViewer = () => {
+        setShowImageViewer(false);
+        setViewerImageSrc('');
     };
 
     // 스와이프 네비게이션 로직
@@ -621,8 +654,21 @@ const MemoDetailModal = ({
 
                             {/* 읽기 모드 컨텐츠 - HTML 렌더링 */}
                             <S.ReadModeContainer
+                                ref={readModeContainerRef}
                                 $isImportant={isImportant}
-                                onDoubleClick={() => {
+                                onClick={(e) => {
+                                    // 이미지 클릭인 경우 이미지 뷰어 열기
+                                    if (e.target.tagName === 'IMG') {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleImageClick(e.target.src);
+                                    }
+                                }}
+                                onDoubleClick={(e) => {
+                                    // 이미지 클릭인 경우 무시
+                                    if (e.target.tagName === 'IMG') {
+                                        return;
+                                    }
                                     // 텍스트 선택이 발생한 경우 무시
                                     if (window.getSelection && window.getSelection().toString().length > 0) {
                                         return;
@@ -634,6 +680,10 @@ const MemoDetailModal = ({
                                     setIsEditMode(true);
                                 }}
                                 onTouchEnd={(e) => {
+                                    // 이미지 탭인 경우 무시
+                                    if (e.target.tagName === 'IMG') {
+                                        return;
+                                    }
                                     // 텍스트 선택이 발생한 경우 무시
                                     if (window.getSelection && window.getSelection().toString().length > 0) {
                                         return;
@@ -808,6 +858,18 @@ const MemoDetailModal = ({
                     }}
                 />
             )} */}
+
+            {/* 이미지 뷰어 모달 */}
+            {showImageViewer && (
+                <S.ImageViewerOverlay onClick={handleCloseImageViewer}>
+                    <S.ImageViewerContent onClick={(e) => e.stopPropagation()}>
+                        <S.ImageViewerImage src={viewerImageSrc} alt="Full size" />
+                        <S.ImageViewerCloseButton onClick={handleCloseImageViewer}>
+                            <span className="material-icons">close</span>
+                        </S.ImageViewerCloseButton>
+                    </S.ImageViewerContent>
+                </S.ImageViewerOverlay>
+            )}
         </Fragment>
       </Portal>
     );

@@ -121,9 +121,10 @@ export const sendGroupMessage = async (groupId, senderId, content, type = 'text'
  * @param {string} groupId - 그룹 채팅방 ID
  * @param {string} userId - 현재 사용자 ID (참여 시점 확인용)
  * @param {Function} callback - 메시지 목록을 받을 콜백
+ * @param {number} messageLimit - 메시지 로드 제한 개수 (기본: 30)
  * @returns {Function} unsubscribe 함수
  */
-export const subscribeToGroupMessages = (groupId, userId, callback) => {
+export const subscribeToGroupMessages = (groupId, userId, callback, messageLimit = 30) => {
   // 먼저 그룹 정보를 가져와서 사용자의 joinedAt 확인
   const groupRef = doc(db, 'groupChats', groupId);
 
@@ -146,13 +147,13 @@ export const subscribeToGroupMessages = (groupId, userId, callback) => {
         messagesRef,
         where('createdAt', '>=', joinedAt),
         orderBy('createdAt', 'desc'),
-        limit(100)
+        limit(messageLimit)
       );
-      console.log(`📨 ${userId}의 참여 시점 이후 메시지만 조회`);
+      console.log(`📨 ${userId}의 참여 시점 이후 최근 ${messageLimit}개 메시지 조회`);
     } else {
       // joinedAt이 없으면 모든 메시지 조회 (하위 호환성 - 방장 등)
-      q = query(messagesRef, orderBy('createdAt', 'desc'), limit(100));
-      console.log(`📨 모든 메시지 조회 (joinedAt 없음)`);
+      q = query(messagesRef, orderBy('createdAt', 'desc'), limit(messageLimit));
+      console.log(`📨 최근 ${messageLimit}개 메시지 조회 (joinedAt 없음)`);
     }
 
     // 메시지 구독
@@ -161,7 +162,9 @@ export const subscribeToGroupMessages = (groupId, userId, callback) => {
         id: doc.id,
         ...doc.data()
       })).reverse(); // 최신순으로 가져왔으므로 다시 오래된순으로 정렬
-      callback(messages);
+
+      // 더 많은 메시지가 있는지 콜백에 알려주기 위해 메타데이터 추가
+      callback(messages, { hasMore: snapshot.docs.length >= messageLimit });
     });
   });
 };

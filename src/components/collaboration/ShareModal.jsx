@@ -1,4 +1,5 @@
 // 메모/스케줄 공유 모달
+import { toast } from '../../utils/toast';
 
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
@@ -50,7 +51,7 @@ const ShareModal = ({ isOpen, onClose, noteData, noteType = 'memo' }) => {
 
   const handleShare = async () => {
     if (selectedFriends.length === 0) {
-      alert('공유할 친구를 선택해주세요');
+      toast('공유할 친구를 선택해주세요');
       return;
     }
 
@@ -69,10 +70,10 @@ const ShareModal = ({ isOpen, onClose, noteData, noteType = 'memo' }) => {
 
       await shareNote(noteData, participants, noteType);
 
-      alert('공유가 완료되었습니다!');
+      toast('공유가 완료되었습니다!');
       onClose();
     } catch (err) {
-      alert('공유 실패: ' + err.message);
+      toast('공유 실패: ' + err.message);
       console.error(err);
     } finally {
       setLoading(false);

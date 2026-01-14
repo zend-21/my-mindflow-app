@@ -40,7 +40,14 @@ export const getUsersInfo = async (userIds) => {
 
   await Promise.all(
     userIds.map(async (userId) => {
-      usersInfo[userId] = await getUserInfo(userId);
+      try {
+        usersInfo[userId] = await getUserInfo(userId);
+        console.log(`✅ 사용자 정보 가져오기 성공: ${userId}`, usersInfo[userId]);
+      } catch (error) {
+        console.error(`❌ 사용자 정보 가져오기 실패: ${userId}`, error);
+        // 실패해도 기본값으로 설정
+        usersInfo[userId] = { displayName: '익명', profileImage: null };
+      }
     })
   );
 

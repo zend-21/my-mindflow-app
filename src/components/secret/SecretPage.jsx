@@ -14,6 +14,7 @@ import EmailConfirmModal from './EmailConfirmModal';
 import CategoryNameEditModal from './CategoryNameEditModal';
 import TempPinDisplayModal from './TempPinDisplayModal';
 import { ALL_ICONS } from './categoryIcons';
+import { toast } from '../../utils/toast';
 import {
     hasPinSet,
     setPin,
@@ -1213,7 +1214,7 @@ const SecretPage = ({ onClose, profile, showToast, setShowHeader }) => {
             }
         } else {
             // 이메일 발송 실패
-            alert(`⚠️ 이메일 발송에 실패했습니다.\n\n에러: ${emailResult.message}\n\n관리자에게 문의하세요.`);
+            toast(`⚠️ 이메일 발송에 실패했습니다. 에러: ${emailResult.message} 관리자에게 문의하세요.`);
         }
 
         // 데이터 정리

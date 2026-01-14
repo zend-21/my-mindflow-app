@@ -395,26 +395,27 @@ export const enterDMRoom = (roomId, userId) => enterRoom('directMessages', roomI
 export const exitDMRoom = (roomId, userId) => exitRoom('directMessages', roomId, userId);
 
 /**
- * 메시지 목록 실시간 구독 (quota 최적화: 최근 50개 + 증분 업데이트)
+ * 메시지 목록 실시간 구독 (quota 최적화: 최근 N개 + 증분 업데이트)
  * @param {string} roomId
  * @param {function} callback
+ * @param {number} messageLimit - 메시지 로드 제한 개수 (기본: 30)
  * @returns {function} unsubscribe 함수
  */
-export const subscribeToMessages = (roomId, callback) => {
+export const subscribeToMessages = (roomId, callback, messageLimit = 30) => {
   const messagesRef = collection(db, 'directMessages', roomId, 'messages');
 
-  // quota 최적화: 최근 50개 메시지만 로드
+  // quota 최적화: 최근 N개 메시지만 로드
   const q = query(
     messagesRef,
     orderBy('createdAt', 'desc'),
-    limit(50)
+    limit(messageLimit)
   );
 
   let isInitialLoad = true;
 
   return onSnapshot(q, (snapshot) => {
     if (isInitialLoad) {
-      // 초기 로드: 전체 메시지 (최근 50개)
+      // 초기 로드: 전체 메시지 (최근 N개)
       const messages = snapshot.docs
         .map(doc => ({
           id: doc.id,
@@ -422,7 +423,8 @@ export const subscribeToMessages = (roomId, callback) => {
         }))
         .reverse(); // 오름차순으로 변경 (오래된 것 → 최신)
 
-      callback(messages);
+      // 더 많은 메시지가 있는지 메타데이터 전달
+      callback(messages, { hasMore: snapshot.docs.length >= messageLimit });
       isInitialLoad = false;
     } else {
       // 증분 업데이트: 변경된 메시지만 처리 (추가 + 수정)

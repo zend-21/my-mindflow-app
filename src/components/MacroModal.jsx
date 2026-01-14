@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import Portal from './Portal';
 import { FiCopy, FiCheck, FiEdit2 } from 'react-icons/fi';
+import { toast } from '../utils/toast';
 
 const Overlay = styled.div`
     position: fixed;
@@ -410,7 +411,7 @@ const MacroModal = ({ onClose, onSave }) => {
             }, 2000);
         } catch (error) {
             console.error('Failed to copy:', error);
-            alert('복사에 실패했습니다.');
+            toast('복사에 실패했습니다.');
         }
     };
 

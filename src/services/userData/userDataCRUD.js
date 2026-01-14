@@ -14,6 +14,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { convertTimestampsToMillis, removeUndefinedValues } from './userDataHelpers';
+import { showAlert } from '../../utils/alertModal';
 
 // ========================================
 // 메모 데이터 (개별 문서)
@@ -767,11 +768,12 @@ if (typeof window !== 'undefined') {
       try {
         const result = await deleteAllUserData(userId);
         console.log('✅ 데이터 정리 완료!', result);
-        alert('데이터가 모두 삭제되었습니다. 페이지를 새로고침합니다.');
-        window.location.reload();
+        showAlert('데이터가 모두 삭제되었습니다. 페이지를 새로고침합니다.', '삭제 완료', () => {
+          window.location.reload();
+        });
       } catch (error) {
         console.error('❌ 오류 발생:', error);
-        alert('데이터 삭제 중 오류가 발생했습니다: ' + error.message);
+        showAlert('데이터 삭제 중 오류가 발생했습니다: ' + error.message, '오류');
       }
     }
   };

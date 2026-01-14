@@ -9,6 +9,7 @@ import Header from './Header';
 import { BsCircle } from 'react-icons/bs';
 import { Snowflake } from 'lucide-react';
 import * as S from './MemoPage.styles';
+import { toast } from '../utils/toast';
 
 // Helper Components (using S. prefix)
 const GridIcon = () => (
@@ -48,7 +49,8 @@ const MemoPage = ({
     onRequestShareSelectedMemos,
     onRequestUnshareSelectedMemos,
     folderSyncContext,
-    onActiveFolderChange // 활성 폴더 변경 콜백 추가
+    onActiveFolderChange, // 활성 폴더 변경 콜백 추가
+    currentUserId // 현재 사용자 ID 추가
 }) => {
     const [layoutView, setLayoutView] = useLocalStorage('memoLayoutView', 'list');
     const [sortOrder, setSortOrder] = React.useState('date'); // 'date' 또는 'importance'
@@ -103,6 +105,81 @@ const MemoPage = ({
 
     // 프리즈 문서 경고 모달
     const [showFrozenWarning, setShowFrozenWarning] = useState(false);
+    const [frozenMemoInfo, setFrozenMemoInfo] = useState(null); // { chatRoomId, chatRoomName, chatType }
+    const [chatRoomDetails, setChatRoomDetails] = useState(null); // { name, type, partnerName }
+
+    // 동결된 메모의 대화방 정보 가져오기
+    useEffect(() => {
+        console.log('🔍 [대화방 정보 useEffect] 실행됨:', {
+            frozenMemoInfo,
+            currentUserId,
+            hasChatRoomId: !!frozenMemoInfo?.chatRoomId
+        });
+
+        if (!frozenMemoInfo?.chatRoomId) {
+            console.log('⚠️ [대화방 정보] chatRoomId 없음, 초기화');
+            setChatRoomDetails(null);
+            return;
+        }
+
+        const fetchChatRoomInfo = async () => {
+            try {
+                console.log('📡 [대화방 정보] Firestore 조회 시작:', frozenMemoInfo.chatRoomId);
+                const { doc, getDoc } = await import('firebase/firestore');
+                const { db } = await import('../firebase/config');
+
+                // dm_로 시작하면 1:1 대화방 (directMessages 컬렉션)
+                const isDirect = frozenMemoInfo.chatRoomId.startsWith('dm_');
+                const collectionName = isDirect ? 'directMessages' : 'chatRooms';
+                console.log('📂 [대화방 정보] 컬렉션:', collectionName, '/ isDirect:', isDirect);
+
+                const chatRoomRef = doc(db, collectionName, frozenMemoInfo.chatRoomId);
+                const chatRoomSnap = await getDoc(chatRoomRef);
+
+                if (chatRoomSnap.exists()) {
+                    const data = chatRoomSnap.data();
+                    const chatType = isDirect ? 'direct' : (data.type || 'direct');
+                    console.log('✅ [대화방 정보] 문서 발견:', { chatType, data, collectionName });
+
+                    if (chatType === 'direct') {
+                        // 1:1 대화방 - 상대방 이름 가져오기
+                        const participants = data.participants || [];
+                        const partnerId = participants.find(id => id !== currentUserId);
+                        console.log('👥 [대화방 정보] 1:1 대화방 처리:', { participants, partnerId, currentUserId });
+
+                        if (partnerId) {
+                            // 상대방 닉네임 가져오기
+                            const { getUserNickname } = await import('../services/nicknameService');
+                            const partnerNickname = await getUserNickname(partnerId);
+                            console.log('📝 [대화방 정보] 닉네임 가져옴:', partnerNickname);
+
+                            const details = {
+                                type: '1:1',
+                                partnerName: partnerNickname || '알 수 없음'
+                            };
+                            console.log('✅ [대화방 정보] setState 호출 (1:1):', details);
+                            setChatRoomDetails(details);
+                        }
+                    } else {
+                        // 단체방 - 방 이름 사용
+                        const details = {
+                            type: '단체방',
+                            roomName: data.name || '단체 대화방'
+                        };
+                        console.log('✅ [대화방 정보] setState 호출 (단체방):', details);
+                        setChatRoomDetails(details);
+                    }
+                } else {
+                    console.log('❌ [대화방 정보] 문서가 존재하지 않음:', frozenMemoInfo.chatRoomId);
+                }
+            } catch (error) {
+                console.error('❌ [대화방 정보] 로드 실패:', error);
+                setChatRoomDetails(null);
+            }
+        };
+
+        fetchChatRoomInfo();
+    }, [frozenMemoInfo, currentUserId]);
 
     // 활성 폴더 변경 시 App.jsx로 알림
     useEffect(() => {
@@ -144,7 +221,7 @@ const MemoPage = ({
     // 폴더 모달 열기
     const openAddFolderModal = () => {
         if (!canAddFolder) {
-            alert(`폴더는 최대 ${maxFolders}개까지만 생성할 수 있습니다.`);
+            toast(`폴더는 최대 ${maxFolders}개까지만 생성할 수 있습니다.`);
             return;
         }
         setFolderModal({ mode: 'add' });
@@ -906,12 +983,17 @@ const MemoPage = ({
                                 onClick={(e) => {
                                     e.stopPropagation();
 
-                                    // 프리즈된 문서이고 공유 폴더에 있는 경우
+                                    // 프리즈된 문서 체크 (공유 폴더에서)
                                     const isInSharedFolder = activeFolder === 'shared' || memo.folderId === 'shared';
                                     const isMemoFrozen = memo.hasPendingEdits === true;
 
                                     if (isMemoFrozen && isInSharedFolder && !isSelectionMode) {
                                         // 프리즈 경고 모달 표시
+                                        const frozenInfo = {
+                                            chatRoomId: memo.currentWorkingRoomId || null,
+                                            memoId: memo.id
+                                        };
+                                        setFrozenMemoInfo(frozenInfo);
                                         setShowFrozenWarning(true);
                                         return;
                                     }
@@ -1077,7 +1159,7 @@ const MemoPage = ({
                             )}
                         </S.FolderModalTitleRow>
 
-                        <FolderInput
+                        <S.FolderInput
                             type="text"
                             placeholder="폴더 이름을 입력하세요 (최대 8자)"
                             value={folderName}
@@ -1231,26 +1313,52 @@ const MemoPage = ({
             )}
 
             {/* 프리즈된 문서 경고 모달 */}
-            {showFrozenWarning && ReactDOM.createPortal(
-                <S.FrozenWarningOverlay onClick={() => setShowFrozenWarning(false)}>
-                    <S.FrozenWarningContent onClick={(e) => e.stopPropagation()}>
-                        <S.FrozenWarningHeader>
-                            <Snowflake size={24} color="#4a90e2" />
-                            <div>편집 중인 문서</div>
-                        </S.FrozenWarningHeader>
-                        <S.FrozenWarningBody>
-                            이 문서는 대화방에서 편집 작업이 진행 중입니다.
-                        </S.FrozenWarningBody>
-                        <S.FrozenWarningInfo>
-                            편집, 이동, 삭제 작업은 대화방에서 편집이 완료된 후 가능합니다.
-                        </S.FrozenWarningInfo>
-                        <S.FrozenWarningButton onClick={() => setShowFrozenWarning(false)}>
-                            확인
-                        </S.FrozenWarningButton>
-                    </S.FrozenWarningContent>
-                </S.FrozenWarningOverlay>,
-                document.getElementById('modal-root')
-            )}
+            {showFrozenWarning && (() => {
+                console.log('🎨 [모달 렌더] 프리즈 경고 모달 렌더링:', {
+                    showFrozenWarning,
+                    frozenMemoInfo,
+                    chatRoomDetails
+                });
+                return ReactDOM.createPortal(
+                    <S.FrozenWarningOverlay onClick={() => setShowFrozenWarning(false)}>
+                        <S.FrozenWarningContent onClick={(e) => e.stopPropagation()}>
+                            <S.FrozenWarningHeader>
+                                <Snowflake size={24} color="#4a90e2" />
+                                <div>편집 중인 문서</div>
+                            </S.FrozenWarningHeader>
+                            <S.FrozenWarningBody>
+                                이 문서는 대화방에서 편집 작업이 진행 중입니다.
+                            </S.FrozenWarningBody>
+                            {frozenMemoInfo?.chatRoomId ? (
+                                chatRoomDetails ? (
+                                    <S.FrozenWarningChatInfo>
+                                        {chatRoomDetails.type === '1:1' ? (
+                                            <>협업방(1:1): '{chatRoomDetails.partnerName}'님과의 대화방</>
+                                        ) : (
+                                            <>협업방(단체방): '{chatRoomDetails.roomName}'</>
+                                        )}
+                                    </S.FrozenWarningChatInfo>
+                                ) : (
+                                    <S.FrozenWarningChatInfo>
+                                        로딩 중...
+                                    </S.FrozenWarningChatInfo>
+                                )
+                            ) : (
+                                <S.FrozenWarningChatInfo>
+                                    협업방: 알 수 없음
+                                </S.FrozenWarningChatInfo>
+                            )}
+                            <S.FrozenWarningInfo>
+                                편집, 이동, 삭제 작업은 대화방에서 편집이 완료된 후 가능합니다.
+                            </S.FrozenWarningInfo>
+                            <S.FrozenWarningButton onClick={() => setShowFrozenWarning(false)}>
+                                확인
+                            </S.FrozenWarningButton>
+                        </S.FrozenWarningContent>
+                    </S.FrozenWarningOverlay>,
+                    document.getElementById('modal-root')
+                );
+            })()}
         </S.MemoContainer>
     );
 };

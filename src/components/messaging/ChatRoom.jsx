@@ -1,5 +1,5 @@
 // 전체화면 채팅방 컴포넌트
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import * as S from './ChatRoom.styles';
 import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Settings, X, UserCog, UserPlus, Trash2, Mail, Copy, Shield } from 'lucide-react';
@@ -77,7 +77,17 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   const [isOtherUserBlocked, setIsOtherUserBlocked] = useState(false); // 상대방 차단 여부 (양방향)
   const [checkingBlockStatus, setCheckingBlockStatus] = useState(true); // 차단 상태 확인 중
   const [groupDeletionInfo, setGroupDeletionInfo] = useState(null); // 그룹 삭제 정보 { deleterName, countdown }
+  const [collapsibleMessages, setCollapsibleMessages] = useState(new Set()); // 접을 수 있는 메시지 ID (18줄 이상)
+  const [showFullMessageModal, setShowFullMessageModal] = useState(false); // 전체 메시지 모달
+  const [fullMessageContent, setFullMessageContent] = useState(''); // 전체 메시지 내용
+  const [firstUnreadIndex, setFirstUnreadIndex] = useState(-1); // 첫 번째 안 읽은 메시지 인덱스 (-1이면 모두 읽음)
+  const [messageLimit, setMessageLimit] = useState(30); // 메시지 로드 개수 제한
+  const [hasMoreMessages, setHasMoreMessages] = useState(false); // 더 많은 메시지가 있는지 여부
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false); // 이전 메시지 로딩 중
+  const [initialMessageCount, setInitialMessageCount] = useState(0); // 초기 로드된 메시지 개수 (이전 대화 경계 표시용)
   const messagesEndRef = useRef(null);
+  const unreadMarkerRef = useRef(null); // 안 읽은 메시지 마커 참조
+  const messagesContainerRef = useRef(null); // 메시지 컨테이너 참조 (스크롤 위치 보존용)
   const inputRef = useRef(null);
   const imageInputRef = useRef(null); // 프로필 이미지 업로드용
 
@@ -400,22 +410,71 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     const timeoutId = setTimeout(() => {
       if (!isMounted) return;
 
-      // 🆕 통합 메시지 구독 (1:1과 그룹 모두 지원)
-      unsubscribe = subscribeToUnifiedMessages(chat.id, chat.type, currentUserId, async (newMessages) => {
-        if (!isMounted) return;
+      // 🆕 통합 메시지 구독 (1:1과 그룹 모두 지원) + 페이지네이션
+      unsubscribe = subscribeToUnifiedMessages(
+        chat.id,
+        chat.type,
+        currentUserId,
+        async (newMessages, metadata) => {
+          if (!isMounted) return;
 
-        // 새 메시지가 추가되었고, 내가 보낸 메시지가 아니면 효과음 재생
-        if (prevMessageCount > 0 && newMessages.length > prevMessageCount && notificationSettings.enabled) {
-          const latestMessage = newMessages[newMessages.length - 1];
-          // 상대방이 보낸 메시지인 경우만 효과음 재생
-          if (latestMessage?.senderId !== currentUserId) {
-            playChatMessageSound();
+          // 더 많은 메시지 유무 체크
+          if (metadata?.hasMore !== undefined) {
+            setHasMoreMessages(metadata.hasMore);
+            console.log('📊 더 많은 메시지 있음:', metadata.hasMore);
+          }
+
+          // 새 메시지가 추가되었고, 내가 보낸 메시지가 아니면 효과음 재생
+          if (prevMessageCount > 0 && newMessages.length > prevMessageCount && notificationSettings.enabled) {
+            const latestMessage = newMessages[newMessages.length - 1];
+            // 상대방이 보낸 메시지인 경우만 효과음 재생
+            if (latestMessage?.senderId !== currentUserId) {
+              playChatMessageSound();
+            }
+          }
+
+          // 새 메시지 도착 시 페이지가 보이는 경우에만 읽음 처리
+          if (prevMessageCount > 0 && newMessages.length > prevMessageCount) {
+            markUnifiedAsRead(chat.id, chat.type, currentUserId, isPageVisible);
+          }
+
+        // ⭐ 첫 번째 안 읽은 메시지 인덱스 계산 (최초 입장 시에만)
+        if (prevMessageCount === 0 && newMessages.length > 0) {
+          // chatRoomData에서 내 lastAccessTime 가져오기
+          const myLastAccessTime = chatRoomData?.lastAccessTime?.[currentUserId];
+
+          if (myLastAccessTime) {
+            // lastAccessTime 이후의 첫 번째 메시지 찾기
+            const lastAccessDate = myLastAccessTime.toDate ? myLastAccessTime.toDate() : new Date(myLastAccessTime);
+            const unreadIndex = newMessages.findIndex(msg => {
+              const msgDate = msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date(msg.createdAt);
+              return msgDate > lastAccessDate;
+            });
+
+            // 안 읽은 메시지가 5개 이상일 때만 마커 표시 (카카오톡 방식)
+            if (unreadIndex >= 0 && (newMessages.length - unreadIndex) >= 5) {
+              setFirstUnreadIndex(unreadIndex);
+              console.log('📊 안 읽은 메시지가 많음 - 마커 표시:', unreadIndex, '/', newMessages.length);
+            } else {
+              setFirstUnreadIndex(-1);
+              console.log('📊 안 읽은 메시지 적음 - 맨 아래로 스크롤');
+            }
+          } else {
+            // lastAccessTime이 없으면 모두 안 읽은 것으로 간주
+            if (newMessages.length >= 5) {
+              setFirstUnreadIndex(0);
+              console.log('📊 lastAccessTime 없음 - 첫 메시지부터 안 읽음');
+            } else {
+              setFirstUnreadIndex(-1);
+              console.log('📊 메시지 적음 - 맨 아래로 스크롤');
+            }
           }
         }
 
-        // 새 메시지 도착 시 페이지가 보이는 경우에만 읽음 처리
-        if (prevMessageCount > 0 && newMessages.length > prevMessageCount) {
-          markUnifiedAsRead(chat.id, chat.type, currentUserId, isPageVisible);
+        // 초기 로드된 메시지 개수 저장 (이전 대화 경계 표시용)
+        if (prevMessageCount === 0 && newMessages.length > 0) {
+          setInitialMessageCount(newMessages.length);
+          console.log('📊 초기 메시지 개수 저장:', newMessages.length);
         }
 
         prevMessageCount = newMessages.length;
@@ -441,13 +500,37 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
           }
         }
 
-        // 스크롤을 맨 아래로
-        setTimeout(() => {
-          if (isMounted) {
-            messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }
-        }, 100);
-      });
+        // ⭐ 스크롤 위치 결정: 안 읽은 메시지가 많으면 마커로, 적으면 맨 아래로
+        // requestAnimationFrame 2번으로 DOM 렌더링 완료 후 스크롤
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            if (isMounted) {
+              const isInitialLoad = prevMessageCount === 0;
+              const container = messagesContainerRef.current;
+
+              if (!container) return;
+
+              // 최초 입장 시 안 읽은 메시지가 5개 이상이면 unreadMarkerRef로 스크롤
+              if (isInitialLoad && firstUnreadIndex >= 0 && unreadMarkerRef.current) {
+                // 마커 위치로 직접 스크롤 (애니메이션 없음)
+                const markerTop = unreadMarkerRef.current.offsetTop;
+                container.scrollTop = markerTop - 100; // 상단 여백 100px
+                console.log('📍 안 읽은 메시지 마커로 즉시 스크롤 (인덱스:', firstUnreadIndex, ')');
+              } else if (!isInitialLoad) {
+                // 새 메시지 도착 시만 부드럽게 스크롤
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+                console.log('📍 새 메시지 - 부드럽게 맨 아래로');
+              } else {
+                // 초기 로드이고 안 읽은 메시지가 적으면 즉시 맨 아래로
+                container.scrollTop = container.scrollHeight;
+                console.log('📍 초기 로드 - 즉시 맨 아래로');
+              }
+            }
+          });
+        });
+        },
+        messageLimit // 메시지 로드 제한
+      );
 
       // 🆕 읽음 표시 (통합 함수 사용 - 페이지 가시성 확인)
       markUnifiedAsRead(chat.id, chat.type, currentUserId, isPageVisible);
@@ -466,7 +549,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
         }
       }
     };
-  }, [chat.id, currentUserId, userNicknames, userDisplayNames]);
+  }, [chat.id, currentUserId, userNicknames, userDisplayNames, chatRoomData, firstUnreadIndex, messageLimit]);
 
   // 채팅방 참여자 프로필 사진 로드 (페이지 로드 시 1회만)
   useEffect(() => {
@@ -791,6 +874,35 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       exitUnifiedChatRoom(chat.id, chat.type, currentUserId);
     };
   }, [chat.id, chat.type, currentUserId]);
+
+  // ⭐ 이전 메시지 더 불러오기
+  const handleLoadMoreMessages = () => {
+    if (loadingOlderMessages) return;
+
+    // 현재 스크롤 위치 저장 (맨 위에서의 거리)
+    const container = messagesContainerRef.current;
+    if (container) {
+      const scrollBefore = container.scrollHeight - container.scrollTop;
+
+      setLoadingOlderMessages(true);
+      // 30개씩 추가로 불러오기
+      setMessageLimit(prev => {
+        const newLimit = prev + 30;
+        console.log('📊 메시지 로드 한도 증가:', prev, '→', newLimit);
+        return newLimit;
+      });
+
+      // 스크롤 위치 복원 (새 메시지 로드 후)
+      setTimeout(() => {
+        if (container) {
+          const scrollAfter = container.scrollHeight - scrollBefore;
+          container.scrollTop = scrollAfter;
+          console.log('📍 스크롤 위치 복원:', scrollAfter);
+        }
+        setLoadingOlderMessages(false);
+      }, 300);
+    }
+  };
 
   // 메시지 전송 (통합)
   const handleSendMessage = async () => {
@@ -1325,16 +1437,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
 
   // 아바타 색상 생성
   const getAvatarColor = (userId) => {
-    const colors = [
-      'linear-gradient(135deg, #667eea, #764ba2)',
-      'linear-gradient(135deg, #f093fb, #f5576c)',
-      'linear-gradient(135deg, #4facfe, #00f2fe)',
-      'linear-gradient(135deg, #43e97b, #38f9d7)',
-      'linear-gradient(135deg, #fa709a, #fee140)',
-      'linear-gradient(135deg, #30cfd0, #330867)',
-    ];
-    const index = userId ? userId.charCodeAt(0) % colors.length : 0;
-    return colors[index];
+    return '#1E90FF'; // 선명한 파랑
   };
 
   // 아바타 배경색 매핑
@@ -1581,7 +1684,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       )}
 
       {/* 메시지 목록 */}
-      <S.MessagesContainer>
+      <S.MessagesContainer ref={messagesContainerRef}>
         {/* 그룹 삭제 알림 (카운트다운) */}
         {groupDeletionInfo && (
           <S.DeletionNotice>
@@ -1608,15 +1711,57 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
           </S.EmptyState>
         ) : (
           <>
+            {/* ⭐ 이전 대화 불러오기 버튼 */}
+            {hasMoreMessages && !loadingOlderMessages && (
+              <S.LoadMoreButton onClick={handleLoadMoreMessages}>
+                ↑ 이전 대화 불러오기
+              </S.LoadMoreButton>
+            )}
+            {loadingOlderMessages && (
+              <S.LoadMoreButton disabled>
+                불러오는 중...
+              </S.LoadMoreButton>
+            )}
+
             {messages.map((message, index) => {
               const isMine = message.senderId === currentUserId;
               const showDate = shouldShowDateSeparator(message, messages[index - 1]);
-              // 🆕 그룹 채팅은 항상 프로필/닉네임 표시, 1:1은 연속 메시지에서 생략
-              const showAvatar = !isMine && (
-                chat.type === 'group'
-                  ? true  // 그룹 채팅: 항상 표시
-                  : (index === messages.length - 1 || messages[index + 1]?.senderId !== message.senderId)  // 1:1: 연속 메시지 생략
-              );
+
+              // 프로필 표시 조건
+              const showAvatar = !isMine && (() => {
+                if (chat.type === 'group') {
+                  return true; // 그룹 채팅: 항상 표시
+                }
+
+                // 1:1 채팅: 이전 메시지와 발신자가 다르거나, 시간이 다를 때 표시
+                const prevMessage = messages[index - 1];
+                if (!prevMessage || prevMessage.senderId !== message.senderId) {
+                  return true; // 이전 메시지 발신자가 다름
+                }
+
+                // 시간 비교 (분 단위까지만)
+                const currentTime = formatMessageTime(message.createdAt);
+                const prevTime = formatMessageTime(prevMessage.createdAt);
+                return currentTime !== prevTime; // 시간이 다르면 표시
+              })();
+
+              // 시간 표시 조건
+              const showTime = (() => {
+                if (chat.type === 'group') {
+                  return true; // 그룹 채팅: 항상 표시
+                }
+
+                // 1:1 채팅: 다음 메시지와 발신자가 다르거나, 시간이 다를 때 표시 (마지막 메시지)
+                const nextMessage = messages[index + 1];
+                if (!nextMessage || nextMessage.senderId !== message.senderId) {
+                  return true; // 다음 메시지 발신자가 다름 (현재 메시지가 마지막)
+                }
+
+                // 시간 비교 (분 단위까지만)
+                const currentTime = formatMessageTime(message.createdAt);
+                const nextTime = formatMessageTime(nextMessage.createdAt);
+                return currentTime !== nextTime; // 시간이 다르면 표시 (현재 메시지가 시간 그룹의 마지막)
+              })();
 
               // 상대방 ID 찾기
               const otherUserId = chat.participants?.find(id => id !== currentUserId);
@@ -1688,12 +1833,49 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
               }
 
               // 일반 메시지
+              const messageText = message.text || message.content || '';
+              const isCollapsible = collapsibleMessages.has(message.id);
+
+              const handleShowFullMessage = () => {
+                setFullMessageContent(messageText);
+                setShowFullMessageModal(true);
+              };
+
+              // ref callback으로 높이 체크
+              const handleTextContentRef = (element) => {
+                if (element) {
+                  const lineHeight = 1.5 * 14; // line-height * font-size
+                  const maxHeight = lineHeight * 18;
+                  const actualHeight = element.scrollHeight;
+
+                  if (actualHeight > maxHeight && !collapsibleMessages.has(message.id)) {
+                    setCollapsibleMessages(prev => {
+                      const newSet = new Set(prev);
+                      newSet.add(message.id);
+                      return newSet;
+                    });
+                  }
+                }
+              };
+
               return (
                 <div key={message.id}>
                   {showDate && (
                     <S.DateSeparator>
                       <S.DateText>{formatDate(message.createdAt)}</S.DateText>
                     </S.DateSeparator>
+                  )}
+                  {/* ⭐ 이전 대화 경계 구분선 (추가 로드된 메시지의 시작점) */}
+                  {index === initialMessageCount && initialMessageCount > 0 && messages.length > initialMessageCount && (
+                    <S.OlderMessagesDivider>
+                      <S.OlderMessagesDividerText>────── 이전 대화 보기 ──────</S.OlderMessagesDividerText>
+                    </S.OlderMessagesDivider>
+                  )}
+                  {/* ⭐ 안 읽은 메시지 마커 표시 */}
+                  {index === firstUnreadIndex && firstUnreadIndex >= 0 && (
+                    <S.UnreadMarker ref={unreadMarkerRef}>
+                      <S.UnreadMarkerText>여기까지 읽음</S.UnreadMarkerText>
+                    </S.UnreadMarker>
                   )}
                   <S.MessageItem $isMine={isMine}>
                     {!isMine && showAvatar && (
@@ -1713,19 +1895,43 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                     {!isMine && !showAvatar && <div style={{ width: '32px' }} />}
                     <S.MessageContent $isMine={isMine}>
                       {!isMine && showAvatar && <S.SenderName>{userNicknames[message.senderId] || userDisplayNames[message.senderId] || '사용자'}</S.SenderName>}
-                      <S.MessageBubble $isMine={isMine}>
-                        {message.text || message.content}
-                      </S.MessageBubble>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', flexDirection: isMine ? 'row-reverse' : 'row' }}>
+                        <div style={{ position: 'relative' }}>
+                          <S.MessageBubble
+                            $isMine={isMine}
+                            $collapsed={isCollapsible}
+                            data-message-id={message.id}
+                          >
+                            <S.MessageTextContent
+                              ref={handleTextContentRef}
+                              $collapsed={isCollapsible}
+                              $isMine={isMine}
+                            >
+                              {messageText}
+                            </S.MessageTextContent>
+                          </S.MessageBubble>
+                          {isCollapsible && (
+                            <S.ShowMoreOverlay $isMine={isMine}>
+                              <S.ShowMoreButton
+                                onClick={handleShowFullMessage}
+                                $isMine={isMine}
+                              >
+                                전체보기
+                              </S.ShowMoreButton>
+                            </S.ShowMoreOverlay>
+                          )}
+                        </div>
+                        <S.MessageMeta style={{ marginBottom: '3px' }} $isMine={isMine}>
+                          {/* 내가 보낸 메시지 중 읽지 않은 사람이 있는 경우 표시 */}
+                          {isUnreadByOther && (
+                            <S.UnreadBadge>
+                              {chat.type === 'group' ? unreadCount : 1}
+                            </S.UnreadBadge>
+                          )}
+                          <S.MessageTime style={{ visibility: showTime ? 'visible' : 'hidden' }}>{formatMessageTime(message.createdAt)}</S.MessageTime>
+                        </S.MessageMeta>
+                      </div>
                     </S.MessageContent>
-                    <S.MessageMeta>
-                      {/* 내가 보낸 메시지 중 읽지 않은 사람이 있는 경우 표시 */}
-                      {isUnreadByOther && (
-                        <S.UnreadBadge>
-                          {chat.type === 'group' ? unreadCount : 1}
-                        </S.UnreadBadge>
-                      )}
-                      <S.MessageTime>{formatMessageTime(message.createdAt)}</S.MessageTime>
-                    </S.MessageMeta>
                   </S.MessageItem>
                 </div>
               );
@@ -2965,6 +3171,31 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
         style={{ display: 'none' }}
         onChange={handleImageSelect}
       />
+
+      {/* 전체 메시지 보기 모달 */}
+      {showFullMessageModal && (
+        <S.ModalOverlay onClick={() => setShowFullMessageModal(false)}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '600px', maxHeight: '95vh' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>전체 메시지</S.ModalTitle>
+              <S.IconButton onClick={() => setShowFullMessageModal(false)}>
+                <X size={20} />
+              </S.IconButton>
+            </S.ModalHeader>
+            <S.ModalContent style={{ maxHeight: '85vh', overflow: 'auto' }}>
+              <div style={{
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                lineHeight: '1.6',
+                fontSize: '14px',
+                color: '#e0e0e0'
+              }}>
+                {fullMessageContent}
+              </div>
+            </S.ModalContent>
+          </S.ModalContainer>
+        </S.ModalOverlay>
+      )}
     </S.FullScreenContainer>,
     document.body
   );

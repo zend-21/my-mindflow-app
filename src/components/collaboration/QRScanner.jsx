@@ -1,4 +1,5 @@
 // QR 스캐너 컴포넌트 - 친구 ID QR 코드 스캔
+import { toast } from '../../utils/toast';
 
 import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
@@ -92,11 +93,11 @@ const QRScanner = ({ isOpen, onClose, onSuccess }) => {
     setSending(true);
     try {
       await sendFriendRequest(auth.currentUser.uid, foundUser.id);
-      alert('친구 요청을 보냈습니다!');
+      toast('친구 요청을 보냈습니다!');
       onSuccess?.();
       onClose();
     } catch (err) {
-      alert('친구 요청 실패: ' + err.message);
+      toast('친구 요청 실패: ' + err.message);
     } finally {
       setSending(false);
     }

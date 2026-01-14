@@ -62,6 +62,8 @@ const CollaborativeDocumentEditor = ({
   const [editInputText, setEditInputText] = useState(''); // 수정할 텍스트 (형광펜: 대체 텍스트)
   const [editReasonText, setEditReasonText] = useState(''); // 설명/이유 (취소선: 삭제 이유, 형광펜: 설명)
   const [pendingMarker, setPendingMarker] = useState(null); // 대기 중인 마커 정보
+  const [showImageViewer, setShowImageViewer] = useState(false); // 이미지 원본 보기 모달
+  const [viewerImageSrc, setViewerImageSrc] = useState(''); // 보기 중인 이미지 URL
   const [showLoadConfirmModal, setShowLoadConfirmModal] = useState(false); // 문서 불러오기 확인 모달
   const [pendingLoadMemo, setPendingLoadMemo] = useState(null); // 불러오려는 메모 정보
   const [currentDocId, setCurrentDocId] = useState(null); // 현재 열린 문서 ID
@@ -88,6 +90,11 @@ const CollaborativeDocumentEditor = ({
   const [showMarkerCommentsModal, setShowMarkerCommentsModal] = useState(false); // 마커 의견 제시 모달
   const [selectedMarkerForComments, setSelectedMarkerForComments] = useState(null); // 의견을 볼 마커 정보
   const [showNewMemoModal, setShowNewMemoModal] = useState(false); // 새 문서 작성 모달
+  const [showWithdrawConfirmModal, setShowWithdrawConfirmModal] = useState(false); // 제안 철회 확인 모달
+  const [pendingWithdrawEdit, setPendingWithdrawEdit] = useState(null); // 철회 대기 중인 편집 정보
+  const [downloadEnabled, setDownloadEnabled] = useState(false); // 다운로드 허용 여부
+  const [canDownload, setCanDownload] = useState(false); // 현재 사용자가 다운로드 가능한지 여부
+  const [showDownloadConfirmModal, setShowDownloadConfirmModal] = useState(false); // 다운로드 허용 확인 모달
 
   const contentRef = useRef(null);
   const fullScreenContentRef = useRef(null);
@@ -290,9 +297,19 @@ const CollaborativeDocumentEditor = ({
         return;
       }
 
-      await updateDoc(memoRef, {
+      // hasPendingEdits와 currentWorkingRoomId를 함께 업데이트
+      const updateData = {
         hasPendingEdits: hasPending
-      });
+      };
+
+      // pending 상태이면 currentWorkingRoomId도 설정
+      if (hasPending) {
+        console.log('🔧 [updateMemoPendingFlag] chatRoomId 설정:', chatRoomId);
+        updateData.currentWorkingRoomId = chatRoomId;
+      }
+
+      console.log('💾 [updateMemoPendingFlag] Firestore 업데이트 데이터:', updateData);
+      await updateDoc(memoRef, updateData);
 
       // 저장 후 다시 읽어서 확인
       const updatedSnap = await getDoc(memoRef);
@@ -467,13 +484,16 @@ const CollaborativeDocumentEditor = ({
     if (!selectedMarkerDetail || !selectedMarkerDetail.id) return;
 
     const updatedEdit = pendingEdits.find(edit => edit.id === selectedMarkerDetail.id);
-    if (updatedEdit && updatedEdit.commentCount !== selectedMarkerDetail.commentCount) {
-      setSelectedMarkerDetail(prev => ({
-        ...prev,
-        commentCount: updatedEdit.commentCount
-      }));
+    if (updatedEdit && updatedEdit.commentCount !== undefined) {
+      // commentCount가 다를 때만 업데이트
+      if (selectedMarkerDetail.commentCount !== updatedEdit.commentCount) {
+        setSelectedMarkerDetail(prev => ({
+          ...prev,
+          commentCount: updatedEdit.commentCount
+        }));
+      }
     }
-  }, [pendingEdits, selectedMarkerDetail]);
+  }, [pendingEdits]);
 
   // 참여자 목록 로드
   const loadParticipants = useCallback(async () => {
@@ -720,12 +740,32 @@ const CollaborativeDocumentEditor = ({
       console.log('📝 편집 이력 먼저 로드 - 개수:', edits.length);
 
       // 2. 로컬 캐시에서 편집 중인 버전 확인 (우선순위 1)
-      let contentToLoad = memo.content || '';
-      let titleToLoad = extractTitleFromContent(memo.content || '');
+      // 원본 메모의 최신 데이터 가져오기 (승인된 내용 반영)
+      let memoData = memo;
+      try {
+        const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', memo.id);
+        const memoSnap = await getDoc(memoRef);
+        if (memoSnap.exists()) {
+          memoData = { id: memo.id, ...memoSnap.data() };
+          console.log('📄 Firestore에서 최신 메모 데이터 로드:', memo.id);
+
+          // ⭐ 다른 방에서 협업 중인지 확인
+          if (memoData.currentWorkingRoomId && memoData.currentWorkingRoomId !== chatRoomId) {
+            showToast?.('이 문서는 다른 대화방에서 협업 중입니다. 먼저 해당 대화방에서 문서를 비우거나 승인해주세요.');
+            console.warn('❌ 다른 방에서 협업 중:', memoData.currentWorkingRoomId);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('원본 메모 로드 실패, 전달된 memo 사용:', error);
+      }
+
+      let contentToLoad = memoData.content || '';
+      let titleToLoad = extractTitleFromContent(memoData.content || '');
 
       console.log('📄 문서 불러오기 시작 - ID:', memo.id);
-      console.log('📄 원본 memo.content 길이:', memo.content?.length || 0);
-      console.log('📄 원본 컨텐츠에 마커 포함?', memo.content?.includes('data-edit-id') || false);
+      console.log('📄 원본 memo.content 길이:', memoData.content?.length || 0);
+      console.log('📄 원본 컨텐츠에 마커 포함?', memoData.content?.includes('data-edit-id') || false);
 
       if (globalDocumentCache.has(memo.id)) {
         const cached = globalDocumentCache.get(memo.id);
@@ -768,8 +808,8 @@ const CollaborativeDocumentEditor = ({
         console.log('💾 재생성된 마커를 캐시에 저장:', memo.id);
       }
 
-      // 5. 원본 문서의 소유자 정보 가져오기 (memo.userId)
-      const originalOwnerId = memo.userId || currentUserId;
+      // 5. 원본 문서의 소유자 정보 가져오기 (memoData.userId)
+      const originalOwnerId = memoData.userId || currentUserId;
       let ownerNickname;
       let wsCode = null;
 
@@ -817,7 +857,7 @@ const CollaborativeDocumentEditor = ({
           currentWorkingRoomId: chatRoomId,
           hasPendingEdits: edits.length > 0
         }, { merge: true });
-        console.log('✅ 원본 메모에 currentWorkingRoomId 설정:', memo.id, '→', chatRoomId, '경로:', memoRef.path);
+        console.log('✅ 원본 메모에 currentWorkingRoomId 설정:', memo.id, '→', chatRoomId, 'hasPendingEdits:', edits.length > 0, '(edits:', edits.length, '개)', '경로:', memoRef.path);
       } catch (error) {
         console.error('원본 메모 currentWorkingRoomId 설정 실패:', error);
       }
@@ -894,6 +934,64 @@ const CollaborativeDocumentEditor = ({
     setShowLoadConfirmModal(false);
     setPendingLoadMemo(null);
   };
+
+  // 이미지 클릭 시 원본 보기
+  const handleImageClick = useCallback((imgSrc) => {
+    setViewerImageSrc(imgSrc);
+    setShowImageViewer(true);
+  }, []);
+
+  // 이미지 뷰어 닫기
+  const handleCloseImageViewer = useCallback(() => {
+    setShowImageViewer(false);
+    setViewerImageSrc('');
+  }, []);
+
+  // 이미지 클릭 이벤트 리스너 등록
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (e.target.tagName === 'IMG') {
+        e.preventDefault();
+        handleImageClick(e.target.src);
+      }
+    };
+
+    const contentElement = contentRef.current;
+    const fullScreenElement = fullScreenContentRef.current;
+
+    if (contentElement) {
+      contentElement.addEventListener('click', handleClick);
+    }
+    if (fullScreenElement) {
+      fullScreenElement.addEventListener('click', handleClick);
+    }
+
+    return () => {
+      if (contentElement) {
+        contentElement.removeEventListener('click', handleClick);
+      }
+      if (fullScreenElement) {
+        fullScreenElement.removeEventListener('click', handleClick);
+      }
+    };
+  }, [handleImageClick, showFullScreenEdit]);
+
+  // 이미지 뷰어에서 ESC 키로 닫기
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && showImageViewer) {
+        handleCloseImageViewer();
+      }
+    };
+
+    if (showImageViewer) {
+      document.addEventListener('keydown', handleEscape);
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showImageViewer, handleCloseImageViewer]);
 
   // 외부에서 메모를 선택했을 때 처리
   const lastSelectedMemoIdRef = useRef(null);
@@ -979,20 +1077,83 @@ const CollaborativeDocumentEditor = ({
     );
 
     const q = query(editHistoryRef, where('status', '==', 'pending'));
+    const commentUnsubscribers = new Map();
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const edits = [];
-      snapshot.forEach((doc) => {
-        edits.push({ id: doc.id, ...doc.data() });
+      const currentEditIds = new Set();
+
+      snapshot.forEach((docSnap) => {
+        currentEditIds.add(docSnap.id);
+
+        // 이미 리스너가 있는 경우 스킵
+        if (commentUnsubscribers.has(docSnap.id)) {
+          return;
+        }
+
+        // 각 edit의 comments에 대한 실시간 리스너 추가
+        const commentsRef = collection(
+          db,
+          'chatRooms',
+          chatRoomId,
+          'documents',
+          currentDocId,
+          'editHistory',
+          docSnap.id,
+          'comments'
+        );
+
+        const commentUnsub = onSnapshot(commentsRef, (commentsSnap) => {
+          const commentCount = commentsSnap.size;
+
+          // pendingEdits 업데이트
+          setPendingEdits(prev => {
+            const existingEdit = prev.find(e => e.id === docSnap.id);
+            if (existingEdit) {
+              // 기존 edit의 commentCount만 업데이트
+              return prev.map(edit =>
+                edit.id === docSnap.id
+                  ? { ...edit, commentCount }
+                  : edit
+              );
+            } else {
+              // 새 edit 추가
+              return [...prev, { id: docSnap.id, ...docSnap.data(), commentCount }];
+            }
+          });
+        });
+
+        commentUnsubscribers.set(docSnap.id, commentUnsub);
       });
-      setPendingEdits(edits);
+
+      // 삭제된 edit 제거 및 리스너 정리
+      setPendingEdits(prev => {
+        const filtered = prev.filter(edit => {
+          if (currentEditIds.has(edit.id)) {
+            return true;
+          } else {
+            // 리스너 정리
+            const unsub = commentUnsubscribers.get(edit.id);
+            if (unsub) {
+              unsub();
+              commentUnsubscribers.delete(edit.id);
+            }
+            return false;
+          }
+        });
+        return filtered;
+      });
     }, (error) => {
       if (error.code !== 'permission-denied') {
         console.error('편집 이력 실시간 감시 오류:', error);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      // 모든 댓글 리스너 정리
+      commentUnsubscribers.forEach(unsub => unsub());
+      commentUnsubscribers.clear();
+    };
   }, [currentDocId, chatRoomId]);
 
   // 실시간 문서 내용 및 마커 감시 (chatRoomId만 의존)
@@ -1032,6 +1193,10 @@ const CollaborativeDocumentEditor = ({
 
       // 문서가 존재하는 경우 (업데이트 또는 불러오기)
       const data = snapshot.data();
+
+      // 다운로드 허용 상태 업데이트
+      setDownloadEnabled(data.downloadEnabled || false);
+      setCanDownload(data.downloadEnabled && data.lastEditedBy !== currentUserId);
 
       // 내용이 변경된 경우 반영 (다른 사용자의 마커 추가 포함)
       const hasContentChanged = data.content !== content;
@@ -1075,11 +1240,24 @@ const CollaborativeDocumentEditor = ({
           console.log('닉네임 조회 실패, Firestore 값 사용:', error);
         }
 
-        // documentOwner 객체로 설정 (userId, nickname)
+        // 워크스페이스 코드 가져오기
+        let wsCode = null;
+        try {
+          const workspaceId = `workspace_${data.lastEditedBy}`;
+          const workspaceRef = doc(db, 'workspaces', workspaceId);
+          const workspaceSnap = await getDoc(workspaceRef);
+          if (workspaceSnap.exists()) {
+            wsCode = workspaceSnap.data().workspaceCode || null;
+          }
+        } catch (error) {
+          console.log('워크스페이스 코드 조회 실패:', error);
+        }
+
+        // documentOwner 객체로 설정 (userId, nickname, wsCode)
         setDocumentOwner({
           userId: data.lastEditedBy,
           nickname: ownerNickname,
-          wsCode: null // wsCode는 실시간으로 동기화하지 않음
+          wsCode: wsCode
         });
 
         // 통합 권한 업데이트: 문서 소유자만 편집 가능 (1:1 및 그룹 모두 동일)
@@ -1138,7 +1316,7 @@ const CollaborativeDocumentEditor = ({
     );
   }, [chatRoomId]);
 
-  // 🔧 content에서 첫 줄 추출하여 제목으로 설정 (15자 제한)
+  // 🔧 content에서 첫 줄 추출하여 제목으로 설정 (16자 제한)
   const extractTitleFromContent = useCallback((htmlContent) => {
     if (!htmlContent || htmlContent.trim() === '') {
       return '제목 없음';
@@ -1147,10 +1325,32 @@ const CollaborativeDocumentEditor = ({
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = htmlContent;
 
-    // 첫 번째 줄 추출 (개행 기준)
-    const textContent = tempDiv.textContent || tempDiv.innerText || '';
-    const firstLine = textContent.split('\n')[0].trim();
+    // HTML을 순회하면서 첫 번째 줄바꿈 전까지의 텍스트만 추출
+    let titleText = '';
+    const walker = document.createTreeWalker(tempDiv, NodeFilter.SHOW_ALL);
+    let node;
 
+    while ((node = walker.nextNode())) {
+      // 줄바꿈 요소를 만나면 중단 (br, div, p 등)
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const tagName = node.nodeName.toLowerCase();
+        if (tagName === 'br' || tagName === 'div' || tagName === 'p') {
+          // 이미 텍스트가 있으면 중단, 없으면 계속 (첫 번째 요소일 수 있음)
+          if (titleText.trim()) break;
+        }
+      }
+      // 텍스트 노드면 추가
+      if (node.nodeType === Node.TEXT_NODE && node.textContent.trim()) {
+        titleText += node.textContent;
+        // \n을 만나면 그 전까지만 사용
+        if (titleText.includes('\n')) {
+          titleText = titleText.split('\n')[0];
+          break;
+        }
+      }
+    }
+
+    const firstLine = titleText.trim();
     if (!firstLine) {
       return '제목 없음';
     }
@@ -1809,17 +2009,173 @@ const CollaborativeDocumentEditor = ({
 
         try {
           range.surroundContents(markerSpan);
-          console.log(`✅ ${pendingMarker.type} 마커 삽입 완료`);
+
+          // 마커 삽입 후 정리 작업
+          const parent = markerSpan.parentNode;
+
+          // 1. 마커 다음의 빈 텍스트 노드 제거
+          let nextSibling = markerSpan.nextSibling;
+          while (nextSibling) {
+            const next = nextSibling.nextSibling;
+            if (nextSibling.nodeType === Node.TEXT_NODE && nextSibling.textContent.trim() === '') {
+              nextSibling.remove();
+              nextSibling = next;
+            } else if (nextSibling.nodeName === 'BR' && !next) {
+              // 마지막 <br> 제거
+              nextSibling.remove();
+              break;
+            } else {
+              break;
+            }
+          }
+
+          // 2. 부모 노드 정규화 (인접한 텍스트 노드 병합)
+          if (parent) {
+            parent.normalize();
+          }
+
         } catch (error) {
-          console.warn('⚠️ surroundContents 실패, 대체 방법 사용:', error.message);
           // surroundContents 실패 시 대체 방법 사용
           try {
-            // 선택된 내용을 텍스트로 추출하여 새로운 텍스트 노드 생성
+            // 선택 영역의 HTML 구조 추출 (cloneContents 사용)
+            const clonedContents = range.cloneContents();
+            const tempDiv = document.createElement('div');
+            tempDiv.appendChild(clonedContents);
+
+            // 선택된 내용을 텍스트로만 추출
             const selectedText = range.toString();
-            markerSpan.textContent = selectedText;
-            range.deleteContents();
-            range.insertNode(markerSpan);
+
+            // ⭐ [중요] HTML 구조가 있는 경우 (태그가 포함된 경우)
+            // 한글 텍스트가 <li>, <dt>, <dd>, <blockquote> 등의 블록 요소에 포함된 경우
+            // range.deleteContents()를 사용하면 HTML 구조가 파괴되어 줄바꿈이 발생함
+            // 따라서 extractContents()로 DOM 구조를 보존하면서 텍스트 노드만 마커로 감싸야 함
+            // ⚠️ 이 로직을 수정하면 한글 마커 삽입 시 줄바꿈 문제가 재발할 수 있음!
+            if (tempDiv.innerHTML.includes('<')) {
+              // 🔍 디버깅: 마커 삽입 전 주변 HTML 구조 확인
+              const beforeContainer = range.commonAncestorContainer;
+              const beforeDiv = document.createElement('div');
+              if (beforeContainer.nodeType === Node.ELEMENT_NODE) {
+                beforeDiv.innerHTML = beforeContainer.innerHTML;
+              } else if (beforeContainer.parentElement) {
+                beforeDiv.innerHTML = beforeContainer.parentElement.innerHTML;
+              }
+              console.log('🔍 [삽입 전] 주변 HTML 구조:', beforeDiv.innerHTML);
+
+              // ⭐ [중요] extractContents 대신 deleteContents 사용
+              // extractContents는 DOM 구조를 제거해버려 삽입 위치가 잘못됨
+              // deleteContents는 내용만 제거하고 위치는 유지
+              const selectedText = range.toString();
+              markerSpan.textContent = selectedText;
+
+              range.deleteContents();
+              range.insertNode(markerSpan);
+
+              // 🔍 디버깅: 마커 삽입 후 주변 HTML 구조 확인
+              const afterContainer = markerSpan.parentElement || markerSpan.parentNode;
+              const afterDiv = document.createElement('div');
+              if (afterContainer) {
+                afterDiv.innerHTML = afterContainer.innerHTML;
+              }
+              console.log('🔍 [삽입 후] 주변 HTML 구조:', afterDiv.innerHTML);
+            } else {
+              // 순수 텍스트만 있는 경우 (기존 로직 유지)
+              markerSpan.textContent = selectedText;
+              range.deleteContents();
+              range.insertNode(markerSpan);
+            }
+
+            // 삽입 후 부모가 <ul>이나 <ol>인지 확인 (잘못된 구조)
+            const parentNode = markerSpan.parentNode;
+            if (parentNode && (parentNode.nodeName === 'UL' || parentNode.nodeName === 'OL')) {
+              // <ul> 바로 아래에 삽입된 경우: <li><p> 구조로 감싸기
+              const liElement = document.createElement('li');
+              const pElement = document.createElement('p');
+              parentNode.insertBefore(liElement, markerSpan);
+              liElement.appendChild(pElement);
+              pElement.appendChild(markerSpan);
+
+              // 마커 다음의 모든 형제 노드들을 같은 <p> 안으로 이동
+              let nextSibling = markerSpan.nextSibling;
+              while (nextSibling && nextSibling.nodeName !== 'LI') {
+                const next = nextSibling.nextSibling;
+                pElement.appendChild(nextSibling);
+                nextSibling = next;
+              }
+
+              // 다음 <li>가 있고, 그 안에 <p>만 있다면 병합
+              const nextLi = liElement.nextSibling;
+              if (nextLi && nextLi.nodeName === 'LI') {
+                const nextP = nextLi.querySelector('p');
+                if (nextP) {
+                  // 다음 <li>의 <p> 내용을 현재 <p>로 이동
+                  while (nextP.firstChild) {
+                    pElement.appendChild(nextP.firstChild);
+                  }
+                  // 빈 <li> 제거
+                  nextLi.remove();
+                }
+              }
+            } else if (parentNode && (parentNode.nodeName === 'LI' || parentNode.nodeName === 'DT' || parentNode.nodeName === 'DD' || parentNode.nodeName === 'BLOCKQUOTE')) {
+              // ⭐ [중요] <li>, <dt>, <dd>, <blockquote> 바로 아래에 삽입된 경우: <p>로 감싸기
+              // 이 블록 요소들은 자동으로 줄바꿈을 생성하므로, 마커가 직접 삽입되면 레이아웃이 깨짐
+              // 반드시 <p> 태그로 감싸서 정상적인 문단 구조를 유지해야 함
+              // ⚠️ 이 로직을 제거하면 한글 마커 삽입 시 줄바꿈 문제가 재발함!
+              const pElement = document.createElement('p');
+              parentNode.insertBefore(pElement, markerSpan);
+              pElement.appendChild(markerSpan);
+
+              // 마커 다음의 모든 형제 노드들을 같은 <p> 안으로 이동
+              let nextSibling = markerSpan.nextSibling;
+              while (nextSibling) {
+                const next = nextSibling.nextSibling;
+                pElement.appendChild(nextSibling);
+                nextSibling = next;
+              }
+            }
+
+            // 삽입 후 정리 작업
+            const parent = markerSpan.parentNode;
+
+            // 1. 마커 앞뒤의 빈 텍스트 노드 제거
+            let prevSibling = markerSpan.previousSibling;
+            if (prevSibling && prevSibling.nodeType === Node.TEXT_NODE && prevSibling.textContent === '') {
+              prevSibling.remove();
+            }
+
+            let nextSibling = markerSpan.nextSibling;
+            while (nextSibling) {
+              const next = nextSibling.nextSibling;
+              if (nextSibling.nodeType === Node.TEXT_NODE) {
+                if (nextSibling.textContent === '') {
+                  // 완전히 빈 텍스트 노드 제거
+                  nextSibling.remove();
+                  nextSibling = next;
+                  continue;
+                } else if (nextSibling.textContent.trim() === '' && !next) {
+                  // 공백만 있는 마지막 텍스트 노드 제거
+                  nextSibling.remove();
+                  break;
+                }
+              } else if (nextSibling.nodeName === 'BR' && !next) {
+                // 마지막 BR 제거
+                nextSibling.remove();
+                break;
+              }
+              break;
+            }
+
+            // 2. 부모 노드 정규화 (인접한 텍스트 노드 병합)
+            if (parent) {
+              parent.normalize();
+            }
+
+            // 3. contentEditable 전체 정규화
+            if (activeRef.current) {
+              activeRef.current.normalize();
+            }
+
             console.log(`✅ ${pendingMarker.type} 마커 삽입 완료 (대체 방법)`);
+            console.log('📄 삽입 직후 HTML:', activeRef.current.innerHTML.substring(0, 500));
           } catch (fallbackError) {
             console.error('❌ 마커 삽입 완전 실패:', fallbackError);
             // Firestore에서 방금 추가한 편집 이력 삭제
@@ -1836,8 +2192,11 @@ const CollaborativeDocumentEditor = ({
         }
       }
 
-      // 콘텐츠 state 업데이트
+      // 콘텐츠 state 업데이트 - 정리 작업 직후 즉시 HTML 캡처
       const finalHTML = activeRef.current.innerHTML;
+      console.log('📄 캡처된 HTML:', finalHTML.substring(0, 500));
+      console.log('📄 이전 content:', content.substring(0, 500));
+      console.log('📄 HTML 동일 여부:', finalHTML === content);
       setContent(finalHTML);
       debouncedSave(finalHTML);
 
@@ -1891,7 +2250,9 @@ const CollaborativeDocumentEditor = ({
         date: now,
         createdAt: now,
         displayDate: new Date(now).toLocaleString(),
-        folderId: 'shared' // 공유 폴더
+        folderId: 'shared', // 공유 폴더
+        currentWorkingRoomId: null, // 초기값 명시
+        hasPendingEdits: false // 초기값 명시
       };
 
       // syncMemo로 즉시 로컬 상태 업데이트 + Firestore 저장
@@ -2319,6 +2680,102 @@ const CollaborativeDocumentEditor = ({
     }
   }, [actualIsManager, title, content, currentUserId, chatRoomId, showToast]);
 
+  // 다운로드 허용 토글 핸들러 (문서 소유자만)
+  const handleToggleDownload = useCallback(() => {
+    if (!currentDocId || !chatRoomId) {
+      showToast?.('문서가 없습니다');
+      return;
+    }
+
+    if (documentOwner?.userId !== currentUserId) {
+      showToast?.('문서 소유자만 다운로드를 허용할 수 있습니다');
+      return;
+    }
+
+    // 비활성화는 바로 처리, 활성화는 확인 모달 표시
+    if (downloadEnabled) {
+      confirmToggleDownload();
+    } else {
+      setShowDownloadConfirmModal(true);
+    }
+  }, [currentDocId, chatRoomId, documentOwner, currentUserId, downloadEnabled, showToast]);
+
+  // 다운로드 허용 토글 확정 실행
+  const confirmToggleDownload = useCallback(async () => {
+    try {
+      const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+      const newDownloadEnabled = !downloadEnabled;
+
+      await updateDoc(docRef, {
+        downloadEnabled: newDownloadEnabled
+      });
+
+      setDownloadEnabled(newDownloadEnabled);
+      showToast?.(newDownloadEnabled ? '다운로드가 허용되었습니다' : '다운로드가 비활성화되었습니다');
+    } catch (error) {
+      console.error('다운로드 허용 토글 실패:', error);
+      showToast?.('다운로드 설정에 실패했습니다');
+    }
+  }, [chatRoomId, downloadEnabled, showToast]);
+
+  // 다운로드 핸들러 - 협업 참여자용 (공유 폴더에 다운로드, 이미지/비디오 URL 유지)
+  const handleDownloadDocument = useCallback(async () => {
+    if (!canDownload || !currentDocId) {
+      showToast?.('다운로드할 수 없습니다');
+      return;
+    }
+
+    // 용량 체크 (200KB 제한)
+    const contentSize = new Blob([content]).size;
+    const maxSize = 200 * 1024; // 200KB
+
+    if (contentSize > maxSize) {
+      showToast?.(`문서 용량이 너무 큽니다 (최대 200KB, 현재 ${Math.round(contentSize / 1024)}KB)`);
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      // 새 메모 ID 생성
+      const newMemoId = `m${Date.now()}`;
+
+      // 공유 폴더에 저장 (HTML 그대로, 이미지/비디오 URL 유지)
+      const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', newMemoId);
+
+      await setDoc(memoRef, {
+        id: newMemoId,
+        title: `${title} (다운로드)`,
+        content: content, // HTML 그대로 저장 (이미지/비디오 URL 포함)
+        folderId: 'shared',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        isShared: true,
+        color: '#4a90e2'
+      });
+
+      // 로컬 상태도 업데이트
+      if (syncMemo) {
+        syncMemo(newMemoId, {
+          id: newMemoId,
+          title: `${title} (다운로드)`,
+          content: content,
+          folderId: 'shared',
+          date: Date.now(),
+          createdAt: Date.now(),
+          displayDate: new Date().toLocaleString()
+        });
+      }
+
+      showToast?.('문서가 공유 폴더에 다운로드되었습니다');
+    } catch (error) {
+      console.error('문서 다운로드 실패:', error);
+      showToast?.('문서 다운로드에 실패했습니다');
+    } finally {
+      setSaving(false);
+    }
+  }, [canDownload, currentDocId, title, content, currentUserId, showToast, syncMemo]);
+
   // 다운로드 핸들러 - 일반 사용자용 (공유 폴더에 다운로드)
   const handleDownloadToShared = useCallback(async () => {
     if (!title.trim()) {
@@ -2591,7 +3048,37 @@ const CollaborativeDocumentEditor = ({
           console.log('💾 개별 승인 후 캐시 업데이트:', currentDocId);
         }
 
-        // 7. UI 업데이트
+        // 7. 원본 메모 업데이트
+        const isLastEdit = pendingEdits.length === 1;
+        if (currentDocId) {
+          try {
+            const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', currentDocId);
+
+            // ⚠️ [중요] 원본 메모에 저장할 때는 모든 마커를 제거해야 함
+            // newContent는 현재 마커만 제거된 상태이므로, 다른 pending 마커들이 남아있음
+            // 따라서 모든 마커를 제거한 cleanContent를 사용
+            const cleanDiv = document.createElement('div');
+            cleanDiv.innerHTML = newContent;
+            const remainingMarkers = cleanDiv.querySelectorAll('[data-edit-id]');
+            remainingMarkers.forEach(marker => {
+              const textNode = document.createTextNode(marker.textContent);
+              marker.parentNode.replaceChild(textNode, marker);
+            });
+            const cleanContentForMemo = cleanDiv.innerHTML;
+
+            await setDoc(memoRef, {
+              title: title,
+              content: cleanContentForMemo, // 모든 마커 제거된 content 사용
+              hasPendingEdits: !isLastEdit,
+              currentWorkingRoomId: isLastEdit ? null : chatRoomId
+            }, { merge: true });
+            console.log('✅ 개별 승인 - 원본 메모 업데이트:', currentDocId, '(모든 마커 제거됨)');
+          } catch (error) {
+            console.error('원본 메모 업데이트 실패:', error);
+          }
+        }
+
+        // 8. UI 업데이트
         setPendingEdits(prev => {
           const updated = prev.filter(e => e.id !== editId);
           // 더 이상 pending 편집이 없으면 플래그 제거
@@ -2618,7 +3105,7 @@ const CollaborativeDocumentEditor = ({
       console.error('편집 승인 실패:', error);
       showToast?.('편집 승인에 실패했습니다');
     }
-  }, [actualIsManager, content, chatRoomId, currentDocId, title, currentUserId, currentUserName, selectedEdits, showToast, getEditHistoryRef]);
+  }, [actualIsManager, content, chatRoomId, currentDocId, title, currentUserId, currentUserName, selectedEdits, showToast, getEditHistoryRef, pendingEdits]);
 
   // 전체 승인 버튼 클릭 - 확인 모달 표시
   const handleFinalApply = useCallback(() => {
@@ -2742,17 +3229,19 @@ const CollaborativeDocumentEditor = ({
         console.log('✅ 원본 메모의 hasPendingEdits 플래그 업데이트:', currentDocId, false);
       }
 
-      // ⭐ 원본 메모의 currentWorkingRoomId를 null로 설정 (일반 문서로 복원)
+      // ⭐ 원본 메모 업데이트 (content, title, 플래그 모두 업데이트)
       if (currentDocId) {
         try {
           const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', currentDocId);
           await setDoc(memoRef, {
+            title: title,
+            content: finalContent,
             currentWorkingRoomId: null,
             hasPendingEdits: false
           }, { merge: true });
-          console.log('✅ 원본 메모의 currentWorkingRoomId를 null로 설정:', currentDocId);
+          console.log('✅ 전체 승인 - 원본 메모 업데이트:', currentDocId);
         } catch (error) {
-          console.error('원본 메모 currentWorkingRoomId 초기화 실패:', error);
+          console.error('원본 메모 업데이트 실패:', error);
         }
       }
 
@@ -2783,40 +3272,38 @@ const CollaborativeDocumentEditor = ({
       // 1. HTML에서 모든 마커 제거 (텍스트만 남김)
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = content;
+      console.log('🔍 [전체 리셋] 원본 content:', content.substring(0, 200));
 
       // 모든 편집 마커 제거
       const markers = tempDiv.querySelectorAll('[data-edit-id]');
+      console.log('🔍 [전체 리셋] 찾은 마커 개수:', markers.length);
       markers.forEach(marker => {
+        console.log('🗑️ [전체 리셋] 마커 제거:', marker.dataset.editId, marker.textContent);
         const textNode = document.createTextNode(marker.textContent);
         marker.parentNode.replaceChild(textNode, marker);
       });
 
       const cleanContent = tempDiv.innerHTML;
+      console.log('🔍 [전체 리셋] 정리된 content:', cleanContent.substring(0, 200));
 
-      // 2. Firestore의 편집 이력 모두 삭제 (모든 대화방에서)
-      // collectionGroup을 사용해 모든 대화방의 해당 문서의 editHistory를 삭제
-      const editHistoryQuery = query(
-        collectionGroup(db, 'editHistory'),
-        where('status', '==', 'pending')
-      );
-      const allEditsSnap = await getDocs(editHistoryQuery);
+      // 2. Firestore의 편집 이력 모두 삭제 (현재 대화방의 현재 문서만)
+      // ⚠️ status 조건 없이 모든 editHistory 삭제 (승인된 것도 포함)
+      const editHistoryRef = collection(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory');
+      const allEditsSnap = await getDocs(editHistoryRef);
+
+      console.log('🔍 [전체 리셋] 삭제 대상 editHistory 개수:', allEditsSnap.size);
 
       const deletePromises = [];
       allEditsSnap.forEach((editDoc) => {
-        // 경로: chatRooms/{chatRoomId}/documents/{memoId}/editHistory/{editId}
-        const pathParts = editDoc.ref.path.split('/');
-        const memoId = pathParts[3];
-
-        // 현재 문서의 editHistory만 삭제
-        if (memoId === currentDocId) {
-          deletePromises.push(deleteDoc(editDoc.ref));
-          console.log('🗑️ editHistory 삭제:', editDoc.ref.path);
-        }
+        console.log('🗑️ editHistory 삭제 예정:', editDoc.id, editDoc.data());
+        deletePromises.push(deleteDoc(editDoc.ref));
       });
 
       if (deletePromises.length > 0) {
         await Promise.all(deletePromises);
         console.log(`✅ 총 ${deletePromises.length}개의 editHistory 삭제 완료`);
+      } else {
+        console.log('⚠️ 삭제할 editHistory가 없습니다');
       }
 
       // 3. Firestore 문서 업데이트 (마커 제거된 내용으로)
@@ -2858,17 +3345,50 @@ const CollaborativeDocumentEditor = ({
         console.log('✅ 원본 메모의 hasPendingEdits 플래그 업데이트:', currentDocId, false);
       }
 
-      // ⭐ 원본 메모의 currentWorkingRoomId를 null로 설정 (일반 문서로 복원)
+      // ⭐ 원본 메모 업데이트
+      // ⚠️ [중요] 전체 리셋 시 원본 메모의 content도 cleanContent로 업데이트해야 함
+      // 그렇지 않으면 문서를 비우고 다시 불러올 때 마커가 포함된 원본이 로드됨
+      // ⚠️ [중요] 현재 방의 마커는 삭제되지만, 다른 방에 마커가 남아있을 수 있음
       if (currentDocId) {
         try {
+          // 다른 방에 pending 마커가 있는지 확인
+          const chatRoomsRef = collection(db, 'chatRooms');
+          const chatRoomsSnapshot = await getDocs(chatRoomsRef);
+
+          let hasMarkerInOtherRoom = false;
+          let otherRoomId = null;
+
+          for (const roomDoc of chatRoomsSnapshot.docs) {
+            const roomId = roomDoc.id;
+            if (roomId === chatRoomId) continue; // 현재 방은 스킵 (방금 삭제했으므로)
+
+            const editsRef = collection(db, 'chatRooms', roomId, 'documents', currentDocId, 'editHistory');
+            const pendingQuery = query(editsRef, where('status', '==', 'pending'));
+            const pendingSnapshot = await getDocs(pendingQuery);
+
+            if (pendingSnapshot.size > 0) {
+              hasMarkerInOtherRoom = true;
+              otherRoomId = roomId;
+              console.log(`📌 전체 리셋 후 다른 방에 마커 발견: ${roomId} (${pendingSnapshot.size}개)`);
+              break;
+            }
+          }
+
           const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', currentDocId);
           await setDoc(memoRef, {
-            currentWorkingRoomId: null,
-            hasPendingEdits: false
+            title: title,
+            content: cleanContent, // 모든 마커 제거된 content로 업데이트
+            currentWorkingRoomId: hasMarkerInOtherRoom ? otherRoomId : null,
+            hasPendingEdits: hasMarkerInOtherRoom
           }, { merge: true });
-          console.log('✅ 원본 메모의 currentWorkingRoomId를 null로 설정:', currentDocId);
+
+          if (hasMarkerInOtherRoom) {
+            console.log('✅ 전체 리셋 완료 - 다른 방에 마커 존재, currentWorkingRoomId 유지:', otherRoomId);
+          } else {
+            console.log('✅ 전체 리셋 완료 - 모든 마커 제거, 일반 문서로 복원:', currentDocId);
+          }
         } catch (error) {
-          console.error('원본 메모 currentWorkingRoomId 초기화 실패:', error);
+          console.error('원본 메모 전체 리셋 실패:', error);
         }
       }
 
@@ -2971,6 +3491,9 @@ const CollaborativeDocumentEditor = ({
 
   // 문서 비우기 확정 실행
   const performClearDocument = useCallback(async () => {
+    // ⭐ 모달을 먼저 닫아서 사용자에게 즉각 피드백
+    setShowClearConfirmModal(false);
+
     const docIdToClose = currentDocId;
 
     // contentRef 비우기
@@ -3006,44 +3529,65 @@ const CollaborativeDocumentEditor = ({
       globalDocumentCache.delete(docIdToClose);
       console.log('🗑️ 캐시에서 문서 삭제:', docIdToClose);
 
-      // ⭐ 원본 메모의 currentWorkingRoomId를 null로 설정 (일반 문서로 복원)
+      // ⭐ [중요] 비우기 시 원본 메모 업데이트
+      // 비우기는 로컬 상태만 초기화하는 것이므로, editHistory는 그대로 유지됨
+      // → 현재 방에 마커가 있는지만 확인 (다른 방은 검색 불필요 - 데이터 낭비 방지)
       try {
+        // 현재 방의 editHistory만 검색하여 pending 마커가 있는지 확인
+        const editsRef = collection(db, 'chatRooms', chatRoomId, 'documents', docIdToClose, 'editHistory');
+        const pendingQuery = query(editsRef, where('status', '==', 'pending'));
+        const pendingSnapshot = await getDocs(pendingQuery);
+
+        const hasMarker = pendingSnapshot.size > 0;
+
         const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', docIdToClose);
         await setDoc(memoRef, {
-          currentWorkingRoomId: null,
-          hasPendingEdits: false
+          currentWorkingRoomId: hasMarker ? chatRoomId : null,
+          hasPendingEdits: hasMarker
         }, { merge: true });
-        console.log('✅ 원본 메모의 currentWorkingRoomId를 null로 설정 (문서 비우기):', docIdToClose);
+
+        if (hasMarker) {
+          console.log(`✅ 비우기 - 현재 방에 마커 존재 (${pendingSnapshot.size}개), currentWorkingRoomId 유지:`, chatRoomId);
+        } else {
+          console.log('✅ 비우기 - 마커 없음, 원본 메모 초기화 완료:', docIdToClose);
+        }
+
+        // 즉시 메모 동기화 (공유 폴더에서 배지 업데이트)
+        if (syncMemo) {
+          syncMemo(docIdToClose, {
+            currentWorkingRoomId: hasMarker ? chatRoomId : null,
+            hasPendingEdits: hasMarker
+          });
+        }
       } catch (error) {
-        console.error('원본 메모 currentWorkingRoomId 초기화 실패:', error);
+        console.error('❌ 비우기 - 원본 메모 업데이트 실패:', error);
       }
     }
 
-    setShowClearConfirmModal(false);
     showToast?.('문서가 비워졌습니다');
-  }, [currentDocId, chatRoomId, currentUserId, currentUserName, showToast]);
+  }, [currentDocId, chatRoomId, currentUserId, currentUserName, showToast, pendingEdits]);
 
   // 제안 철회 핸들러
-  const handleWithdrawProposal = useCallback(async (editId) => {
+  const handleWithdrawProposal = useCallback(async (edit) => {
     try {
       // 댓글이 있는지 확인
-      const commentsRef = collection(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', editId, 'comments');
+      const commentsRef = collection(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', edit.id, 'comments');
       const commentsSnapshot = await getDocs(commentsRef);
 
       if (!commentsSnapshot.empty) {
-        showToast?.('의견 제시가 달린 제안은 철회할 수 없습니다');
+        showToast?.('의견이 달린 제안은 철회할 수 없습니다');
         return;
       }
 
-      if (!window.confirm('이 제안을 철회하시겠습니까?')) return;
-
-      const editRef = doc(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', editId);
-      await deleteDoc(editRef);
-
-      showToast?.('제안이 철회되었습니다');
-      setShowEditModal(false); // 모달 닫기
+      // 모달 표시
+      setPendingWithdrawEdit({
+        id: edit.id,
+        markerType: edit.type
+      });
+      setShowWithdrawConfirmModal(true);
+      setShowEditModal(false);
     } catch (error) {
-      console.error('제안 철회 실패:', error);
+      console.error('제안 철회 확인 실패:', error);
       showToast?.('제안 철회에 실패했습니다');
     }
   }, [chatRoomId, currentDocId, showToast]);
@@ -3073,6 +3617,13 @@ const CollaborativeDocumentEditor = ({
             const commentsRef = collection(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory', editId, 'comments');
             const commentsSnapshot = await getDocs(commentsRef);
             const commentCount = commentsSnapshot.size;
+            console.log('📊 댓글 개수 조회:', {
+              chatRoomId,
+              currentDocId,
+              editId,
+              commentCount,
+              commentsPath: `chatRooms/${chatRoomId}/documents/${currentDocId}/editHistory/${editId}/comments`
+            });
 
             // 제안자의 WS 코드 조회
             let wsCode = null;
@@ -3237,22 +3788,68 @@ const CollaborativeDocumentEditor = ({
           </div>
         ) : documentOwner && currentDocId && !currentDocId.startsWith('temp_') ? (
           <div
-            onClick={() => setShowOwnerModal(true)}
             style={{
               padding: '8px 16px',
               background: 'rgba(74, 144, 226, 0.1)',
               borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
               fontSize: '12px',
               color: '#4a90e2',
-              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px'
+              justifyContent: 'space-between',
+              gap: '8px'
             }}
-            title="클릭하여 사용자 ID 확인"
           >
-            <Users size={14} />
-            문서 소유자: {documentOwner.nickname}{documentOwner.userId === currentUserId ? ' (나)' : ''}
+            <div
+              onClick={() => setShowOwnerModal(true)}
+              style={{
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                flex: 1
+              }}
+              title="클릭하여 사용자 ID 확인"
+            >
+              <Users size={14} />
+              문서 소유자: {documentOwner.nickname}{documentOwner.userId === currentUserId ? ' (나)' : ''}
+            </div>
+            {/* 다운로드 허용/다운로드 버튼 */}
+            {documentOwner.userId === currentUserId ? (
+              <button
+                onClick={handleToggleDownload}
+                style={{
+                  fontSize: '11px',
+                  padding: '4px 8px',
+                  background: downloadEnabled ? '#4a90e2' : '#666',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+                title={downloadEnabled ? '다운로드 비활성화' : '다운로드 허용'}
+              >
+                {downloadEnabled ? '다운로드 활성화됨' : '다운로드 허용'}
+              </button>
+            ) : canDownload ? (
+              <button
+                onClick={handleDownloadDocument}
+                style={{
+                  fontSize: '11px',
+                  padding: '4px 8px',
+                  background: '#4a90e2',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+                title="공유 폴더에 다운로드"
+              >
+                📥 다운로드
+              </button>
+            ) : null}
           </div>
         ) : null}
 
@@ -3487,8 +4084,7 @@ const CollaborativeDocumentEditor = ({
                       </div>
                       {edit.editedBy === currentUserId && (
                         <button
-                          onClick={() => handleWithdrawProposal(edit.id)}
-                          disabled={edit.commentCount > 0}
+                          onClick={() => handleWithdrawProposal(edit)}
                           style={{
                             background: edit.commentCount > 0 ? 'rgba(255, 107, 107, 0.2)' : 'rgba(255, 107, 107, 0.1)',
                             border: `1px solid ${edit.commentCount > 0 ? 'rgba(255, 107, 107, 0.3)' : 'rgba(255, 107, 107, 0.4)'}`,
@@ -3592,7 +4188,8 @@ const CollaborativeDocumentEditor = ({
                             memoId: currentDocId,
                             editId: edit.id,
                             markerData: {
-                              originalText: edit.oldText,
+                              type: edit.type,
+                              oldText: edit.oldText,
                               newText: edit.newText || '',
                               description: edit.description || edit.reason || ''
                             }
@@ -3798,38 +4395,15 @@ const CollaborativeDocumentEditor = ({
                             return;
                           }
 
-                          if (!window.confirm('이 제안을 철회하시겠습니까?')) return;
-
-                          // 1. DOM에서 마커 제거
-                          const container = activeRef.current;
-                          if (container) {
-                            const markerClass = pendingMarker.type === 'strikethrough' ? 'strikethrough' : 'highlight';
-                            const markers = container.querySelectorAll(`.${markerClass}[data-edit-id="${pendingMarker.id}"]`);
-                            markers.forEach(marker => {
-                              const parent = marker.parentNode;
-                              const textNode = document.createTextNode(marker.textContent);
-                              parent.replaceChild(textNode, marker);
-                              parent.normalize();
-                            });
-                          }
-
-                          // 2. Firestore에서 제안 삭제
-                          const editRef = doc(
-                            db,
-                            'chatRooms',
-                            chatRoomId,
-                            'documents',
-                            currentDocId,
-                            'editHistory',
-                            pendingMarker.id
-                          );
-                          await deleteDoc(editRef);
-
-                          showToast?.('제안이 철회되었습니다');
+                          // 모달 표시
+                          setPendingWithdrawEdit({
+                            id: pendingMarker.id,
+                            markerType: pendingMarker.type
+                          });
+                          setShowWithdrawConfirmModal(true);
                           setShowEditInputModal(false);
-                          setPendingMarker(null);
                         } catch (error) {
-                          console.error('제안 철회 실패:', error);
+                          console.error('제안 철회 확인 실패:', error);
                           showToast?.('제안 철회에 실패했습니다');
                         }
                       }}
@@ -3991,7 +4565,8 @@ const CollaborativeDocumentEditor = ({
                         memoId: currentDocId,
                         editId: pendingMarker.id,
                         markerData: {
-                          originalText: pendingMarker.text,
+                          type: pendingMarker.type,
+                          oldText: pendingMarker.text,
                           newText: pendingMarker.editData.newText,
                           description: pendingMarker.editData.description || pendingMarker.editData.reason
                         }
@@ -4875,49 +5450,16 @@ const CollaborativeDocumentEditor = ({
                   </div>
                   {selectedMarkerDetail.editedBy === currentUserId && (
                     <button
-                      disabled={selectedMarkerDetail.commentCount > 0}
-                      onClick={async () => {
-                        // 댓글이 있으면 철회 불가 (비활성화 버튼 클릭 시)
+                      onClick={() => {
+                        // 댓글이 있으면 철회 불가
                         if (selectedMarkerDetail.commentCount > 0) {
-                          showToast?.('의견 제시가 달린 제안은 철회할 수 없습니다');
+                          showToast?.('의견이 달린 제안은 철회할 수 없습니다');
                           return;
                         }
 
-                        if (!window.confirm('이 제안을 철회하시겠습니까?')) return;
-
-                        try {
-                          // 1. DOM에서 마커 제거
-                          const container = showFullScreenEdit ? fullScreenContentRef.current : contentRef.current;
-                          if (container) {
-                            const markerClass = selectedMarkerDetail.markerType === 'strikethrough' ? 'strikethrough' : 'highlight';
-                            const markers = container.querySelectorAll(`.${markerClass}[data-edit-id="${selectedMarkerDetail.id}"]`);
-                            markers.forEach(marker => {
-                              const parent = marker.parentNode;
-                              const textNode = document.createTextNode(marker.textContent);
-                              parent.replaceChild(textNode, marker);
-                              parent.normalize();
-                            });
-                          }
-
-                          // 2. Firestore에서 제안 삭제
-                          const editRef = doc(
-                            db,
-                            'chatRooms',
-                            chatRoomId,
-                            'documents',
-                            currentDocId,
-                            'editHistory',
-                            selectedMarkerDetail.id
-                          );
-                          await deleteDoc(editRef);
-
-                          showToast?.('제안이 철회되었습니다');
-                          setShowMarkerDetailModal(false);
-                          setSelectedMarkerDetail(null);
-                        } catch (error) {
-                          console.error('제안 철회 실패:', error);
-                          showToast?.('제안 철회에 실패했습니다');
-                        }
+                        // 모달 표시
+                        setPendingWithdrawEdit(selectedMarkerDetail);
+                        setShowWithdrawConfirmModal(true);
                       }}
                       style={{
                         padding: '6px 12px',
@@ -4969,6 +5511,54 @@ const CollaborativeDocumentEditor = ({
                   </>
                 )}
               </S.EditInfo>
+
+              {/* 의견 제시 댓글 보기 버튼 */}
+              <div style={{ marginTop: '16px', marginBottom: '16px' }}>
+                <button
+                  onClick={() => {
+                    // MarkerCommentsModal 열기
+                    setSelectedMarkerForComments({
+                      chatRoomId,
+                      memoId: currentDocId,
+                      editId: selectedMarkerDetail.id,
+                      markerData: {
+                        type: selectedMarkerDetail.markerType,
+                        oldText: selectedMarkerDetail.oldText,
+                        newText: selectedMarkerDetail.newText,
+                        reason: selectedMarkerDetail.reason,
+                        description: selectedMarkerDetail.description
+                      }
+                    });
+                    setShowMarkerCommentsModal(true);
+                    // 현재 모달 닫기
+                    setShowMarkerDetailModal(false);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 16px',
+                    background: 'rgba(74, 144, 226, 0.15)',
+                    border: '1px solid rgba(74, 144, 226, 0.3)',
+                    borderRadius: '8px',
+                    color: '#4a90e2',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'rgba(74, 144, 226, 0.25)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'rgba(74, 144, 226, 0.15)';
+                  }}
+                >
+                  💬 의견 제시 ({selectedMarkerDetail.commentCount || 0})
+                </button>
+              </div>
 
               {actualIsManager && (
                 <S.ModalActions>
@@ -5235,12 +5825,156 @@ const CollaborativeDocumentEditor = ({
         />
       )}
 
+      {/* 제안 철회 확인 모달 */}
+      {showWithdrawConfirmModal && pendingWithdrawEdit && (
+        <S.Modal onClick={() => setShowWithdrawConfirmModal(false)} style={{ zIndex: 500000 }}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>
+                <X size={18} color="#ff6b6b" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                제안 철회 확인
+              </S.ModalTitle>
+              <S.IconButton onClick={() => setShowWithdrawConfirmModal(false)}>
+                <X size={20} />
+              </S.IconButton>
+            </S.ModalHeader>
+
+            <S.ModalBody>
+              <div style={{ marginBottom: '12px', color: '#e0e0e0', lineHeight: '1.6' }}>
+                이 제안을 철회하시겠습니까?
+              </div>
+              <div style={{ marginBottom: '20px', color: '#ff6b6b', fontSize: '13px' }}>
+                ⚠️ 철회된 제안은 복구할 수 없습니다
+              </div>
+
+              <S.ModalActions>
+                <S.RejectButton onClick={() => {
+                  setShowWithdrawConfirmModal(false);
+                  setPendingWithdrawEdit(null);
+                }}>
+                  취소
+                </S.RejectButton>
+                <S.ConfirmButton
+                  onClick={async () => {
+                    try {
+                      // 1. DOM에서 마커 제거
+                      const container = showFullScreenEdit ? fullScreenContentRef.current : contentRef.current;
+                      if (container) {
+                        const markerClass = pendingWithdrawEdit.markerType === 'strikethrough' ? 'strikethrough' : 'highlight';
+                        const markers = container.querySelectorAll(`.${markerClass}[data-edit-id="${pendingWithdrawEdit.id}"]`);
+                        markers.forEach(marker => {
+                          const parent = marker.parentNode;
+                          const textNode = document.createTextNode(marker.textContent);
+                          parent.replaceChild(textNode, marker);
+                          parent.normalize();
+                        });
+
+                        // 2. Firestore의 sharedDocument에도 마커 제거된 HTML 저장
+                        const updatedContent = container.innerHTML;
+                        const docRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
+                        await updateDoc(docRef, {
+                          content: updatedContent,
+                          lastEditedBy: currentUserId,
+                          lastEditedAt: serverTimestamp()
+                        });
+                      }
+
+                      // 3. Firestore에서 제안 삭제
+                      const editRef = doc(
+                        db,
+                        'chatRooms',
+                        chatRoomId,
+                        'documents',
+                        currentDocId,
+                        'editHistory',
+                        pendingWithdrawEdit.id
+                      );
+                      await deleteDoc(editRef);
+
+                      showToast?.('제안이 철회되었습니다');
+                      setShowWithdrawConfirmModal(false);
+                      setPendingWithdrawEdit(null);
+                      setShowMarkerDetailModal(false);
+                      setSelectedMarkerDetail(null);
+                      setShowEditInputModal(false);
+                      setPendingMarker(null);
+                    } catch (error) {
+                      console.error('제안 철회 실패:', error);
+                      showToast?.('제안 철회에 실패했습니다');
+                    }
+                  }}
+                  style={{ background: 'linear-gradient(135deg, #ff6b6b, #ff5252)' }}
+                >
+                  철회
+                </S.ConfirmButton>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
+      )}
+
+      {/* 다운로드 허용 확인 모달 */}
+      {showDownloadConfirmModal && (
+        <S.Modal onClick={() => setShowDownloadConfirmModal(false)} style={{ zIndex: 500000 }}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>
+                <Download size={18} color="#4a90e2" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                다운로드 허용 확인
+              </S.ModalTitle>
+              <S.IconButton onClick={() => setShowDownloadConfirmModal(false)}>
+                <X size={20} />
+              </S.IconButton>
+            </S.ModalHeader>
+
+            <S.ModalBody>
+              <div style={{ marginBottom: '16px', color: '#e0e0e0', lineHeight: '1.6', fontSize: '14px' }}>
+                현재 열어놓은 문서를 상대방(멤버)이 다운로드할 수 있도록 하겠습니까?
+              </div>
+              <div style={{ marginBottom: '16px', color: '#b0b0b0', fontSize: '13px', lineHeight: '1.5' }}>
+                수정 대기중인 문서라면 마커 정보도 함께 다운로드됩니다.
+              </div>
+              <div style={{ marginBottom: '20px', color: '#ff6b6b', fontSize: '13px', lineHeight: '1.5', fontWeight: '600' }}>
+                ⚠️ 다운로드를 허용하기전에 민감한 내용이나 개인정보 등의 중요한 내용이 없는지 반드시 확인하세요.
+              </div>
+
+              <S.ModalActions>
+                <S.RejectButton onClick={() => setShowDownloadConfirmModal(false)}>
+                  취소
+                </S.RejectButton>
+                <S.ConfirmButton
+                  onClick={() => {
+                    confirmToggleDownload();
+                    setShowDownloadConfirmModal(false);
+                  }}
+                  style={{ background: 'linear-gradient(135deg, #4a90e2, #357abd)' }}
+                >
+                  허용
+                </S.ConfirmButton>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
+      )}
+
       {/* 새 문서 작성 모달 */}
       <CollaborationMemoModal
         isOpen={showNewMemoModal}
         onSave={handleSaveNewMemo}
         onCancel={() => setShowNewMemoModal(false)}
       />
+
+      {/* 이미지 뷰어 모달 */}
+      {showImageViewer && (
+        <S.ImageViewerOverlay onClick={handleCloseImageViewer}>
+          <S.ImageViewerContent onClick={(e) => e.stopPropagation()}>
+            <S.ImageViewerImage src={viewerImageSrc} alt="Full size" />
+            <S.ImageViewerCloseButton onClick={handleCloseImageViewer}>
+              <X size={24} />
+            </S.ImageViewerCloseButton>
+          </S.ImageViewerContent>
+        </S.ImageViewerOverlay>
+      )}
     </S.EditorContainer>
   );
 };

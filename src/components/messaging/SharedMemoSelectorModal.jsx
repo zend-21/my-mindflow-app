@@ -297,20 +297,20 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
 
     if (sharedMemoIds.length === 0 || !currentUserId) return;
 
-    console.log('🔥 실시간 리스너 설정 - 공유 폴더 메모:', sharedMemoIds.length, '개', 'userId:', currentUserId);
+    console.log('🔥 [실시간 리스너] 시작 - 메모 개수:', sharedMemoIds.length);
 
     const unsubscribers = [];
 
     sharedMemoIds.forEach((id) => {
       if (!id) return;
 
-      // mindflowUsers/{currentUserId}/memos/{memoId} 경로의 메모 감시 (본인의 메모만)
       const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', id);
 
       const unsubscribe = onSnapshot(memoRef, (docSnapshot) => {
         if (docSnapshot.exists()) {
           const data = docSnapshot.data();
-          console.log(`🔄 실시간 업데이트 - 메모 ${id}:`, {
+
+          console.log('📡 [실시간 업데이트] 메모:', id, {
             currentWorkingRoomId: data.currentWorkingRoomId,
             hasPendingEdits: data.hasPendingEdits
           });
@@ -330,91 +330,91 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
       unsubscribers.push(unsubscribe);
     });
 
-    // 클린업: 모든 리스너 해제
     return () => {
-      console.log('🧹 실시간 리스너 해제 -', unsubscribers.length, '개');
+      console.log('🔇 [실시간 리스너] 종료');
       unsubscribers.forEach(unsub => unsub());
     };
-  }, [allMemos, currentUserId]); // allMemos 또는 currentUserId가 변경될 때마다 리스너 재설정
+  }, [allMemos, currentUserId]);
 
-  // 프리즌 상태 체크 - pending 편집 기반 판단
+  // 프리즌 상태 체크 - 실제 editHistory 개수 조회
   useEffect(() => {
     const checkFrozenStatus = async () => {
-      if (sharedMemos.length === 0) return;
+      if (sharedMemos.length === 0 || !currentUserId) return;
+
+      // ⚠️ [중요] 실시간 리스너가 초기 데이터를 받을 때까지 약간 대기
+      // 그렇지 않으면 allMemos의 오래된 currentWorkingRoomId를 사용함
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       const frozenSet = new Set();
       const pendingInfo = {};
 
-      // 1. 먼저 모든 pending 편집 조회
-      try {
-        const editHistoryQuery = query(
-          collectionGroup(db, 'editHistory'),
-          where('status', '==', 'pending')
-        );
-        const snapshot = await getDocs(editHistoryQuery);
+      console.log('🔍 [Frozen 체크] 시작 - chatRoomId:', chatRoomId);
 
-        // 메모별 pending 편집 정보 수집 (어느 방의 편집인지 포함)
-        const memoEditInfo = {}; // { memoId: { count: n, chatRoomId: 'xxx' } }
+      // 각 메모의 실제 editHistory 개수 조회
+      for (const memo of sharedMemos) {
+        // ⚠️ [중요] 실시간 데이터를 우선 사용 (realtimeMemoData가 가장 최신 상태)
+        const workingRoomId = realtimeMemoData[memo.id]?.currentWorkingRoomId || memo.currentWorkingRoomId;
 
-        snapshot.docs.forEach(doc => {
-          const pathParts = doc.ref.path.split('/');
-          // 경로: chatRooms/{chatRoomId}/documents/{memoId}/editHistory/{editId}
-          const editChatRoomId = pathParts[1];
-          const memoId = pathParts[3];
+        console.log('🔍 [Frozen 체크] 메모:', memo.id, {
+          memoWorkingRoomId: memo.currentWorkingRoomId,
+          realtimeWorkingRoomId: realtimeMemoData[memo.id]?.currentWorkingRoomId,
+          finalWorkingRoomId: workingRoomId,
+          currentChatRoomId: chatRoomId
+        });
 
-          if (!memoEditInfo[memoId]) {
-            memoEditInfo[memoId] = {
-              count: 0,
-              chatRoomId: editChatRoomId
+        if (!workingRoomId) {
+          console.log('✅ [Frozen 체크] 스킵 (workingRoomId 없음):', memo.id);
+          continue;
+        }
+
+        try {
+          // 실제 editHistory 문서 개수 조회
+          const editsRef = collection(db, 'chatRooms', workingRoomId, 'documents', memo.id, 'editHistory');
+          const pendingQuery = query(editsRef, where('status', '==', 'pending'));
+          const snapshot = await getDocs(pendingQuery);
+          const actualCount = snapshot.size;
+
+          console.log('📊 [Frozen 체크] editHistory 개수:', memo.id, actualCount);
+
+          if (workingRoomId === chatRoomId) {
+            // 현재 방에서 열어놓은 문서
+            if (actualCount === 0) {
+              // 마커 없음 → 배지 표시 안 함
+              console.log('✅ [Frozen 체크] 현재 방 - 마커 없음 - 배지 없음:', memo.id);
+              continue;
+            }
+            // 마커 있음 → "N개 대기" 파란색 배지 (실시간 개수 표시)
+            console.log('📝 [Frozen 체크] 현재 방 - 작업 중:', memo.id, `(${actualCount}개 대기 - 파란색)`);
+            pendingInfo[memo.id] = {
+              pendingCount: actualCount,
+              chatRoomId: workingRoomId,
+              isWorkingInOtherRoom: false
+            };
+          } else {
+            // 다른 방에서 열어놓은 문서 (동결)
+            // ⚠️ actualCount와 무관하게 frozen 상태 & 배지 표시
+            // - actualCount > 0: "N개 대기" 빨간색 배지
+            // - actualCount === 0: "협업 대기중" 빨간색 배지
+            console.log('🔒 [Frozen 체크] 다른 방 - frozen:', memo.id,
+              actualCount > 0 ? `(${actualCount}개 대기 - 빨간색)` : '(협업 대기중 - 빨간색)');
+            frozenSet.add(memo.id);
+            pendingInfo[memo.id] = {
+              pendingCount: actualCount,
+              chatRoomId: workingRoomId,
+              isWorkingInOtherRoom: true
             };
           }
-          memoEditInfo[memoId].count++;
-        });
-
-        // 2. 각 메모의 상태 판단
-        sharedMemos.forEach(memo => {
-          const editInfo = memoEditInfo[memo.id];
-
-          if (editInfo) {
-            // pending 편집이 있는 메모
-            if (editInfo.chatRoomId === chatRoomId) {
-              // 현재 방의 편집 → 파란색 배지 (활성)
-              console.log(`✅ 현재 방에서 작업 중: ${memo.id} (${editInfo.count}개 대기)`);
-              pendingInfo[memo.id] = {
-                pendingCount: editInfo.count,
-                chatRoomId: editInfo.chatRoomId
-              };
-            } else {
-              // 다른 방의 편집 → 빨간색 배지 (동결)
-              console.log(`❄️ 다른 방에서 작업 중 (frozen): ${memo.id} (${editInfo.count}개 대기, 방: ${editInfo.chatRoomId})`);
-              frozenSet.add(memo.id);
-              pendingInfo[memo.id] = {
-                pendingCount: editInfo.count,
-                chatRoomId: editInfo.chatRoomId
-              };
-            }
-          } else {
-            // pending 편집이 없는 일반 메모
-            console.log(`📄 일반 문서 (pending 편집 없음): ${memo.id}`);
-          }
-        });
-
-        console.log('🔍 프리즌 체크 결과 (pending 편집 기반):', {
-          chatRoomId,
-          totalMemos: sharedMemos.length,
-          frozenMemos: Array.from(frozenSet),
-          pendingInfo
-        });
-
-        setFrozenMemoIds(frozenSet);
-        setFrozenMemoInfo(pendingInfo);
-      } catch (error) {
-        console.error('프리즌 상태 체크 실패:', error);
+        } catch (error) {
+          console.error(`메모 ${memo.id} 체크 실패:`, error);
+        }
       }
+
+      setFrozenMemoIds(frozenSet);
+      setFrozenMemoInfo(pendingInfo);
     };
 
     checkFrozenStatus();
-  }, [sharedMemos, chatRoomId]);
+  }, [sharedMemos, chatRoomId, currentUserId, realtimeMemoData]);
 
   useEffect(() => {
     if (!searchQuery) {
@@ -508,8 +508,23 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
             filteredMemos.map(memo => {
               const isFrozen = frozenMemoIds.has(memo.id);
               const frozenInfo = frozenMemoInfo[memo.id];
+              const pendingCount = frozenInfo?.pendingCount || 0;
               const isActiveInThisRoom = frozenInfo && !isFrozen; // 현재 방에서 작업 중
-              const showBadge = isFrozen || isActiveInThisRoom; // frozen이거나 현재 방에서 작업 중이면 배지 표시
+
+              // ⚠️ [중요] 배지 표시 조건:
+              // 1. 다른 방에서 불러온 상태 (isFrozen = true) → 항상 표시 ("협업 대기중")
+              // 2. 현재 방에서 작업 중 (isActiveInThisRoom = true) AND pendingCount > 0 → 표시 ("N개 대기")
+              // 3. 현재 방에서 작업 중이지만 pendingCount = 0 (모두 승인/거절) → 표시 안 함 (일반 문서로 복귀)
+              const showBadge = isFrozen || (isActiveInThisRoom && pendingCount > 0);
+
+              // 배지 텍스트 결정
+              const getBadgeText = () => {
+                if (!frozenInfo) return '';
+                // 다른 방에서 불러온 상태 (수정 없음)
+                if (pendingCount === 0 && isFrozen) return '협업 대기중';
+                // 수정 대기중
+                return `${pendingCount}개 대기`;
+              };
 
               return (
                 <MemoItem
@@ -522,7 +537,7 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
                     {showBadge && (
                       <FrozenBadge $active={isActiveInThisRoom}>
                         {isFrozen && <Lock size={12} />}
-                        {frozenInfo?.pendingCount || 0}개 대기
+                        {getBadgeText()}
                       </FrozenBadge>
                     )}
                   </MemoHeader>
