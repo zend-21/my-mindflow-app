@@ -349,7 +349,7 @@ const CollapsibleDocumentEditor = ({
       const newMemo = {
         title: modifiedTitle,
         content: content,
-        folder: 'shared', // 폴더 ID는 'shared'
+        folderId: 'shared',
         userId: currentUserId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

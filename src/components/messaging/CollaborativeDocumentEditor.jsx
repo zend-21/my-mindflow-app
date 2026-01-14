@@ -1,6 +1,6 @@
 // 📝 실시간 협업 문서 편집기 (모바일 최적화)
 // 드래그 선택 → 입력 → 자동 형광표시 → 매니저 컨펌 시스템
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ChevronDown, ChevronUp, Save, X, Users, Lock, FolderOpen, Info, Strikethrough, Highlighter, Maximize2, Eye, Download, Check, FileText, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, UserCog, HelpCircle, MessageCircle } from 'lucide-react';
 import {
   doc,
@@ -95,6 +95,9 @@ const CollaborativeDocumentEditor = ({
   const [downloadEnabled, setDownloadEnabled] = useState(false); // 다운로드 허용 여부
   const [canDownload, setCanDownload] = useState(false); // 현재 사용자가 다운로드 가능한지 여부
   const [showDownloadConfirmModal, setShowDownloadConfirmModal] = useState(false); // 다운로드 허용 확인 모달
+
+  // 마커 유무 확인 (pendingEdits 배열로 확인 - 수정 대기중 개수)
+  const hasMarkers = pendingEdits.length > 0;
 
   const contentRef = useRef(null);
   const fullScreenContentRef = useRef(null);
@@ -2660,7 +2663,7 @@ const CollaborativeDocumentEditor = ({
       const newMemo = {
         title: modifiedTitle,
         content: plainTextContent,
-        folder: 'shared',
+        folderId: 'shared',
         userId: currentUserId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -2752,18 +2755,21 @@ const CollaborativeDocumentEditor = ({
         updatedAt: serverTimestamp(),
         isShared: true,
         color: '#4a90e2'
+        // 마커가 있는 문서는 다운로드가 차단되므로 hasMarkers, isLocked 불필요
       });
 
       // 로컬 상태도 업데이트
       if (syncMemo) {
-        syncMemo(newMemoId, {
+        syncMemo({
           id: newMemoId,
           title: `${title} (다운로드)`,
           content: content,
           folderId: 'shared',
           date: Date.now(),
           createdAt: Date.now(),
-          displayDate: new Date().toLocaleString()
+          displayDate: new Date().toLocaleString(),
+          isShared: true,
+          color: '#4a90e2'
         });
       }
 
@@ -2808,7 +2814,7 @@ const CollaborativeDocumentEditor = ({
       const newMemo = {
         title: downloadTitle,
         content: plainTextContent,
-        folder: 'shared',
+        folderId: 'shared',
         userId: currentUserId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -2856,7 +2862,7 @@ const CollaborativeDocumentEditor = ({
         title: tempTitle,
         content: content, // HTML 그대로 저장 (마커 포함)
         contentType: 'html', // HTML 타입 표시
-        folder: 'shared',
+        folderId: 'shared',
         userId: currentUserId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -3810,7 +3816,8 @@ const CollaborativeDocumentEditor = ({
             {/* 다운로드 허용/다운로드 버튼 */}
             {documentOwner.userId === currentUserId ? (
               <button
-                onClick={handleToggleDownload}
+                onClick={hasMarkers ? undefined : handleToggleDownload}
+                disabled={hasMarkers}
                 style={{
                   fontSize: '11px',
                   padding: '4px 8px',
@@ -3818,10 +3825,10 @@ const CollaborativeDocumentEditor = ({
                   color: '#fff',
                   border: 'none',
                   borderRadius: '4px',
-                  cursor: 'pointer',
-                  whiteSpace: 'nowrap'
+                  cursor: hasMarkers ? 'not-allowed' : 'pointer',
+                  whiteSpace: 'nowrap',
+                  opacity: hasMarkers ? 0.4 : 1
                 }}
-                title={downloadEnabled ? '다운로드 비활성화' : '다운로드 허용'}
               >
                 {downloadEnabled ? '다운로드 활성화됨' : '다운로드 허용'}
               </button>
@@ -5698,14 +5705,24 @@ const CollaborativeDocumentEditor = ({
 
             {/* 툴바 - 2줄 레이아웃 (모든 사용자에게 표시) */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              {/* 첫 번째 줄: 취소선, 형광펜 */}
+              {/* 첫 번째 줄: 취소선, 형광펜 (다운로드 허용 상태면 비활성화) */}
               <S.FullScreenToolbar style={{ borderBottom: 'none', paddingBottom: '7px' }}>
-                <S.ToolbarButton onClick={handleApplyStrikethrough} title="선택한 텍스트에 취소선 적용">
+                <S.ToolbarButton
+                  onClick={downloadEnabled ? undefined : handleApplyStrikethrough}
+                  disabled={downloadEnabled}
+                  title={downloadEnabled ? "다운로드 허용 중에는 수정 제안을 할 수 없습니다" : "선택한 텍스트에 취소선 적용"}
+                  style={{ opacity: downloadEnabled ? 0.4 : 1, cursor: downloadEnabled ? 'not-allowed' : 'pointer' }}
+                >
                   <Strikethrough size={16} />
                   취소선
                 </S.ToolbarButton>
 
-                <S.ToolbarButton onClick={handleApplyHighlighter} title="선택한 텍스트에 형광펜 적용">
+                <S.ToolbarButton
+                  onClick={downloadEnabled ? undefined : handleApplyHighlighter}
+                  disabled={downloadEnabled}
+                  title={downloadEnabled ? "다운로드 허용 중에는 수정 제안을 할 수 없습니다" : "선택한 텍스트에 형광펜 적용"}
+                  style={{ opacity: downloadEnabled ? 0.4 : 1, cursor: downloadEnabled ? 'not-allowed' : 'pointer' }}
+                >
                   <Highlighter size={16} />
                   형광펜
                 </S.ToolbarButton>
@@ -5927,8 +5944,9 @@ const CollaborativeDocumentEditor = ({
               <div style={{ marginBottom: '16px', color: '#b0b0b0', fontSize: '13px', lineHeight: '1.5' }}>
                 수정 대기중인 문서라면 마커 정보도 함께 다운로드됩니다.
               </div>
-              <div style={{ marginBottom: '20px', color: '#ff6b6b', fontSize: '13px', lineHeight: '1.5', fontWeight: '600' }}>
-                ⚠️ 다운로드를 허용하기전에 민감한 내용이나 개인정보 등의 중요한 내용이 없는지 반드시 확인하세요.
+              <div style={{ marginBottom: '20px', color: '#ff6b6b', fontSize: '13px', lineHeight: '1.5', fontWeight: '600', display: 'flex' }}>
+                <span style={{ flexShrink: 0 }}>⚠️</span>
+                <span style={{ marginLeft: '6px' }}>다운로드를 허용하기전에 민감한 내용이나 개인정보 등의 중요한 내용이 없는지 반드시 확인하세요.</span>
               </div>
 
               <S.ModalActions>

@@ -985,6 +985,7 @@ const MemoPage = ({
 
                                     // 프리즈된 문서 체크 (공유 폴더에서)
                                     const isInSharedFolder = activeFolder === 'shared' || memo.folderId === 'shared';
+                                    // hasPendingEdits: 대화방에서 편집 중인 문서
                                     const isMemoFrozen = memo.hasPendingEdits === true;
 
                                     if (isMemoFrozen && isInSharedFolder && !isSelectionMode) {

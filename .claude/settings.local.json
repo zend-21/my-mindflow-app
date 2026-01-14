@@ -44,7 +44,15 @@
       "Bash(git status:*)",
       "Bash(wc:*)",
       "Bash(pkill:*)",
-      "Bash(git count-objects:*)"
+      "Bash(git count-objects:*)",
+      "Bash($date = Get-Date -Format \"yyyy-MM-dd_HHmm\")",
+      "Bash($backupPath = \"F:\\\\share-note-backup\\\\중요복원지점_$date\")",
+      "Bash(Copy-Item -Path \"F:\\\\React test\\\\share-note\" -Destination $backupPath -Recurse -Exclude \"node_modules\",\".git\")",
+      "Bash(Write-Host \"백업 완료: $backupPath\")",
+      "Bash(powershell:*)",
+      "Bash(cmd /c \"robocopy \"\"F:\\\\React test\\\\share-note\"\" \"\"F:\\\\share-note-backup\\\\backup_2026-01-15_2030\"\" /E /XD node_modules .git\")",
+      "Bash(xcopy:*)",
+      "Bash(tar:*)"
     ],
     "deny": [],
     "ask": []
