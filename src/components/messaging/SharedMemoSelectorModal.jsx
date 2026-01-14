@@ -223,6 +223,20 @@ const FrozenBadge = styled.div`
   z-index: 2;
 `;
 
+const DownloadedBadge = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(76, 175, 80, 0.15);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #4caf50;
+  white-space: nowrap;
+  flex-shrink: 0;
+`;
+
 const MemoPreview = styled.p`
   font-size: 11px;
   color: #888;
@@ -539,6 +553,9 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
                 >
                   <MemoHeader>
                     <MemoTitle>{getDisplayTitle(memo)}</MemoTitle>
+                    {memo.isDownloaded && (
+                      <DownloadedBadge>다운로드</DownloadedBadge>
+                    )}
                     {showBadge && (
                       <FrozenBadge $active={isActiveInThisRoom}>
                         {isFrozen && <Lock size={12} />}

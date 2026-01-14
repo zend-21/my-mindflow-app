@@ -10,6 +10,7 @@ import { BsCircle } from 'react-icons/bs';
 import { Snowflake } from 'lucide-react';
 import * as S from './MemoPage.styles';
 import { toast } from '../utils/toast';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 
 // Helper Components (using S. prefix)
 const GridIcon = () => (
@@ -1082,7 +1083,7 @@ const MemoPage = ({
                                     <S.MemoText
                                         $layoutView={layoutView}
                                         {...(layoutView === 'grid' && !memo.isStealth
-                                            ? { dangerouslySetInnerHTML: { __html: memo.content || '' } }
+                                            ? { dangerouslySetInnerHTML: { __html: sanitizeHtml(memo.content || '') } }
                                             : {}
                                         )}
                                     >

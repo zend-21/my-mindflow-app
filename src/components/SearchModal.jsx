@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { X, Search, Clock, TrendingUp } from 'lucide-react';
 import Portal from './Portal';
+import { sanitizeSearchResult } from '../utils/sanitizeHtml';
 
 const slideIn = keyframes`
   from {
@@ -728,7 +729,7 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
                                             <>
                                                 <ResultTitle
                                                     dangerouslySetInnerHTML={{
-                                                        __html: highlightText(item.title, searchTerm)
+                                                        __html: sanitizeSearchResult(highlightText(item.title, searchTerm))
                                                     }}
                                                 />
                                                 <ResultPreview style={{ color: '#808080' }}>
@@ -743,12 +744,12 @@ const SearchModal = ({ onClose, allData, onSelectResult }) => {
                                             <>
                                                 <ResultTitle
                                                     dangerouslySetInnerHTML={{
-                                                        __html: highlightText(extractTitle(item.content), searchTerm)
+                                                        __html: sanitizeSearchResult(highlightText(extractTitle(item.content), searchTerm))
                                                     }}
                                                 />
                                                 <ResultPreview
                                                     dangerouslySetInnerHTML={{
-                                                        __html: highlightText(getMatchedPreview(item.content, searchTerm), searchTerm)
+                                                        __html: sanitizeSearchResult(highlightText(getMatchedPreview(item.content, searchTerm), searchTerm))
                                                     }}
                                                 />
                                                 <ResultMeta>

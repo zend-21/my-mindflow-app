@@ -4,6 +4,7 @@
 import React, { useState, useRef } from 'react';
 import styled from 'styled-components';
 import { ALL_ICONS } from './categoryIcons';
+import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
 const Card = styled.div`
     background: ${props => props.$isSelected
@@ -714,7 +715,7 @@ const SecretDocCard = ({ doc, onClick, onCategoryChange, onDelete, onLongPress, 
                 )}
             </CardHeader>
 
-            <Preview dangerouslySetInnerHTML={{ __html: doc.preview || doc.content || '내용 없음' }} />
+            <Preview dangerouslySetInnerHTML={{ __html: sanitizeHtml(doc.preview || doc.content || '내용 없음') }} />
 
             <CardFooter>
                 {doc.tags && doc.tags.length > 0 ? (

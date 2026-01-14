@@ -23,6 +23,7 @@ import { getAbsoluteOffset, getNodeAndOffset, rangeToAbsoluteOffset, absoluteOff
 import MarkerCommentsModal from './MarkerCommentsModal';
 import CollaborationMemoModal from './CollaborationMemoModal';
 import * as S from './CollaborativeDocumentEditor.styles';
+import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
 // ===== 전역 문서 캐시 (컴포넌트 인스턴스 간 공유) =====
 // 컴포넌트가 언마운트되어도 캐시가 유지되도록 전역으로 관리
@@ -95,6 +96,7 @@ const CollaborativeDocumentEditor = ({
   const [downloadEnabled, setDownloadEnabled] = useState(false); // 다운로드 허용 여부
   const [canDownload, setCanDownload] = useState(false); // 현재 사용자가 다운로드 가능한지 여부
   const [showDownloadConfirmModal, setShowDownloadConfirmModal] = useState(false); // 다운로드 허용 확인 모달
+  const [showDownloadWarningModal, setShowDownloadWarningModal] = useState(false); // 다운로드 주의 안내 모달
 
   // 마커 유무 확인 (pendingEdits 배열로 확인 - 수정 대기중 개수)
   const hasMarkers = pendingEdits.length > 0;
@@ -950,12 +952,22 @@ const CollaborativeDocumentEditor = ({
     setViewerImageSrc('');
   }, []);
 
-  // 이미지 클릭 이벤트 리스너 등록
+  // 이미지 클릭 및 링크 클릭 이벤트 리스너 등록
   useEffect(() => {
     const handleClick = (e) => {
+      // 이미지 클릭: 원본 보기
       if (e.target.tagName === 'IMG') {
         e.preventDefault();
         handleImageClick(e.target.src);
+        return;
+      }
+      // 링크 클릭: 페이지 이동 차단 (마커 작업을 위해)
+      // 링크 스타일은 유지하되 클릭 시 이동만 막음
+      if (e.target.tagName === 'A' || e.target.closest('a')) {
+        e.preventDefault();
+        e.stopPropagation();
+        showToast?.('문서 편집 중에는 링크가 비활성화됩니다');
+        return;
       }
     };
 
@@ -977,7 +989,7 @@ const CollaborativeDocumentEditor = ({
         fullScreenElement.removeEventListener('click', handleClick);
       }
     };
-  }, [handleImageClick, showFullScreenEdit]);
+  }, [handleImageClick, showFullScreenEdit, showToast]);
 
   // 이미지 뷰어에서 ESC 키로 닫기
   useEffect(() => {
@@ -2721,12 +2733,18 @@ const CollaborativeDocumentEditor = ({
     }
   }, [chatRoomId, downloadEnabled, showToast]);
 
-  // 다운로드 핸들러 - 협업 참여자용 (공유 폴더에 다운로드, 이미지/비디오 URL 유지)
-  const handleDownloadDocument = useCallback(async () => {
+  // 다운로드 버튼 클릭 핸들러 - 경고 모달 표시
+  const handleDownloadClick = useCallback(() => {
     if (!canDownload || !currentDocId) {
       showToast?.('다운로드할 수 없습니다');
       return;
     }
+    setShowDownloadWarningModal(true);
+  }, [canDownload, currentDocId, showToast]);
+
+  // 다운로드 핸들러 - 협업 참여자용 (공유 폴더에 다운로드, 이미지/비디오 URL 유지)
+  const handleDownloadDocument = useCallback(async () => {
+    setShowDownloadWarningModal(false);
 
     // 용량 체크 (200KB 제한)
     const contentSize = new Blob([content]).size;
@@ -2743,32 +2761,53 @@ const CollaborativeDocumentEditor = ({
       // 새 메모 ID 생성
       const newMemoId = `m${Date.now()}`;
 
-      // 공유 폴더에 저장 (HTML 그대로, 이미지/비디오 URL 유지)
+      // 보안: 링크를 비활성화하고 경고 표시로 변환
+      // <a href="url">텍스트</a> → 텍스트 (<span style="color:#ff6b6b">[주의]</span> url)
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = content;
+      const links = tempDiv.querySelectorAll('a[href]');
+      links.forEach(link => {
+        const href = link.getAttribute('href');
+        const text = link.textContent || '';
+        // 링크를 텍스트 + 경고 URL로 변환
+        const warningSpan = document.createElement('span');
+        if (text && text !== href) {
+          warningSpan.innerHTML = `${text} (<span style="color:#ff6b6b;font-weight:600">[주의]</span> ${href})`;
+        } else {
+          warningSpan.innerHTML = `<span style="color:#ff6b6b;font-weight:600">[주의]</span> ${href}`;
+        }
+        link.parentNode.replaceChild(warningSpan, link);
+      });
+      const safeContent = tempDiv.innerHTML;
+
+      // 공유 폴더에 저장 (링크 비활성화됨)
       const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', newMemoId);
 
       await setDoc(memoRef, {
         id: newMemoId,
-        title: `${title} (다운로드)`,
-        content: content, // HTML 그대로 저장 (이미지/비디오 URL 포함)
+        title: title, // 제목에서 (다운로드) 텍스트 제거 - 배지로 표시
+        content: safeContent, // 링크가 비활성화된 안전한 콘텐츠
         folderId: 'shared',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         isShared: true,
+        isDownloaded: true, // 다운로드된 문서 표시용 플래그
         color: '#4a90e2'
         // 마커가 있는 문서는 다운로드가 차단되므로 hasMarkers, isLocked 불필요
       });
 
-      // 로컬 상태도 업데이트
+      // 로컬 상태도 업데이트 (링크 비활성화된 콘텐츠 사용)
       if (syncMemo) {
         syncMemo({
           id: newMemoId,
-          title: `${title} (다운로드)`,
-          content: content,
+          title: title,
+          content: safeContent,
           folderId: 'shared',
           date: Date.now(),
           createdAt: Date.now(),
           displayDate: new Date().toLocaleString(),
           isShared: true,
+          isDownloaded: true,
           color: '#4a90e2'
         });
       }
@@ -2780,7 +2819,7 @@ const CollaborativeDocumentEditor = ({
     } finally {
       setSaving(false);
     }
-  }, [canDownload, currentDocId, title, content, currentUserId, showToast, syncMemo]);
+  }, [content, title, currentUserId, showToast, syncMemo]);
 
   // 다운로드 핸들러 - 일반 사용자용 (공유 폴더에 다운로드)
   const handleDownloadToShared = useCallback(async () => {
@@ -3834,7 +3873,7 @@ const CollaborativeDocumentEditor = ({
               </button>
             ) : canDownload ? (
               <button
-                onClick={handleDownloadDocument}
+                onClick={handleDownloadClick}
                 style={{
                   fontSize: '11px',
                   padding: '4px 8px',
@@ -4034,7 +4073,7 @@ const CollaborativeDocumentEditor = ({
               handleEditMarkerClick(editId, e.target);
             }
           }}
-          dangerouslySetInnerHTML={{ __html: content }}
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
         />
         {/* Placeholder는 CSS ::before로 처리 */}
 
@@ -5801,7 +5840,7 @@ const CollaborativeDocumentEditor = ({
                     handleEditMarkerClick(editId, e.target);
                   }
                 }}
-                dangerouslySetInnerHTML={{ __html: content }}
+                dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
               />
             </S.FullScreenContent>
 
@@ -5961,6 +6000,64 @@ const CollaborativeDocumentEditor = ({
                   style={{ background: 'linear-gradient(135deg, #4a90e2, #357abd)' }}
                 >
                   허용
+                </S.ConfirmButton>
+              </S.ModalActions>
+            </S.ModalBody>
+          </S.ModalContent>
+        </S.Modal>
+      )}
+
+      {/* 다운로드 주의 안내 모달 */}
+      {showDownloadWarningModal && (
+        <S.Modal onClick={() => setShowDownloadWarningModal(false)} style={{ zIndex: 500000 }}>
+          <S.ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>
+                <Download size={18} color="#4a90e2" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                문서 다운로드
+              </S.ModalTitle>
+              <S.IconButton onClick={() => setShowDownloadWarningModal(false)}>
+                <X size={20} />
+              </S.IconButton>
+            </S.ModalHeader>
+
+            <S.ModalBody>
+              <div style={{ marginBottom: '16px', color: '#e0e0e0', lineHeight: '1.7', fontSize: '14px' }}>
+                이 문서는 다른 사용자가 작성한 것입니다.<br />
+                다운로드하기 전에 다음 사항을 확인하세요:
+              </div>
+
+              <div style={{ marginBottom: '20px', background: 'rgba(74, 144, 226, 0.1)', border: '1px solid rgba(74, 144, 226, 0.3)', borderRadius: '8px', padding: '14px', fontSize: '13px', color: '#b0b0b0', lineHeight: '1.7' }}>
+                <div style={{ display: 'flex', marginBottom: '8px' }}>
+                  <span style={{ flexShrink: 0, marginRight: '8px', color: '#4a90e2' }}>•</span>
+                  <span>신뢰할 수 있는 사용자의 문서인지 확인하세요</span>
+                </div>
+                <div style={{ display: 'flex', marginBottom: '8px' }}>
+                  <span style={{ flexShrink: 0, marginRight: '8px', color: '#4a90e2' }}>•</span>
+                  <span>문서내 링크는 보안을 위해 비활성화 됩니다</span>
+                </div>
+                <div style={{ display: 'flex' }}>
+                  <span style={{ flexShrink: 0, marginRight: '8px', color: '#4a90e2' }}>•</span>
+                  <span>다운로드한 문서는 공유 폴더에 저장됩니다</span>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: '12px', color: '#888', fontSize: '12px', lineHeight: '1.5' }}>
+                URL은 텍스트로 표시되며 필요시 직접 복사하여 사용하세요.
+              </div>
+              <div style={{ marginBottom: '20px', color: '#888', fontSize: '12px', lineHeight: '1.5' }}>
+                다운로드한 문서의 내용에 대한 책임은 본인에게 있습니다.
+              </div>
+
+              <S.ModalActions>
+                <S.RejectButton onClick={() => setShowDownloadWarningModal(false)}>
+                  취소
+                </S.RejectButton>
+                <S.ConfirmButton
+                  onClick={handleDownloadDocument}
+                  style={{ background: 'linear-gradient(135deg, #4a90e2, #357abd)' }}
+                >
+                  확인하고 다운로드
                 </S.ConfirmButton>
               </S.ModalActions>
             </S.ModalBody>

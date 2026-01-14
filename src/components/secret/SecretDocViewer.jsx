@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import styled, { keyframes } from 'styled-components';
 import { ALL_ICONS } from './categoryIcons';
+import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
 const fadeIn = keyframes`
     from { opacity: 0; }
@@ -688,7 +689,7 @@ const SecretDocViewer = ({ doc, docs = [], selectedCategory, onClose, onEdit, on
                     onTouchStart={handleTouchStart}
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
-                    dangerouslySetInnerHTML={{ __html: doc.content || '내용 없음' }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(doc.content || '내용 없음') }}
                 />
             </ModalContent>
         </Overlay>,

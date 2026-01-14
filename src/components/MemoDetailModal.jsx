@@ -9,6 +9,7 @@ import RichTextEditor from './RichTextEditor';
 // import { createCollaborationRoom, checkMemoSharedStatus } from '../services/collaborationRoomService';
 import { useMemoFolders } from '../hooks/useMemoFolders';
 import * as S from './MemoDetailModal.styles';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 
 // ========================================
 // ✨ 읽기/편집 모드 분리 구현 (메모 상세보기)
@@ -706,7 +707,7 @@ const MemoDetailModal = ({
                                         setLastTap(now);
                                     }
                                 }}
-                                dangerouslySetInnerHTML={{ __html: editedContent }}
+                                dangerouslySetInnerHTML={{ __html: sanitizeHtml(editedContent) }}
                             />
                         </>
                     ) : (

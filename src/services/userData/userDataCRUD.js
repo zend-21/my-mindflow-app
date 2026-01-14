@@ -66,8 +66,12 @@ export const saveMemoToFirestore = async (userId, memo) => {
     const docRef = doc(db, 'mindflowUsers', userId, 'memos', memo.id);
 
     // ⭐ Evernote 방식: 모든 저장에 deleted: false와 serverTimestamp 추가
+    // ⚠️ [중요] currentWorkingRoomId와 hasPendingEdits는 협업 상태 관리용이므로 제외
+    // 이 값들은 CollaborativeDocumentEditor에서만 직접 관리해야 함
+    const { currentWorkingRoomId, hasPendingEdits, ...memoWithoutCollabFields } = memo;
+
     const dataToSave = {
-      ...memo,
+      ...memoWithoutCollabFields,
       deleted: false,  // 활성 문서 표시
       updatedAt: serverTimestamp(),  // 서버 시간으로 강제 (기기 시간 조작 방지)
       createdAt: memo.createdAt || serverTimestamp()  // 신규 생성 시에만 설정
@@ -78,7 +82,7 @@ export const saveMemoToFirestore = async (userId, memo) => {
       Object.entries(dataToSave).map(([key, value]) => [key, value === undefined ? null : value])
     );
 
-    await setDoc(docRef, sanitizedData);
+    await setDoc(docRef, sanitizedData, { merge: true });
   } catch (error) {
     console.error('메모 저장 실패:', error);
     throw error;
