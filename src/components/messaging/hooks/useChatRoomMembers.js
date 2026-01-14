@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../../firebase/config';
+import { getUserNickname } from '../../../services/nicknameService';
 
 /**
  * 채팅방 참여자 닉네임 실시간 구독 및 관리
@@ -37,25 +38,29 @@ export function useChatRoomMembers(chat) {
     const unsubscribers = [];
     let isMounted = true;
 
-    // 초기 닉네임 로드 (동기적으로 먼저 가져오기)
+    // 초기 닉네임 로드 (nicknames 컬렉션에서 앱 닉네임, settings에서 구글 displayName)
     const loadInitialNicknames = async () => {
       console.log('📥 초기 닉네임 로드 시작:', Array.from(userIds));
 
       const nicknamePromises = Array.from(userIds).map(async (userId) => {
         try {
-          const settingsRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
-          const settingsSnap = await getDoc(settingsRef);
+          // 1순위: nicknames 컬렉션에서 앱 닉네임
+          const nickname = await getUserNickname(userId);
 
-          if (settingsSnap.exists()) {
-            const data = settingsSnap.data();
-            const nickname = data.nickname || null;
-            const displayName = data.displayName || null; // 구글 displayName (fallback용)
-            console.log(`✅ 초기 닉네임: ${userId} → ${nickname} (구글: ${displayName})`);
-            return { userId, nickname, displayName };
-          } else {
-            console.log(`⚠️ settings 문서 없음: ${userId}`);
-            return { userId, nickname: null, displayName: null };
+          // 2순위(fallback): settings에서 구글 displayName
+          let displayName = null;
+          try {
+            const settingsRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
+            const settingsSnap = await getDoc(settingsRef);
+            if (settingsSnap.exists()) {
+              displayName = settingsSnap.data().displayName || null;
+            }
+          } catch (settingsError) {
+            console.error(`settings displayName 로드 실패 (${userId}):`, settingsError);
           }
+
+          console.log(`✅ 초기 닉네임: ${userId} → ${nickname} (구글: ${displayName})`);
+          return { userId, nickname, displayName };
         } catch (error) {
           console.error(`❌ 초기 닉네임 로드 오류 (${userId}):`, error);
           return { userId, nickname: null, displayName: null };
@@ -85,39 +90,41 @@ export function useChatRoomMembers(chat) {
 
       console.log('🔥 닉네임 실시간 리스너 시작:', Array.from(userIds));
 
-      // 각 참여자의 닉네임 실시간 구독
+      // 각 참여자의 닉네임 실시간 구독 (nicknames 컬렉션)
       userIds.forEach(userId => {
-        const settingsRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
+        const nicknameRef = doc(db, 'nicknames', userId);
 
-        const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
+        const unsubscribeNickname = onSnapshot(nicknameRef, (docSnap) => {
+          let nickname = null;
           if (docSnap.exists()) {
-            const data = docSnap.data();
-            const nickname = data.nickname || null;
-            const displayName = data.displayName || null;
-            console.log(`🔄 닉네임 실시간 업데이트: ${userId} → ${nickname} (구글: ${displayName})`);
-            setUserNicknames(prev => ({
-              ...prev,
-              [userId]: nickname
-            }));
+            nickname = docSnap.data().nickname || null;
+          }
+          console.log(`🔄 닉네임 실시간 업데이트: ${userId} → ${nickname}`);
+          setUserNicknames(prev => ({
+            ...prev,
+            [userId]: nickname
+          }));
+        }, (error) => {
+          console.error(`❌ nicknames 리스너 오류 (${userId}):`, error);
+        });
+
+        unsubscribers.push(unsubscribeNickname);
+
+        // displayName은 settings에서 구독 (구글 displayName fallback용)
+        const settingsRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
+        const unsubscribeSettings = onSnapshot(settingsRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const displayName = docSnap.data().displayName || null;
             setUserDisplayNames(prev => ({
               ...prev,
               [userId]: displayName
-            }));
-          } else {
-            setUserNicknames(prev => ({
-              ...prev,
-              [userId]: null
-            }));
-            setUserDisplayNames(prev => ({
-              ...prev,
-              [userId]: null
             }));
           }
         }, (error) => {
           console.error(`❌ settings 리스너 오류 (${userId}):`, error);
         });
 
-        unsubscribers.push(unsubscribe);
+        unsubscribers.push(unsubscribeSettings);
       });
     });
 

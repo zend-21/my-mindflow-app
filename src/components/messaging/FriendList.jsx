@@ -153,27 +153,22 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
     try {
       const userId = localStorage.getItem('firebaseUserId');
 
-      // ⚡ Firestore에서 최신 닉네임 로드 (mindflowUsers/.../userData/settings)
-      let nickname = '나';
+      // ⚡ nicknames 컬렉션에서 앱 닉네임 로드, 없으면 구글 displayName 사용
+      let nickname = localStorage.getItem('userName'); // 구글 displayName fallback
 
       try {
-        const { doc, getDoc } = await import('firebase/firestore');
-        const { db } = await import('../../firebase/config');
-        const settingsRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
-        const settingsSnap = await getDoc(settingsRef);
+        const { getUserNickname } = await import('../../services/nicknameService');
+        const appNickname = await getUserNickname(userId);
 
-        if (settingsSnap.exists()) {
-          const data = settingsSnap.data();
-          if (data.nickname) {
-            nickname = data.nickname;
-            // localStorage에 캐싱
-            localStorage.setItem('userNickname', data.nickname);
-          }
+        if (appNickname) {
+          nickname = appNickname;
+          // localStorage에 캐싱
+          localStorage.setItem('userNickname', appNickname);
         }
       } catch (error) {
         console.error('닉네임 로드 실패:', error);
         // 실패 시 localStorage fallback
-        nickname = localStorage.getItem('userNickname') || '나';
+        nickname = localStorage.getItem('userNickname') || localStorage.getItem('userName');
       }
 
       // 본인인증 상태 확인 - MVP에서 제외
@@ -234,21 +229,18 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
             };
           }
 
-          // Firestore에서 가져오기
+          // nicknames 컬렉션에서 가져오기
           try {
-            const settingsRef = doc(db, 'mindflowUsers', friend.friendId, 'userData', 'settings');
-            const settingsSnap = await getDoc(settingsRef);
+            const { getUserNickname } = await import('../../services/nicknameService');
+            const nickname = await getUserNickname(friend.friendId);
 
-            if (settingsSnap.exists()) {
-              const data = settingsSnap.data();
-              if (data.nickname) {
-                console.log(`✅ Firestore에서 로드: ${friend.friendId} → ${data.nickname}`);
-                nicknameCache[friend.friendId] = data.nickname;
-                return {
-                  ...friend,
-                  friendName: data.nickname
-                };
-              }
+            if (nickname) {
+              console.log(`✅ nicknames에서 로드: ${friend.friendId} → ${nickname}`);
+              nicknameCache[friend.friendId] = nickname;
+              return {
+                ...friend,
+                friendName: nickname
+              };
             }
           } catch (error) {
             console.error(`친구 닉네임 로드 실패 (${friend.friendId}):`, error);
@@ -322,21 +314,18 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
             };
           }
 
-          // Firestore에서 가져오기
+          // nicknames 컬렉션에서 가져오기
           try {
-            const settingsRef = doc(db, 'mindflowUsers', request.requesterId, 'userData', 'settings');
-            const settingsSnap = await getDoc(settingsRef);
+            const { getUserNickname } = await import('../../services/nicknameService');
+            const nickname = await getUserNickname(request.requesterId);
 
-            if (settingsSnap.exists()) {
-              const data = settingsSnap.data();
-              if (data.nickname) {
-                console.log(`✅ 요청자 Firestore 로드: ${request.requesterId} → ${data.nickname}`);
-                nicknameCache[request.requesterId] = data.nickname;
-                return {
-                  ...request,
-                  requesterName: data.nickname
-                };
-              }
+            if (nickname) {
+              console.log(`✅ 요청자 nicknames 로드: ${request.requesterId} → ${nickname}`);
+              nicknameCache[request.requesterId] = nickname;
+              return {
+                ...request,
+                requesterName: nickname
+              };
             }
           } catch (error) {
             console.error(`요청자 닉네임 로드 실패 (${request.requesterId}):`, error);

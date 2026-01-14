@@ -372,10 +372,10 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     }
 
     const otherUserInfo = chat.participantsInfo?.[otherUserId];
-    // 1순위: 앱 닉네임, 2순위: 구글 displayName, 3순위: '사용자'
+    // 1순위: 앱 닉네임, 2순위: 구글 displayName
     const nickname = userNicknames[otherUserId];
     const googleDisplayName = userDisplayNames[otherUserId];
-    const displayName = nickname || googleDisplayName || '사용자';
+    const displayName = nickname || googleDisplayName;
     return {
       name: displayName,
       userId: otherUserId,
@@ -487,13 +487,15 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
           if (userNicknames[senderId] !== undefined || userDisplayNames[senderId] !== undefined) continue;
 
           try {
+            // 1순위: nicknames 컬렉션에서 앱 닉네임
+            const nickname = await getUserNickname(senderId);
+            setUserNicknames(prev => ({ ...prev, [senderId]: nickname }));
+
+            // 2순위(fallback): settings에서 구글 displayName
             const settingsRef = doc(db, 'mindflowUsers', senderId, 'userData', 'settings');
             const settingsSnap = await getDoc(settingsRef);
-
             if (settingsSnap.exists()) {
-              const data = settingsSnap.data();
-              setUserNicknames(prev => ({ ...prev, [senderId]: data.nickname || null }));
-              setUserDisplayNames(prev => ({ ...prev, [senderId]: data.displayName || null }));
+              setUserDisplayNames(prev => ({ ...prev, [senderId]: settingsSnap.data().displayName || null }));
             }
           } catch (error) {
             console.error(`메시지 발신자 닉네임 로드 실패 (${senderId}):`, error);
@@ -662,25 +664,29 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     const unsubscribers = [];
     let isMounted = true;
 
-    // 🔥 초기 닉네임 로드 (동기적으로 먼저 가져오기)
+    // 🔥 초기 닉네임 로드 (nicknames 컬렉션에서 앱 닉네임, settings에서 구글 displayName)
     const loadInitialNicknames = async () => {
       console.log('📥 초기 닉네임 로드 시작:', Array.from(userIds));
 
       const nicknamePromises = Array.from(userIds).map(async (userId) => {
         try {
-          const settingsRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
-          const settingsSnap = await getDoc(settingsRef);
+          // 1순위: nicknames 컬렉션에서 앱 닉네임 가져오기
+          const nickname = await getUserNickname(userId);
 
-          if (settingsSnap.exists()) {
-            const data = settingsSnap.data();
-            const nickname = data.nickname || null;
-            const displayName = data.displayName || null; // 구글 displayName (fallback용)
-            console.log(`✅ 초기 닉네임: ${userId} → ${nickname} (구글: ${displayName})`);
-            return { userId, nickname, displayName };
-          } else {
-            console.log(`⚠️ settings 문서 없음: ${userId}`);
-            return { userId, nickname: null, displayName: null };
+          // 2순위(fallback): mindflowUsers/.../settings에서 구글 displayName 가져오기
+          let displayName = null;
+          try {
+            const settingsRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
+            const settingsSnap = await getDoc(settingsRef);
+            if (settingsSnap.exists()) {
+              displayName = settingsSnap.data().displayName || null;
+            }
+          } catch (settingsError) {
+            console.error(`settings displayName 로드 실패 (${userId}):`, settingsError);
           }
+
+          console.log(`✅ 초기 닉네임: ${userId} → ${nickname} (구글: ${displayName})`);
+          return { userId, nickname, displayName };
         } catch (error) {
           console.error(`❌ 초기 닉네임 로드 오류 (${userId}):`, error);
           return { userId, nickname: null, displayName: null };
@@ -710,39 +716,41 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
 
       console.log('🔥 닉네임 실시간 리스너 시작:', Array.from(userIds));
 
-      // 각 참여자의 닉네임 실시간 구독
+      // 각 참여자의 닉네임 실시간 구독 (nicknames 컬렉션)
       userIds.forEach(userId => {
-        const settingsRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
+        const nicknameRef = doc(db, 'nicknames', userId);
 
-        const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
+        const unsubscribe = onSnapshot(nicknameRef, async (docSnap) => {
+          let nickname = null;
           if (docSnap.exists()) {
-            const data = docSnap.data();
-            const nickname = data.nickname || null;
-            const displayName = data.displayName || null;
-            console.log(`🔄 닉네임 실시간 업데이트: ${userId} → ${nickname} (구글: ${displayName})`);
-            setUserNicknames(prev => ({
-              ...prev,
-              [userId]: nickname
-            }));
+            nickname = docSnap.data().nickname || null;
+          }
+          console.log(`🔄 닉네임 실시간 업데이트: ${userId} → ${nickname}`);
+          setUserNicknames(prev => ({
+            ...prev,
+            [userId]: nickname
+          }));
+        }, (error) => {
+          console.error(`❌ nicknames 리스너 오류 (${userId}):`, error);
+        });
+
+        unsubscribers.push(unsubscribe);
+
+        // displayName은 자주 변경되지 않으므로 settings도 구독 (구글 displayName fallback용)
+        const settingsRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
+        const unsubscribeSettings = onSnapshot(settingsRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const displayName = docSnap.data().displayName || null;
             setUserDisplayNames(prev => ({
               ...prev,
               [userId]: displayName
-            }));
-          } else {
-            setUserNicknames(prev => ({
-              ...prev,
-              [userId]: null
-            }));
-            setUserDisplayNames(prev => ({
-              ...prev,
-              [userId]: null
             }));
           }
         }, (error) => {
           console.error(`❌ settings 리스너 오류 (${userId}):`, error);
         });
 
-        unsubscribers.push(unsubscribe);
+        unsubscribers.push(unsubscribeSettings);
       });
     });
 
@@ -3108,8 +3116,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
             userId,
             ...memberInfo,
             // 최신 닉네임으로 덮어쓰기 (1순위: 앱 닉네임, 2순위: 구글 displayName, 3순위: 기존 displayName)
-            displayName: userNicknames[userId] || userDisplayNames[userId] || memberInfo.displayName || '사용자'
-          }))}
+            displayName: userNicknames[userId] || userDisplayNames[userId] || memberInfo.displayName           }))}
           currentUserId={currentUserId}
           onClose={() => setShowAppointSubManagerModal(false)}
           onAppoint={handleAppointSubManager}

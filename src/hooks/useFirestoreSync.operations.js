@@ -311,13 +311,37 @@ export const createSyncSettings = (setSettings, debouncedSave) => {
 /**
  * 메모 배열 동기화 (하위 호환)
  */
-export const createSyncMemos = (userId, setMemos, debouncedSave) => {
-  return (newMemos) => {
-    setMemos(newMemos);
-    setAccountLocalStorage(userId, 'memos', newMemos);
+export const createSyncMemos = (userId, setMemos, debouncedSave, getMemosRef) => {
+  return (newMemosOrUpdater) => {
+    // 함수형 업데이트 지원: 함수가 전달되면 현재 memos를 전달
+    let newMemos;
+    if (typeof newMemosOrUpdater === 'function') {
+      const currentMemos = getMemosRef ? getMemosRef() : [];
+      newMemos = newMemosOrUpdater(currentMemos);
+    } else {
+      newMemos = newMemosOrUpdater;
+    }
+
+    // 배열이 아니면 무시
+    if (!Array.isArray(newMemos)) {
+      console.warn('⚠️ syncMemos: 배열이 아닌 값 무시:', newMemos);
+      return;
+    }
+
+    // 방어 코드: 유효하지 않은 메모 필터링
+    const validMemos = newMemos.filter(memo => {
+      if (!memo || !memo.id) {
+        console.warn('⚠️ syncMemos: 유효하지 않은 메모 스킵:', memo);
+        return false;
+      }
+      return true;
+    });
+
+    setMemos(validMemos);
+    setAccountLocalStorage(userId, 'memos', validMemos);
 
     // 🚀 변경 감지 후 각 메모를 개별 저장
-    newMemos.forEach(memo => {
+    validMemos.forEach(memo => {
       debouncedSave(saveMemoToFirestore, `memo_${memo.id}`, memo, memo);
     });
   };

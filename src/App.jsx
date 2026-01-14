@@ -6,7 +6,7 @@ import * as S from './App.styles';
 import { GoogleLogin, googleLogout } from '@react-oauth/google';
 import { jwtDecode } from 'jwt-decode';
 import { GoogleAuthProvider, signInWithCredential, signOut, onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './firebase/config';
 import { initializeGapiClient, setAccessToken, syncToGoogleDrive, loadFromGoogleDrive, loadProfilePictureFromGoogleDrive, syncProfilePictureToGoogleDrive } from './utils/googleDriveSync';
 import { backupToGoogleDrive } from './utils/googleDriveBackup';
@@ -22,6 +22,8 @@ import useAlarmManager from './hooks/useAlarmManager';
 import { getRandomStealthPhrase } from './utils/stealthPhrases';
 import { setCurrentUserId, setCurrentUserData, getCurrentUserId, checkSync, migrateUserData, logout as userStorageLogout, getProfileSetting, setProfileSetting, cleanupSharedKeys } from './utils/userStorage';
 import { deleteBase64ImagesFromCalendar } from './services/userDataService';
+import { findPhoneByFirebaseUID, isLegacyUser } from './services/authService';
+import './utils/cleanBase64'; // window.cleanInvalidMemos 등록용
 import MessagingHub from './components/messaging/MessagingHub.jsx';
 import AuthRequiredModal from './components/AuthRequiredModal.jsx';
 import AdBanner from './components/messaging/AdBanner.jsx';
@@ -214,6 +216,26 @@ function App() {
                     } catch (e) {
                         console.error('프로필 복원 실패:', e);
                     }
+                }
+
+                // 💬 기존 사용자 displayName 자동 보정 (채팅에서 이름 표시용)
+                // mindflowUsers/.../settings에 displayName이 없으면 저장
+                try {
+                    const chatSettingsRef = doc(db, 'mindflowUsers', user.uid, 'userData', 'settings');
+                    const chatSettingsSnap = await getDoc(chatSettingsRef);
+
+                    if (!chatSettingsSnap.exists() || !chatSettingsSnap.data().displayName) {
+                        const googleDisplayName = user.displayName || localStorage.getItem('userName');
+                        if (googleDisplayName) {
+                            await setDoc(chatSettingsRef, {
+                                displayName: googleDisplayName,
+                                updatedAt: serverTimestamp()
+                            }, { merge: true });
+                            console.log('✅ 채팅용 displayName 자동 보정 완료:', googleDisplayName);
+                        }
+                    }
+                } catch (displayNameError) {
+                    console.error('⚠️ displayName 자동 보정 실패:', displayNameError);
                 }
 
                 // Firebase Auth와 localStorage 동기화 확인
@@ -1504,6 +1526,17 @@ function App() {
                         if (firestoreNickname) {
                             profileData.nickname = firestoreNickname;
                             setProfileSetting('userNickname', firestoreNickname); // localStorage 동기화
+                            // ✅ userProfile localStorage도 업데이트
+                            try {
+                                const savedProfile = localStorage.getItem('userProfile');
+                                if (savedProfile) {
+                                    const profileObj = JSON.parse(savedProfile);
+                                    profileObj.nickname = firestoreNickname;
+                                    localStorage.setItem('userProfile', JSON.stringify(profileObj));
+                                }
+                            } catch (e) {
+                                console.error('userProfile 닉네임 동기화 실패:', e);
+                            }
                             // ✅ Header와 SideMenu에 알림
                             window.dispatchEvent(new CustomEvent('nicknameChanged', { detail: firestoreNickname }));
                         } else {
@@ -1804,6 +1837,19 @@ function App() {
                 console.error('⚠️ 사용자 문서 생성/업데이트 오류:', userError);
             }
 
+            // 💬 채팅용 displayName 저장 (mindflowUsers/.../userData/settings)
+            // ⚠️ 중요: 채팅에서 상대방 이름을 이 경로에서 조회하므로 반드시 저장 필요
+            try {
+                const chatSettingsRef = doc(db, 'mindflowUsers', firebaseUserId, 'userData', 'settings');
+                await setDoc(chatSettingsRef, {
+                    displayName: userInfo.name,
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+                console.log('✅ 채팅용 displayName 저장 완료 (mindflowUsers)');
+            } catch (chatSettingsError) {
+                console.error('⚠️ 채팅용 displayName 저장 오류:', chatSettingsError);
+            }
+
             // 🆔 Workspace 문서 생성/확인 (친구 추가용 WS 코드)
             try {
                 const workspaceRef = doc(db, 'workspaces', `workspace_${firebaseUserId}`);
@@ -1933,6 +1979,19 @@ function App() {
                 }
             } catch (userError) {
                 console.error('⚠️ 사용자 문서 생성/업데이트 오류:', userError);
+            }
+
+            // 💬 채팅용 displayName 저장 (mindflowUsers/.../userData/settings)
+            // ⚠️ 중요: 채팅에서 상대방 이름을 이 경로에서 조회하므로 반드시 저장 필요
+            try {
+                const chatSettingsRef = doc(db, 'mindflowUsers', firebaseUserId, 'userData', 'settings');
+                await setDoc(chatSettingsRef, {
+                    displayName: userInfo.name,
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+                console.log('✅ 채팅용 displayName 저장 완료 (mindflowUsers)');
+            } catch (chatSettingsError) {
+                console.error('⚠️ 채팅용 displayName 저장 오류:', chatSettingsError);
             }
 
             // 🆔 Workspace 문서 생성/확인 (친구 추가용 WS 코드)
@@ -2439,7 +2498,8 @@ function App() {
         // 🧹 공유 키 정리 (보안: 이전 사용자 데이터 노출 방지)
         cleanupSharedKeys();
 
-        // localStorage 완전 정리 (기존 방식 - 호환성, cleanupSharedKeys와 중복이지만 안전성을 위해 유지)
+        // localStorage 완전 정리 (민감 정보 삭제 - Notion 방식)
+        // 계정별 캐시(user_{userId}_*)는 유지 (다음 로그인 시 빠른 로드)
         localStorage.removeItem('userProfile');
         localStorage.removeItem('accessToken');
         localStorage.removeItem('tokenExpiresAt');
@@ -2450,19 +2510,27 @@ function App() {
         localStorage.removeItem('lastLoginTime');
         localStorage.removeItem('mindflowUserId');
         localStorage.removeItem('isPhoneVerified');
+        localStorage.removeItem('userNickname');
+        localStorage.removeItem('userDisplayName');
+        localStorage.removeItem('profileImageType');
+        localStorage.removeItem('selectedAvatarId');
+        localStorage.removeItem('avatarBgColor');
+        localStorage.removeItem('customProfilePicture');
+        localStorage.removeItem('customProfilePictureHash');
 
         // sessionStorage 완전 정리 (Google OAuth 세션 포함)
         sessionStorage.clear();
         console.log('✅ sessionStorage 정리 완료');
 
-        // IndexedDB 정리 (Google Identity Services가 사용하는 데이터베이스)
+        // IndexedDB 정리 (Firebase Auth + Google Identity Services)
         try {
             const databases = await window.indexedDB.databases();
             databases.forEach(db => {
                 if (db.name && (
                     db.name.includes('google') ||
                     db.name.includes('gsi') ||
-                    db.name.includes('oauth')
+                    db.name.includes('oauth') ||
+                    db.name.includes('firebase') // Firebase Auth 세션 삭제
                 )) {
                     window.indexedDB.deleteDatabase(db.name);
                     console.log(`🗑️ IndexedDB 삭제: ${db.name}`);
@@ -2861,10 +2929,26 @@ function App() {
                             />
                         )}
                         {/* 채팅은 상태 유지를 위해 항상 렌더링하되 CSS로 숨김 (로그인한 경우만) */}
-                        {profile && (
+                        {profile ? (
                             <div style={{ display: activeTab === 'chat' ? 'block' : 'none', height: '100%' }}>
                                 <MessagingHub showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={handleUpdateMemoPendingFlag} syncMemo={syncMemo} />
                             </div>
+                        ) : (
+                            activeTab === 'chat' && (
+                                <div style={{
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    height: '100%',
+                                    color: '#888',
+                                    fontSize: '16px',
+                                    gap: '12px'
+                                }}>
+                                    <span style={{ fontSize: '48px' }}>🔒</span>
+                                    <span>로그인이 필요한 서비스입니다</span>
+                                </div>
+                            )
                         )}
                     </S.ContentArea>
 

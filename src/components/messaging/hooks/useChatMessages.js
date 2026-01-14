@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../firebase/config';
 import { subscribeToUnifiedMessages, markUnifiedAsRead, markAllUnifiedMessagesAsRead } from '../../../services/unifiedChatService';
+import { getUserNickname } from '../../../services/nicknameService';
 
 /**
  * 채팅방 메시지 실시간 구독 및 관리
@@ -51,13 +52,15 @@ export function useChatMessages(chat, currentUserId, isPageVisible, notification
           if (userNicknames[senderId] !== undefined || userDisplayNames[senderId] !== undefined) continue;
 
           try {
+            // 1순위: nicknames 컬렉션에서 앱 닉네임
+            const nickname = await getUserNickname(senderId);
+            setUserNicknames(prev => ({ ...prev, [senderId]: nickname }));
+
+            // 2순위: settings에서 구글 displayName
             const settingsRef = doc(db, 'mindflowUsers', senderId, 'userData', 'settings');
             const settingsSnap = await getDoc(settingsRef);
-
             if (settingsSnap.exists()) {
-              const data = settingsSnap.data();
-              setUserNicknames(prev => ({ ...prev, [senderId]: data.nickname || null }));
-              setUserDisplayNames(prev => ({ ...prev, [senderId]: data.displayName || null }));
+              setUserDisplayNames(prev => ({ ...prev, [senderId]: settingsSnap.data().displayName || null }));
             }
           } catch (error) {
             console.error(`메시지 발신자 닉네임 로드 실패 (${senderId}):`, error);

@@ -100,6 +100,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
   // 데이터 상태
   const [memos, setMemos] = useState([]);
+  const memosRef = useRef([]); // 함수형 업데이트 지원을 위한 ref
   const [folders, setFolders] = useState([]);
   const [trash, setTrash] = useState([]);
   const [macros, setMacros] = useState([]);
@@ -123,6 +124,11 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
   // 리스너가 설정되었는지 여부 (중복 방지)
   const listenersSetupRef = useRef(false);
+
+  // memos 변경 시 ref 업데이트 (함수형 업데이트 지원)
+  useEffect(() => {
+    memosRef.current = memos;
+  }, [memos]);
 
   // userId 변경 시 초기화
   useEffect(() => {
@@ -407,7 +413,12 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
   const syncSettings = useCallback(createSyncSettings(setSettings, debouncedSave), [debouncedSave]);
 
   // 배열 기반 동기화 함수들 (하위 호환)
-  const syncMemos = useCallback(createSyncMemos(userId, setMemos, debouncedSave), [userId, debouncedSave]);
+  // getMemosRef를 useMemo 대신 ref로 저장하여 안정성 확보
+  const getMemosRefFn = useRef(() => memosRef.current);
+  const syncMemos = useCallback(
+    createSyncMemos(userId, setMemos, debouncedSave, getMemosRefFn.current),
+    [userId, debouncedSave]
+  );
   const syncFolders = useCallback(createSyncFolders(userId, setFolders, debouncedSave), [userId, debouncedSave]);
   const syncTrash = useCallback(createSyncTrash(userId, setTrash, debouncedSave), [userId, debouncedSave]);
   const syncMacros = useCallback(createSyncMacros(userId, enabled, setMacros, debouncedSave), [userId, enabled, debouncedSave]);

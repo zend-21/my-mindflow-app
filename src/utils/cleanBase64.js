@@ -51,7 +51,63 @@ export async function cleanBase64FromCalendar() {
   }
 }
 
+/**
+ * localStorage에서 손상된 메모(id가 없거나 undefined인 메모) 정리
+ */
+export function cleanInvalidMemos() {
+  const userId = localStorage.getItem('firebaseUserId');
+  if (!userId) {
+    console.error('❌ userId를 찾을 수 없습니다');
+    return;
+  }
+
+  const memosKey = `user_${userId}_memos`;
+  const memosRaw = localStorage.getItem(memosKey);
+
+  if (!memosRaw) {
+    console.log('📭 저장된 메모가 없습니다');
+    return;
+  }
+
+  try {
+    const memos = JSON.parse(memosRaw);
+    const beforeCount = memos.length;
+
+    const validMemos = memos.filter((memo, index) => {
+      if (!memo) {
+        console.log(`🗑️ 인덱스 ${index}: null/undefined 메모 제거`);
+        return false;
+      }
+      if (!memo.id) {
+        console.log(`🗑️ 인덱스 ${index}: id 없는 메모 제거`, memo);
+        return false;
+      }
+      if (typeof memo.id !== 'string') {
+        console.log(`🗑️ 인덱스 ${index}: id가 문자열이 아닌 메모 제거`, memo);
+        return false;
+      }
+      return true;
+    });
+
+    const removedCount = beforeCount - validMemos.length;
+    localStorage.setItem(memosKey, JSON.stringify(validMemos));
+
+    console.log(`✅ 정리 완료: ${removedCount}개 손상된 메모 제거됨 (${beforeCount} → ${validMemos.length})`);
+
+    if (removedCount > 0) {
+      showAlert(`${removedCount}개의 손상된 메모 데이터를 정리했습니다. 페이지를 새로고침하세요.`, '정리 완료', () => {
+        window.location.reload();
+      });
+    } else {
+      showAlert('손상된 메모가 없습니다.', '확인');
+    }
+  } catch (error) {
+    console.error('❌ 메모 정리 실패:', error);
+  }
+}
+
 // 브라우저 콘솔에서 사용할 수 있도록 window에 추가
 if (typeof window !== 'undefined') {
   window.cleanBase64FromCalendar = cleanBase64FromCalendar;
+  window.cleanInvalidMemos = cleanInvalidMemos;
 }

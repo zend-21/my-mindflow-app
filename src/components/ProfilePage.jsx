@@ -128,21 +128,22 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
             // nickname state 업데이트 (즉시 UI 반영)
             setNickname(newNickname);
 
-            // 🔥 mindflowUsers/.../settings에 닉네임 동기화 (ChatRoom에서 읽는 곳)
-            try {
-                const { fetchSettingsFromFirestore, saveSettingsToFirestore } = await import('../services/userDataService');
-                const currentSettings = await fetchSettingsFromFirestore(userId);
-                await saveSettingsToFirestore(userId, {
-                    ...currentSettings,
-                    nickname: newNickname
-                });
-                console.log('✅ settings 닉네임 동기화 완료');
-            } catch (settingsError) {
-                console.error('settings 닉네임 동기화 실패:', settingsError);
-                // 동기화 실패해도 닉네임은 저장됨 (nicknames 컬렉션에)
-            }
+            // ✅ 닉네임은 nicknames 컬렉션에만 저장 (위에서 updateNickname으로 이미 저장됨)
+            // ChatRoom도 nicknames 컬렉션에서 읽으므로 별도 동기화 불필요
 
             showToast?.('✅ 닉네임이 변경되었습니다');
+
+            // userProfile localStorage도 업데이트 (앱 새로고침 시 반영되도록)
+            try {
+                const savedProfile = localStorage.getItem('userProfile');
+                if (savedProfile) {
+                    const profileData = JSON.parse(savedProfile);
+                    profileData.nickname = newNickname;
+                    localStorage.setItem('userProfile', JSON.stringify(profileData));
+                }
+            } catch (e) {
+                console.error('userProfile localStorage 업데이트 실패:', e);
+            }
 
             // profile 상태 업데이트를 위해 이벤트 발생
             window.dispatchEvent(new CustomEvent('nicknameChanged', { detail: newNickname }));

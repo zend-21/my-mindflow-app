@@ -43,7 +43,8 @@
       "Bash(echo:*)",
       "Bash(git status:*)",
       "Bash(wc:*)",
-      "Bash(pkill:*)"
+      "Bash(pkill:*)",
+      "Bash(git count-objects:*)"
     ],
     "deny": [],
     "ask": []

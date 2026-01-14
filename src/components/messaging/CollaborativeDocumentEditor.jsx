@@ -3551,14 +3551,7 @@ const CollaborativeDocumentEditor = ({
         } else {
           console.log('✅ 비우기 - 마커 없음, 원본 메모 초기화 완료:', docIdToClose);
         }
-
-        // 즉시 메모 동기화 (공유 폴더에서 배지 업데이트)
-        if (syncMemo) {
-          syncMemo(docIdToClose, {
-            currentWorkingRoomId: hasMarker ? chatRoomId : null,
-            hasPendingEdits: hasMarker
-          });
-        }
+        // 참고: SharedMemoSelectorModal의 실시간 리스너가 Firestore 변경을 감지하여 배지 업데이트
       } catch (error) {
         console.error('❌ 비우기 - 원본 메모 업데이트 실패:', error);
       }

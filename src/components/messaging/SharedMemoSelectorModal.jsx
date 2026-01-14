@@ -353,7 +353,12 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
       // 각 메모의 실제 editHistory 개수 조회
       for (const memo of sharedMemos) {
         // ⚠️ [중요] 실시간 데이터를 우선 사용 (realtimeMemoData가 가장 최신 상태)
-        const workingRoomId = realtimeMemoData[memo.id]?.currentWorkingRoomId || memo.currentWorkingRoomId;
+        // null도 유효한 값이므로 undefined와 구분해야 함 (null은 "협업 안 함" 상태)
+        const realtimeData = realtimeMemoData[memo.id];
+        // realtimeData가 존재하고, currentWorkingRoomId 키가 명시적으로 있을 때만 실시간 값 사용
+        const workingRoomId = (realtimeData && 'currentWorkingRoomId' in realtimeData)
+          ? realtimeData.currentWorkingRoomId
+          : memo.currentWorkingRoomId;
 
         console.log('🔍 [Frozen 체크] 메모:', memo.id, {
           memoWorkingRoomId: memo.currentWorkingRoomId,

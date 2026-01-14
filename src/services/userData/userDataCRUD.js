@@ -57,6 +57,12 @@ export const fetchMemosFromFirestore = async (userId) => {
  */
 export const saveMemoToFirestore = async (userId, memo) => {
   try {
+    // 방어 코드: memo 객체 유효성 검사
+    if (!memo || !memo.id) {
+      console.error('❌ saveMemoToFirestore: 유효하지 않은 memo 객체', { userId, memo });
+      throw new Error('Invalid memo object: memo or memo.id is undefined');
+    }
+
     const docRef = doc(db, 'mindflowUsers', userId, 'memos', memo.id);
 
     // ⭐ Evernote 방식: 모든 저장에 deleted: false와 serverTimestamp 추가
@@ -234,16 +240,13 @@ export const saveTrashItemToFirestore = async (userId, trashItem) => {
 };
 
 /**
- * Firestore에서 단일 휴지통 항목 삭제 (Soft Delete)
+ * Firestore에서 단일 휴지통 항목 영구 삭제 (Hard Delete)
  */
 export const deleteTrashItemFromFirestore = async (userId, trashId) => {
   try {
     const docRef = doc(db, 'mindflowUsers', userId, 'trash', trashId);
-    await setDoc(docRef, {
-      deleted: true,
-      deletedAt: serverTimestamp()
-    }, { merge: true });
-    console.log(`✅ 휴지통 항목 soft delete 완료: ${trashId}`);
+    await deleteDoc(docRef);
+    console.log(`✅ 휴지통 항목 영구 삭제 완료: ${trashId}`);
   } catch (error) {
     console.error('휴지통 항목 삭제 실패:', error);
     throw error;

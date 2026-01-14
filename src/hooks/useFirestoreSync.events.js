@@ -41,6 +41,11 @@ export const createVisibilityChangeHandler = (userId, enabled, migrated, setSync
 
         // localStorage에서 저장 실패 마크가 있는 항목만 찾기
         const unsyncedMemos = localMemos.filter(localMemo => {
+          // 방어 코드: 유효하지 않은 메모 스킵
+          if (!localMemo || !localMemo.id) {
+            console.warn('⚠️ 유효하지 않은 메모 발견 - 스킵:', localMemo);
+            return false;
+          }
           const lastSaved = localStorage.getItem(`firestore_saved_memo_${localMemo.id}`);
           return !lastSaved; // 한 번도 저장 안 된 것만
         });
