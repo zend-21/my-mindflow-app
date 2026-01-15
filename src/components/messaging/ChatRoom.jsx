@@ -1,8 +1,9 @@
 // 전체화면 채팅방 컴포넌트
 import { useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
+import Portal from '../Portal';
 import * as S from './ChatRoom.styles';
-import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Settings, X, UserCog, UserPlus, Trash2, Mail, Copy, Shield } from 'lucide-react';
+import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Settings, X, UserCog, UserPlus, Trash2, Mail, Copy, Shield, Volume2, VolumeX } from 'lucide-react';
 // 🆕 통합 채팅 서비스 (1:1 + 그룹)
 import {
   sendMessage as sendUnifiedMessage,
@@ -10,19 +11,20 @@ import {
   markAsRead as markUnifiedAsRead,
   markAllMessagesAsRead as markAllUnifiedMessagesAsRead,
   enterChatRoom as enterUnifiedChatRoom,
-  exitChatRoom as exitUnifiedChatRoom
+  exitChatRoom as exitUnifiedChatRoom,
+  deleteMessageByAdmin
 } from '../../services/unifiedChatService';
 // 개별 서비스 (그룹 관리 기능용)
 import { subscribeToDMRoom } from '../../services/directMessageService';
-import { acceptInvitation, rejectInvitation, inviteMembersToGroup, transferRoomOwnership, removeMemberFromGroup, deleteGroupChat, cancelInvitation, updateGroupRoomType, appointSubManager, updateGroupImage } from '../../services/groupChatService';
+import { acceptInvitation, rejectInvitation, inviteMembersToGroup, transferRoomOwnership, removeMemberFromGroup, deleteGroupChat, cancelInvitation, updateGroupRoomType, appointSubManager, removeSubManager, updateGroupImage, subscribeToGroupRoom, muteUserInGroup, unmuteUserInGroup, getMutedUsersInGroup } from '../../services/groupChatService';
 import { getMyFriends, getUserByWorkspaceCode } from '../../services/friendService';
 import { getUserNickname } from '../../services/nicknameService';
 import { isUserBlocked } from '../../services/userManagementService';
 import { playChatMessageSound, notificationSettings } from '../../utils/notificationSounds';
 import CollaborativeDocumentEditor from './CollaborativeDocumentEditor';
 import SharedMemoSelectorModal from './SharedMemoSelectorModal';
-import PermissionManagementModal from './PermissionManagementModal';
 import AppointSubManagerModal from './AppointSubManagerModal';
+import UserProfileModal from './UserProfileModal';
 import { db } from '../../firebase/config';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { getCurrentUserId, getCurrentUserData } from '../../utils/userStorage';
@@ -36,8 +38,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showDocument, setShowDocument] = useState(false);
   const [currentDocument, setCurrentDocument] = useState(null); // 현재 편집중인 문서
+  const [hasSharedDocument, setHasSharedDocument] = useState(false); // Firestore에 공유 문서가 있는지 여부
   const [showSharedMemoSelector, setShowSharedMemoSelector] = useState(false); // 공유 폴더 메모 선택 모달
-  const [showPermissionModal, setShowPermissionModal] = useState(false); // 권한 관리 모달 (deprecated)
   const [permissions, setPermissions] = useState({ editors: [], manager: null }); // 권한 정보
   const [selectedMemoToLoad, setSelectedMemoToLoad] = useState(null); // CollaborativeDocumentEditor에 전달할 메모
   const [isPageVisible, setIsPageVisible] = useState(!document.hidden); // 🆕 페이지 가시성 상태
@@ -74,7 +76,9 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   const [leaveAfterTransfer, setLeaveAfterTransfer] = useState(false); // 위임 후 나가기 플래그
   const [showOwnerLeaveGuideModal, setShowOwnerLeaveGuideModal] = useState(false); // 방장 나가기 안내 모달
   const [showTransferConfirmModal, setShowTransferConfirmModal] = useState(false); // 위임 최종 확인 모달
-  const [isOtherUserBlocked, setIsOtherUserBlocked] = useState(false); // 상대방 차단 여부 (양방향)
+  const [isOtherUserBlocked, setIsOtherUserBlocked] = useState(false); // 내가 상대방을 차단했는지 여부 (일방향 - 조용히 차단)
+  const [showBlockedJoinConfirm, setShowBlockedJoinConfirm] = useState({ show: false, blockedNames: '' }); // 차단 사용자 있는 방 참여 확인
+  const [showCancelInviteConfirm, setShowCancelInviteConfirm] = useState({ show: false, targetId: null, targetName: '' }); // 초대 취소 확인
   const [checkingBlockStatus, setCheckingBlockStatus] = useState(true); // 차단 상태 확인 중
   const [groupDeletionInfo, setGroupDeletionInfo] = useState(null); // 그룹 삭제 정보 { deleterName, countdown }
   const [collapsibleMessages, setCollapsibleMessages] = useState(new Set()); // 접을 수 있는 메시지 ID (18줄 이상)
@@ -85,6 +89,14 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   const [hasMoreMessages, setHasMoreMessages] = useState(false); // 더 많은 메시지가 있는지 여부
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false); // 이전 메시지 로딩 중
   const [initialMessageCount, setInitialMessageCount] = useState(0); // 초기 로드된 메시지 개수 (이전 대화 경계 표시용)
+  const [hasLoadedOlderMessages, setHasLoadedOlderMessages] = useState(false); // 이전 메시지를 추가로 로드했는지 여부
+  const [showVolumeSettingModal, setShowVolumeSettingModal] = useState(false); // 개별 음량 설정 모달
+  const [roomMessageVolume, setRoomMessageVolume] = useState(10); // 단체방 메시지 알림음 음량 (0-100)
+  const [roomReceiveVolume, setRoomReceiveVolume] = useState(10); // 단체방 수신음 음량 (0-100)
+  const [avatarContextMenu, setAvatarContextMenu] = useState({ show: false, x: 0, y: 0, messageId: null, senderId: null, senderName: '', isDeleted: false }); // 프사 컨텍스트 메뉴
+  const [userProfileModal, setUserProfileModal] = useState({ show: false, userId: null, userName: '', profilePicture: null }); // 프로필 모달
+  const [mutedUsers, setMutedUsers] = useState([]); // 이 채팅방에서 내가 차단한 사용자 목록
+  const longPressTimerRef = useRef(null); // 길게 누르기 타이머
   const messagesEndRef = useRef(null);
   const unreadMarkerRef = useRef(null); // 안 읽은 메시지 마커 참조
   const messagesContainerRef = useRef(null); // 메시지 컨테이너 참조 (스크롤 위치 보존용)
@@ -179,6 +191,21 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   // 선택된 이모지 카테고리 상태
   const [selectedEmojiCategory, setSelectedEmojiCategory] = useState('😊 표정');
 
+  // 🔊 단체방 개별 음량 설정 로드
+  useEffect(() => {
+    if (!chat.id || chat.type !== 'group') return;
+
+    try {
+      const roomVolumeSettings = JSON.parse(localStorage.getItem('roomVolumeSettings') || '{}');
+      if (roomVolumeSettings[chat.id]) {
+        setRoomMessageVolume(roomVolumeSettings[chat.id].messageVolume ?? 10);
+        setRoomReceiveVolume(roomVolumeSettings[chat.id].receiveVolume ?? 10);
+      }
+    } catch (error) {
+      console.error('개별 음량 설정 로드 실패:', error);
+    }
+  }, [chat.id, chat.type]);
+
   // ⚡ 권한 정보 실시간 구독 (그룹 채팅만) - 최적화: 2개 리스너 통합
   useEffect(() => {
     if (!chat.id || chat.type !== 'group') return;
@@ -209,12 +236,34 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
           manager: docData.lastEditedBy
         }));
       }
+      // 문서 내용이 실제로 있는지 확인 (공유 문서 표시용)
+      const hasContent = !!(docData?.content && docData.content.trim().length > 0);
+      setHasSharedDocument(hasContent);
     });
     unsubscribers.push(unsubscribeDoc);
 
     return () => {
       isMounted = false;
       unsubscribers.forEach(unsub => unsub());
+    };
+  }, [chat.id, chat.type]);
+
+  // 📄 DM용 공유 문서 상태 구독
+  useEffect(() => {
+    if (!chat.id || chat.type === 'group') return; // DM만 (그룹은 위에서 처리)
+
+    let isMounted = true;
+    const docRef = doc(db, 'chatRooms', chat.id, 'sharedDocument', 'currentDoc');
+    const unsubscribe = onSnapshot(docRef, (docSnapshot) => {
+      if (!isMounted) return;
+      const docData = docSnapshot.data();
+      const hasContent = !!(docData?.content && docData.content.trim().length > 0);
+      setHasSharedDocument(hasContent);
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
     };
   }, [chat.id, chat.type]);
 
@@ -276,16 +325,17 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     };
   }, [chat.id, chat.type, chat.membersInfo, messages, groupDeletionInfo, onClose]);
 
-  // 그룹 채팅에서 내 멤버 상태 확인
+  // 그룹 채팅에서 내 멤버 상태 확인 (초기값)
   useEffect(() => {
     if (!chat.id || chat.type !== 'group' || !currentUserId) return;
 
-    // chat.membersInfo에서 내 상태 확인
+    // chat에서 초기 상태 확인
     const myStatus = chat.membersInfo?.[currentUserId]?.status;
     setMyMemberStatus(myStatus || 'active');
   }, [chat.id, chat.type, chat.membersInfo, currentUserId]);
 
-  // DM 방에서 차단 상태 확인 (양방향)
+  // DM 방에서 차단 상태 확인 (일방향 - 조용히 차단)
+  // 카카오톡 방식: 내가 차단한 경우만 확인, 상대가 나를 차단해도 메시지 전송은 가능
   useEffect(() => {
     if (chat.type === 'group') {
       setCheckingBlockStatus(false);
@@ -301,11 +351,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
           return;
         }
 
-        // 양방향 차단 확인: 내가 상대를 차단했거나 상대가 나를 차단한 경우
+        // 일방향 차단 확인: 내가 상대를 차단한 경우만 확인
+        // 상대가 나를 차단해도 메시지 전송은 가능 (조용히 차단)
         const iBlockedThem = await isUserBlocked(currentUserId, otherUserId);
-        const theyBlockedMe = await isUserBlocked(otherUserId, currentUserId);
 
-        setIsOtherUserBlocked(iBlockedThem || theyBlockedMe);
+        setIsOtherUserBlocked(iBlockedThem);
       } catch (error) {
         console.error('차단 상태 확인 오류:', error);
         setIsOtherUserBlocked(false);
@@ -385,17 +435,52 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   }, [chat.type, chat.groupName, chat.membersInfo, chat.participants, chat.participantsInfo, currentUserId, userNicknames, userDisplayNames]);
 
   useEffect(() => {
-    if (!chat.id || chat.type === 'group') {
+    if (!chat.id) {
       setChatRoomData(chat);
       return;
     }
 
-    // 1:1 채팅방 데이터 실시간 구독
-    const unsubscribe = subscribeToDMRoom(chat.id, (updatedChat) => {
-      setChatRoomData(updatedChat);
-    });
+    // 채팅방 데이터 실시간 구독 (그룹/1:1 모두)
+    let unsubscribe;
 
-    return () => unsubscribe();
+    if (chat.type === 'group') {
+      // 그룹 채팅방 실시간 구독
+      unsubscribe = subscribeToGroupRoom(chat.id, (updatedChat) => {
+        setChatRoomData(updatedChat);
+
+        // 강퇴 또는 초대 거부 감지 시 방 강제 퇴장
+        const isKicked = updatedChat?.kickedUsers?.includes(currentUserId);
+        const myMemberInfo = updatedChat?.membersInfo?.[currentUserId];
+        const isRejected = myMemberInfo?.status === 'rejected';
+
+        if (isKicked) {
+          showToast?.('방에서 강퇴되었습니다');
+          onClose?.();
+          return;
+        }
+
+        if (isRejected) {
+          onClose?.();
+          return;
+        }
+
+        // mutedUsers 업데이트 (내 membersInfo에서 가져옴)
+        if (myMemberInfo?.mutedUsers) {
+          setMutedUsers(myMemberInfo.mutedUsers);
+        } else {
+          setMutedUsers([]);
+        }
+      });
+    } else {
+      // 1:1 채팅방 데이터 실시간 구독
+      unsubscribe = subscribeToDMRoom(chat.id, (updatedChat) => {
+        setChatRoomData(updatedChat);
+      });
+    }
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [chat.id, chat.type]);
 
   // 메시지 실시간 구독
@@ -429,44 +514,71 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
             const latestMessage = newMessages[newMessages.length - 1];
             // 상대방이 보낸 메시지인 경우만 효과음 재생
             if (latestMessage?.senderId !== currentUserId) {
-              playChatMessageSound();
+              // 단체방인 경우 개별 음량 설정 적용
+              let customVolume = null;
+              if (chat.type === 'group') {
+                try {
+                  const roomVolumeSettings = JSON.parse(localStorage.getItem('roomVolumeSettings') || '{}');
+                  if (roomVolumeSettings[chat.id]?.receiveVolume !== undefined) {
+                    customVolume = roomVolumeSettings[chat.id].receiveVolume;
+                  }
+                } catch (e) {
+                  console.error('개별 음량 설정 읽기 실패:', e);
+                }
+              }
+              playChatMessageSound(customVolume);
             }
           }
 
           // 새 메시지 도착 시 페이지가 보이는 경우에만 읽음 처리
-          if (prevMessageCount > 0 && newMessages.length > prevMessageCount) {
+          // ⚠️ pending 상태(초대 수락 전)에서는 읽음 처리 안 함
+          const myStatus = chat.membersInfo?.[currentUserId]?.status;
+          if (prevMessageCount > 0 && newMessages.length > prevMessageCount && myStatus !== 'pending') {
             markUnifiedAsRead(chat.id, chat.type, currentUserId, isPageVisible);
           }
 
         // ⭐ 첫 번째 안 읽은 메시지 인덱스 계산 (최초 입장 시에만)
+        // 내가 보낸 메시지는 제외 - 상대가 보낸 메시지 중 내가 안 읽은 것만 마커 표시
         if (prevMessageCount === 0 && newMessages.length > 0) {
           // chatRoomData에서 내 lastAccessTime 가져오기
           const myLastAccessTime = chatRoomData?.lastAccessTime?.[currentUserId];
 
           if (myLastAccessTime) {
-            // lastAccessTime 이후의 첫 번째 메시지 찾기
+            // lastAccessTime 이후의 첫 번째 "상대가 보낸" 메시지 찾기
             const lastAccessDate = myLastAccessTime.toDate ? myLastAccessTime.toDate() : new Date(myLastAccessTime);
             const unreadIndex = newMessages.findIndex(msg => {
+              // 내가 보낸 메시지는 스킵 (당연히 읽은 것)
+              if (msg.senderId === currentUserId) return false;
               const msgDate = msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date(msg.createdAt);
               return msgDate > lastAccessDate;
             });
 
             // 안 읽은 메시지가 5개 이상일 때만 마커 표시 (카카오톡 방식)
-            if (unreadIndex >= 0 && (newMessages.length - unreadIndex) >= 5) {
+            // 상대가 보낸 안 읽은 메시지 개수 계산
+            const unreadFromOthers = newMessages.filter((msg, idx) => {
+              if (msg.senderId === currentUserId) return false;
+              const msgDate = msg.createdAt?.toDate ? msg.createdAt.toDate() : new Date(msg.createdAt);
+              return msgDate > lastAccessDate;
+            }).length;
+
+            if (unreadIndex >= 0 && unreadFromOthers >= 5) {
               setFirstUnreadIndex(unreadIndex);
-              console.log('📊 안 읽은 메시지가 많음 - 마커 표시:', unreadIndex, '/', newMessages.length);
+              console.log('📊 상대가 보낸 안 읽은 메시지가 많음 - 마커 표시:', unreadIndex, '/', unreadFromOthers, '개');
             } else {
               setFirstUnreadIndex(-1);
-              console.log('📊 안 읽은 메시지 적음 - 맨 아래로 스크롤');
+              console.log('📊 상대가 보낸 안 읽은 메시지 적음 - 맨 아래로 스크롤');
             }
           } else {
-            // lastAccessTime이 없으면 모두 안 읽은 것으로 간주
-            if (newMessages.length >= 5) {
-              setFirstUnreadIndex(0);
-              console.log('📊 lastAccessTime 없음 - 첫 메시지부터 안 읽음');
+            // lastAccessTime이 없으면 상대가 보낸 메시지만 안 읽은 것으로 간주
+            const messagesFromOthers = newMessages.filter(msg => msg.senderId !== currentUserId);
+            if (messagesFromOthers.length >= 5) {
+              // 첫 번째 상대 메시지 위치 찾기
+              const firstOtherIndex = newMessages.findIndex(msg => msg.senderId !== currentUserId);
+              setFirstUnreadIndex(firstOtherIndex);
+              console.log('📊 lastAccessTime 없음 - 상대 메시지부터 안 읽음:', firstOtherIndex);
             } else {
               setFirstUnreadIndex(-1);
-              console.log('📊 메시지 적음 - 맨 아래로 스크롤');
+              console.log('📊 상대 메시지 적음 - 맨 아래로 스크롤');
             }
           }
         }
@@ -477,8 +589,23 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
           console.log('📊 초기 메시지 개수 저장:', newMessages.length);
         }
 
+        // 🆕 조용히 차단: DM 방에서 내가 차단한 사용자의 메시지 필터링
+        // 상대가 메시지를 보내도 나에게는 안 보임 (상대는 정상 전송된 것처럼 보임)
+        let filteredMessages = newMessages;
+        if (chat.type !== 'group') {
+          const otherUserId = chat.participants?.find(id => id !== currentUserId);
+          if (otherUserId) {
+            const iBlockedThem = await isUserBlocked(currentUserId, otherUserId);
+            if (iBlockedThem) {
+              // 내가 차단한 상대의 메시지 필터링 (내가 보낸 메시지만 표시)
+              filteredMessages = newMessages.filter(msg => msg.senderId === currentUserId);
+              console.log('🚫 조용히 차단: 차단한 사용자의 메시지 필터링됨');
+            }
+          }
+        }
+
         prevMessageCount = newMessages.length;
-        setMessages(newMessages);
+        setMessages(filteredMessages);
 
         // 🆕 메시지 발신자들의 닉네임 동적 로드
         const senderIds = new Set(newMessages.map(msg => msg.senderId).filter(Boolean));
@@ -517,15 +644,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                 // 마커 위치로 직접 스크롤 (애니메이션 없음)
                 const markerTop = unreadMarkerRef.current.offsetTop;
                 container.scrollTop = markerTop - 100; // 상단 여백 100px
-                console.log('📍 안 읽은 메시지 마커로 즉시 스크롤 (인덱스:', firstUnreadIndex, ')');
-              } else if (!isInitialLoad) {
-                // 새 메시지 도착 시만 부드럽게 스크롤
-                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-                console.log('📍 새 메시지 - 부드럽게 맨 아래로');
-              } else {
-                // 초기 로드이고 안 읽은 메시지가 적으면 즉시 맨 아래로
+              } else if (isInitialLoad) {
+                // 초기 로드 - 즉시 맨 아래로
                 container.scrollTop = container.scrollHeight;
-                console.log('📍 초기 로드 - 즉시 맨 아래로');
+              } else {
+                // 새 메시지 도착 시 - 즉시 맨 아래로
+                container.scrollTop = container.scrollHeight;
               }
             }
           });
@@ -535,8 +659,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       );
 
       // 🆕 읽음 표시 (통합 함수 사용 - 페이지 가시성 확인)
-      markUnifiedAsRead(chat.id, chat.type, currentUserId, isPageVisible);
-      markAllUnifiedMessagesAsRead(chat.id, chat.type, currentUserId, isPageVisible);
+      // ⚠️ pending 상태(초대 수락 전)에서는 읽음 처리 안 함
+      const myStatus = chat.membersInfo?.[currentUserId]?.status;
+      if (myStatus !== 'pending') {
+        markUnifiedAsRead(chat.id, chat.type, currentUserId, isPageVisible);
+        markAllUnifiedMessagesAsRead(chat.id, chat.type, currentUserId, isPageVisible);
+      }
     }, 50);
 
     return () => {
@@ -566,11 +694,9 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     if (chat.type !== 'group') {
       chat.participants?.forEach(userId => userIds.add(userId));
     } else {
-      // 그룹 채팅인 경우 - 활성 멤버만
+      // 그룹 채팅인 경우 - 모든 멤버 (pending, rejected 포함 - 참여자 목록에 표시되므로)
       Object.keys(chat.membersInfo || {}).forEach(userId => {
-        if (chat.membersInfo[userId]?.status === 'active') {
-          userIds.add(userId);
-        }
+        userIds.add(userId);
       });
     }
 
@@ -648,11 +774,9 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     if (chat.type !== 'group') {
       chat.participants?.forEach(userId => userIds.add(userId));
     } else {
-      // 그룹 채팅인 경우 - 활성 멤버만
+      // 그룹 채팅인 경우 - 모든 멤버 (pending, rejected 포함 - 참여자 목록에 표시되므로)
       Object.keys(chat.membersInfo || {}).forEach(userId => {
-        if (chat.membersInfo[userId]?.status === 'active') {
-          userIds.add(userId);
-        }
+        userIds.add(userId);
       });
     }
 
@@ -776,8 +900,9 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   // 초기 닉네임 로딩은 실시간 리스너가 처리 (위의 useEffect 참조)
 
   // 방장 여부 확인 (그룹 채팅인 경우 creatorId가 방장, DM은 모두 방장)
-  const isRoomOwner = chat.type === 'group'
-    ? (chat.creatorId === currentUserId || chat.createdBy === currentUserId) // creatorId와 createdBy 둘 다 체크
+  // ⚠️ chatRoomData 사용 (실시간 업데이트된 방장 정보 필요 - 방장 위임 시)
+  const isRoomOwner = chatRoomData?.type === 'group'
+    ? (chatRoomData.creatorId === currentUserId || chatRoomData.createdBy === currentUserId) // creatorId와 createdBy 둘 다 체크
     : true; // DM은 모두 편집 가능
 
   // 사용자 역할 확인 함수
@@ -818,14 +943,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       // 차단 사용자가 있는 경우
       if (error.message?.startsWith('BLOCKED_MEMBERS_IN_GROUP:')) {
         const blockedNames = error.message.replace('BLOCKED_MEMBERS_IN_GROUP:', '');
-        const confirmed = window.confirm(
-          `참여자 중에 차단한 사용자가 있습니다.\n\n차단한 사용자: ${blockedNames}\n\n이 방에 참여하시겠습니까?\n(참여하면 이 방에서는 서로 대화할 수 있습니다)`
-        );
-
-        if (confirmed) {
-          // 사용자가 참여를 선택한 경우 forceAccept로 다시 호출
-          await handleAcceptInvitation(true);
-        }
+        setShowBlockedJoinConfirm({ show: true, blockedNames });
         setProcessingInvitation(false);
         return;
       }
@@ -843,8 +961,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       await rejectInvitation(chat.id, currentUserId);
       setMyMemberStatus('rejected');
       showToast?.('초대를 거부했습니다');
-      // 거부 후 채팅방 닫기
-      setTimeout(() => onClose(), 1000);
+      // 거부 후 채팅방 즉시 닫기
+      onClose();
     } catch (error) {
       console.error('초대 거부 실패:', error);
       showToast?.('❌ 초대 거부에 실패했습니다');
@@ -863,8 +981,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       if (visible) {
         // 페이지가 다시 보이면: inRoom = true로 설정 + 읽음 처리
         await enterUnifiedChatRoom(chat.id, chat.type, currentUserId);
-        markUnifiedAsRead(chat.id, chat.type, currentUserId, true);
-        markAllUnifiedMessagesAsRead(chat.id, chat.type, currentUserId, true);
+        // ⚠️ pending 상태(초대 수락 전)에서는 읽음 처리 안 함
+        const myStatus = chat.membersInfo?.[currentUserId]?.status;
+        if (myStatus !== 'pending') {
+          markUnifiedAsRead(chat.id, chat.type, currentUserId, true);
+          markAllUnifiedMessagesAsRead(chat.id, chat.type, currentUserId, true);
+        }
       } else {
         // 페이지가 숨겨지면: inRoom = false로 설정
         await exitUnifiedChatRoom(chat.id, chat.type, currentUserId);
@@ -893,6 +1015,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       const scrollBefore = container.scrollHeight - container.scrollTop;
 
       setLoadingOlderMessages(true);
+      setHasLoadedOlderMessages(true); // 이전 메시지 로드 플래그 설정
       // 30개씩 추가로 불러오기
       setMessageLimit(prev => {
         const newLimit = prev + 30;
@@ -930,9 +1053,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       // 🆕 통합 메시지 전송
       await sendUnifiedMessage(chat.id, chat.type, currentUserId, textToSend, chatRoomData);
 
-      // 스크롤을 맨 아래로
+      // 스크롤을 맨 아래로 (즉시 - 깜빡임 방지)
       setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+        const container = messagesContainerRef.current;
+        if (container) {
+          container.scrollTop = container.scrollHeight;
+        }
       }, 100);
     } catch (error) {
       console.error('메시지 전송 오류:', error);
@@ -1037,15 +1163,27 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     }
   };
 
-  // 날짜가 바뀌는지 체크
-  const shouldShowDateSeparator = (currentMsg, prevMsg) => {
-    if (!prevMsg) return true;
+  // 날짜 구분선을 표시할 메시지 인덱스들을 미리 계산 (메모이제이션)
+  const dateSeparatorIndices = useMemo(() => {
+    const indices = new Set();
+    for (let i = 0; i < messages.length; i++) {
+      const currentMsg = messages[i];
+      const prevMsg = messages[i - 1];
 
-    const currentDate = currentMsg.createdAt?.toDate?.() || new Date(currentMsg.createdAt);
-    const prevDate = prevMsg.createdAt?.toDate?.() || new Date(prevMsg.createdAt);
+      if (!prevMsg) {
+        indices.add(i); // 첫 번째 메시지는 항상 날짜 표시
+        continue;
+      }
 
-    return currentDate.toDateString() !== prevDate.toDateString();
-  };
+      const currentDate = currentMsg.createdAt?.toDate?.() || new Date(currentMsg.createdAt);
+      const prevDate = prevMsg.createdAt?.toDate?.() || new Date(prevMsg.createdAt);
+
+      if (currentDate.toDateString() !== prevDate.toDateString()) {
+        indices.add(i);
+      }
+    }
+    return indices;
+  }, [messages]);
 
   // 아이디로 사용자 검색 핸들러
   const handleSearchUserById = async () => {
@@ -1159,8 +1297,208 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     }
   };
 
-  // 단체방 프로필 이미지 변경 핸들러
-  const handleAvatarClick = () => {
+  // 부방장 해임 핸들러
+  const handleRemoveSubManager = async (subManagerId) => {
+    try {
+      await removeSubManager(chat.id, currentUserId, subManagerId);
+      const subManagerName = chat.membersInfo?.[subManagerId]?.displayName || '익명';
+      showToast?.(`${subManagerName}님의 부방장 권한을 해제했습니다`);
+    } catch (error) {
+      console.error('부방장 해임 실패:', error);
+      showToast?.(error.message || '부방장 해임에 실패했습니다');
+      throw error;
+    }
+  };
+
+  // 메시지 삭제 권한 체크 (방장: 모두, 부방장: manage_messages 권한 + 일반멤버만)
+  // ⚠️ chatRoomData 사용 (실시간 업데이트된 subManagers 정보 필요)
+  const canDeleteMessage = (messageSenderId) => {
+    // 1:1 DM인 경우: 삭제 기능 비활성화
+    if (chat?.type === 'dm' || chatRoomData?.type === 'dm') {
+      return false;
+    }
+
+    // 그룹 채팅인 경우
+    // 자신의 메시지는 삭제 가능
+    if (messageSenderId === currentUserId) return true;
+
+    // 방장인 경우: 모든 메시지 삭제 가능
+    if (isRoomOwner) return true;
+
+    // 부방장인 경우 (실시간 데이터에서 확인)
+    const subManagerData = chatRoomData?.subManagers?.[currentUserId];
+    if (subManagerData) {
+      // manage_messages 권한이 있는지 체크
+      if (!subManagerData.permissions?.includes('manage_messages')) {
+        return false; // 권한 없음
+      }
+      // 삭제 대상이 방장이면 불가
+      if (messageSenderId === chatRoomData.creatorId) return false;
+      // 삭제 대상이 다른 부방장이면 불가
+      if (chatRoomData?.subManagers?.[messageSenderId]) return false;
+      // 일반 멤버 메시지만 삭제 가능
+      return true;
+    }
+
+    return false;
+  };
+
+  // 강퇴 권한 체크 (방장: 모두(부방장 포함), 부방장: kick_member 권한 + 일반멤버만)
+  // ⚠️ chatRoomData 사용 (실시간 업데이트된 subManagers 정보 필요)
+  const canKickMember = (targetMemberId) => {
+    if (chatRoomData?.type !== 'group') return false; // 그룹 채팅에서만 가능
+
+    // 자기 자신은 강퇴 불가
+    if (targetMemberId === currentUserId) return false;
+
+    // 방장인 경우: 부방장 포함 모든 멤버 강퇴 가능
+    if (isRoomOwner) {
+      // 방장 자신은 제외
+      return targetMemberId !== chatRoomData.creatorId;
+    }
+
+    // 부방장인 경우 (실시간 데이터에서 확인)
+    const subManagerData = chatRoomData?.subManagers?.[currentUserId];
+    if (subManagerData) {
+      // kick_member 권한이 있는지 체크
+      if (!subManagerData.permissions?.includes('kick_member')) {
+        return false; // 권한 없음
+      }
+      // 강퇴 대상이 방장이면 불가
+      if (targetMemberId === chatRoomData.creatorId) return false;
+      // 강퇴 대상이 다른 부방장이면 불가
+      if (chatRoomData?.subManagers?.[targetMemberId]) return false;
+      // 일반 멤버만 강퇴 가능
+      return true;
+    }
+
+    return false;
+  };
+
+  // 아바타 터치 정보
+  const avatarTouchInfoRef = useRef({ userId: null, userName: null, profilePicture: null });
+
+  // 아바타 탭 - 프로필 모달 (PC용)
+  const handleAvatarClick = (userId, userName, profilePicture) => {
+    setUserProfileModal({ show: true, userId, userName, profilePicture });
+  };
+
+  // 아바타 터치 시작 (모바일용)
+  const handleAvatarTouchStart = (e, messageId, senderId, senderName, profilePicture, isDeleted = false) => {
+    avatarTouchInfoRef.current = { userId: senderId, userName: senderName, profilePicture };
+
+    // 그룹 채팅에서는 삭제 권한 또는 차단 기능 사용 가능
+    // (삭제된 메시지라도 차단 기능은 사용 가능하도록 메뉴 표시)
+    // 1:1 채팅에서는 삭제 권한만
+    const canShowMenu = chat.type === 'group' ? (canDeleteMessage(senderId) || senderId !== currentUserId) : canDeleteMessage(senderId);
+
+    if (canShowMenu) {
+      const target = e.currentTarget || e.target;
+      const rect = target?.getBoundingClientRect();
+      if (rect) {
+        longPressTimerRef.current = setTimeout(() => {
+          avatarTouchInfoRef.current = { userId: null, userName: null, profilePicture: null };
+          longPressTimerRef.current = null;
+          setAvatarContextMenu({
+            show: true,
+            x: rect.left,
+            y: rect.bottom + 8,
+            messageId,
+            senderId,
+            senderName,
+            isDeleted
+          });
+        }, 500);
+      }
+    }
+  };
+
+  // 아바타 터치 종료 (모바일용)
+  const handleAvatarTouchEnd = (e) => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    const { userId, userName, profilePicture } = avatarTouchInfoRef.current;
+    if (userId) {
+      e.preventDefault();
+      setUserProfileModal({ show: true, userId, userName, profilePicture });
+    }
+
+    avatarTouchInfoRef.current = { userId: null, userName: null, profilePicture: null };
+  };
+
+  // 아바타 터치 취소
+  const handleAvatarTouchCancel = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    avatarTouchInfoRef.current = { userId: null, userName: null, profilePicture: null };
+  };
+
+  // 컨텍스트 메뉴 닫기
+  const closeAvatarContextMenu = () => {
+    setAvatarContextMenu({ show: false, x: 0, y: 0, messageId: null, senderId: null, senderName: '', isDeleted: false });
+  };
+
+  // 메시지 삭제 처리
+  const handleDeleteMessage = async () => {
+    if (!avatarContextMenu.messageId) return;
+
+    try {
+      const deleterName = userNicknames[currentUserId] || currentUserName || '관리자';
+      await deleteMessageByAdmin(chat.id, chat.type, avatarContextMenu.messageId, deleterName);
+      closeAvatarContextMenu();
+    } catch (error) {
+      console.error('메시지 삭제 실패:', error);
+      showToast?.('메시지 삭제에 실패했습니다');
+    }
+  };
+
+  // 이 사용자 메시지 차단 처리
+  const handleMuteUser = async () => {
+    if (!avatarContextMenu.senderId) return;
+
+    try {
+      await muteUserInGroup(chat.id, currentUserId, avatarContextMenu.senderId);
+      showToast?.(`${avatarContextMenu.senderName}님의 메시지를 차단했습니다`);
+      closeAvatarContextMenu();
+    } catch (error) {
+      console.error('사용자 메시지 차단 실패:', error);
+      showToast?.('메시지 차단에 실패했습니다');
+    }
+  };
+
+  // 이 사용자 메시지 차단 해제 처리
+  const handleUnmuteUser = async () => {
+    if (!avatarContextMenu.senderId) return;
+
+    try {
+      await unmuteUserInGroup(chat.id, currentUserId, avatarContextMenu.senderId);
+      showToast?.(`${avatarContextMenu.senderName}님의 메시지 차단을 해제했습니다`);
+      closeAvatarContextMenu();
+    } catch (error) {
+      console.error('사용자 메시지 차단 해제 실패:', error);
+      showToast?.('메시지 차단 해제에 실패했습니다');
+    }
+  };
+
+  // 프로필 모달에서 1:1 대화 시작
+  const handleStartDMFromProfile = async (targetUserId, targetUserName) => {
+    // TODO: 1:1 대화방 생성 또는 기존 방으로 이동
+    showToast?.(`${targetUserName}님과의 1:1 대화 기능은 준비 중입니다`);
+  };
+
+  // 프로필 모달에서 차단하기
+  const handleBlockFromProfile = async (targetUserId, targetUserName) => {
+    // TODO: 차단 확인 모달 표시
+    showToast?.(`${targetUserName}님 차단 기능은 준비 중입니다`);
+  };
+
+  // 단체방 상단 프로필 이미지 변경 핸들러
+  const handleHeaderAvatarClick = () => {
     // 단체방이고 방장인 경우에만 이미지 변경 가능
     if (chat.type === 'group' && isRoomOwner) {
       imageInputRef.current?.click();
@@ -1277,11 +1615,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
 
   // 초대 취소 핸들러 (pending/rejected 멤버만)
   const handleCancelInvitation = async (targetId, targetName) => {
-    const confirmed = window.confirm(
-      `${targetName}님의 초대를 취소하시겠습니까?\n목록에서 완전히 제거됩니다.`
-    );
+    setShowCancelInviteConfirm({ show: true, targetId, targetName });
+  };
 
-    if (!confirmed) return;
+  const confirmCancelInvitation = async () => {
+    const { targetId, targetName } = showCancelInviteConfirm;
+    setShowCancelInviteConfirm({ show: false, targetId: null, targetName: '' });
 
     try {
       await cancelInvitation(chat.id, currentUserId, targetId);
@@ -1394,6 +1733,23 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     }
   };
 
+  // 🔊 단체방 개별 음량 설정 저장
+  const handleSaveRoomVolume = () => {
+    try {
+      const roomVolumeSettings = JSON.parse(localStorage.getItem('roomVolumeSettings') || '{}');
+      roomVolumeSettings[chat.id] = {
+        messageVolume: roomMessageVolume,
+        receiveVolume: roomReceiveVolume
+      };
+      localStorage.setItem('roomVolumeSettings', JSON.stringify(roomVolumeSettings));
+      showToast?.('음량 설정이 저장되었습니다');
+      setShowVolumeSettingModal(false);
+    } catch (error) {
+      console.error('음량 설정 저장 실패:', error);
+      showToast?.('음량 설정 저장에 실패했습니다');
+    }
+  };
+
   // 그룹 나가기 핸들러
   const handleLeaveGroup = () => {
     // 방장인지 확인
@@ -1502,7 +1858,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
           <S.Avatar
             $color={otherUser.isGroup ? 'linear-gradient(135deg, #667eea, #764ba2)' : getAvatarColor(otherUser.userId)}
             $clickable={otherUser.isGroup && isRoomOwner}
-            onClick={handleAvatarClick}
+            onClick={handleHeaderAvatarClick}
             title={otherUser.isGroup && isRoomOwner ? '프로필 이미지 변경' : ''}
             style={
               chat.groupImage
@@ -1538,7 +1894,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
             </S.MenuButton>
           )}
           {!otherUser.isSelfChat && (
-            <S.MenuButton onClick={handleToggleDocument} title="공유 문서">
+            <S.MenuButton onClick={handleToggleDocument} title="공유 문서" $hasDocument={hasSharedDocument}>
               <FileText size={20} />
             </S.MenuButton>
           )}
@@ -1558,50 +1914,17 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   {/* 방장 전용 메뉴 */}
                   {isRoomOwner && (
                     <>
-                      {/* 비공개방일 때만 멤버 초대 메뉴 표시 */}
-                      {!chat.isPublic && (
-                        <S.DropdownItem
-                          onClick={() => {
-                            setShowInviteMembersModal(true);
-                            setShowMenuDropdown(false);
-                          }}
-                        >
-                          <Users size={16} />
-                          멤버 초대
-                        </S.DropdownItem>
-                      )}
-                      {/* 공개방일 때만 초대 코드 보기 메뉴 표시 */}
-                      {chat.isPublic && (
-                        <S.DropdownItem
-                          onClick={() => {
-                            setShowInviteCodeModal(true);
-                            setShowMenuDropdown(false);
-                          }}
-                        >
-                          <Mail size={16} />
-                          초대 코드 보기
-                        </S.DropdownItem>
-                      )}
-                      {/* 🆕 방 공개 설정 변경 메뉴 */}
+                      {/* 멤버 초대 */}
                       <S.DropdownItem
                         onClick={() => {
-                          setSelectedRoomType(chat.isPublic); // 현재 방 타입으로 초기화
-                          setShowRoomTypeModal(true);
+                          setShowInviteMembersModal(true);
                           setShowMenuDropdown(false);
                         }}
                       >
-                        <Settings size={16} />
-                        방 공개 설정
+                        <Users size={16} />
+                        멤버 초대
                       </S.DropdownItem>
-                      <S.DropdownItem
-                        onClick={() => {
-                          setShowAppointSubManagerModal(true);
-                          setShowMenuDropdown(false);
-                        }}
-                      >
-                        <Shield size={16} />
-                        부방장 임명
-                      </S.DropdownItem>
+                      {/* 방장 위임 */}
                       <S.DropdownItem
                         onClick={() => {
                           setShowTransferOwnerModal(true);
@@ -1611,31 +1934,69 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                         <UserCog size={16} />
                         방장 위임
                       </S.DropdownItem>
+                      {/* 부방장 임명 */}
+                      <S.DropdownItem
+                        onClick={() => {
+                          setShowAppointSubManagerModal(true);
+                          setShowMenuDropdown(false);
+                        }}
+                      >
+                        <Shield size={16} />
+                        부방장 임명
+                      </S.DropdownItem>
+                      {/* 개별 알림음 설정 */}
+                      <S.DropdownItem
+                        onClick={() => {
+                          setShowVolumeSettingModal(true);
+                          setShowMenuDropdown(false);
+                        }}
+                      >
+                        <Volume2 size={16} />
+                        알림음 설정
+                      </S.DropdownItem>
+                      {/* 구분자 */}
+                      <S.DropdownDivider />
+                      {/* 현 단체방 나가기 (방장) */}
                       <S.DropdownItem
                         onClick={() => {
                           setShowMenuDropdown(false);
-                          handleDeleteGroup();
+                          handleLeaveGroup();
                         }}
                         style={{ color: '#ef4444' }}
                       >
                         <Trash2 size={16} />
-                        단체방 삭제
+                        현 단체방 나가기
                       </S.DropdownItem>
                     </>
                   )}
 
                   {/* 일반 참여자용 메뉴 */}
                   {!isRoomOwner && (
-                    <S.DropdownItem
-                      onClick={() => {
-                        setShowMenuDropdown(false);
-                        handleLeaveGroup();
-                      }}
-                      style={{ color: '#ef4444' }}
-                    >
-                      <Trash2 size={16} />
-                      현재 단체방 탈퇴
-                    </S.DropdownItem>
+                    <>
+                      {/* 개별 알림음 설정 */}
+                      <S.DropdownItem
+                        onClick={() => {
+                          setShowVolumeSettingModal(true);
+                          setShowMenuDropdown(false);
+                        }}
+                      >
+                        <Volume2 size={16} />
+                        알림음 설정
+                      </S.DropdownItem>
+                      {/* 구분자 */}
+                      <S.DropdownDivider />
+                      {/* 현 단체방 나가기 */}
+                      <S.DropdownItem
+                        onClick={() => {
+                          setShowMenuDropdown(false);
+                          handleLeaveGroup();
+                        }}
+                        style={{ color: '#ef4444' }}
+                      >
+                        <Trash2 size={16} />
+                        현 단체방 나가기
+                      </S.DropdownItem>
+                    </>
                   )}
                 </S.DropdownMenu>
               )}
@@ -1692,7 +2053,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       )}
 
       {/* 메시지 목록 */}
-      <S.MessagesContainer ref={messagesContainerRef}>
+      <S.MessagesContainer ref={messagesContainerRef} $blurred={chat.type === 'group' && myMemberStatus === 'pending'}>
         {/* 그룹 삭제 알림 (카운트다운) */}
         {groupDeletionInfo && (
           <S.DeletionNotice>
@@ -1733,7 +2094,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
 
             {messages.map((message, index) => {
               const isMine = message.senderId === currentUserId;
-              const showDate = shouldShowDateSeparator(message, messages[index - 1]);
+              const showDate = dateSeparatorIndices.has(index);
 
               // 프로필 표시 조건
               const showAvatar = !isMine && (() => {
@@ -1840,9 +2201,23 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                 );
               }
 
+              // 삭제된 메시지인지 확인
+              const isDeleted = message.deleted === true;
+
+              // 차단된 사용자의 메시지인지 확인 (그룹 채팅에서만)
+              const isMutedUser = chat.type === 'group' && mutedUsers.includes(message.senderId);
+
               // 일반 메시지
-              const messageText = message.text || message.content || '';
-              const isCollapsible = collapsibleMessages.has(message.id);
+              // 삭제된 메시지: 본인에게는 "관리자에 의해", 다른 사람에게는 삭제자 이름 표시
+              const deletedText = message.senderId === currentUserId
+                ? '관리자에 의해 메시지가 삭제되었습니다'
+                : `${message.deletedByName || '관리자'}님에 의해 메시지가 삭제되었습니다`;
+              const messageText = isDeleted
+                ? deletedText
+                : isMutedUser
+                  ? '차단한 사용자의 메시지입니다'
+                  : (message.text || message.content || '');
+              const isCollapsible = !isDeleted && collapsibleMessages.has(message.id);
 
               const handleShowFullMessage = () => {
                 setFullMessageContent(messageText);
@@ -1873,8 +2248,8 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                       <S.DateText>{formatDate(message.createdAt)}</S.DateText>
                     </S.DateSeparator>
                   )}
-                  {/* ⭐ 이전 대화 경계 구분선 (추가 로드된 메시지의 시작점) */}
-                  {index === initialMessageCount && initialMessageCount > 0 && messages.length > initialMessageCount && (
+                  {/* ⭐ 이전 대화 경계 구분선 (추가 로드된 메시지의 시작점) - "더 보기"를 눌렀을 때만 표시 */}
+                  {hasLoadedOlderMessages && index === initialMessageCount && initialMessageCount > 0 && messages.length > initialMessageCount && (
                     <S.OlderMessagesDivider>
                       <S.OlderMessagesDividerText>────── 이전 대화 보기 ──────</S.OlderMessagesDividerText>
                     </S.OlderMessagesDivider>
@@ -1889,7 +2264,15 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                     {!isMine && showAvatar && (
                       <S.MessageAvatar
                         $color={getAvatarColor(message.senderId)}
-                        style={userProfilePictures[message.senderId] ? { backgroundImage: `url(${userProfilePictures[message.senderId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                        style={{
+                          ...(userProfilePictures[message.senderId] ? { backgroundImage: `url(${userProfilePictures[message.senderId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}),
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => handleAvatarClick(message.senderId, userNicknames[message.senderId] || userDisplayNames[message.senderId] || message.senderName || '사용자', userProfilePictures[message.senderId])}
+                        onTouchStart={(e) => handleAvatarTouchStart(e, message.id, message.senderId, userNicknames[message.senderId] || userDisplayNames[message.senderId] || message.senderName || '사용자', userProfilePictures[message.senderId], isDeleted)}
+                        onTouchEnd={handleAvatarTouchEnd}
+                        onTouchCancel={handleAvatarTouchCancel}
+                        onContextMenu={(e) => e.preventDefault()}
                       >
                         {!userProfilePictures[message.senderId] && userAvatarSettings[message.senderId] && renderAvatarIcon(message.senderId)}
                         {!userProfilePictures[message.senderId] && !userAvatarSettings[message.senderId] && (userNicknames[message.senderId] || userDisplayNames[message.senderId] || '사').charAt(0).toUpperCase()}
@@ -1900,20 +2283,22 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                         )}
                       </S.MessageAvatar>
                     )}
-                    {!isMine && !showAvatar && <div style={{ width: '32px' }} />}
+                    {!isMine && !showAvatar && <div style={{ width: '38px' }} />}
                     <S.MessageContent $isMine={isMine}>
-                      {!isMine && showAvatar && <S.SenderName>{userNicknames[message.senderId] || userDisplayNames[message.senderId] || '사용자'}</S.SenderName>}
+                      {!isMine && showAvatar && <S.SenderName>{userNicknames[message.senderId] || userDisplayNames[message.senderId] || message.senderName || '사용자'}</S.SenderName>}
                       <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', flexDirection: isMine ? 'row-reverse' : 'row' }}>
                         <div style={{ position: 'relative' }}>
                           <S.MessageBubble
                             $isMine={isMine}
                             $collapsed={isCollapsible}
                             data-message-id={message.id}
+                            style={isDeleted ? { background: 'rgba(180, 60, 60, 0.25)', border: '1px dashed rgba(255, 100, 100, 0.3)' } : isMutedUser ? { background: 'rgba(100, 100, 100, 0.3)', border: '1px dashed rgba(255, 255, 255, 0.2)' } : {}}
                           >
                             <S.MessageTextContent
-                              ref={handleTextContentRef}
+                              ref={(isDeleted || isMutedUser) ? undefined : handleTextContentRef}
                               $collapsed={isCollapsible}
                               $isMine={isMine}
+                              style={isDeleted ? { color: '#e57373', fontStyle: 'italic', fontSize: '13px' } : isMutedUser ? { color: '#888', fontStyle: 'italic', fontSize: '13px' } : {}}
                             >
                               {messageText}
                             </S.MessageTextContent>
@@ -1945,6 +2330,60 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
               );
             })}
             <div ref={messagesEndRef} />
+          </>
+        )}
+
+        {/* 프사 길게 누르기 컨텍스트 메뉴 */}
+        {avatarContextMenu.show && (
+          <>
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 99998,
+                background: 'rgba(0, 0, 0, 0.3)'
+              }}
+              onClick={closeAvatarContextMenu}
+            />
+            <div
+              style={{
+                position: 'fixed',
+                top: Math.min(avatarContextMenu.y, window.innerHeight - 120),
+                left: avatarContextMenu.x,
+                zIndex: 99999,
+                background: 'linear-gradient(180deg, #2a2a2a 0%, #1f1f1f 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                borderRadius: '12px',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+                minWidth: '160px',
+                overflow: 'hidden'
+              }}
+            >
+              {/* 삭제 권한이 있고, 아직 삭제되지 않은 경우에만 삭제 메뉴 표시 */}
+              {canDeleteMessage(avatarContextMenu.senderId) && !avatarContextMenu.isDeleted && (
+                <S.DropdownItem onClick={handleDeleteMessage}>
+                  <Trash2 size={16} />
+                  메시지 삭제
+                </S.DropdownItem>
+              )}
+              {/* 그룹 채팅에서 다른 사람의 메시지인 경우 차단/해제 메뉴 표시 */}
+              {chat.type === 'group' && avatarContextMenu.senderId !== currentUserId && (
+                mutedUsers.includes(avatarContextMenu.senderId) ? (
+                  <S.DropdownItem onClick={handleUnmuteUser}>
+                    <Volume2 size={16} />
+                    메시지 차단 해제
+                  </S.DropdownItem>
+                ) : (
+                  <S.DropdownItem onClick={handleMuteUser}>
+                    <VolumeX size={16} />
+                    이 사용자 메시지 차단
+                  </S.DropdownItem>
+                )
+              )}
+            </div>
           </>
         )}
       </S.MessagesContainer>
@@ -2039,17 +2478,6 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
         />
       )}
 
-      {/* 권한 관리 모달 (deprecated) */}
-      {showPermissionModal && chat.type === 'group' && (
-        <PermissionManagementModal
-          chatRoomId={chat.id}
-          currentUserId={currentUserId}
-          isManager={isRoomOwner}
-          showToast={showToast}
-          onClose={() => setShowPermissionModal(false)}
-        />
-      )}
-
       {/* 참여자 목록 모달 */}
       {showMemberListModal && chat.type === 'group' && (
         <S.ModalOverlay onClick={() => setShowMemberListModal(false)}>
@@ -2057,125 +2485,136 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
             <S.ModalHeader>
               <S.ModalTitle>
                 <Users size={24} />
-                참여자 목록 ({chat.membersInfo ? Object.values(chat.membersInfo).filter(m => m.status === 'active').length : 0})
+                참여자 목록 ({chatRoomData?.membersInfo ? Object.entries(chatRoomData.membersInfo).filter(([memberId, m]) => {
+                  // active 상태이고, 강퇴되지 않았고, 방에 아직 있는 멤버만 카운트
+                  const isKicked = chatRoomData.kickedUsers && chatRoomData.kickedUsers.includes(memberId);
+                  const isStillInRoom = chatRoomData.members && chatRoomData.members.includes(memberId);
+                  return m.status === 'active' && !isKicked && isStillInRoom;
+                }).length : 0})
               </S.ModalTitle>
               <S.CloseButton onClick={() => setShowMemberListModal(false)}>
                 <X size={20} />
               </S.CloseButton>
             </S.ModalHeader>
             <S.ModalContent>
-              {/* 방장 먼저 표시 */}
-              {chat.membersInfo && Object.entries(chat.membersInfo).map(([memberId, memberInfo]) => {
-                if (memberId !== chat.creatorId) return null;
-                const isOwner = memberId === chat.creatorId;
-                const displayName = userNicknames[memberId] || userDisplayNames[memberId] || '사용자';
+              {/* 멤버 정렬: 각 그룹(방장/부방장/일반/기타) 내에서 나를 가장 위에, 나머지는 가나다순 */}
+              {chatRoomData?.membersInfo && (() => {
+                const membersArray = Object.entries(chatRoomData.membersInfo).map(([memberId, memberInfo]) => {
+                  const displayName = userNicknames[memberId] || userDisplayNames[memberId] || memberInfo.displayName || '사용자';
+                  const memberStatus = memberInfo.status || 'active';
+                  const isOwner = memberId === chatRoomData.creatorId;
+                  const isSubManager = chatRoomData.subManagers?.[memberId];
+                  const isMe = memberId === currentUserId;
+                  const isKicked = chatRoomData.kickedUsers && chatRoomData.kickedUsers.includes(memberId);
+                  const isStillInRoom = chatRoomData.members && chatRoomData.members.includes(memberId);
+                  const hasLeftAfterKick = isKicked && !isStillInRoom;
+                  const hasLeft = !isStillInRoom && !isKicked; // 자발적 탈퇴
 
-                // 상태 표시 - 초대 대기중/거부만 표시
-                let statusText = null;
-                if (memberInfo.status === 'pending') {
-                  statusText = '초대 대기중';
-                } else if (memberInfo.status === 'rejected') {
-                  statusText = '초대 거부';
-                }
-                // 'active' 상태는 상태 텍스트 없음
+                  // 정렬 우선순위: 0=방장, 1=부방장, 2=일반멤버(active & 방에 있음), 99=맨아래(초대대기/거부/강퇴/탈퇴)
+                  let sortPriority = 2;
+                  if (isOwner && isStillInRoom) sortPriority = 0;
+                  else if (isSubManager && memberStatus === 'active' && isStillInRoom && !isKicked) sortPriority = 1;
+                  else if (memberStatus === 'active' && isStillInRoom && !isKicked) sortPriority = 2;
+                  else sortPriority = 99; // 초대대기, 거부, 강퇴, 탈퇴 모두 맨 아래
 
-                return (
-                  <S.MemberItem key={memberId} onClick={() => handleShowMemberDetail(memberId, displayName)} style={{ cursor: 'pointer' }}>
-                    <S.MemberAvatar
-                      $color={getAvatarColor(memberId)}
-                      style={userProfilePictures[memberId] ? { backgroundImage: `url(${userProfilePictures[memberId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
-                    >
-                      {!userProfilePictures[memberId] && userAvatarSettings[memberId] && renderAvatarIcon(memberId)}
-                      {!userProfilePictures[memberId] && !userAvatarSettings[memberId] && displayName.charAt(0).toUpperCase()}
-                    </S.MemberAvatar>
-                    <S.MemberInfo>
-                      <S.MemberName>
-                        {displayName}
-                        {isOwner && <S.OwnerBadge>방장</S.OwnerBadge>}
-                      </S.MemberName>
-                      {statusText && (
-                        <S.MemberStatus $status={memberInfo.status || 'active'}>
-                          {statusText}
-                        </S.MemberStatus>
-                      )}
-                    </S.MemberInfo>
-                  </S.MemberItem>
-                );
-              })}
+                  // 부방장 권한 정보 (내가 부방장인 경우만 표시)
+                  const subManagerPermissions = isMe && isSubManager ? chatRoomData.subManagers[memberId]?.permissions || [] : [];
 
-              {/* 나머지 멤버들 */}
-              {chat.membersInfo && Object.entries(chat.membersInfo).map(([memberId, memberInfo]) => {
-                if (memberId === chat.creatorId) return null;
-                const displayName = userNicknames[memberId] || userDisplayNames[memberId] || '사용자';
-                const memberStatus = memberInfo.status || 'active';
+                  return { memberId, memberInfo, displayName, memberStatus, isOwner, isSubManager, isMe, isKicked, isStillInRoom, hasLeftAfterKick, hasLeft, sortPriority, subManagerPermissions };
+                });
 
-                // 강퇴 여부 확인
-                const isKicked = chat.kickedUsers && chat.kickedUsers.includes(memberId);
-                // members 배열에 있는지 확인 (대화방에 남아있는지)
-                const isStillInRoom = chat.members && chat.members.includes(memberId);
+                // 정렬: 우선순위 > 같은 우선순위 내에서 나를 먼저 > 이름 가나다순
+                membersArray.sort((a, b) => {
+                  if (a.sortPriority !== b.sortPriority) return a.sortPriority - b.sortPriority;
+                  // 같은 우선순위 내에서 나를 가장 위로
+                  if (a.isMe) return -1;
+                  if (b.isMe) return 1;
+                  return a.displayName.localeCompare(b.displayName, 'ko');
+                });
 
-                // 강퇴되었고 방을 나간 상태
-                const hasLeftAfterKick = isKicked && !isStillInRoom;
+                // 권한 이름 매핑
+                const permissionLabels = {
+                  kick_member: '강퇴',
+                  manage_messages: '메시지 관리',
+                  invite_member: '초대'
+                };
 
-                // 상태 표시 - 초대 대기중/거부만 표시
-                let statusText = null;
-                if (memberStatus === 'pending') {
-                  statusText = '초대 대기중';
-                } else if (memberStatus === 'rejected') {
-                  statusText = '초대 거부';
-                }
-                // 'active' 상태는 상태 텍스트 없음
+                return membersArray.map(({ memberId, memberInfo, displayName, memberStatus, isOwner, isSubManager, isMe, isKicked, isStillInRoom, hasLeftAfterKick, hasLeft, subManagerPermissions }) => {
+                  // 상태 표시
+                  let statusText = null;
+                  if (memberStatus === 'pending') statusText = '초대 대기중';
+                  else if (memberStatus === 'rejected') statusText = '초대 거부';
+                  else if (hasLeft) statusText = '탈퇴함';
 
-                return (
-                  <S.MemberItem
-                    key={memberId}
-                    style={{ opacity: hasLeftAfterKick ? 0.5 : 1, cursor: 'pointer' }}
-                    onClick={(e) => {
-                      // 강퇴 버튼 클릭 시에는 상세 모달 안 띄우기
-                      if (e.target.closest('button')) return;
-                      handleShowMemberDetail(memberId, displayName);
-                    }}
-                  >
-                    <S.MemberAvatar
-                      $color={getAvatarColor(memberId)}
-                      style={{
-                        opacity: hasLeftAfterKick ? 0.6 : 1,
-                        ...(userProfilePictures[memberId] ? { backgroundImage: `url(${userProfilePictures[memberId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {})
+                  // 흐리게 표시할 조건: 강퇴됨, 탈퇴함, 초대 대기/거부
+                  const shouldDim = hasLeftAfterKick || hasLeft || memberStatus === 'pending' || memberStatus === 'rejected';
+
+                  // 권한 텍스트 (내가 부방장인 경우만)
+                  const permissionText = subManagerPermissions.length > 0
+                    ? subManagerPermissions.map(p => permissionLabels[p] || p).join(', ')
+                    : null;
+
+                  return (
+                    <S.MemberItem
+                      key={memberId}
+                      style={{ opacity: shouldDim ? 0.5 : 1, cursor: 'pointer' }}
+                      onClick={(e) => {
+                        if (e.target.closest('button')) return;
+                        handleShowMemberDetail(memberId, displayName);
                       }}
                     >
-                      {!userProfilePictures[memberId] && userAvatarSettings[memberId] && renderAvatarIcon(memberId)}
-                      {!userProfilePictures[memberId] && !userAvatarSettings[memberId] && displayName.charAt(0).toUpperCase()}
-                    </S.MemberAvatar>
-                    <S.MemberInfo>
-                      <S.MemberName style={{ opacity: hasLeftAfterKick ? 0.7 : 1 }}>
-                        {displayName}
-                        {isKicked && <S.OwnerBadge style={{ background: '#e53e3e', marginLeft: '6px' }}>강퇴됨</S.OwnerBadge>}
-                      </S.MemberName>
-                      {(hasLeftAfterKick || statusText) && (
-                        <S.MemberStatus $status={hasLeftAfterKick ? 'rejected' : memberStatus}>
-                          {hasLeftAfterKick ? '퇴장함' : statusText}
-                        </S.MemberStatus>
+                      <S.MemberAvatar
+                        $color={getAvatarColor(memberId)}
+                        style={{
+                          opacity: shouldDim ? 0.6 : 1,
+                          ...(userProfilePictures[memberId] ? { backgroundImage: `url(${userProfilePictures[memberId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {})
+                        }}
+                      >
+                        {!userProfilePictures[memberId] && userAvatarSettings[memberId] && renderAvatarIcon(memberId)}
+                        {!userProfilePictures[memberId] && !userAvatarSettings[memberId] && displayName.charAt(0).toUpperCase()}
+                      </S.MemberAvatar>
+                      <S.MemberInfo>
+                        <S.MemberName style={{ opacity: shouldDim ? 0.7 : 1 }}>
+                          {displayName}{isMe && ' (나)'}
+                          {isOwner && isStillInRoom && <S.OwnerBadge>방장</S.OwnerBadge>}
+                          {isSubManager && !isOwner && isStillInRoom && !isKicked && (
+                            <>
+                              <S.OwnerBadge style={{ background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e' }}>부방장</S.OwnerBadge>
+                              {isMe && permissionText && (
+                                <S.OwnerBadge style={{ background: 'rgba(100, 116, 139, 0.15)', color: '#94a3b8', fontSize: '10px', marginLeft: '4px' }}>
+                                  {permissionText}
+                                </S.OwnerBadge>
+                              )}
+                            </>
+                          )}
+                          {isKicked && <S.OwnerBadge style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#ef4444', marginLeft: '6px' }}>강퇴됨</S.OwnerBadge>}
+                        </S.MemberName>
+                        {statusText && (
+                          <S.MemberStatus $status={hasLeftAfterKick || hasLeft ? 'rejected' : memberStatus}>
+                            {statusText}
+                          </S.MemberStatus>
+                        )}
+                      </S.MemberInfo>
+                      {memberStatus === 'active' && !isKicked && !isOwner && isStillInRoom && !isMe && canKickMember(memberId) && (
+                        <S.RemoveButton onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveMember(memberId, displayName);
+                        }}>
+                          강퇴
+                        </S.RemoveButton>
                       )}
-                    </S.MemberInfo>
-                    {isRoomOwner && memberStatus === 'active' && !isKicked && (
-                      <S.RemoveButton onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveMember(memberId, displayName);
-                      }}>
-                        강퇴
-                      </S.RemoveButton>
-                    )}
-                    {isRoomOwner && (memberStatus === 'pending' || memberStatus === 'rejected') && (
-                      <S.CancelInviteButton onClick={(e) => {
-                        e.stopPropagation();
-                        handleCancelInvitation(memberId, displayName);
-                      }}>
-                        초대 취소
-                      </S.CancelInviteButton>
-                    )}
-                  </S.MemberItem>
-                );
-              })}
+                      {isRoomOwner && (memberStatus === 'pending' || memberStatus === 'rejected') && (
+                        <S.CancelInviteButton onClick={(e) => {
+                          e.stopPropagation();
+                          handleCancelInvitation(memberId, displayName);
+                        }}>
+                          초대 취소
+                        </S.CancelInviteButton>
+                      )}
+                    </S.MemberItem>
+                  );
+                });
+              })()}
             </S.ModalContent>
           </S.ModalContainer>
         </S.ModalOverlay>
@@ -2232,6 +2671,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                         value={searchQueryInvite}
                         onChange={(e) => setSearchQueryInvite(e.target.value)}
                       />
+                      {searchQueryInvite && (
+                        <S.SearchClearButton onClick={() => setSearchQueryInvite('')}>
+                          <X size={12} />
+                        </S.SearchClearButton>
+                      )}
                     </S.SearchBarWrapper>
 
                     {/* 친구 목록 */}
@@ -2528,7 +2972,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   fontSize: '13px',
                   color: '#ffa500'
                 }}>
-                  강퇴된 멤버는 초대 코드로 다시 참여할 수 있습니다.
+                  강퇴된 멤버는 다시 초대하여 참여시킬 수 있습니다.
                 </div>
               </div>
             </S.ModalContent>
@@ -2658,7 +3102,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                     gap: '8px'
                   }}>
                     <span style={{ flexShrink: 0 }}>💡</span>
-                    <span>초대 코드를 공유하면 강퇴된 멤버도 다시 참여할 수 있습니다</span>
+                    <span>강퇴된 멤버는 다시 초대하여 참여시킬 수 있습니다</span>
                   </div>
                 )}
               </div>
@@ -3120,6 +3564,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
           currentUserId={currentUserId}
           onClose={() => setShowAppointSubManagerModal(false)}
           onAppoint={handleAppointSubManager}
+          onRemoveSubManager={handleRemoveSubManager}
         />
       )}
 
@@ -3151,7 +3596,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   fontSize: '13px',
                   color: '#ffa500'
                 }}>
-                  위임하면 일반 참여자가 됩니다
+                  위임하면 당신은 일반 참여자가 됩니다
                 </div>
               </div>
             </S.ModalContent>
@@ -3203,6 +3648,219 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
           </S.ModalContainer>
         </S.ModalOverlay>
       )}
+
+      {/* 차단 사용자 있는 방 참여 확인 모달 */}
+      {showBlockedJoinConfirm.show && (
+        <S.ModalOverlay onClick={() => setShowBlockedJoinConfirm({ show: false, blockedNames: '' })}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>참여 확인</S.ModalTitle>
+              <S.IconButton onClick={() => setShowBlockedJoinConfirm({ show: false, blockedNames: '' })}>
+                <X size={20} />
+              </S.IconButton>
+            </S.ModalHeader>
+            <S.ModalContent>
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+                <div style={{ color: '#e0e0e0', marginBottom: '12px', fontWeight: '600' }}>
+                  참여자 중에 차단한 사용자가 있습니다
+                </div>
+                <div style={{ color: '#ff9800', marginBottom: '16px' }}>
+                  차단한 사용자: {showBlockedJoinConfirm.blockedNames}
+                </div>
+                <div style={{ color: '#888', fontSize: '13px', lineHeight: '1.6' }}>
+                  이 방에 참여하시겠습니까?<br />
+                  (참여하면 이 방에서는 서로 대화할 수 있습니다)
+                </div>
+              </div>
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton onClick={() => setShowBlockedJoinConfirm({ show: false, blockedNames: '' })}>
+                취소
+              </S.CancelButton>
+              <S.ConfirmButton onClick={() => {
+                setShowBlockedJoinConfirm({ show: false, blockedNames: '' });
+                handleAcceptInvitation(true);
+              }}>
+                참여하기
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
+      )}
+
+      {/* 초대 취소 확인 모달 */}
+      {showCancelInviteConfirm.show && (
+        <S.ModalOverlay onClick={() => setShowCancelInviteConfirm({ show: false, targetId: null, targetName: '' })}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>초대 취소</S.ModalTitle>
+              <S.IconButton onClick={() => setShowCancelInviteConfirm({ show: false, targetId: null, targetName: '' })}>
+                <X size={20} />
+              </S.IconButton>
+            </S.ModalHeader>
+            <S.ModalContent>
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div style={{ fontSize: '48px', marginBottom: '16px' }}>🚫</div>
+                <div style={{ color: '#e0e0e0', marginBottom: '16px' }}>
+                  <strong>{showCancelInviteConfirm.targetName}</strong>님의 초대를 취소하시겠습니까?
+                </div>
+                <div style={{ color: '#888', fontSize: '13px' }}>
+                  목록에서 완전히 제거됩니다.
+                </div>
+              </div>
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton onClick={() => setShowCancelInviteConfirm({ show: false, targetId: null, targetName: '' })}>
+                아니오
+              </S.CancelButton>
+              <S.ConfirmButton onClick={confirmCancelInvitation}>
+                취소하기
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
+      )}
+
+      {/* 🔊 현 단체방 음량 개별 설정 모달 */}
+      {showVolumeSettingModal && (
+        <S.ModalOverlay onClick={() => setShowVolumeSettingModal(false)}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <S.ModalHeader>
+              <S.ModalTitle>
+                <Volume2 size={24} />
+                현 단체방 음량 개별 설정
+              </S.ModalTitle>
+              <S.CloseButton onClick={() => setShowVolumeSettingModal(false)}>
+                <X size={20} />
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent style={{ padding: '24px' }}>
+              {/* 메시지 알림음 */}
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '12px'
+                }}>
+                  <span style={{ fontSize: '14px', color: '#e0e0e0', fontWeight: '500' }}>
+                    메시지 알림음
+                  </span>
+                  <span style={{ fontSize: '13px', color: '#667eea', fontWeight: '600' }}>
+                    {roomMessageVolume}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={roomMessageVolume}
+                  onChange={(e) => setRoomMessageVolume(Number(e.target.value))}
+                  style={{
+                    width: '100%',
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: `linear-gradient(to right, #667eea 0%, #667eea ${roomMessageVolume}%, rgba(255,255,255,0.1) ${roomMessageVolume}%, rgba(255,255,255,0.1) 100%)`,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    WebkitAppearance: 'none'
+                  }}
+                />
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginTop: '4px',
+                  fontSize: '11px',
+                  color: '#666'
+                }}>
+                  <span>음소거</span>
+                  <span>최대</span>
+                </div>
+              </div>
+
+              {/* 메시지 수신음 */}
+              <div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: '12px'
+                }}>
+                  <span style={{ fontSize: '14px', color: '#e0e0e0', fontWeight: '500' }}>
+                    메시지 수신음
+                  </span>
+                  <span style={{ fontSize: '13px', color: '#667eea', fontWeight: '600' }}>
+                    {roomReceiveVolume}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={roomReceiveVolume}
+                  onChange={(e) => setRoomReceiveVolume(Number(e.target.value))}
+                  style={{
+                    width: '100%',
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: `linear-gradient(to right, #667eea 0%, #667eea ${roomReceiveVolume}%, rgba(255,255,255,0.1) ${roomReceiveVolume}%, rgba(255,255,255,0.1) 100%)`,
+                    outline: 'none',
+                    cursor: 'pointer',
+                    WebkitAppearance: 'none'
+                  }}
+                />
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginTop: '4px',
+                  fontSize: '11px',
+                  color: '#666'
+                }}>
+                  <span>음소거</span>
+                  <span>최대</span>
+                </div>
+              </div>
+
+              {/* 안내 문구 */}
+              <div style={{
+                marginTop: '20px',
+                padding: '12px',
+                background: 'rgba(102, 126, 234, 0.1)',
+                borderRadius: '8px',
+                fontSize: '12px',
+                color: '#888',
+                lineHeight: '1.5',
+                textAlign: 'center'
+              }}>
+                이 설정은 현재 단체방에만 적용됩니다.<br />
+                기본값은 전체 설정(10%)과 동일합니다.
+              </div>
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton onClick={() => setShowVolumeSettingModal(false)}>
+                취소
+              </S.CancelButton>
+              <S.ConfirmButton onClick={handleSaveRoomVolume}>
+                저장
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
+      )}
+
+      {/* 사용자 프로필 모달 */}
+      <UserProfileModal
+        isOpen={userProfileModal.show}
+        onClose={() => setUserProfileModal({ show: false, userId: null, userName: '', profilePicture: null })}
+        userId={userProfileModal.userId}
+        userName={userProfileModal.userName}
+        profilePicture={userProfileModal.profilePicture}
+        isGroupChat={chat?.type === 'group'}
+        onStartDM={handleStartDMFromProfile}
+        onBlockUser={handleBlockFromProfile}
+        currentUserId={currentUserId}
+      />
     </S.FullScreenContainer>,
     document.body
   );

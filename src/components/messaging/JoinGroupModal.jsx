@@ -3,6 +3,7 @@ import { useState } from 'react';
 import styled from 'styled-components';
 import { X, Key, AlertCircle } from 'lucide-react';
 import { joinGroupByInviteCode } from '../../services/groupChatService';
+import ConfirmModal from '../ConfirmModal';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -169,6 +170,7 @@ const JoinGroupModal = ({ onClose, showToast }) => {
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [blockedConfirm, setBlockedConfirm] = useState({ show: false, blockedNames: '' });
 
   const handleJoin = async (forceJoin = false) => {
     if (!inviteCode.trim()) {
@@ -198,14 +200,7 @@ const JoinGroupModal = ({ onClose, showToast }) => {
       // 차단 사용자가 있는 경우
       if (err.message?.startsWith('BLOCKED_MEMBERS_IN_GROUP:')) {
         const blockedNames = err.message.replace('BLOCKED_MEMBERS_IN_GROUP:', '');
-        const confirmed = window.confirm(
-          `참여자 중에 차단한 사용자가 있습니다.\n\n차단한 사용자: ${blockedNames}\n\n이 방에 참여하시겠습니까?\n(참여하면 이 방에서는 서로 대화할 수 있습니다)`
-        );
-
-        if (confirmed) {
-          // 사용자가 참여를 선택한 경우 forceJoin으로 다시 호출
-          await handleJoin(true);
-        }
+        setBlockedConfirm({ show: true, blockedNames });
         setLoading(false);
         return;
       }
@@ -220,6 +215,11 @@ const JoinGroupModal = ({ onClose, showToast }) => {
     if (e.key === 'Enter' && !loading) {
       handleJoin();
     }
+  };
+
+  const confirmJoinWithBlocked = async () => {
+    setBlockedConfirm({ show: false, blockedNames: '' });
+    await handleJoin(true);
   };
 
   return (
@@ -270,6 +270,18 @@ const JoinGroupModal = ({ onClose, showToast }) => {
           </JoinButton>
         </Footer>
       </ModalContainer>
+
+      {blockedConfirm.show && (
+        <ConfirmModal
+          icon="⚠️"
+          title="차단 사용자 포함"
+          message={`참여자 중에 차단한 사용자가 있습니다.\n\n차단한 사용자: ${blockedConfirm.blockedNames}\n\n이 방에 참여하시겠습니까?\n(참여하면 이 방에서는 서로 대화할 수 있습니다)`}
+          confirmText="참여"
+          cancelText="취소"
+          onConfirm={confirmJoinWithBlocked}
+          onCancel={() => setBlockedConfirm({ show: false, blockedNames: '' })}
+        />
+      )}
     </ModalOverlay>
   );
 };

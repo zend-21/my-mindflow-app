@@ -120,15 +120,25 @@ export const subscribeToMyGroupChats = (callback) => {
       ...doc.data()
     }));
 
-    // 차단으로 인한 초대는 필터링 (조용히 숨김)
+    // 차단, 강퇴, 거부 필터링
     const filteredGroups = groups.filter(group => {
       const myMemberInfo = group.membersInfo?.[userId];
+      const isKicked = group.kickedUsers?.includes(userId);
 
       console.log(`🔍 [그룹 필터링] ${group.groupName} (${group.id}):`, {
         hasMemberInfo: !!myMemberInfo,
         memberInfo: myMemberInfo,
-        isBlocked: myMemberInfo?.isBlockedInvite === true
+        status: myMemberInfo?.status,
+        isBlocked: myMemberInfo?.isBlockedInvite === true,
+        isKicked: isKicked,
+        kickedUsers: group.kickedUsers
       });
+
+      // 강퇴 목록에 있으면 숨김
+      if (isKicked) {
+        console.log(`⚠️ [그룹 필터링] 강퇴됨 - 숨김: ${group.groupName}`);
+        return false;
+      }
 
       // membersInfo에 없으면 표시 안 함
       if (!myMemberInfo) {
@@ -139,6 +149,12 @@ export const subscribeToMyGroupChats = (callback) => {
       // isBlockedInvite가 true면 숨김 (차단한 사용자의 초대)
       if (myMemberInfo.isBlockedInvite === true) {
         console.log(`⚠️ [그룹 필터링] 차단된 초대 - 숨김: ${group.groupName}`);
+        return false;
+      }
+
+      // 초대를 거부한 경우 숨김
+      if (myMemberInfo.status === 'rejected') {
+        console.log(`⚠️ [그룹 필터링] 초대 거부됨 - 숨김: ${group.groupName}`);
         return false;
       }
 
@@ -562,6 +578,31 @@ export const updateSubManagerPermissions = async (groupId, creatorId, subManager
   }
 };
 
+// ==================== 그룹 채팅방 실시간 구독 ====================
+
+/**
+ * 그룹 채팅방 데이터 실시간 구독
+ * @param {string} groupId - 그룹 채팅방 ID
+ * @param {function} callback - 업데이트 시 호출될 콜백 (groupData)
+ * @returns {function} 구독 해제 함수
+ */
+export const subscribeToGroupRoom = (groupId, callback) => {
+  const groupRef = doc(db, 'groupChats', groupId);
+
+  return onSnapshot(groupRef, (docSnap) => {
+    if (docSnap.exists()) {
+      const groupData = {
+        id: docSnap.id,
+        ...docSnap.data(),
+        type: 'group'
+      };
+      callback(groupData);
+    }
+  }, (error) => {
+    console.error('❌ 그룹 채팅방 구독 오류:', error);
+  });
+};
+
 // ==================== 레거시 함수 (하위 호환성) ====================
 // 다른 파일로 이동된 함수들을 재-export하여 기존 import가 깨지지 않도록 함
 
@@ -575,7 +616,10 @@ export {
   acceptInvitation,
   rejectInvitation,
   cancelInvitation,
-  joinGroupByInviteCode
+  joinGroupByInviteCode,
+  muteUserInGroup,
+  unmuteUserInGroup,
+  getMutedUsersInGroup
 } from './groupChatMemberService';
 
 // Message management (groupChatMessageService.js로 이동)

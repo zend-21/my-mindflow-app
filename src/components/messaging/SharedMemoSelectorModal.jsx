@@ -92,7 +92,7 @@ const SearchInput = styled.input`
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
-  padding: 12px 12px 12px 40px;
+  padding: 12px 36px 12px 40px;
   color: #e0e0e0;
   font-size: 14px;
   transition: all 0.2s;
@@ -105,6 +105,28 @@ const SearchInput = styled.input`
     outline: none;
     border-color: #4a90e2;
     background: rgba(255, 255, 255, 0.08);
+  }
+`;
+
+const SearchClearButton = styled.button`
+  position: absolute;
+  right: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #888;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
   }
 `;
 
@@ -507,6 +529,11 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
               onChange={(e) => setSearchQuery(e.target.value)}
               autoFocus
             />
+            {searchQuery && (
+              <SearchClearButton onClick={() => setSearchQuery('')}>
+                <X size={12} />
+              </SearchClearButton>
+            )}
           </SearchWrapper>
         </SearchContainer>
 

@@ -90,6 +90,21 @@ export const addFriendInstantly = async (myUserId, targetWorkspaceCode) => {
       throw new Error('이미 친구로 등록된 사용자입니다');
     }
 
+    // 2-1. 내가 차단한 사용자인지 확인
+    try {
+      const { isUserBlocked } = await import('./userManagementService');
+      const isBlocked = await isUserBlocked(myUserId, targetUser.id);
+      if (isBlocked) {
+        throw new Error('차단한 사용자입니다. 차단을 해제한 후 친구 추가해 주세요.');
+      }
+    } catch (error) {
+      // isUserBlocked 에러가 아닌 경우만 재throw
+      if (error.message.includes('차단한 사용자')) {
+        throw error;
+      }
+      console.warn('차단 확인 실패 (무시):', error);
+    }
+
     // 3. 내 정보 가져오기
     const myUserDoc = await getDoc(doc(db, 'users', myUserId));
     if (!myUserDoc.exists()) {

@@ -8,6 +8,7 @@ import {
   blockUser,
 } from '../../services/userManagementService';
 import { addFriendInstantly } from '../../services/friendService';
+import ConfirmModal from '../ConfirmModal';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -15,7 +16,7 @@ const ModalOverlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -23,19 +24,20 @@ const ModalOverlay = styled.div`
 `;
 
 const ModalContainer = styled.div`
-  background: white;
+  background: #2a2a2a;
   border-radius: 12px;
   width: 90%;
   max-width: 500px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 const ModalHeader = styled.div`
   padding: 20px 24px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -44,7 +46,7 @@ const ModalHeader = styled.div`
 const ModalTitle = styled.h2`
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: #ffffff;
   margin: 0;
 `;
 
@@ -53,14 +55,15 @@ const CloseButton = styled.button`
   border: none;
   padding: 4px;
   cursor: pointer;
-  color: #666;
+  color: #888;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
 
   &:hover {
-    background-color: #f5f5f5;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
   }
 `;
 
@@ -73,7 +76,7 @@ const ModalBody = styled.div`
 const EmptyState = styled.div`
   text-align: center;
   padding: 40px 20px;
-  color: #999;
+  color: #888;
 `;
 
 const EmptyIcon = styled.div`
@@ -83,7 +86,7 @@ const EmptyIcon = styled.div`
 
 const EmptyText = styled.p`
   font-size: 14px;
-  color: #999;
+  color: #888;
   margin: 0;
 `;
 
@@ -91,7 +94,7 @@ const FriendItem = styled.div`
   display: flex;
   align-items: center;
   padding: 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   gap: 10px;
 
   &:last-child {
@@ -130,13 +133,13 @@ const TopRow = styled.div`
 const FriendName = styled.span`
   font-size: 14px;
   font-weight: 500;
-  color: #333;
+  color: #ffffff;
   white-space: nowrap;
 `;
 
 const FriendMeta = styled.span`
   font-size: 13px;
-  color: #999;
+  color: #888;
   white-space: nowrap;
 `;
 
@@ -147,9 +150,9 @@ const BottomRow = styled.div`
 
 const ActionButton = styled.button`
   padding: 5px 8px;
-  border: 1px solid ${props => props.$variant === 'danger' ? '#ff4444' : '#ddd'};
-  background: ${props => props.$variant === 'danger' ? '#ff4444' : 'white'};
-  color: ${props => props.$variant === 'danger' ? 'white' : '#666'};
+  border: 1px solid ${props => props.$variant === 'danger' ? '#ff4444' : 'rgba(255, 255, 255, 0.2)'};
+  background: ${props => props.$variant === 'danger' ? '#ff4444' : 'rgba(255, 255, 255, 0.1)'};
+  color: ${props => props.$variant === 'danger' ? 'white' : '#e0e0e0'};
   border-radius: 5px;
   font-size: 11px;
   cursor: pointer;
@@ -161,7 +164,7 @@ const ActionButton = styled.button`
   flex-shrink: 0;
 
   &:hover {
-    background: ${props => props.$variant === 'danger' ? '#ff3333' : '#f5f5f5'};
+    background: ${props => props.$variant === 'danger' ? '#ff3333' : 'rgba(255, 255, 255, 0.15)'};
     transform: translateY(-1px);
   }
 
@@ -182,6 +185,8 @@ const DeletedFriendsModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
   const [deletedFriends, setDeletedFriends] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, friend: null });
+  const [blockConfirm, setBlockConfirm] = useState({ show: false, friend: null });
 
   useEffect(() => {
     if (isOpen) {
@@ -227,10 +232,13 @@ const DeletedFriendsModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
     }
   };
 
-  const handlePermanentDelete = async (friend) => {
-    if (!window.confirm(`${friend.friendName}님을 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
-      return;
-    }
+  const handlePermanentDelete = (friend) => {
+    setDeleteConfirm({ show: true, friend });
+  };
+
+  const confirmPermanentDelete = async () => {
+    const friend = deleteConfirm.friend;
+    setDeleteConfirm({ show: false, friend: null });
 
     try {
       setActionLoading(friend.friendId);
@@ -252,10 +260,13 @@ const DeletedFriendsModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
     }
   };
 
-  const handleBlock = async (friend) => {
-    if (!window.confirm(`${friend.friendName}님을 차단하시겠습니까?`)) {
-      return;
-    }
+  const handleBlock = (friend) => {
+    setBlockConfirm({ show: true, friend });
+  };
+
+  const confirmBlock = async () => {
+    const friend = blockConfirm.friend;
+    setBlockConfirm({ show: false, friend: null });
 
     try {
       setActionLoading(friend.friendId);
@@ -287,7 +298,7 @@ const DeletedFriendsModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
     <ModalOverlay onClick={onClose}>
       <ModalContainer onClick={(e) => e.stopPropagation()}>
         <ModalHeader>
-          <ModalTitle>친구삭제 목록</ModalTitle>
+          <ModalTitle>친구 삭제 목록</ModalTitle>
           <CloseButton onClick={onClose}>
             <X size={20} />
           </CloseButton>
@@ -344,6 +355,30 @@ const DeletedFriendsModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
           )}
         </ModalBody>
       </ModalContainer>
+
+      {deleteConfirm.show && (
+        <ConfirmModal
+          icon="🗑️"
+          title="영구 삭제"
+          message={`${deleteConfirm.friend?.friendName}님을 영구 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`}
+          confirmText="삭제"
+          cancelText="취소"
+          onConfirm={confirmPermanentDelete}
+          onCancel={() => setDeleteConfirm({ show: false, friend: null })}
+        />
+      )}
+
+      {blockConfirm.show && (
+        <ConfirmModal
+          icon="🚫"
+          title="사용자 차단"
+          message={`${blockConfirm.friend?.friendName}님을 차단하시겠습니까?`}
+          confirmText="차단"
+          cancelText="취소"
+          onConfirm={confirmBlock}
+          onCancel={() => setBlockConfirm({ show: false, friend: null })}
+        />
+      )}
     </ModalOverlay>
   );
 };

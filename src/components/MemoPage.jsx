@@ -149,14 +149,20 @@ const MemoPage = ({
                         console.log('👥 [대화방 정보] 1:1 대화방 처리:', { participants, partnerId, currentUserId });
 
                         if (partnerId) {
-                            // 상대방 닉네임 가져오기
-                            const { getUserNickname } = await import('../services/nicknameService');
-                            const partnerNickname = await getUserNickname(partnerId);
-                            console.log('📝 [대화방 정보] 닉네임 가져옴:', partnerNickname);
+                            // 상대방 표시 이름 가져오기 (앱 닉네임 우선, Google displayName fallback)
+                            const { getUserDisplayName } = await import('../services/nicknameService');
+
+                            // users 컬렉션에서 Google displayName 가져오기
+                            const userRef = doc(db, 'users', partnerId);
+                            const userSnap = await getDoc(userRef);
+                            const googleDisplayName = userSnap.exists() ? userSnap.data().displayName : null;
+
+                            const partnerDisplayName = await getUserDisplayName(partnerId, googleDisplayName);
+                            console.log('📝 [대화방 정보] 표시 이름 가져옴:', partnerDisplayName, '(Google:', googleDisplayName, ')');
 
                             const details = {
                                 type: '1:1',
-                                partnerName: partnerNickname || '알 수 없음'
+                                partnerName: partnerDisplayName
                             };
                             console.log('✅ [대화방 정보] setState 호출 (1:1):', details);
                             setChatRoomDetails(details);

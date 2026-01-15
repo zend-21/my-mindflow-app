@@ -26,7 +26,6 @@ import { findPhoneByFirebaseUID, isLegacyUser } from './services/authService';
 import './utils/cleanBase64'; // window.cleanInvalidMemos 등록용
 import MessagingHub from './components/messaging/MessagingHub.jsx';
 import AuthRequiredModal from './components/AuthRequiredModal.jsx';
-import AdBanner from './components/messaging/AdBanner.jsx';
 import ChatRoom from './components/messaging/ChatRoom.jsx';
 import AppRouter from './components/AppRouter.jsx';
 import Toast from './components/Toast.jsx';
@@ -65,6 +64,8 @@ import Timer from './components/Timer.jsx';
 import MacroModal from './components/MacroModal.jsx';
 import TrashPage from './components/TrashPage.jsx';
 import SecretPage from './components/secret/SecretPage.jsx';
+import SplashScreen from './components/SplashScreen.jsx';
+import TermsAgreementModal, { TERMS_VERSION, PRIVACY_VERSION } from './components/TermsAgreementModal.jsx';
 const getWidgetComponent = (widgetName, props) => {
     switch (widgetName) {
         case 'StatsGrid':
@@ -104,6 +105,9 @@ const DraggableWidget = ({ id, onSwitchTab, addActivity, recentActivities, displ
 };
 
 function App() {
+    // 🎬 스플래시 스크린 상태
+    const [showSplash, setShowSplash] = useState(true);
+
     // ✅ 기존 상태들은 그대로 유지
     const [isLoading, setIsLoading] = useState(true);
     const [profile, setProfile] = useState(null);
@@ -148,6 +152,12 @@ function App() {
 
     const [isUserIdle, setIsUserIdle] = useState(false);
     const idleTimerRef = useRef(null);
+
+    // 📜 약관 동의 관련 상태
+    const [isTermsModalOpen, setIsTermsModalOpen] = useState(false);
+    const [isTermsReConsent, setIsTermsReConsent] = useState(false);
+    const [changedTermsList, setChangedTermsList] = useState([]);
+    const [pendingLoginAfterTerms, setPendingLoginAfterTerms] = useState(null);
     const IDLE_TIMEOUT = 5 * 60 * 1000; // 5분
 
     const contentRef = useRef(null);
@@ -240,6 +250,49 @@ function App() {
 
                 // Firebase Auth와 localStorage 동기화 확인
                 checkSync(user.uid);
+
+                // 📜 기존 로그인 사용자의 약관 변경 체크 (앱 시작 시)
+                // 약관이 변경되었으면 재동의 모달 표시
+                try {
+                    const termsRef = doc(db, 'users', user.uid, 'agreements', 'terms');
+                    const termsSnap = await getDoc(termsRef);
+
+                    if (termsSnap.exists()) {
+                        const data = termsSnap.data();
+                        const agreedTermsVersion = data.termsVersion || '0.0.0';
+                        const agreedPrivacyVersion = data.privacyVersion || '0.0.0';
+
+                        const changedTerms = [];
+                        if (TERMS_VERSION !== agreedTermsVersion) {
+                            changedTerms.push('terms');
+                        }
+                        if (PRIVACY_VERSION !== agreedPrivacyVersion) {
+                            changedTerms.push('privacy');
+                        }
+
+                        if (changedTerms.length > 0) {
+                            console.log('📜 약관 변경 감지 - 재동의 필요:', changedTerms);
+                            // 재동의 필요 - 로그인 데이터 저장 후 모달 표시
+                            const savedProfile = localStorage.getItem('userProfile');
+                            const accessToken = localStorage.getItem('accessToken');
+
+                            if (savedProfile && accessToken) {
+                                const profileData = JSON.parse(savedProfile);
+                                setPendingLoginAfterTerms({
+                                    firebaseUserId: user.uid,
+                                    loginType: 'reconsent', // 재동의 타입 추가
+                                    loginData: null // 이미 로그인된 상태이므로 불필요
+                                });
+                                setIsTermsReConsent(true);
+                                setChangedTermsList(changedTerms);
+                                setIsTermsModalOpen(true);
+                            }
+                        }
+                    }
+                } catch (termsCheckError) {
+                    // 권한 오류 등은 조용히 무시 (기존 사용자가 아직 동의하지 않은 경우)
+                    console.log('📜 약관 체크 스킵 (권한 없음 또는 기록 없음)');
+                }
             } else {
                 console.log('❌ Firebase Auth 로그아웃 상태');
                 setFirebaseUser(null);
@@ -839,7 +892,7 @@ function App() {
         };
 
         // 1. 휴대폰에 파일 다운로드 (모든 사용자)
-        exportData('mindflow_backup', dataToExport);
+        exportData('sharenote_backup', dataToExport);
 
         // 2. 로그인 사용자는 Google Drive에도 백업
         if (profile && accessToken) {
@@ -1195,8 +1248,10 @@ function App() {
     };
 
     // 숨겨진 메모 정리 (존재하지 않는 폴더에 속한 메모들을 미분류로 이동)
+    // 'shared'는 가상 폴더이므로 제외
     const handleCleanupOrphanedMemos = () => {
         const folderIds = new Set(folders.map(f => f.id));
+        folderIds.add('shared');
         const orphanedMemos = memos.filter(memo => memo.folderId && !folderIds.has(memo.folderId));
 
         if (orphanedMemos.length === 0) {
@@ -1205,7 +1260,8 @@ function App() {
         }
 
         const cleanedMemos = memos.map(memo => {
-            if (memo.folderId && !folderIds.has(memo.folderId)) {
+            // 'shared'는 제외하고, 존재하지 않는 폴더에 속한 메모만 미분류로 이동
+            if (memo.folderId && memo.folderId !== 'shared' && !folderIds.has(memo.folderId)) {
                 return { ...memo, folderId: null };
             }
             return memo;
@@ -1679,6 +1735,120 @@ function App() {
         };
     }, []);
 
+    // 📜 약관 동의 여부 확인 함수
+    const checkTermsAgreement = async (firebaseUserId) => {
+        try {
+            const termsRef = doc(db, 'users', firebaseUserId, 'agreements', 'terms');
+            const termsSnap = await getDoc(termsRef);
+
+            if (!termsSnap.exists()) {
+                // 약관 동의 기록이 없음 - 첫 로그인
+                return { needsAgreement: true, isReConsent: false, changedTerms: [] };
+            }
+
+            const data = termsSnap.data();
+            const agreedTermsVersion = data.termsVersion || '0.0.0';
+            const agreedPrivacyVersion = data.privacyVersion || '0.0.0';
+
+            // 버전 비교 (현재 버전이 더 높으면 재동의 필요)
+            const changedTerms = [];
+            if (TERMS_VERSION !== agreedTermsVersion) {
+                changedTerms.push('terms');
+            }
+            if (PRIVACY_VERSION !== agreedPrivacyVersion) {
+                changedTerms.push('privacy');
+            }
+
+            if (changedTerms.length > 0) {
+                // 약관이 변경됨 - 재동의 필요
+                return { needsAgreement: true, isReConsent: true, changedTerms };
+            }
+
+            // 모든 약관에 동의 완료
+            return { needsAgreement: false, isReConsent: false, changedTerms: [] };
+        } catch (error) {
+            console.error('약관 동의 확인 오류:', error);
+            // 오류 시 안전하게 동의 필요 상태로 처리
+            return { needsAgreement: true, isReConsent: false, changedTerms: [] };
+        }
+    };
+
+    // 📜 약관 동의 저장 함수
+    const saveTermsAgreement = async (firebaseUserId, agreementData) => {
+        try {
+            const termsRef = doc(db, 'users', firebaseUserId, 'agreements', 'terms');
+            await setDoc(termsRef, {
+                termsVersion: agreementData.termsVersion,
+                privacyVersion: agreementData.privacyVersion,
+                termsAgreedAt: agreementData.agreedAt,
+                privacyAgreedAt: agreementData.agreedAt,
+                lastUpdated: serverTimestamp(),
+                userAgent: navigator.userAgent,
+                platform: navigator.platform
+            }, { merge: true });
+            console.log('✅ 약관 동의 저장 완료');
+            return true;
+        } catch (error) {
+            console.error('❌ 약관 동의 저장 오류:', error);
+            return false;
+        }
+    };
+
+    // 📜 약관 동의 완료 핸들러
+    const handleTermsAgree = async (agreementData) => {
+        if (!pendingLoginAfterTerms) {
+            console.error('❌ 대기 중인 로그인 데이터 없음');
+            return;
+        }
+
+        const { firebaseUserId, loginType, loginData } = pendingLoginAfterTerms;
+
+        // 약관 동의 저장
+        const saved = await saveTermsAgreement(firebaseUserId, agreementData);
+        if (!saved) {
+            showToast('⚠ 약관 동의 저장에 실패했습니다. 다시 시도해주세요.');
+            return;
+        }
+
+        // 모달 닫기
+        setIsTermsModalOpen(false);
+        setPendingLoginAfterTerms(null);
+
+        // 로그인 진행
+        if (loginType === 'simple') {
+            await handleSimpleLogin(
+                loginData.firebaseUserId,
+                loginData.accessToken,
+                loginData.userInfo,
+                loginData.pictureUrl,
+                loginData.expiresAt
+            );
+        } else if (loginType === 'mindflow') {
+            await completeMindFlowLogin(
+                loginData.phoneNumber,
+                loginData.firebaseUserId,
+                loginData.accessToken,
+                loginData.userInfo,
+                loginData.pictureUrl,
+                loginData.expiresAt
+            );
+        } else if (loginType === 'reconsent') {
+            // 기존 로그인 사용자 재동의 - 추가 로그인 처리 불필요
+            showToast('약관 동의가 완료되었습니다.');
+            console.log('✅ 기존 사용자 약관 재동의 완료');
+        }
+    };
+
+    // 📜 약관 동의 취소 핸들러
+    const handleTermsCancel = () => {
+        setIsTermsModalOpen(false);
+        setPendingLoginAfterTerms(null);
+        showToast('약관에 동의하지 않으면 로그인할 수 없습니다.');
+
+        // Firebase 로그아웃 처리
+        signOut(auth).catch(err => console.error('로그아웃 오류:', err));
+    };
+
     // ✅ 로그인 성공 시 처리 - 휴대폰 인증 통합
     const handleLoginSuccess = async (response) => {
         try {
@@ -1709,12 +1879,65 @@ function App() {
                 firebaseUserId = userInfo.sub || userInfo.id || btoa(userInfo.email).replace(/[^a-zA-Z0-9]/g, '').substring(0, 28);
             }
 
+            // 📜 약관 동의 확인
+            console.log('📜 약관 동의 여부 확인 중...');
+            const { needsAgreement, isReConsent, changedTerms } = await checkTermsAgreement(firebaseUserId);
+
             // 🔐 휴대폰 인증 플로우 시작
             console.log('🔐 휴대폰 번호 확인 중...');
 
             // 1. Firebase UID로 연결된 휴대폰 번호 조회
             const existingPhone = await findPhoneByFirebaseUID(firebaseUserId);
 
+            if (needsAgreement) {
+                // 약관 동의 필요 - 로그인 보류 및 모달 표시
+                console.log('📜 약관 동의 필요:', isReConsent ? '재동의' : '첫 동의', changedTerms);
+
+                // 로그인 데이터 저장
+                if (existingPhone) {
+                    setPendingLoginAfterTerms({
+                        firebaseUserId,
+                        loginType: 'mindflow',
+                        loginData: {
+                            phoneNumber: existingPhone,
+                            firebaseUserId,
+                            accessToken,
+                            userInfo,
+                            pictureUrl,
+                            expiresAt
+                        }
+                    });
+                } else {
+                    setPendingLoginAfterTerms({
+                        firebaseUserId,
+                        loginType: 'simple',
+                        loginData: {
+                            firebaseUserId,
+                            accessToken,
+                            userInfo,
+                            pictureUrl,
+                            expiresAt
+                        }
+                    });
+
+                    // 휴대폰 인증 데이터도 저장 (나중에 필요할 때 사용)
+                    setPendingAuthData({
+                        firebaseUserId,
+                        accessToken,
+                        userInfo,
+                        pictureUrl,
+                        expiresAt
+                    });
+                }
+
+                // 약관 모달 표시
+                setIsTermsReConsent(isReConsent);
+                setChangedTermsList(changedTerms);
+                setIsTermsModalOpen(true);
+                return; // 로그인 처리 중단 - 약관 동의 후 진행
+            }
+
+            // 약관 동의 완료 - 기존 로그인 플로우 진행
             if (existingPhone) {
                 // 이미 휴대폰 인증이 완료된 사용자
                 console.log('✅ 기존 인증 완료 사용자:', existingPhone);
@@ -1727,12 +1950,12 @@ function App() {
 
                 // 구 구조 사용자 확인
                 // ✅ Progressive Onboarding: 휴대폰 인증은 특정 기능 사용 시에만 요구
-                const existingPhone = await findPhoneByFirebaseUID(firebaseUserId);
+                const existingPhoneCheck = await findPhoneByFirebaseUID(firebaseUserId);
 
-                if (existingPhone) {
+                if (existingPhoneCheck) {
                     // 이미 휴대폰 인증을 완료한 사용자
-                    console.log('✅ 기존 휴대폰 인증 사용자:', existingPhone);
-                    localStorage.setItem('mindflowUserId', existingPhone);
+                    console.log('✅ 기존 휴대폰 인증 사용자:', existingPhoneCheck);
+                    localStorage.setItem('mindflowUserId', existingPhoneCheck);
                     localStorage.setItem('isPhoneVerified', 'true');
                 } else {
                     // 신규 사용자 또는 아직 휴대폰 인증하지 않은 사용자
@@ -1782,12 +2005,24 @@ function App() {
                 picture: pictureUrl
             };
 
-            const savedNickname = getProfileSetting('userNickname');
-            const savedCustomPicture = getProfileSetting('customProfilePicture');
-
-            if (savedNickname) {
-                profileData.nickname = savedNickname;
+            // ✅ Firestore nicknames 컬렉션에서 닉네임 가져오기 (새 기기 로그인 시에도 동작)
+            try {
+                const { getUserNickname } = await import('./services/nicknameService');
+                const firestoreNickname = await getUserNickname(firebaseUserId);
+                if (firestoreNickname) {
+                    profileData.nickname = firestoreNickname;
+                    setProfileSetting('userNickname', firestoreNickname); // localStorage 동기화
+                    console.log('✅ Firestore에서 닉네임 로드:', firestoreNickname);
+                }
+            } catch (nicknameError) {
+                console.warn('닉네임 로드 실패, localStorage 폴백:', nicknameError);
+                const savedNickname = getProfileSetting('userNickname');
+                if (savedNickname) {
+                    profileData.nickname = savedNickname;
+                }
             }
+
+            const savedCustomPicture = getProfileSetting('customProfilePicture');
             if (savedCustomPicture) {
                 profileData.customPicture = savedCustomPicture;
             }
@@ -1919,13 +2154,24 @@ function App() {
                 phoneNumber: phoneNumber // Primary ID 추가
             };
 
-            // ✅ 기존에 저장된 커스텀 닉네임 및 프로필 사진이 있으면 추가
-            const savedNickname = getProfileSetting('userNickname');
-            const savedCustomPicture = getProfileSetting('customProfilePicture');
-
-            if (savedNickname) {
-                profileData.nickname = savedNickname;
+            // ✅ Firestore nicknames 컬렉션에서 닉네임 가져오기 (새 기기 로그인 시에도 동작)
+            try {
+                const { getUserNickname } = await import('./services/nicknameService');
+                const firestoreNickname = await getUserNickname(firebaseUserId);
+                if (firestoreNickname) {
+                    profileData.nickname = firestoreNickname;
+                    setProfileSetting('userNickname', firestoreNickname); // localStorage 동기화
+                    console.log('✅ Firestore에서 닉네임 로드:', firestoreNickname);
+                }
+            } catch (nicknameError) {
+                console.warn('닉네임 로드 실패, localStorage 폴백:', nicknameError);
+                const savedNickname = getProfileSetting('userNickname');
+                if (savedNickname) {
+                    profileData.nickname = savedNickname;
+                }
             }
+
+            const savedCustomPicture = getProfileSetting('customProfilePicture');
             if (savedCustomPicture) {
                 profileData.customPicture = savedCustomPicture;
             }
@@ -2842,6 +3088,16 @@ function App() {
                 <TrashProvider autoDeleteDays={30} trashedItems={trash} setTrashedItems={syncTrash}>
                     <AppContent>
                     <GlobalStyle />
+
+                    {/* 🎬 스플래시 스크린 */}
+                    <SplashScreen
+                        show={showSplash}
+                        onComplete={() => setShowSplash(false)}
+                        duration={2000}
+                    />
+
+                {/* 스플래시 중에는 메인 컨텐츠 숨김 */}
+                {!showSplash && (
                 <S.Screen>
                 {/* ★★★ 더 이상 로그인 여부로 화면을 막지 않고, 항상 메인 앱을 보여줍니다. ★★★ */}
                 <>
@@ -2953,7 +3209,6 @@ function App() {
                     </S.ContentArea>
 
                     <FloatingButton onClick={handleOpenNewMemoFromFAB} activeTab={activeTab} />
-                    {activeTab === 'chat' && <AdBanner />}
                     <BottomNav activeTab={activeTab} onSwitchTab={handleSwitchTab} />
                     <SideMenu
                         isOpen={isMenuOpen}
@@ -2990,7 +3245,8 @@ function App() {
                     />
                 </>
             </S.Screen>
-            
+                )}
+
             {/* ★★★ 로그인 모달 렌더링 로직 ★★★ */}
             {isLoginModalOpen && (
                 <LoginModal
@@ -2999,6 +3255,16 @@ function App() {
                     onError={handleLoginError}
                     onClose={() => setIsLoginModalOpen(false)}
                     setProfile={setProfile}
+                />
+            )}
+
+            {/* 📜 약관 동의 모달 */}
+            {isTermsModalOpen && (
+                <TermsAgreementModal
+                    onAgree={handleTermsAgree}
+                    onCancel={isTermsReConsent ? undefined : handleTermsCancel}
+                    isReConsent={isTermsReConsent}
+                    changedTerms={changedTermsList}
                 />
             )}
 

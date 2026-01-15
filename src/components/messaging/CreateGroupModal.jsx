@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { X, Users, Search, Check } from 'lucide-react';
 import { getMyFriends } from '../../services/friendService';
 import { createGroupChat } from '../../services/groupChatService';
+import UserAvatar from '../common/UserAvatar';
 
 // 모달 오버레이
 const ModalOverlay = styled.div`
@@ -211,7 +212,7 @@ const SearchInput = styled.input`
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #e0e0e0;
-  padding: 10px 16px 10px 40px;
+  padding: 10px 36px 10px 40px;
   border-radius: 12px;
   font-size: 14px;
   transition: all 0.2s;
@@ -224,6 +225,30 @@ const SearchInput = styled.input`
     outline: none;
     border-color: #667eea;
     background: rgba(255, 255, 255, 0.08);
+  }
+`;
+
+const ClearButton = styled.button`
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #888;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
   }
 `;
 
@@ -564,6 +589,11 @@ const CreateGroupModal = ({ onClose, showToast }) => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
+                  {searchQuery && (
+                    <ClearButton onClick={() => setSearchQuery('')}>
+                      <X size={12} />
+                    </ClearButton>
+                  )}
                 </SearchBar>
 
                 <FriendList>
@@ -580,9 +610,12 @@ const CreateGroupModal = ({ onClose, showToast }) => {
                           $selected={isSelected}
                           onClick={() => toggleFriend(friendId)}
                         >
-                          <Avatar $color={getAvatarColor(friendId)}>
-                            {displayName.charAt(0).toUpperCase()}
-                          </Avatar>
+                          <UserAvatar
+                            userId={friendId}
+                            fallbackText={displayName}
+                            size="40px"
+                            fontSize="16px"
+                          />
                           <FriendInfo>
                             <FriendName>{displayName}</FriendName>
                             <FriendCode>@{wsCode.replace('WS-', '')}</FriendCode>

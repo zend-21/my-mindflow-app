@@ -5,6 +5,7 @@ import { Settings } from 'lucide-react';
 import ChatList from './ChatList';
 import FriendList from './FriendList';
 import ChatSettingsModal from './ChatSettingsModal';
+import AdBanner from './AdBanner';
 
 // 메인 컨테이너
 const Container = styled.div`
@@ -201,6 +202,14 @@ const MessagingHub = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingF
           <FriendList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onFriendRequestCountChange={handleFriendRequestCountChange} />
         </TabContent>
       </Content>
+
+      {/* 광고 배너 - 채팅/친구 탭별 분리 (display 토글로 re-render 방지) */}
+      <div style={{ display: activeTab === 'chat' ? 'block' : 'none' }}>
+        <AdBanner adSlot="chat-list" />
+      </div>
+      <div style={{ display: activeTab === 'friends' ? 'block' : 'none' }}>
+        <AdBanner adSlot="friend-list" />
+      </div>
 
       {/* 설정 모달 */}
       {showSettings && (

@@ -102,15 +102,35 @@ export const inviteMembersToGroup = async (groupId, inviterId, newMemberIds) => 
       };
     }
 
+    // 강퇴 목록에 있는 멤버들 확인 (재초대 시 강퇴 목록에서 제거 필요)
+    const kickedMembersToRemove = membersToAdd.filter(
+      id => groupData.kickedUsers && groupData.kickedUsers.includes(id)
+    );
+
+    console.log('🔄 [멤버 초대] 강퇴 목록 확인:', {
+      kickedUsers: groupData.kickedUsers,
+      membersToAdd: membersToAdd,
+      kickedMembersToRemove: kickedMembersToRemove
+    });
+
     // 그룹 정보 업데이트 (모든 멤버를 pending으로 추가)
-    await updateDoc(groupRef, {
+    const updateData = {
       members: arrayUnion(...membersToAdd),
       [`membersInfo`]: {
         ...groupData.membersInfo,
         ...newMembersInfo
       },
       updatedAt: serverTimestamp()
-    });
+    };
+
+    // 강퇴 목록에서 제거 (재초대된 멤버들)
+    if (kickedMembersToRemove.length > 0) {
+      updateData.kickedUsers = arrayRemove(...kickedMembersToRemove);
+      console.log('✅ [멤버 초대] 강퇴 목록에서 제거:', kickedMembersToRemove);
+    }
+
+    await updateDoc(groupRef, updateData);
+    console.log('✅ [멤버 초대] Firestore 업데이트 완료');
 
     // 초대자 정보
     const inviterName = groupData.membersInfo[inviterId]?.displayName || '알 수 없음';
@@ -158,7 +178,23 @@ export const leaveGroup = async (groupId, userId) => {
       throw new Error('그룹을 나갈 수 없습니다.');
     }
 
-    const userName = groupData.membersInfo[userId]?.displayName || '익명';
+    const memberInfo = groupData.membersInfo[userId];
+    const userName = memberInfo?.displayName || '익명';
+
+    // 워크스페이스 코드 가져오기 (membersInfo에 없으면 users 컬렉션에서 조회)
+    let wsCode = memberInfo?.wsCode || memberInfo?.workspaceCode || '';
+    if (!wsCode) {
+      try {
+        const userDoc = await getDoc(doc(db, 'users', userId));
+        if (userDoc.exists()) {
+          wsCode = userDoc.data().wsCode || '';
+        }
+      } catch (e) {
+        console.warn('워크스페이스 코드 조회 실패:', e);
+      }
+    }
+    // WS- 접두어 제거하여 6자리만 표시
+    const wsCodeDisplay = wsCode ? wsCode.replace('WS-', '') : '';
 
     // 멤버에서 제거
     await updateDoc(groupRef, {
@@ -166,8 +202,9 @@ export const leaveGroup = async (groupId, userId) => {
       updatedAt: serverTimestamp()
     });
 
-    // 시스템 메시지: 멤버 나가기
-    await sendSystemMessage(groupId, `${userName}님이 방을 나갔습니다`, {
+    // 시스템 메시지: 멤버 나가기 (워크스페이스 코드 포함)
+    const leaveMessage = `${userName}님(${wsCodeDisplay})이 방을 나갔습니다`;
+    await sendSystemMessage(groupId, leaveMessage, {
       action: 'member_left',
       actorId: userId
     });
@@ -192,12 +229,12 @@ export const leaveGroup = async (groupId, userId) => {
 };
 
 /**
- * 멤버 강제 퇴장 (방장 전용)
+ * 멤버 강제 퇴장 (방장 또는 강퇴 권한이 있는 부방장)
  * @param {string} groupId - 그룹 채팅방 ID
- * @param {string} creatorId - 방장 UID
+ * @param {string} actorId - 강퇴를 실행하는 사람 UID (방장 또는 부방장)
  * @param {string} targetId - 퇴장시킬 멤버 UID
  */
-export const removeMemberFromGroup = async (groupId, creatorId, targetId) => {
+export const removeMemberFromGroup = async (groupId, actorId, targetId) => {
   try {
     const groupRef = doc(db, 'groupChats', groupId);
     const groupDoc = await getDoc(groupRef);
@@ -208,11 +245,29 @@ export const removeMemberFromGroup = async (groupId, creatorId, targetId) => {
 
     const groupData = groupDoc.data();
 
-    // 권한 확인 (방장만 가능)
-    if (groupData.creatorId !== creatorId) {
+    // 권한 확인 (방장 또는 강퇴 권한이 있는 부방장)
+    const isCreator = groupData.creatorId === actorId;
+    const subManagerInfo = groupData.subManagers?.[actorId];
+    const hasKickPermission = subManagerInfo?.permissions?.includes('kick_member');
+
+    if (!isCreator && !hasKickPermission) {
       throw new Error('멤버를 내보낼 권한이 없습니다.');
     }
 
+    // 부방장은 방장이나 다른 부방장을 강퇴할 수 없음
+    if (!isCreator) {
+      const isTargetCreator = groupData.creatorId === targetId;
+      const isTargetSubManager = !!groupData.subManagers?.[targetId];
+
+      if (isTargetCreator) {
+        throw new Error('방장은 강퇴할 수 없습니다.');
+      }
+      if (isTargetSubManager) {
+        throw new Error('부방장은 다른 부방장을 강퇴할 수 없습니다.');
+      }
+    }
+
+    const actorName = groupData.membersInfo[actorId]?.displayName || '익명';
     const targetName = groupData.membersInfo[targetId]?.displayName || '익명';
 
     // 멤버에서 제거 및 강퇴 목록에 추가
@@ -222,14 +277,14 @@ export const removeMemberFromGroup = async (groupId, creatorId, targetId) => {
       updatedAt: serverTimestamp()
     });
 
-    // 시스템 메시지: 멤버 강제 퇴장
-    await sendSystemMessage(groupId, `${targetName}님이 강퇴되었습니다.`, {
+    // 시스템 메시지: 멤버 강제 퇴장 (누구에 의해 강퇴되었는지 표시)
+    await sendSystemMessage(groupId, `${actorName}님에 의해 ${targetName}님이 강퇴되었습니다.`, {
       action: 'member_kicked',
-      actorId: creatorId,
+      actorId: actorId,
       targetId
     });
 
-    console.log('✅ 멤버 강제 퇴장 완료:', targetId);
+    console.log('✅ 멤버 강제 퇴장 완료:', targetId, '강퇴한 사람:', actorId);
   } catch (error) {
     console.error('❌ 멤버 강제 퇴장 실패:', error);
     throw error;
@@ -348,7 +403,7 @@ export const acceptInvitation = async (groupId, userId, forceAccept = false) => 
 
     // 시스템 메시지: 초대 수락
     const userName = groupData.membersInfo[userId]?.displayName || '익명';
-    await sendSystemMessage(groupId, `${userName}님이 방에 들어왔습니다`, {
+    await sendSystemMessage(groupId, `${userName}님이 대화에 참여했습니다.`, {
       action: 'invitation_accepted',
       userId
     });
@@ -522,7 +577,7 @@ export const joinGroupByInviteCode = async (inviteCode, userId, forceJoin = fals
     await updateDoc(groupRef, updateData);
 
     // 시스템 메시지: 새 멤버 참여
-    await sendSystemMessage(group.id, `${newMemberInfo.displayName}님이 방에 들어왔습니다`, {
+    await sendSystemMessage(group.id, `${newMemberInfo.displayName}님이 대화에 참여했습니다.`, {
       action: 'joined_by_invite_code',
       userId
     });
@@ -532,5 +587,121 @@ export const joinGroupByInviteCode = async (inviteCode, userId, forceJoin = fals
   } catch (error) {
     console.error('❌ 초대 코드로 단체방 참여 실패:', error);
     throw error;
+  }
+};
+
+// ==================== 메시지 차단 (Mute) ====================
+
+/**
+ * 특정 사용자의 메시지 차단 (이 채팅방에서만)
+ * @param {string} groupId - 그룹 채팅방 ID
+ * @param {string} myUserId - 내 UID
+ * @param {string} targetUserId - 차단할 사용자 UID
+ */
+export const muteUserInGroup = async (groupId, myUserId, targetUserId) => {
+  try {
+    const groupRef = doc(db, 'groupChats', groupId);
+    const groupDoc = await getDoc(groupRef);
+
+    if (!groupDoc.exists()) {
+      throw new Error('그룹을 찾을 수 없습니다.');
+    }
+
+    const groupData = groupDoc.data();
+
+    // 내가 멤버인지 확인
+    if (!groupData.members.includes(myUserId)) {
+      throw new Error('이 채팅방의 멤버가 아닙니다.');
+    }
+
+    // membersInfo에 mutedUsers 배열 추가/업데이트
+    const myMemberInfo = groupData.membersInfo[myUserId] || {};
+    const currentMutedUsers = myMemberInfo.mutedUsers || [];
+
+    if (currentMutedUsers.includes(targetUserId)) {
+      console.log('⚠️ 이미 차단된 사용자입니다.');
+      return { success: true, alreadyMuted: true };
+    }
+
+    await updateDoc(groupRef, {
+      [`membersInfo.${myUserId}.mutedUsers`]: arrayUnion(targetUserId),
+      updatedAt: serverTimestamp()
+    });
+
+    console.log('✅ 사용자 메시지 차단 완료:', targetUserId);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ 사용자 메시지 차단 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * 특정 사용자의 메시지 차단 해제
+ * @param {string} groupId - 그룹 채팅방 ID
+ * @param {string} myUserId - 내 UID
+ * @param {string} targetUserId - 차단 해제할 사용자 UID
+ */
+export const unmuteUserInGroup = async (groupId, myUserId, targetUserId) => {
+  try {
+    const groupRef = doc(db, 'groupChats', groupId);
+    const groupDoc = await getDoc(groupRef);
+
+    if (!groupDoc.exists()) {
+      throw new Error('그룹을 찾을 수 없습니다.');
+    }
+
+    await updateDoc(groupRef, {
+      [`membersInfo.${myUserId}.mutedUsers`]: arrayRemove(targetUserId),
+      updatedAt: serverTimestamp()
+    });
+
+    console.log('✅ 사용자 메시지 차단 해제 완료:', targetUserId);
+    return { success: true };
+  } catch (error) {
+    console.error('❌ 사용자 메시지 차단 해제 실패:', error);
+    throw error;
+  }
+};
+
+/**
+ * 내가 차단한 사용자 목록 가져오기 (이 채팅방에서)
+ * @param {string} groupId - 그룹 채팅방 ID
+ * @param {string} myUserId - 내 UID
+ * @returns {Promise<Array<string>>} 차단한 사용자 ID 배열
+ */
+export const getMutedUsersInGroup = async (groupId, myUserId) => {
+  try {
+    const groupRef = doc(db, 'groupChats', groupId);
+    const groupDoc = await getDoc(groupRef);
+
+    if (!groupDoc.exists()) {
+      return [];
+    }
+
+    const groupData = groupDoc.data();
+    const myMemberInfo = groupData.membersInfo?.[myUserId];
+
+    return myMemberInfo?.mutedUsers || [];
+  } catch (error) {
+    console.error('❌ 차단 사용자 목록 조회 실패:', error);
+    return [];
+  }
+};
+
+/**
+ * 특정 사용자가 내가 차단한 사용자인지 확인
+ * @param {string} groupId - 그룹 채팅방 ID
+ * @param {string} myUserId - 내 UID
+ * @param {string} targetUserId - 확인할 사용자 UID
+ * @returns {Promise<boolean>}
+ */
+export const isUserMutedInGroup = async (groupId, myUserId, targetUserId) => {
+  try {
+    const mutedUsers = await getMutedUsersInGroup(groupId, myUserId);
+    return mutedUsers.includes(targetUserId);
+  } catch (error) {
+    console.error('❌ 차단 여부 확인 실패:', error);
+    return false;
   }
 };

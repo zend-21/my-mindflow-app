@@ -733,6 +733,34 @@ const CollaborativeDocumentEditor = ({
     try {
       const currentDocRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
 
+      // 0. ⭐ [중요] 기존 문서가 있었다면 currentWorkingRoomId 정리
+      // 주의: 기존 문서가 현재 방에서 마커가 있으면 현재 방 유지, 없으면 건드리지 않음
+      // (다른 방에서 마커가 있을 수 있으므로 null로 설정하지 않음)
+      if (currentDocId && currentDocId !== memo.id && !currentDocId.startsWith('temp_')) {
+        try {
+          // 현재 방의 기존 문서 editHistory 검색하여 pending 마커가 있는지 확인
+          const oldEditsRef = collection(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory');
+          const oldPendingQuery = query(oldEditsRef, where('status', '==', 'pending'));
+          const oldPendingSnapshot = await getDocs(oldPendingQuery);
+          const hasOldMarkerInCurrentRoom = oldPendingSnapshot.size > 0;
+
+          if (hasOldMarkerInCurrentRoom) {
+            // 현재 방에 마커가 있으면 currentWorkingRoomId를 현재 방으로 유지
+            const oldMemoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', currentDocId);
+            await setDoc(oldMemoRef, {
+              currentWorkingRoomId: chatRoomId,
+              hasPendingEdits: true
+            }, { merge: true });
+            console.log(`✅ 문서 교체 - 기존 문서에 마커 존재 (${oldPendingSnapshot.size}개), currentWorkingRoomId 유지:`, currentDocId);
+          } else {
+            // 현재 방에 마커가 없으면 건드리지 않음 (다른 방에 마커가 있을 수 있음)
+            console.log('✅ 문서 교체 - 현재 방에 마커 없음, currentWorkingRoomId 변경 안 함:', currentDocId);
+          }
+        } catch (error) {
+          console.error('❌ 기존 문서 currentWorkingRoomId 정리 실패:', error);
+        }
+      }
+
       // 1. 편집 이력 먼저 로드 (마커 재생성을 위해)
       const editsRef = collection(db, 'chatRooms', chatRoomId, 'documents', memo.id, 'editHistory');
       const editsSnap = await getDocs(query(editsRef, where('status', '==', 'pending')));
@@ -897,7 +925,7 @@ const CollaborativeDocumentEditor = ({
       console.error('문서 불러오기 실패:', error);
       showToast?.('문서 불러오기에 실패했습니다');
     }
-  }, [chatRoomId, currentUserId, currentUserName, showToast, reconstructMarkersFromEditHistory]);
+  }, [chatRoomId, currentUserId, currentUserName, currentDocId, showToast, reconstructMarkersFromEditHistory]);
 
   // 실제 문서 불러오기 처리 (ChatRoom에서 호출)
   const handleLoadDocument = useCallback(async (memo) => {
@@ -3576,25 +3604,27 @@ const CollaborativeDocumentEditor = ({
 
       // ⭐ [중요] 비우기 시 원본 메모 업데이트
       // 비우기는 로컬 상태만 초기화하는 것이므로, editHistory는 그대로 유지됨
-      // → 현재 방에 마커가 있는지만 확인 (다른 방은 검색 불필요 - 데이터 낭비 방지)
+      // → 현재 방에 마커가 있으면 현재 방 유지, 없으면 건드리지 않음
+      // (다른 방에서 마커가 있을 수 있으므로 null로 설정하지 않음)
       try {
         // 현재 방의 editHistory만 검색하여 pending 마커가 있는지 확인
         const editsRef = collection(db, 'chatRooms', chatRoomId, 'documents', docIdToClose, 'editHistory');
         const pendingQuery = query(editsRef, where('status', '==', 'pending'));
         const pendingSnapshot = await getDocs(pendingQuery);
 
-        const hasMarker = pendingSnapshot.size > 0;
+        const hasMarkerInCurrentRoom = pendingSnapshot.size > 0;
 
-        const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', docIdToClose);
-        await setDoc(memoRef, {
-          currentWorkingRoomId: hasMarker ? chatRoomId : null,
-          hasPendingEdits: hasMarker
-        }, { merge: true });
-
-        if (hasMarker) {
+        if (hasMarkerInCurrentRoom) {
+          // 현재 방에 마커가 있으면 currentWorkingRoomId를 현재 방으로 유지
+          const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', docIdToClose);
+          await setDoc(memoRef, {
+            currentWorkingRoomId: chatRoomId,
+            hasPendingEdits: true
+          }, { merge: true });
           console.log(`✅ 비우기 - 현재 방에 마커 존재 (${pendingSnapshot.size}개), currentWorkingRoomId 유지:`, chatRoomId);
         } else {
-          console.log('✅ 비우기 - 마커 없음, 원본 메모 초기화 완료:', docIdToClose);
+          // 현재 방에 마커가 없으면 건드리지 않음 (다른 방에 마커가 있을 수 있음)
+          console.log('✅ 비우기 - 현재 방에 마커 없음, currentWorkingRoomId 변경 안 함:', docIdToClose);
         }
         // 참고: SharedMemoSelectorModal의 실시간 리스너가 Firestore 변경을 감지하여 배지 업데이트
       } catch (error) {
@@ -3993,41 +4023,8 @@ const CollaborativeDocumentEditor = ({
                       <ChevronRight size={14} />
                     </S.EditNavigationButton>
 
-                    {(actualIsManager || actualIsSubManager) && !isOneOnOneChat && (
-                      <S.EditNavigationButton
-                        onClick={() => {
-                          setShowPermissionModal(true);
-                          loadParticipants();
-                        }}
-                        title="권한 관리"
-                        style={{
-                          background: 'rgba(74, 144, 226, 0.15)',
-                          borderColor: 'rgba(74, 144, 226, 0.3)',
-                          color: '#4a90e2'
-                        }}
-                      >
-                        <UserCog size={14} />
-                      </S.EditNavigationButton>
-                    )}
                   </S.EditNavigationGroup>
                 </>
-              ) : (actualIsManager || actualIsSubManager) && !isOneOnOneChat ? (
-                <S.EditNavigationGroup>
-                  <S.EditNavigationButton
-                    onClick={() => {
-                      setShowPermissionModal(true);
-                      loadParticipants();
-                    }}
-                    title="권한 관리"
-                    style={{
-                      background: 'rgba(74, 144, 226, 0.15)',
-                      borderColor: 'rgba(74, 144, 226, 0.3)',
-                      color: '#4a90e2'
-                    }}
-                  >
-                    <UserCog size={14} />
-                  </S.EditNavigationButton>
-                </S.EditNavigationGroup>
               ) : null}
             </S.ToolbarRow>
           )}
@@ -5216,235 +5213,6 @@ const CollaborativeDocumentEditor = ({
                   승인
                 </S.ConfirmButton>
               </S.ModalActions>
-            </S.ModalBody>
-          </S.ModalContent>
-        </S.Modal>
-      )}
-
-      {/* 권한 관리 모달 */}
-      {showPermissionModal && (
-        <S.Modal onClick={() => setShowPermissionModal(false)}>
-          <S.ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
-            <S.ModalHeader>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <S.ModalTitle>
-                  <Users size={18} color="#4a90e2" style={{ marginRight: '6px', verticalAlign: 'middle' }} />
-                  권한 관리
-                </S.ModalTitle>
-                <S.IconButton
-                  onClick={() => setShowPermissionGuideModal(true)}
-                  title="권한 안내"
-                  style={{
-                    padding: '4px',
-                    background: 'rgba(74, 144, 226, 0.15)',
-                    borderRadius: '50%'
-                  }}
-                >
-                  <HelpCircle size={16} color="#4a90e2" />
-                </S.IconButton>
-              </div>
-              <S.IconButton onClick={() => {
-                setShowPermissionModal(false);
-              }}>
-                <X size={20} />
-              </S.IconButton>
-            </S.ModalHeader>
-
-            <S.ModalBody>
-              <div style={{ marginBottom: '16px', fontSize: '13px', color: '#888' }}>
-                참여자의 권한을 관리할 수 있습니다
-              </div>
-
-              {participants.length === 0 ? (
-                <div style={{ padding: '40px 20px', textAlign: 'center', color: '#666' }}>
-                  참여자 정보를 불러오는 중...
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  {participants.map((participant) => (
-                    <div
-                      key={participant.userId}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.03)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '8px',
-                        padding: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between'
-                      }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#e0e0e0', marginBottom: '4px' }}>
-                          {participant.isManager && '👑 '}
-                          {participant.isSubManager && '🎖️ '}
-                          {participant.isEditor && '✏️ '}
-                          {participant.isViewer && '👁️ '}
-                          {participant.nickname}
-                        </div>
-                        <div style={{ fontSize: '11px', color: '#888' }}>
-                          {participant.isManager && '방장'}
-                          {participant.isSubManager && '부방장'}
-                          {participant.isEditor && '편집자'}
-                          {participant.isViewer && '뷰어'}
-                        </div>
-                      </div>
-
-                      {participant.userId !== currentUserId && (
-                        <select
-                          value={
-                            participant.isManager ? 'manager' :
-                            participant.isSubManager ? 'submanager' :
-                            participant.isEditor ? 'editor' : 'viewer'
-                          }
-                          onChange={(e) => handlePermissionChange(participant.userId, e.target.value)}
-                          style={{
-                            background: 'rgba(255, 255, 255, 0.05)',
-                            border: '1px solid rgba(255, 255, 255, 0.1)',
-                            borderRadius: '6px',
-                            color: '#e0e0e0',
-                            padding: '6px 12px',
-                            fontSize: '12px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <option value="manager" disabled={actualIsSubManager && !actualIsManager}>👑 방장</option>
-                          <option value="submanager" disabled={actualIsSubManager && !actualIsManager}>🎖️ 부방장</option>
-                          <option value="editor">✏️ 편집자</option>
-                          <option value="viewer">👁️ 뷰어</option>
-                        </select>
-                      )}
-
-                      {participant.userId === currentUserId && (
-                        <div style={{ fontSize: '11px', color: '#4a90e2', fontWeight: '600' }}>
-                          나
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* 초대 권한 설정 (방장만) */}
-              {actualIsManager && (
-                <div style={{
-                  marginTop: '16px',
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: '8px',
-                  padding: '12px'
-                }}>
-                  <div style={{ fontSize: '13px', fontWeight: '600', color: '#e0e0e0', marginBottom: '8px' }}>
-                    ⚙️ 방 설정
-                  </div>
-                  <div style={{ fontSize: '12px', color: '#888', marginBottom: '8px' }}>
-                    초대 권한: 누가 새로운 사람을 초대할 수 있나요?
-                  </div>
-                  <select
-                    value={invitePermission}
-                    onChange={(e) => handleInvitePermissionChange(e.target.value)}
-                    style={{
-                      width: '100%',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '6px',
-                      color: '#e0e0e0',
-                      padding: '8px 12px',
-                      fontSize: '12px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    <option value="managers_only">👑 방장만</option>
-                    <option value="managers_and_submanagers">👑🎖️ 방장 + 부방장</option>
-                    <option value="editors_allowed">✏️ 편집자 이상</option>
-                    <option value="everyone">👥 모든 참여자</option>
-                  </select>
-                </div>
-              )}
-            </S.ModalBody>
-          </S.ModalContent>
-        </S.Modal>
-      )}
-
-      {/* 권한 안내 모달 */}
-      {showPermissionGuideModal && (
-        <S.Modal onClick={() => setShowPermissionGuideModal(false)}>
-          <S.ModalContent onClick={(e) => e.stopPropagation()} style={{ maxWidth: '450px' }}>
-            <S.ModalHeader>
-              <S.ModalTitle>ℹ️ 권한 안내</S.ModalTitle>
-              <S.IconButton onClick={() => setShowPermissionGuideModal(false)}>
-                <X size={20} />
-              </S.IconButton>
-            </S.ModalHeader>
-
-            <S.ModalBody>
-              <div style={{
-                background: 'rgba(74, 144, 226, 0.1)',
-                border: '1px solid rgba(74, 144, 226, 0.3)',
-                borderRadius: '8px',
-                padding: '16px',
-                fontSize: '13px',
-                lineHeight: '1.8',
-                color: '#e0e0e0'
-              }}>
-                <div style={{ fontWeight: '600', marginBottom: '12px', color: '#4a90e2', fontSize: '14px' }}>
-                  단체방 권한 체계
-                </div>
-                <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                  <span style={{ fontSize: '18px', flexShrink: 0 }}>👑</span>
-                  <div>
-                    <strong>방장</strong>
-                    <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>
-                      편집 + 승인/거부 + 모든 권한 관리
-                    </div>
-                  </div>
-                </div>
-                <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                  <span style={{ fontSize: '18px', flexShrink: 0 }}>🎖️</span>
-                  <div>
-                    <strong>부방장</strong>
-                    <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>
-                      편집 + 수정 제안 + 편집자 관리
-                    </div>
-                  </div>
-                </div>
-                <div style={{ marginBottom: '8px', display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                  <span style={{ fontSize: '18px', flexShrink: 0 }}>✏️</span>
-                  <div>
-                    <strong>편집자</strong>
-                    <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>
-                      편집 + 수정 제안
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                  <span style={{ fontSize: '18px', flexShrink: 0 }}>👁️</span>
-                  <div>
-                    <strong>뷰어</strong>
-                    <div style={{ fontSize: '12px', color: '#aaa', marginTop: '2px' }}>
-                      읽기 전용 + 채팅
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={{
-                marginTop: '16px',
-                background: 'rgba(255, 255, 255, 0.03)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                borderRadius: '8px',
-                padding: '12px',
-                fontSize: '12px',
-                color: '#aaa',
-                lineHeight: '1.6'
-              }}>
-                <div style={{ marginBottom: '6px' }}>
-                  💡 <strong style={{ color: '#e0e0e0' }}>1:1 대화방</strong>에서는 참여자 모두 최고 권한(방장 권한)을 가지게 됩니다.
-                </div>
-                <div>
-                  권한 관리 기능은 단체방에서만 사용할 수 있습니다.
-                </div>
-              </div>
             </S.ModalBody>
           </S.ModalContent>
         </S.Modal>

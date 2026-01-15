@@ -75,8 +75,9 @@ export const playNewMessageNotification = async () => {
 /**
  * 효과음 2: 채팅 중 메시지 수신 (채팅창 안에서)
  * 매우 부드러운 팝 사운드
+ * @param {number|null} customVolume - 개별 음량 (0-100, null이면 전체설정 사용)
  */
-export const playChatMessageSound = async () => {
+export const playChatMessageSound = async (customVolume = null) => {
   try {
     if (!notificationSettings.enabled) return;
 
@@ -92,9 +93,10 @@ export const playChatMessageSound = async () => {
     oscillator.frequency.setValueAtTime(800, currentTime);
     oscillator.frequency.exponentialRampToValueAtTime(400, currentTime + 0.1);
 
-    // 볼륨 설정 (매우 짧고 조용하게) - 사용자 설정 음량 적용
-    const maxVolume = 0.15 * notificationSettings.volume;
-    const minVolume = 0.01 * notificationSettings.volume;
+    // 볼륨 설정 (매우 짧고 조용하게) - 개별 음량 또는 전체설정 음량 적용
+    const volumeToUse = customVolume !== null ? (customVolume / 100) : notificationSettings.volume;
+    const maxVolume = 0.15 * volumeToUse;
+    const minVolume = 0.01 * volumeToUse;
     gainNode.gain.setValueAtTime(0, currentTime);
     gainNode.gain.linearRampToValueAtTime(maxVolume, currentTime + 0.01); // 빠른 페이드 인
     gainNode.gain.exponentialRampToValueAtTime(Math.max(minVolume, 0.001), currentTime + 0.15); // 빠른 페이드 아웃
@@ -107,7 +109,7 @@ export const playChatMessageSound = async () => {
     oscillator.start(currentTime);
     oscillator.stop(currentTime + 0.15);
 
-    console.log('💬 채팅 메시지 수신음 재생 (음량:', Math.round(notificationSettings.volume * 100) + '%)');
+    console.log('💬 채팅 메시지 수신음 재생 (음량:', Math.round(volumeToUse * 100) + '%)');
   } catch (error) {
     console.error('메시지 수신음 재생 오류:', error);
   }

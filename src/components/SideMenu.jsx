@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { avatarList } from './avatars/AvatarIcons';
-import SecurityDocViewer from './SecurityDocViewer';
 import ConfirmationModal from './ConfirmationModal';
 
 // 문제를 단순화하기 위해, 일단 Roulette 컴포넌트는 잠시 제외했습니다.
@@ -290,6 +289,231 @@ const MenuGroup = styled.div`
     }
 `;
 
+// 백업/복원 안내 모달 스타일
+const GuideModalOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+`;
+
+const GuideModalContainer = styled.div`
+    width: 90%;
+    max-width: 340px;
+    background: rgba(35, 35, 40, 0.98);
+    border-radius: 16px;
+    padding: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    animation: scaleIn 0.2s ease;
+
+    @keyframes scaleIn {
+        from { transform: scale(0.95); opacity: 0; }
+        to { transform: scale(1); opacity: 1; }
+    }
+`;
+
+const GuideTitle = styled.h3`
+    font-size: 18px;
+    font-weight: 600;
+    color: #fff;
+    margin: 0 0 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+`;
+
+const GuideContent = styled.div`
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.6;
+    margin-bottom: 20px;
+`;
+
+const GuideHighlight = styled.div`
+    background: rgba(100, 180, 255, 0.15);
+    border: 1px solid rgba(100, 180, 255, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 12px 0;
+    font-size: 13px;
+    color: rgba(180, 220, 255, 0.95);
+`;
+
+const CheckboxRow = styled.label`
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    margin-bottom: 16px;
+
+    input {
+        width: 16px;
+        height: 16px;
+        accent-color: #667eea;
+    }
+`;
+
+const GuideButtonRow = styled.div`
+    display: flex;
+    gap: 10px;
+`;
+
+const GuideButton = styled.button`
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &.cancel {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: rgba(255, 255, 255, 0.7);
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+    }
+
+    &.continue {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border: none;
+        color: #fff;
+
+        &:hover {
+            opacity: 0.9;
+        }
+    }
+
+    &.danger {
+        background: linear-gradient(135deg, #e53935, #c62828);
+        border: none;
+        color: #fff;
+
+        &:hover {
+            opacity: 0.9;
+        }
+    }
+`;
+
+// 기기 데이터 삭제 경고 모달
+const DeleteWarningList = styled.ul`
+    margin: 12px 0;
+    padding-left: 20px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.8;
+
+    li {
+        margin-bottom: 4px;
+    }
+`;
+
+const DeleteWarningBox = styled.div`
+    background: rgba(229, 57, 53, 0.15);
+    border: 1px solid rgba(229, 57, 53, 0.3);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 12px 0;
+    font-size: 13px;
+    color: rgba(255, 180, 180, 0.95);
+`;
+
+// 기기 데이터 삭제 모달 컴포넌트
+const DeviceDataDeleteModal = ({ isOpen, onConfirm, onCancel }) => {
+    if (!isOpen) return null;
+
+    return (
+        <GuideModalOverlay onClick={onCancel}>
+            <GuideModalContainer onClick={e => e.stopPropagation()}>
+                <GuideTitle>
+                    🗑️ 기기 데이터 삭제
+                </GuideTitle>
+                <GuideContent>
+                    이 기능은 <strong>현재 기기에 저장된 셰어노트 관련 데이터를 모두</strong> 삭제합니다.
+                </GuideContent>
+                <DeleteWarningList>
+                    <li>로컬에 저장된 메모, 일정, 설정 등 캐시 데이터</li>
+                    <li>앱 설정 및 환경설정</li>
+                    <li>로그인 정보 (로그아웃 처리됨)</li>
+                </DeleteWarningList>
+                <GuideHighlight>
+                    😌 <strong>안심하세요:</strong> 서버에 저장된 데이터는 삭제되지 않습니다.
+                    다시 로그인하면 데이터를 불러올 수 있습니다.
+                </GuideHighlight>
+                <GuideContent style={{ marginTop: '8px', fontSize: '13px' }}>
+                    기기 양도, 캐시 문제 해결, 앱 완전 초기화가 필요할 때 사용하세요.
+                </GuideContent>
+                <GuideButtonRow>
+                    <GuideButton className="cancel" onClick={onCancel}>
+                        취소
+                    </GuideButton>
+                    <GuideButton className="danger" onClick={onConfirm}>
+                        삭제하기
+                    </GuideButton>
+                </GuideButtonRow>
+            </GuideModalContainer>
+        </GuideModalOverlay>
+    );
+};
+
+// 백업/복원 안내 모달 컴포넌트
+const BackupGuideModal = ({ isOpen, actionType, onContinue, onCancel }) => {
+    const [dontShowAgain, setDontShowAgain] = React.useState(false);
+
+    if (!isOpen) return null;
+
+    return (
+        <GuideModalOverlay onClick={onCancel}>
+            <GuideModalContainer onClick={e => e.stopPropagation()}>
+                <GuideTitle>
+                    {actionType === 'backup' ? '💾' : '📂'}
+                    {actionType === 'backup' ? ' 휴대폰 백업' : ' 휴대폰 복원'}
+                </GuideTitle>
+                <GuideContent>
+                    이 기능은 <strong>로그인하지 않고 사용하는 분들</strong>을 위한 기능입니다.
+                </GuideContent>
+                <GuideHighlight>
+                    로그인한 사용자는 모든 데이터가 <strong>자동으로 서버에 저장</strong>되므로,
+                    새 기기에서 로그인만 하면 데이터가 자동 복구됩니다.
+                </GuideHighlight>
+                <CheckboxRow>
+                    <input
+                        type="checkbox"
+                        checked={dontShowAgain}
+                        onChange={e => setDontShowAgain(e.target.checked)}
+                    />
+                    다음부터 이 안내 보지 않기
+                </CheckboxRow>
+                <GuideButtonRow>
+                    <GuideButton className="cancel" onClick={onCancel}>
+                        취소
+                    </GuideButton>
+                    <GuideButton className="continue" onClick={() => onContinue(dontShowAgain)}>
+                        계속하기
+                    </GuideButton>
+                </GuideButtonRow>
+            </GuideModalContainer>
+        </GuideModalOverlay>
+    );
+};
+
 const BACKGROUND_COLORS = {
     // 그라데이션
     'none': 'transparent',
@@ -312,22 +536,14 @@ const SideMenu = ({
     onClose,
     onExport,
     onImport,
-    onRestoreFromDrive,
     profile,
-    wsCode,  // ✅ wsCode를 App에서 prop으로 받음 (헤더처럼)
     onProfileClick,
     onLogout,
     onLoginClick,
-    onSync,
-    onManualSync,  // 🔄 수동 동기화 함수
-    syncStatus = 'idle',  // 🔄 동기화 상태
-    onOpenMacro,  // ⚙️ 매크로 기능 추가
-    onOpenFortune,
-    onOpenTimer,  // ⏱️ 타이머 기능 추가
-    onOpenTrash,  // 🗑️ 휴지통 기능 추가
-    onRestoreMemoFolder,  // 📁 메모 폴더 복원 기능
-    showToast,  // 토스트 메시지 표시 함수
-    onRoomSelect  // 🏠 방 선택 핸들러
+    onOpenMacro,
+    onOpenTimer,
+    onOpenTrash,
+    showToast
 }) => {
     const fileInputRef = useRef(null);
     const [imageError, setImageError] = useState(false); // ✅ 추가: 이미지 로드 오류 상태
@@ -336,8 +552,8 @@ const SideMenu = ({
     const [avatarBgColor, setAvatarBgColor] = useState('none');
     const [customPicture, setCustomPicture] = useState(null);
     // 협업 관련 상태
-    const [isSecurityDocViewerOpen, setIsSecurityDocViewerOpen] = useState(false);
-    const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false); // 서버 복원 확인 모달
+    const [backupGuideModal, setBackupGuideModal] = useState({ isOpen: false, action: null }); // 백업/복원 안내 모달
+    const [deviceDeleteModal, setDeviceDeleteModal] = useState(false); // 기기 데이터 삭제 모달
 
     const handleError = () => { // 에러 발생 시 상태 변경
         setImageError(true);
@@ -510,25 +726,93 @@ const SideMenu = ({
         }
     };
 
-    // 수동 동기화 핸들러
-    const handleManualSync = async () => {
-        if (!onManualSync) return;
+    // 백업/복원 안내 모달 "다시 보지 않기" 확인
+    const shouldShowBackupGuide = () => {
+        return localStorage.getItem('hideBackupGuide') !== 'true';
+    };
 
-        const success = await onManualSync();
-        if (success) {
-            showToast?.('동기화가 완료되었습니다', 'success');
+    // 백업 클릭 핸들러
+    const handleBackupClick = () => {
+        if (shouldShowBackupGuide()) {
+            setBackupGuideModal({ isOpen: true, action: 'backup' });
         } else {
-            showToast?.('동기화에 실패했습니다. 다시 시도해주세요.', 'error');
+            onExport?.();
         }
     };
 
-    // 동기화 상태 텍스트
-    const getSyncStatusText = () => {
-        switch (syncStatus) {
-            case 'syncing': return '동기화 중...';
-            case 'synced': return '동기화됨';
-            case 'offline': return '오프라인';
-            default: return '동기화';
+    // 복원 클릭 핸들러
+    const handleRestoreClick = () => {
+        if (shouldShowBackupGuide()) {
+            setBackupGuideModal({ isOpen: true, action: 'restore' });
+        } else {
+            fileInputRef.current?.click();
+        }
+    };
+
+    // 안내 모달에서 계속하기
+    const handleBackupGuideContinue = (dontShowAgain) => {
+        if (dontShowAgain) {
+            localStorage.setItem('hideBackupGuide', 'true');
+        }
+
+        const action = backupGuideModal.action;
+        setBackupGuideModal({ isOpen: false, action: null });
+
+        if (action === 'backup') {
+            onExport?.();
+        } else if (action === 'restore') {
+            fileInputRef.current?.click();
+        }
+    };
+
+    // 기기 데이터 삭제 실행 (로그아웃 포함)
+    const handleDeviceDataDelete = async () => {
+        try {
+            // 1. Firebase Auth 로그아웃 먼저 실행 (인증 상태 정리)
+            try {
+                const { signOut } = await import('firebase/auth');
+                const { auth } = await import('../firebase/config');
+                if (auth.currentUser) {
+                    await signOut(auth);
+                    console.log('🔥 Firebase 로그아웃 완료');
+                }
+            } catch (authError) {
+                console.warn('Firebase 로그아웃 오류 (무시):', authError);
+            }
+
+            // 2. 모든 localStorage 데이터 삭제
+            const itemCount = localStorage.length;
+            localStorage.clear();
+            console.log(`✅ localStorage 삭제 완료: ${itemCount}개 항목`);
+
+            // 3. sessionStorage도 정리
+            sessionStorage.clear();
+            console.log('✅ sessionStorage 삭제 완료');
+
+            // 4. IndexedDB 정리 (Firebase 관련)
+            try {
+                const databases = await window.indexedDB.databases();
+                for (const db of databases) {
+                    if (db.name && (
+                        db.name.includes('firebase') ||
+                        db.name.includes('firebaseLocalStorage')
+                    )) {
+                        window.indexedDB.deleteDatabase(db.name);
+                        console.log(`🗑️ IndexedDB 삭제: ${db.name}`);
+                    }
+                }
+            } catch (idbError) {
+                console.warn('IndexedDB 정리 실패 (무시):', idbError);
+            }
+
+            setDeviceDeleteModal(false);
+            onClose();
+
+            // 5. 페이지 새로고침하여 완전히 초기화된 상태로 시작
+            window.location.reload();
+        } catch (error) {
+            console.error('❌ 기기 데이터 삭제 실패:', error);
+            showToast?.('데이터 삭제 중 오류가 발생했습니다.');
         }
     };
 
@@ -597,19 +881,13 @@ const SideMenu = ({
                         </MenuHeader>
 
                         <MenuItemsWrapper>
-                            {/* 🔮 그룹 1: 기능 */}
+                            {/* 🔧 그룹 1: 도구 */}
                             <MenuGroup>
                                 <MenuItem onClick={() => {
                                     onClose();
                                     if (onOpenMacro) onOpenMacro();
                                 }}>
                                     <span className="icon">⚙️</span> 매크로
-                                </MenuItem>
-                                <MenuItem onClick={() => {
-                                    onClose();
-                                    onOpenFortune();
-                                }}>
-                                    <span className="icon">🔮</span> 오늘의 운세
                                 </MenuItem>
                                 <MenuItem onClick={() => {
                                     onClose();
@@ -621,10 +899,10 @@ const SideMenu = ({
 
                             {/* 📱 그룹 2: 백업/복원 */}
                             <MenuGroup>
-                                <MenuItem onClick={onExport}>
+                                <MenuItem onClick={handleBackupClick}>
                                     <span className="icon">💾</span> 휴대폰 백업
                                 </MenuItem>
-                                <MenuItem onClick={handleImportClick}>
+                                <MenuItem onClick={handleRestoreClick}>
                                     <span className="icon">📂</span> 휴대폰 복원
                                     <FileInput
                                         type="file"
@@ -633,46 +911,35 @@ const SideMenu = ({
                                         ref={fileInputRef}
                                     />
                                 </MenuItem>
-                                <MenuItem onClick={() => {
-                                    if (onRestoreFromDrive) {
-                                        setIsRestoreConfirmOpen(true);
-                                    }
-                                }}>
-                                    <span className="icon">☁️</span> 서버에서 복원
+                            </MenuGroup>
+
+                            {/* 🧹 그룹 3: 기기 데이터 */}
+                            <MenuGroup>
+                                <MenuItem onClick={() => setDeviceDeleteModal(true)}>
+                                    <span className="icon">🧹</span> 기기 데이터 삭제
                                 </MenuItem>
                             </MenuGroup>
 
-                            {/* 🔄 그룹 2.5: 수동 동기화 */}
-                            {profile && (
-                                <MenuGroup>
-                                    <MenuItem
-                                        onClick={handleManualSync}
-                                        style={{
-                                            opacity: syncStatus === 'syncing' ? 0.6 : 1,
-                                            pointerEvents: syncStatus === 'syncing' ? 'none' : 'auto'
-                                        }}
-                                    >
-                                        <span className="icon">🔄</span> {getSyncStatusText()}
-                                    </MenuItem>
-                                </MenuGroup>
-                            )}
-
-                            {/* ⚙️ 그룹 3: 설정/관리 */}
+                            {/* 📚 그룹 4: 도움말/관리 */}
                             <MenuGroup>
-                                <MenuItem>
-                                    <span className="icon">⚙️</span> 설정
-                                </MenuItem>
                                 <MenuItem onClick={() => {
                                     onClose();
-                                    setIsSecurityDocViewerOpen(true);
+                                    // TODO: 사용설명서 열기
                                 }}>
-                                    <span className="icon">🔒</span> 보안 &amp; 개인정보
+                                    <span className="icon">📖</span> 사용설명서
                                 </MenuItem>
                                 <MenuItem onClick={() => {
                                     onClose();
                                     if (onOpenTrash) onOpenTrash();
                                 }}>
                                     <span className="icon">🗑️</span> 휴지통
+                                </MenuItem>
+                            </MenuGroup>
+
+                            {/* ⚙️ 그룹 5: 설정 */}
+                            <MenuGroup>
+                                <MenuItem>
+                                    <span className="icon">⚙️</span> 설정
                                 </MenuItem>
                             </MenuGroup>
 
@@ -686,25 +953,22 @@ const SideMenu = ({
                 </>
             )}
 
-            {/* 보안 문서 뷰어 */}
-            {isSecurityDocViewerOpen && (
-                <SecurityDocViewer
-                    onClose={() => setIsSecurityDocViewerOpen(false)}
+            {/* 휴대폰 백업/복원 안내 모달 */}
+            {backupGuideModal.isOpen && (
+                <BackupGuideModal
+                    isOpen={true}
+                    actionType={backupGuideModal.action}
+                    onContinue={handleBackupGuideContinue}
+                    onCancel={() => setBackupGuideModal({ isOpen: false, action: null })}
                 />
             )}
 
-            {/* 서버 복원 확인 모달 */}
-            {isRestoreConfirmOpen && (
-                <ConfirmationModal
+            {/* 기기 데이터 삭제 모달 */}
+            {deviceDeleteModal && (
+                <DeviceDataDeleteModal
                     isOpen={true}
-                    message={`서버에 저장된 데이터로 복원하시겠습니까?\n\n현재 기기의 모든 데이터가 서버 데이터로 덮어씌워집니다.\n(이미 자동 동기화 중이므로, 수동으로 복원이 필요한 경우에만 사용하세요)`}
-                    confirmText="복원"
-                    onConfirm={() => {
-                        setIsRestoreConfirmOpen(false);
-                        onClose();
-                        onRestoreFromDrive();
-                    }}
-                    onCancel={() => setIsRestoreConfirmOpen(false)}
+                    onConfirm={handleDeviceDataDelete}
+                    onCancel={() => setDeviceDeleteModal(false)}
                 />
             )}
         </>

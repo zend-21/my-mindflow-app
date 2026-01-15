@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import './AddressManageModal.css';
 import AddressInput from './AddressInput';
+import ConfirmModal from './ConfirmModal';
 
 // 아이콘 옵션 (시크릿 페이지에서 사용하는 아이콘 재사용)
 const ICON_OPTIONS = [
@@ -26,6 +27,7 @@ const AddressManageModal = ({
   const [baseAddress, setBaseAddress] = useState(null); // 지번/도로명 주소
   const [detailAddress, setDetailAddress] = useState(''); // 동/호수
   const [showAddressInput, setShowAddressInput] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (isOpen && currentAddress) {
@@ -116,11 +118,14 @@ const AddressManageModal = ({
   };
 
   const handleDelete = () => {
-    if (window.confirm('이 주소를 삭제하시겠습니까?')) {
-      onDelete(slotIndex);
-      onClose();
-      showToast?.('주소가 삭제되었습니다.');
-    }
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    setShowDeleteConfirm(false);
+    onDelete(slotIndex);
+    onClose();
+    showToast?.('주소가 삭제되었습니다.');
   };
 
   if (!isOpen) return null;
@@ -250,6 +255,18 @@ const AddressManageModal = ({
             </div>
           </div>
         </div>
+      )}
+
+      {showDeleteConfirm && (
+        <ConfirmModal
+          icon="🗑️"
+          title="주소 삭제"
+          message="이 주소를 삭제하시겠습니까?"
+          confirmText="삭제"
+          cancelText="취소"
+          onConfirm={confirmDelete}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
       )}
     </>,
     document.body

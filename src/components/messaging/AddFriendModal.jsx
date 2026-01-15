@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { X, Search, QrCode, UserPlus, AlertCircle, CheckCircle } from 'lucide-react';
 import { getUserByWorkspaceCode, addFriendInstantly, isFriend } from '../../services/friendService';
+import { unblockUser, isUserBlocked } from '../../services/userManagementService';
 import QRScannerModal from '../collaboration/QRScannerModal';
 import { avatarList } from '../avatars/AvatarIcons';
 
@@ -280,6 +281,8 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
   const [userProfilePicture, setUserProfilePicture] = useState(null);
   const [userAvatarSettings, setUserAvatarSettings] = useState(null);
+  const [showUnblockConfirm, setShowUnblockConfirm] = useState(false); // 차단 해제 확인 모달
+  const [blockedUserToAdd, setBlockedUserToAdd] = useState(null); // 차단 해제 후 추가할 사용자
 
   const handleSearch = async () => {
     if (!searchId.trim()) {
@@ -347,11 +350,56 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
           onClose();
         }, 1500);
       } else {
-        setMessage({ type: 'error', text: result.error || '친구 추가에 실패했습니다' });
+        // 차단한 사용자인 경우 차단 해제 확인 모달 표시
+        if (result.error && result.error.includes('차단한 사용자')) {
+          setBlockedUserToAdd(searchResult);
+          setShowUnblockConfirm(true);
+        } else {
+          setMessage({ type: 'error', text: result.error || '친구 추가에 실패했습니다' });
+        }
       }
     } catch (error) {
       console.error('친구 추가 오류:', error);
       setMessage({ type: 'error', text: '친구 추가 중 오류가 발생했습니다' });
+    }
+  };
+
+  // 차단 해제 후 친구 추가
+  const handleUnblockAndAdd = async () => {
+    if (!blockedUserToAdd) return;
+
+    try {
+      // 1. 차단 해제
+      const unblockResult = await unblockUser(userId, blockedUserToAdd.id);
+      if (!unblockResult.success) {
+        setMessage({ type: 'error', text: '차단 해제에 실패했습니다' });
+        setShowUnblockConfirm(false);
+        return;
+      }
+
+      // 2. 친구 추가
+      const addResult = await addFriendInstantly(userId, blockedUserToAdd.workspaceCode);
+
+      if (addResult.success) {
+        setMessage({
+          type: 'success',
+          text: `차단 해제 후 ${blockedUserToAdd.displayName || '친구'}님이 친구로 추가되었습니다!`
+        });
+        showToast?.(`✅ ${blockedUserToAdd.displayName || '친구'}님이 친구로 추가되었습니다`);
+
+        setTimeout(() => {
+          onFriendAdded?.();
+          onClose();
+        }, 1500);
+      } else {
+        setMessage({ type: 'error', text: addResult.error || '친구 추가에 실패했습니다' });
+      }
+    } catch (error) {
+      console.error('차단 해제 및 친구 추가 오류:', error);
+      setMessage({ type: 'error', text: '처리 중 오류가 발생했습니다' });
+    } finally {
+      setShowUnblockConfirm(false);
+      setBlockedUserToAdd(null);
     }
   };
 
@@ -382,7 +430,19 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
           onClose();
         }, 1500);
       } else {
-        setMessage({ type: 'error', text: result.error || '친구 추가에 실패했습니다' });
+        // 차단한 사용자인 경우 차단 해제 확인 모달 표시
+        if (result.error && result.error.includes('차단한 사용자')) {
+          // QR로 스캔한 사용자 정보 가져오기
+          const user = await getUserByWorkspaceCode(wsCode);
+          if (user) {
+            setBlockedUserToAdd(user);
+            setShowUnblockConfirm(true);
+          } else {
+            setMessage({ type: 'error', text: result.error || '친구 추가에 실패했습니다' });
+          }
+        } else {
+          setMessage({ type: 'error', text: result.error || '친구 추가에 실패했습니다' });
+        }
       }
     } catch (error) {
       console.error('QR 친구 추가 오류:', error);
@@ -592,6 +652,78 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
           onClose={() => setIsQRScannerOpen(false)}
           onCodeScanned={handleQRCodeScanned}
         />
+      )}
+
+      {/* 차단 해제 확인 모달 */}
+      {showUnblockConfirm && blockedUserToAdd && (
+        <Overlay onClick={(e) => e.target === e.currentTarget && setShowUnblockConfirm(false)} style={{ zIndex: 10004 }}>
+          <Modal style={{ maxWidth: '360px' }}>
+            <Header>
+              <Title style={{ fontSize: '18px' }}>차단된 사용자</Title>
+              <CloseButton onClick={() => {
+                setShowUnblockConfirm(false);
+                setBlockedUserToAdd(null);
+              }}>
+                <X size={20} />
+              </CloseButton>
+            </Header>
+            <Content style={{ textAlign: 'center' }}>
+              <div style={{ marginBottom: '16px', color: '#e0e0e0', lineHeight: '1.6' }}>
+                <strong style={{ color: '#ff6b6b' }}>
+                  {blockedUserToAdd.displayName || '이 사용자'}
+                </strong>님은<br />
+                차단한 사용자입니다.
+              </div>
+              <div style={{
+                fontSize: '14px',
+                color: '#888',
+                marginBottom: '20px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                padding: '12px',
+                borderRadius: '8px'
+              }}>
+                차단을 해제하고 친구로 추가할까요?
+              </div>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  onClick={() => {
+                    setShowUnblockConfirm(false);
+                    setBlockedUserToAdd(null);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: 'rgba(255, 255, 255, 0.1)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '8px',
+                    color: '#888',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleUnblockAndAdd}
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    background: 'rgba(74, 144, 226, 0.2)',
+                    border: '1px solid rgba(74, 144, 226, 0.4)',
+                    borderRadius: '8px',
+                    color: '#4a90e2',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer'
+                  }}
+                >
+                  해제 후 추가
+                </button>
+              </div>
+            </Content>
+          </Modal>
+        </Overlay>
       )}
     </>
   );

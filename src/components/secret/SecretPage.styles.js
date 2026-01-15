@@ -71,7 +71,7 @@ export const SearchIcon = styled.div`
 
 export const SearchInput = styled.input`
     width: 100%;
-    padding: 12px 16px 12px 44px;
+    padding: 12px 36px 12px 44px;
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(255, 255, 255, 0.05);
@@ -89,6 +89,30 @@ export const SearchInput = styled.input`
 
     &::placeholder {
         color: #808080;
+    }
+`;
+
+export const SearchClearButton = styled.button`
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #888;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    padding: 0;
+
+    &:hover {
+        background: rgba(255, 255, 255, 0.2);
+        color: #fff;
     }
 `;
 

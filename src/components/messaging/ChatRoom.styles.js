@@ -127,7 +127,7 @@ export const ChatStatus = styled.div`
 export const MenuButton = styled.button`
   background: transparent;
   border: none;
-  color: #888;
+  color: ${props => props.$hasDocument ? '#4a90e2' : '#888'};
   padding: 8px;
   cursor: pointer;
   display: flex;
@@ -139,7 +139,7 @@ export const MenuButton = styled.button`
 
   &:hover {
     background: rgba(255, 255, 255, 0.05);
-    color: #ffffff;
+    color: ${props => props.$hasDocument ? '#5a9fee' : '#ffffff'};
   }
 `;
 
@@ -181,6 +181,13 @@ export const DropdownItem = styled.button`
   }
 `;
 
+// 드롭다운 메뉴 구분자
+export const DropdownDivider = styled.div`
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 8px 0;
+`;
+
 // 메시지 영역
 export const MessagesContainer = styled.div`
   flex: 1;
@@ -190,6 +197,13 @@ export const MessagesContainer = styled.div`
   display: flex;
   flex-direction: column;
   gap: 17px;
+
+  /* 초대 수락 전 블러 처리 */
+  ${props => props.$blurred && `
+    filter: blur(8px);
+    pointer-events: none;
+    user-select: none;
+  `}
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -358,11 +372,15 @@ export const MessageItem = styled.div`
 `;
 
 export const MessageAvatar = styled(Avatar)`
-  width: 32px;
-  height: 32px;
-  font-size: 14px;
+  width: 38px;
+  height: 38px;
+  font-size: 15px;
   position: relative;
   margin-top: 4px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 `;
 
 export const RoleBadge = styled.div`
@@ -1027,6 +1045,31 @@ export const TabButton = styled.button`
 
 export const SearchBarWrapper = styled.div`
   margin-bottom: 16px;
+  position: relative;
+`;
+
+export const SearchClearButton = styled.button`
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #888;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+  }
 `;
 
 export const SearchByIdContainer = styled.div`
@@ -1125,7 +1168,7 @@ export const SearchInput = styled.input`
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #e0e0e0;
-  padding: 12px 16px;
+  padding: 12px 36px 12px 16px;
   border-radius: 12px;
   font-size: 14px;
   transition: all 0.2s;

@@ -185,3 +185,32 @@ export const exitChatRoom = (chatId, chatType, userId) => {
 
   return exitRoom(collectionName, chatId, userId);
 };
+
+/**
+ * 🆕 메시지 삭제 (관리자 권한으로)
+ * 메시지 내용을 삭제하고 '삭제됨' 표시로 대체
+ * @param {string} chatId - 채팅방 ID
+ * @param {string} chatType - 채팅 타입
+ * @param {string} messageId - 삭제할 메시지 ID
+ * @param {string} deletedByName - 삭제한 사람 이름
+ */
+export const deleteMessageByAdmin = async (chatId, chatType, messageId, deletedByName) => {
+  const type = detectChatType(chatId, chatType);
+  const collectionName = type === 'group' ? 'groupChats' : 'directMessages';
+
+  try {
+    const messageRef = doc(db, collectionName, chatId, 'messages', messageId);
+    await updateDoc(messageRef, {
+      text: null,
+      content: null,
+      deleted: true,
+      deletedAt: serverTimestamp(),
+      deletedByName: deletedByName
+    });
+    console.log('✅ 메시지 삭제 완료:', messageId);
+    return true;
+  } catch (error) {
+    console.error('❌ 메시지 삭제 실패:', error);
+    throw error;
+  }
+};

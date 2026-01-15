@@ -433,6 +433,7 @@ const MarkerCommentsModal = ({
   const [expandedComments, setExpandedComments] = useState({});
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState(null);
+  const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false);
 
   // 의견 목록 실시간 구독
   useEffect(() => {
@@ -578,14 +579,19 @@ const MarkerCommentsModal = ({
   };
 
   // 제안 철회
-  const handleWithdrawProposal = async () => {
+  const handleWithdrawProposal = () => {
     // 댓글이 있으면 철회 불가
     if (comments.length > 0) {
       showToast?.('의견 제시가 달린 제안은 철회할 수 없습니다');
       return;
     }
 
-    if (!window.confirm('이 제안을 철회하시겠습니까?')) return;
+    setShowWithdrawConfirm(true);
+  };
+
+  // 제안 철회 확인
+  const confirmWithdrawProposal = async () => {
+    setShowWithdrawConfirm(false);
 
     try {
       const editRef = doc(
@@ -767,6 +773,24 @@ const MarkerCommentsModal = ({
               </ConfirmButton>
               <ConfirmButton $primary onClick={confirmDeleteComment}>
                 삭제
+              </ConfirmButton>
+            </ConfirmButtons>
+          </ConfirmBox>
+        </ConfirmModal>
+      )}
+
+      {/* 제안 철회 확인 모달 */}
+      {showWithdrawConfirm && (
+        <ConfirmModal onClick={() => setShowWithdrawConfirm(false)}>
+          <ConfirmBox onClick={(e) => e.stopPropagation()}>
+            <ConfirmTitle>제안 철회</ConfirmTitle>
+            <ConfirmMessage>이 제안을 철회하시겠습니까?</ConfirmMessage>
+            <ConfirmButtons>
+              <ConfirmButton onClick={() => setShowWithdrawConfirm(false)}>
+                취소
+              </ConfirmButton>
+              <ConfirmButton $primary onClick={confirmWithdrawProposal}>
+                철회
               </ConfirmButton>
             </ConfirmButtons>
           </ConfirmBox>

@@ -24,7 +24,7 @@ export const SearchInput = styled.input`
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #e0e0e0;
-  padding: 10px 16px 10px 40px;
+  padding: 10px 36px 10px 40px;
   border-radius: 20px;
   font-size: 14px;
   transition: all 0.2s;
@@ -53,6 +53,30 @@ export const SearchIcon = styled(Search)`
   color: #666;
   width: 18px;
   height: 18px;
+`;
+
+export const SearchClearButton = styled.button`
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #888;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+  }
 `;
 
 export const IconButton = styled.button`
@@ -228,7 +252,8 @@ export const FriendItem = styled.div`
   align-items: center;
   gap: 12px;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background 0.2s;
+  background: transparent;
 
   &:hover {
     background: rgba(255, 255, 255, 0.05);

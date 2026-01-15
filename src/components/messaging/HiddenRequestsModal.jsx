@@ -8,6 +8,7 @@ import {
   permanentlyDeleteRequest,
 } from '../../services/friendService';
 import UserAvatar from '../common/UserAvatar';
+import ConfirmModal from '../ConfirmModal';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -15,7 +16,7 @@ const ModalOverlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -23,19 +24,20 @@ const ModalOverlay = styled.div`
 `;
 
 const ModalContainer = styled.div`
-  background: white;
+  background: #2a2a2a;
   border-radius: 12px;
   width: 90%;
   max-width: 500px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 const ModalHeader = styled.div`
   padding: 20px 24px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -44,7 +46,7 @@ const ModalHeader = styled.div`
 const ModalTitle = styled.h2`
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: #ffffff;
   margin: 0;
 `;
 
@@ -53,14 +55,15 @@ const CloseButton = styled.button`
   border: none;
   padding: 4px;
   cursor: pointer;
-  color: #666;
+  color: #888;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
 
   &:hover {
-    background-color: #f5f5f5;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
   }
 `;
 
@@ -73,7 +76,7 @@ const ModalBody = styled.div`
 const EmptyState = styled.div`
   text-align: center;
   padding: 40px 20px;
-  color: #999;
+  color: #888;
 `;
 
 const EmptyIcon = styled.div`
@@ -83,7 +86,7 @@ const EmptyIcon = styled.div`
 
 const EmptyText = styled.p`
   font-size: 14px;
-  color: #999;
+  color: #888;
   margin: 0;
 `;
 
@@ -91,7 +94,7 @@ const RequestItem = styled.div`
   display: flex;
   align-items: center;
   padding: 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   gap: 12px;
 
   &:last-child {
@@ -107,13 +110,13 @@ const RequestInfo = styled.div`
 const RequestName = styled.div`
   font-size: 14px;
   font-weight: 500;
-  color: #333;
+  color: #ffffff;
   margin-bottom: 2px;
 `;
 
 const RequestId = styled.div`
   font-size: 12px;
-  color: #999;
+  color: #888;
 `;
 
 const ActionButtons = styled.div`
@@ -148,6 +151,7 @@ const ActionButton = styled.button`
 const HiddenRequestsModal = ({ isOpen, onClose, showToast, onRequestsUpdated }) => {
   const [hiddenRequests, setHiddenRequests] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState({ show: false, request: null });
 
   useEffect(() => {
     if (isOpen) {
@@ -191,10 +195,13 @@ const HiddenRequestsModal = ({ isOpen, onClose, showToast, onRequestsUpdated }) 
     }
   };
 
-  const handlePermanentDelete = async (request) => {
-    if (!window.confirm(`${request.requesterName}님의 요청을 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
-      return;
-    }
+  const handlePermanentDelete = (request) => {
+    setDeleteConfirm({ show: true, request });
+  };
+
+  const confirmPermanentDelete = async () => {
+    const request = deleteConfirm.request;
+    setDeleteConfirm({ show: false, request: null });
 
     try {
       const userId = localStorage.getItem('firebaseUserId');
@@ -262,6 +269,18 @@ const HiddenRequestsModal = ({ isOpen, onClose, showToast, onRequestsUpdated }) 
           )}
         </ModalBody>
       </ModalContainer>
+
+      {deleteConfirm.show && (
+        <ConfirmModal
+          icon="🗑️"
+          title="영구 삭제"
+          message={`${deleteConfirm.request?.requesterName}님의 요청을 영구 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.`}
+          confirmText="삭제"
+          cancelText="취소"
+          onConfirm={confirmPermanentDelete}
+          onCancel={() => setDeleteConfirm({ show: false, request: null })}
+        />
+      )}
     </ModalOverlay>
   );
 };

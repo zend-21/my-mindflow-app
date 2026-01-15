@@ -1,10 +1,6 @@
 // src/components/ProfilePage.jsx
 
 import React, { useState, useEffect, useRef } from 'react';
-import { getUserProfile } from '../utils/fortuneLogic';
-import { getTodayFortune } from '../utils/fortuneLogic';
-import FortuneInputModal from './FortuneInputModal';
-import FortuneFlow from './FortuneFlow';
 import { syncProfilePictureToGoogleDrive, loadProfilePictureFromGoogleDrive } from '../utils/googleDriveSync';
 import AvatarSelector from './AvatarSelector';
 import { avatarList } from './avatars/AvatarIcons';
@@ -16,6 +12,8 @@ import { checkNicknameAvailability, updateNickname, deleteNickname } from '../se
 import ChangePasswordModal from './ChangePasswordModal';
 import { hasMasterPassword } from '../services/keyManagementService';
 import { getProfileSetting, setProfileSetting } from '../utils/userStorage';
+import ConfirmModal from './ConfirmModal';
+import SecurityDocViewer from './SecurityDocViewer';
 import * as S from './ProfilePage.styles';
 
 const BACKGROUND_COLORS = {
@@ -36,13 +34,8 @@ const BACKGROUND_COLORS = {
 };
 
 const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, onCleanupOrphanedMemos, onClose }) => {
-    const [isFortuneExpanded, setIsFortuneExpanded] = useState(false);
     const [isEditingNickname, setIsEditingNickname] = useState(false);
     const [nickname, setNickname] = useState(''); // 초기값 빈 문자열로 변경 - Firebase에서 로드
-    const [isBirthdayReminderEnabled, setIsBirthdayReminderEnabled] = useState(false);
-    const [birthdayCalendarType, setBirthdayCalendarType] = useState('solar'); // 'solar' | 'lunar'
-    const [isFortuneInputModalOpen, setIsFortuneInputModalOpen] = useState(false);
-    const [isFortuneFlowOpen, setIsFortuneFlowOpen] = useState(false);
     const [imageError, setImageError] = useState(false);
 
     // 아바타 관련 상태 (계정별로 분리)
@@ -66,12 +59,11 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
     const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
     const [hasMasterPasswordSet, setHasMasterPasswordSet] = useState(false);
 
-    // 운세 프로필 정보
-    const fortuneProfile = getUserProfile();
+    // 프로필 초기화 확인 모달
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-    // 오늘의 운세 확인 여부
-    const todayFortune = getTodayFortune();
-    const hasCheckedTodayFortune = !!todayFortune;
+    // 보안 & 개인정보 모달
+    const [isSecurityDocViewerOpen, setIsSecurityDocViewerOpen] = useState(false);
 
     // 사용자 이름 결정
     const userName = nickname || profile?.name || profile?.email?.split('@')[0] || '게스트';
@@ -85,7 +77,9 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
     const importantMemos = memos?.filter(m => m.isImportant).length || 0;
 
     // 숨겨진 메모 계산 (존재하지 않는 폴더에 속한 메모)
+    // 'shared'는 가상 폴더이므로 제외
     const folderIds = new Set(folders?.map(f => f.id) || []);
+    folderIds.add('shared');
     const orphanedMemosCount = memos?.filter(memo => memo.folderId && !folderIds.has(memo.folderId)).length || 0;
 
     // 닉네임 저장
@@ -157,11 +151,12 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
     };
 
     // 프로필 초기화 (구글 프로필로 되돌리기)
-    const handleResetProfile = async () => {
-        if (!window.confirm('구글 계정 프로필로 되돌리시겠습니까?\n(닉네임과 프로필 사진이 초기화됩니다)')) {
-            return;
-        }
+    const handleResetProfile = () => {
+        setShowResetConfirm(true);
+    };
 
+    const confirmResetProfile = async () => {
+        setShowResetConfirm(false);
         try {
             const userId = localStorage.getItem('firebaseUserId');
             if (!userId) {
@@ -1033,10 +1028,6 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
                             <S.StatValue>{totalSchedules}</S.StatValue>
                             <S.StatLabel>스케줄</S.StatLabel>
                         </S.StatItem>
-                        <S.StatItem>
-                            <S.StatValue>{hasCheckedTodayFortune ? '✓' : '-'}</S.StatValue>
-                            <S.StatLabel>오늘 운세</S.StatLabel>
-                        </S.StatItem>
                     </S.StatsGrid>
                 </S.Section>
 
@@ -1062,142 +1053,18 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
                     </S.Section>
                 )}
 
-                {/* 운세 정보 관리 */}
+                {/* 보안 & 개인정보 */}
                 <S.Section>
-                    <S.FortuneSection onClick={() => setIsFortuneExpanded(!isFortuneExpanded)}>
-                        <S.FortuneSectionHeader>
-                            <S.SectionTitle style={{ margin: 0 }}>🔮 운세 정보 관리</S.SectionTitle>
-                            <S.CollapseIcon $isExpanded={isFortuneExpanded}>▼</S.CollapseIcon>
-                        </S.FortuneSectionHeader>
-                    </S.FortuneSection>
-
-                    <S.FortuneContent $isExpanded={isFortuneExpanded}>
-                        <S.FortuneStatusBadge $checked={hasCheckedTodayFortune}>
-                            {hasCheckedTodayFortune ? '✓ 오늘의 운세 확인 완료' : '⚠️ 오늘의 운세 미확인'}
-                        </S.FortuneStatusBadge>
-
-                        {fortuneProfile && (
-                            <S.FortuneInfo>
-                                <S.InfoRow>
-                                    <S.InfoLabel>생년월일</S.InfoLabel>
-                                    <S.MaskedInfoValue
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleBirthDateTap();
-                                        }}
-                                        title="탭하면 3초간 표시됩니다"
-                                    >
-                                        {maskBirthDate(fortuneProfile.birthYear, fortuneProfile.birthMonth, fortuneProfile.birthDay)}
-                                        {!isBirthDateRevealed && ' 👁️'}
-                                    </S.MaskedInfoValue>
-                                </S.InfoRow>
-                                {fortuneProfile.birthHour !== undefined && (
-                                    <S.InfoRow>
-                                        <S.InfoLabel>출생 시간</S.InfoLabel>
-                                        <S.InfoValue>
-                                            {String(fortuneProfile.birthHour).padStart(2, '0')}:
-                                            {String(fortuneProfile.birthMinute).padStart(2, '0')}
-                                        </S.InfoValue>
-                                    </S.InfoRow>
-                                )}
-                                {fortuneProfile.country && (
-                                    <S.InfoRow>
-                                        <S.InfoLabel>출생지</S.InfoLabel>
-                                        <S.InfoValue>{fortuneProfile.country}, {fortuneProfile.city}</S.InfoValue>
-                                    </S.InfoRow>
-                                )}
-                                <S.InfoRow>
-                                    <S.InfoLabel>성별</S.InfoLabel>
-                                    <S.InfoValue>{fortuneProfile.gender === 'male' || fortuneProfile.gender === '남성' ? '남성' : '여성'}</S.InfoValue>
-                                </S.InfoRow>
-                            </S.FortuneInfo>
-                        )}
-
-                        <S.ActionButton
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditFortuneInfo();
-                            }}
-                            style={{ marginBottom: '12px' }}
-                        >
-                            운세 정보 수정
-                        </S.ActionButton>
-
-                        <S.ActionButton
-                            $primary
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewFortune();
-                            }}
-                        >
-                            {hasCheckedTodayFortune ? '오늘의 운세 다시보기' : '오늘의 운세 보기'}
-                        </S.ActionButton>
-
-                        {/* 생일 알림 설정 */}
-                        {fortuneProfile && (
-                            <S.BirthdayReminderSection>
-                                <S.ReminderOption>
-                                    <S.ReminderLabel>🎂 생일 자동 알림</S.ReminderLabel>
-                                    <S.ToggleSwitch>
-                                        <S.ToggleInput
-                                            type="checkbox"
-                                            checked={isBirthdayReminderEnabled}
-                                            onChange={(e) => {
-                                                e.stopPropagation();
-                                                handleBirthdayReminderToggle();
-                                            }}
-                                        />
-                                        <S.ToggleSlider />
-                                    </S.ToggleSwitch>
-                                </S.ReminderOption>
-
-                                {isBirthdayReminderEnabled && (
-                                    <S.CalendarTypeSelector onClick={(e) => e.stopPropagation()}>
-                                        <S.CalendarTypeButton
-                                            $selected={birthdayCalendarType === 'solar'}
-                                            onClick={() => setBirthdayCalendarType('solar')}
-                                        >
-                                            양력
-                                        </S.CalendarTypeButton>
-                                        <S.CalendarTypeButton
-                                            $selected={birthdayCalendarType === 'lunar'}
-                                            onClick={() => setBirthdayCalendarType('lunar')}
-                                        >
-                                            음력
-                                        </S.CalendarTypeButton>
-                                    </S.CalendarTypeSelector>
-                                )}
-                            </S.BirthdayReminderSection>
-                        )}
-                    </S.FortuneContent>
+                    <S.SectionTitle>🔒 보안 & 개인정보</S.SectionTitle>
+                    <S.SecurityLinkButton onClick={() => setIsSecurityDocViewerOpen(true)}>
+                        <span>이용약관 · 개인정보처리방침</span>
+                        <span style={{ opacity: 0.5 }}>›</span>
+                    </S.SecurityLinkButton>
                 </S.Section>
                         </S.Container>
                     </S.ScrollContent>
                 </S.ModalContainer>
             </S.Overlay>
-
-            {/* 운세 정보 수정 모달 */}
-            {isFortuneInputModalOpen && (
-                <FortuneInputModal
-                    onClose={() => setIsFortuneInputModalOpen(false)}
-                    onSubmit={(userData) => {
-                        // fortuneLogic에서 자동으로 저장됨
-                        showToast?.('운세 정보가 저장되었습니다');
-                        setIsFortuneInputModalOpen(false);
-                    }}
-                    initialData={fortuneProfile}
-                    userName={userName}
-                    isEditMode={true}
-                />
-            )}
-
-            {/* 운세 플로우 */}
-            {isFortuneFlowOpen && (
-                <FortuneFlow
-                    onClose={() => setIsFortuneFlowOpen(false)}
-                    profile={profile}
-                />
-            )}
 
             {/* 아바타 선택 모달 */}
             {isAvatarSelectorOpen && (
@@ -1239,6 +1106,26 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
                     onSuccess={() => {
                         showToast?.('✅ 비밀번호가 성공적으로 변경되었습니다');
                     }}
+                />
+            )}
+
+            {/* 프로필 초기화 확인 모달 */}
+            {showResetConfirm && (
+                <ConfirmModal
+                    icon="🔄"
+                    title="프로필 초기화"
+                    message="구글 계정 프로필로 되돌리시겠습니까?\n\n닉네임과 프로필 사진이 초기화됩니다."
+                    confirmText="초기화"
+                    cancelText="취소"
+                    onConfirm={confirmResetProfile}
+                    onCancel={() => setShowResetConfirm(false)}
+                />
+            )}
+
+            {/* 보안 & 개인정보 문서 뷰어 */}
+            {isSecurityDocViewerOpen && (
+                <SecurityDocViewer
+                    onClose={() => setIsSecurityDocViewerOpen(false)}
                 />
             )}
 

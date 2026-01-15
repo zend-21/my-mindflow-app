@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import Portal from '../Portal';
+import ConfirmModal from '../ConfirmModal';
 import {
   getWorkspaceByUserId,
   changeWorkspaceCode,
@@ -231,6 +232,7 @@ const WorkspaceSettings = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showCodeChangeConfirm, setShowCodeChangeConfirm] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -267,11 +269,12 @@ const WorkspaceSettings = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleChangeCode = async () => {
-    if (!confirm('워크스페이스 코드를 변경하시겠습니까?\n\n기존 코드로는 더 이상 접근할 수 없게 됩니다.')) {
-      return;
-    }
+  const handleChangeCode = () => {
+    setShowCodeChangeConfirm(true);
+  };
 
+  const confirmChangeCode = async () => {
+    setShowCodeChangeConfirm(false);
     setLoading(true);
     setError('');
 
@@ -365,6 +368,18 @@ const WorkspaceSettings = ({ isOpen, onClose }) => {
           ) : null}
         </ModalBox>
       </Overlay>
+
+      {showCodeChangeConfirm && (
+        <ConfirmModal
+          icon="🔄"
+          title="워크스페이스 코드 변경"
+          message="워크스페이스 코드를 변경하시겠습니까?\n\n기존 코드로는 더 이상 접근할 수 없게 됩니다."
+          confirmText="변경"
+          cancelText="취소"
+          onConfirm={confirmChangeCode}
+          onCancel={() => setShowCodeChangeConfirm(false)}
+        />
+      )}
     </Portal>
   );
 };

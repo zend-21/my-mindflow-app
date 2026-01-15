@@ -5,7 +5,7 @@ import { subscribeToMyDMRooms } from '../../services/directMessageService';
 import { subscribeToMyGroupChats } from '../../services/groupChatService';
 import { playNewMessageNotification, notificationSettings } from '../../utils/notificationSounds';
 import { getUserDisplayName } from '../../services/nicknameService';
-import { Search, Pin, Users, Mail } from 'lucide-react';
+import { Search, Pin, Users, Mail, X } from 'lucide-react';
 import CreateGroupModal from './CreateGroupModal';
 import JoinGroupModal from './JoinGroupModal';
 import ChatRoom from './ChatRoom';
@@ -52,7 +52,7 @@ const SearchInput = styled.input`
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #e0e0e0;
-  padding: 10px 16px 10px 40px;
+  padding: 10px 36px 10px 40px;
   border-radius: 12px;
   font-size: 14px;
   transition: all 0.2s;
@@ -65,6 +65,30 @@ const SearchInput = styled.input`
     outline: none;
     border-color: #4a90e2;
     background: rgba(255, 255, 255, 0.08);
+  }
+`;
+
+const SearchClearButton = styled.button`
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: #888;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
   }
 `;
 
@@ -136,14 +160,12 @@ const SectionTitle = styled.div`
 const ChatItem = styled.div`
   padding: 14px 20px;
   cursor: pointer;
-  transition: all 0.2s;
-  border-left: 3px solid transparent;
+  transition: background 0.2s;
   position: relative;
   background: ${props => props.$unread ? 'rgba(74, 144, 226, 0.03)' : 'transparent'};
 
   &:hover {
     background: rgba(255, 255, 255, 0.05);
-    border-left-color: #4a90e2;
   }
 
   &:active {
@@ -701,10 +723,15 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag,
             <SearchIcon />
             <SearchInput
               type="text"
-              placeholder="대화 검색..."
+              placeholder="대화방 검색..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            {searchQuery && (
+              <SearchClearButton onClick={() => setSearchQuery('')}>
+                <X size={12} />
+              </SearchClearButton>
+            )}
           </SearchInputWrapper>
           <ActionButtons>
             <NewGroupButton onClick={handleNewGroup} title="단체방 만들기">

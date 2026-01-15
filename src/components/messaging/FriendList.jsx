@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { UserPlus, MessageCircle, UserMinus, /* Shield, */ ChevronRight, X, UserCheck, MoreHorizontal, Copy, Ban, EyeOff } from 'lucide-react'; // Shield는 MVP에서 본인인증 제외로 미사용
 import { getMyFriends, removeFriend, getFriendRequests, acceptFriendRequest, rejectFriendRequest } from '../../services/friendService';
+import { blockUser } from '../../services/userManagementService';
 // import { checkVerificationStatus, checkVerificationStatusBatch } from '../../services/verificationService';
 import { createOrGetDMRoom } from '../../services/directMessageService';
 // import VerificationModal from './VerificationModal'; // MVP에서 제외
@@ -29,10 +30,13 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
   const [deletingFriend, setDeletingFriend] = useState(false);
   const [openMenuId, setOpenMenuId] = useState(null); // 드롭다운 메뉴 열림 상태
   const [showMyProfileMenu, setShowMyProfileMenu] = useState(false); // 내 프로필 메뉴
-  const [showDeletedFriendsModal, setShowDeletedFriendsModal] = useState(false); // 친구삭제 목록 모달
+  const [showDeletedFriendsModal, setShowDeletedFriendsModal] = useState(false); // 친구 삭제 목록 모달
   const [showBlockedUsersModal, setShowBlockedUsersModal] = useState(false); // 차단 목록 모달
   const [showHiddenRequestsModal, setShowHiddenRequestsModal] = useState(false); // 숨긴 요청 목록 모달
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, request: null }); // 친구 요청 확인 모달
+  const [showBlockModal, setShowBlockModal] = useState(false); // 차단 확인 모달
+  const [friendToBlock, setFriendToBlock] = useState(null); // 차단할 친구
+  const [blockingFriend, setBlockingFriend] = useState(false); // 차단 진행 중
   const [userProfilePictures, setUserProfilePictures] = useState({}); // 친구 프로필 사진
   const [userAvatarSettings, setUserAvatarSettings] = useState({}); // 친구 아바타 설정
 
@@ -497,9 +501,39 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
   };
 
   const handleBlockFriend = (friend) => {
-    // 차단 기능 구현 예정
-    showToast?.('차단 기능은 준비 중입니다');
+    setFriendToBlock(friend);
+    setShowBlockModal(true);
     setOpenMenuId(null);
+  };
+
+  // 차단 실행
+  const confirmBlockFriend = async () => {
+    if (!friendToBlock) return;
+
+    setBlockingFriend(true);
+    try {
+      const userId = localStorage.getItem('firebaseUserId');
+      const result = await blockUser(userId, friendToBlock.friendId, {
+        userName: friendToBlock.friendName,
+        userEmail: friendToBlock.friendEmail || '',
+        userWorkspaceCode: friendToBlock.friendWorkspaceCode || ''
+      });
+
+      if (result.success) {
+        showToast?.(`${friendToBlock.friendName || '사용자'}님을 차단했습니다`);
+        // 친구 목록 새로고침 (친구 목록에서 삭제됨)
+        await loadFriends();
+        setShowBlockModal(false);
+        setFriendToBlock(null);
+      } else {
+        showToast?.(result.error || '차단에 실패했습니다');
+      }
+    } catch (error) {
+      console.error('차단 오류:', error);
+      showToast?.('차단에 실패했습니다');
+    } finally {
+      setBlockingFriend(false);
+    }
   };
 
   const handleMenuToggle = (friendId, e) => {
@@ -624,6 +658,11 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+          {searchQuery && (
+            <S.SearchClearButton onClick={() => setSearchQuery('')}>
+              <X size={12} />
+            </S.SearchClearButton>
+          )}
         </S.SearchInputWrapper>
         <S.IconButton onClick={handleAddFriend} title="친구 추가">
           <UserPlus size={20} />
@@ -674,7 +713,7 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
                 setShowDeletedFriendsModal(true);
               }}>
                 <UserMinus size={16} />
-                친구삭제 목록
+                친구 삭제 목록
               </S.DropdownItem>
               <S.DropdownItem onClick={() => {
                 setShowMyProfileMenu(false);
@@ -690,19 +729,14 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
 
       {/* 친구 목록 */}
       <S.FriendListContainer>
-        {/* 나를 친구 추가한 사람 섹션 */}
+        {/* 나를 친구 추가한 사용자 섹션 */}
         {friendRequests.length > 0 && (
           <>
             <S.SectionHeader>
               <S.SectionTitle>
-                나를 친구 추가한 사람
+                나를 친구 추가한 사용자
                 <S.FriendCount>{friendRequests.length}</S.FriendCount>
               </S.SectionTitle>
-              <S.SectionActions>
-                <S.MoreButton>
-                  <MoreHorizontal size={18} />
-                </S.MoreButton>
-              </S.SectionActions>
             </S.SectionHeader>
 
             {friendRequests.map(request => (
@@ -924,6 +958,64 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
         </S.ModalOverlay>
       )}
 
+      {/* 차단 확인 모달 */}
+      {showBlockModal && friendToBlock && (
+        <S.ModalOverlay onClick={() => !blockingFriend && setShowBlockModal(false)}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>사용자 차단</S.ModalTitle>
+              <S.CloseButton onClick={() => !blockingFriend && setShowBlockModal(false)}>
+                <X size={20} />
+              </S.CloseButton>
+            </S.ModalHeader>
+            <S.ModalContent>
+              <div style={{
+                textAlign: 'center',
+                fontSize: '15px',
+                lineHeight: '1.6',
+                color: '#e0e0e0'
+              }}>
+                <strong style={{ color: '#ff6b6b' }}>
+                  {friendToBlock.friendName || '이 사용자'}
+                </strong>님을<br />
+                차단하시겠습니까?
+                <ul style={{
+                  marginTop: '16px',
+                  padding: '12px 12px 12px 28px',
+                  background: 'rgba(136, 136, 136, 0.1)',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  color: '#999',
+                  lineHeight: '1.8',
+                  textAlign: 'left',
+                  listStyle: 'circle'
+                }}>
+                  <li>친구로 등록된 경우, 친구 목록에서 자동 삭제됩니다.</li>
+                  <li>상대방이 보낸 메시지가 내게 표시되지 않습니다.</li>
+                  <li>상대방은 자신이 차단된 것을 알 수 없습니다.</li>
+                  <li>그룹 채팅 시 차단한 사용자의 메시지는 보이지 않습니다.</li>
+                </ul>
+              </div>
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton
+                onClick={() => setShowBlockModal(false)}
+                disabled={blockingFriend}
+              >
+                취소
+              </S.CancelButton>
+              <S.ConfirmButton
+                onClick={confirmBlockFriend}
+                disabled={blockingFriend}
+                style={{ background: '#ff4757' }}
+              >
+                {blockingFriend ? '차단 중...' : '차단하기'}
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
+      )}
+
       {/* 숨긴 친구 요청 모달 */}
       <HiddenRequestsModal
         isOpen={showHiddenRequestsModal}
@@ -932,7 +1024,7 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
         onRequestsUpdated={loadFriendRequests}
       />
 
-      {/* 친구삭제 목록 모달 */}
+      {/* 친구 삭제 목록 모달 */}
       <DeletedFriendsModal
         isOpen={showDeletedFriendsModal}
         onClose={() => setShowDeletedFriendsModal(false)}
@@ -958,10 +1050,12 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
               </S.ModalTitle>
             </S.ModalHeader>
             <S.ModalBody style={{ padding: '24px', textAlign: 'center' }}>
-              <p style={{ fontSize: '15px', color: '#333', marginBottom: '8px' }}>
-                {confirmModal.request?.requesterName || '익명'}님을
+              <p style={{ fontSize: '15px', color: '#e0e0e0', marginBottom: '8px' }}>
+                <span style={{ color: confirmModal.type === 'accept' ? '#4a90e2' : '#ff6b6b', fontWeight: '600' }}>
+                  {confirmModal.request?.requesterName || '익명'}
+                </span>님을
               </p>
-              <p style={{ fontSize: '15px', color: '#333' }}>
+              <p style={{ fontSize: '15px', color: '#e0e0e0' }}>
                 {confirmModal.type === 'accept' ? '친구로 추가하시겠습니까?' : '거절하시겠습니까?'}
               </p>
             </S.ModalBody>

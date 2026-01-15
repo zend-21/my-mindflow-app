@@ -7,6 +7,7 @@ import {
   unblockUser,
 } from '../../services/userManagementService';
 import { addFriendInstantly } from '../../services/friendService';
+import ConfirmModal from '../ConfirmModal';
 
 const ModalOverlay = styled.div`
   position: fixed;
@@ -14,7 +15,7 @@ const ModalOverlay = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -22,19 +23,20 @@ const ModalOverlay = styled.div`
 `;
 
 const ModalContainer = styled.div`
-  background: white;
+  background: #2a2a2a;
   border-radius: 12px;
   width: 90%;
   max-width: 500px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 `;
 
 const ModalHeader = styled.div`
   padding: 20px 24px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -43,7 +45,7 @@ const ModalHeader = styled.div`
 const ModalTitle = styled.h2`
   font-size: 18px;
   font-weight: 600;
-  color: #333;
+  color: #ffffff;
   margin: 0;
 `;
 
@@ -52,14 +54,15 @@ const CloseButton = styled.button`
   border: none;
   padding: 4px;
   cursor: pointer;
-  color: #666;
+  color: #888;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
 
   &:hover {
-    background-color: #f5f5f5;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #fff;
   }
 `;
 
@@ -72,7 +75,7 @@ const ModalBody = styled.div`
 const EmptyState = styled.div`
   text-align: center;
   padding: 40px 20px;
-  color: #999;
+  color: #888;
 `;
 
 const EmptyIcon = styled.div`
@@ -82,7 +85,7 @@ const EmptyIcon = styled.div`
 
 const EmptyText = styled.p`
   font-size: 14px;
-  color: #999;
+  color: #888;
   margin: 0;
 `;
 
@@ -90,7 +93,7 @@ const UserItem = styled.div`
   display: flex;
   align-items: center;
   padding: 12px;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   gap: 12px;
 
   &:last-child {
@@ -121,13 +124,13 @@ const UserInfo = styled.div`
 const UserName = styled.div`
   font-size: 14px;
   font-weight: 500;
-  color: #666;
+  color: #ffffff;
   margin-bottom: 4px;
 `;
 
 const UserMeta = styled.div`
   font-size: 12px;
-  color: #999;
+  color: #888;
 `;
 
 const ActionButtons = styled.div`
@@ -138,9 +141,9 @@ const ActionButtons = styled.div`
 
 const ActionButton = styled.button`
   padding: 6px 12px;
-  border: 1px solid ${props => props.$variant === 'primary' ? '#4A90E2' : '#ddd'};
-  background: ${props => props.$variant === 'primary' ? '#4A90E2' : 'white'};
-  color: ${props => props.$variant === 'primary' ? 'white' : '#666'};
+  border: 1px solid ${props => props.$variant === 'primary' ? '#4A90E2' : 'rgba(255, 255, 255, 0.2)'};
+  background: ${props => props.$variant === 'primary' ? '#4A90E2' : 'rgba(255, 255, 255, 0.1)'};
+  color: ${props => props.$variant === 'primary' ? 'white' : '#e0e0e0'};
   border-radius: 6px;
   font-size: 12px;
   cursor: pointer;
@@ -150,7 +153,7 @@ const ActionButton = styled.button`
   transition: all 0.2s;
 
   &:hover {
-    background: ${props => props.$variant === 'primary' ? '#3A80D2' : '#f5f5f5'};
+    background: ${props => props.$variant === 'primary' ? '#3A80D2' : 'rgba(255, 255, 255, 0.15)'};
     transform: translateY(-1px);
   }
 
@@ -171,6 +174,7 @@ const BlockedUsersModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
+  const [unblockConfirm, setUnblockConfirm] = useState({ show: false, user: null });
 
   useEffect(() => {
     if (isOpen) {
@@ -192,10 +196,13 @@ const BlockedUsersModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
     }
   };
 
-  const handleUnblock = async (user) => {
-    if (!window.confirm(`${user.userName}님의 차단을 해제하시겠습니까?`)) {
-      return;
-    }
+  const handleUnblock = (user) => {
+    setUnblockConfirm({ show: true, user });
+  };
+
+  const confirmUnblock = async () => {
+    const user = unblockConfirm.user;
+    setUnblockConfirm({ show: false, user: null });
 
     try {
       setActionLoading(user.userId);
@@ -295,6 +302,18 @@ const BlockedUsersModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
           )}
         </ModalBody>
       </ModalContainer>
+
+      {unblockConfirm.show && (
+        <ConfirmModal
+          icon="🔓"
+          title="차단 해제"
+          message={`${unblockConfirm.user?.userName}님의 차단을 해제하시겠습니까?`}
+          confirmText="해제"
+          cancelText="취소"
+          onConfirm={confirmUnblock}
+          onCancel={() => setUnblockConfirm({ show: false, user: null })}
+        />
+      )}
     </ModalOverlay>
   );
 };

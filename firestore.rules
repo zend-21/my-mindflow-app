@@ -97,6 +97,18 @@ service cloud.firestore {
         // 생성/수정/삭제: 본인만
         allow create, update, delete: if isSignedIn() && request.auth.uid == userId;
       }
+
+      // 🆕 약관 동의 서브컬렉션
+      match /agreements/{agreementType} {
+        // 읽기: 본인만
+        allow read: if isSignedIn() && request.auth.uid == userId;
+
+        // 생성/수정: 본인만
+        allow create, update: if isSignedIn() && request.auth.uid == userId;
+
+        // 삭제: 금지 (약관 동의 기록 보존)
+        allow delete: if false;
+      }
     }
 
     // ========================================

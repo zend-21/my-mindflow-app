@@ -52,7 +52,11 @@
       "Bash(powershell:*)",
       "Bash(cmd /c \"robocopy \"\"F:\\\\React test\\\\share-note\"\" \"\"F:\\\\share-note-backup\\\\backup_2026-01-15_2030\"\" /E /XD node_modules .git\")",
       "Bash(xcopy:*)",
-      "Bash(tar:*)"
+      "Bash(tar:*)",
+      "Bash(npx wrangler pages deploy:*)",
+      "Bash(npx wrangler login)",
+      "Bash(npx firebase deploy:*)",
+      "Bash(npx firebase:*)"
     ],
     "deny": [],
     "ask": []
