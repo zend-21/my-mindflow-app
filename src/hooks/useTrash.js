@@ -5,12 +5,12 @@ import { useLocalStorage } from './useLocalStorage';
 
 /**
  * 휴지통 관리 커스텀 훅
- * @param {number} autoDeleteDays - 자동 삭제까지의 일수 (기본: 30일)
+ * @param {number} autoDeleteDays - 자동 삭제까지의 일수 (기본: 7일)
  * @param {Array} externalTrashedItems - 외부에서 관리되는 휴지통 아이템 (Firestore 동기화용)
  * @param {Function} externalSetTrashedItems - 외부 상태 업데이트 함수 (Firestore 동기화용)
  * @returns {Object} 휴지통 관련 상태와 함수들
  */
-export const useTrash = (autoDeleteDays = 30, externalTrashedItems = null, externalSetTrashedItems = null) => {
+export const useTrash = (autoDeleteDays = 7, externalTrashedItems = null, externalSetTrashedItems = null) => {
     // 외부 상태가 제공되면 사용, 아니면 로컬스토리지 사용 (하위 호환성)
     const [localTrashedItems, setLocalTrashedItems] = useLocalStorage('trashedItems_shared', []);
     const trashedItems = externalTrashedItems !== null ? externalTrashedItems : localTrashedItems;
@@ -18,6 +18,14 @@ export const useTrash = (autoDeleteDays = 30, externalTrashedItems = null, exter
 
     // 자동 삭제 기간 설정 (로컬스토리지)
     const [autoDeletePeriod, setAutoDeletePeriod] = useLocalStorage('autoDeletePeriod_shared', autoDeleteDays);
+
+    // 기존 30일 설정을 7일로 강제 업데이트 (일회성 마이그레이션)
+    useEffect(() => {
+        if (autoDeletePeriod === 30) {
+            setAutoDeletePeriod(7);
+            console.log('🔄 휴지통 자동 삭제 기간: 30일 → 7일로 업데이트');
+        }
+    }, [autoDeletePeriod, setAutoDeletePeriod]);
 
     /**
      * 아이템을 휴지통으로 이동

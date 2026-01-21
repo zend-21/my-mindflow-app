@@ -36,7 +36,12 @@ import {
 import {
   getAccountLocalStorage,
   setAccountLocalStorage,
-  getLocalStorageWithFallback
+  getLocalStorageWithFallback,
+  setAccountLocalStorageWithTTL,
+  getAccountLocalStorageWithTTL,
+  markLocalStorageSynced,
+  removeIfSynced,
+  cleanupExpiredLocalStorage
 } from './useFirestoreSync.utils';
 
 import {
@@ -149,6 +154,23 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
         setLoading(true);
         setError(null);
 
+        // 🧹 Step 0-1: 만료된 localStorage 데이터 정리
+        const cleanedCount = cleanupExpiredLocalStorage(userId);
+        if (cleanedCount > 0) {
+          console.log(`🧹 localStorage 만료 데이터 ${cleanedCount}개 정리 완료`);
+        }
+
+        // 🧹 Step 0-2: Firestore 삭제된 문서 정리 (10일 유예 기간)
+        try {
+          const { cleanupDeletedFirestoreDocuments } = await import('../services/userDataService');
+          const deletedDocsCount = await cleanupDeletedFirestoreDocuments(userId);
+          if (deletedDocsCount > 0) {
+            console.log(`🧹 Firestore 삭제 문서 ${deletedDocsCount}개 완전 삭제 완료`);
+          }
+        } catch (error) {
+          console.warn('⚠️ Firestore 삭제 문서 정리 실패:', error);
+        }
+
         // 🔄 Step 1: 구 구조 Firestore → 신 구조 Firestore 마이그레이션
         const legacyMigrationKey = `legacy_firestore_migrated_${userId}`;
         const legacyAlreadyMigrated = localStorage.getItem(legacyMigrationKey) === 'true';
@@ -258,19 +280,22 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
           console.log('✅ Evernote 방식 다중 기기 동기화 완료');
         }
 
-        // localStorage에 병합된 데이터 캐싱
+        // localStorage에 병합된 데이터 캐싱 (TTL 기반)
         const currentMemos = memos.length > 0 ? memos : (data.memos || []);
         const currentFolders = folders.length > 0 ? folders : (data.folders || []);
         const currentCalendar = Object.keys(calendar).length > 0 ? calendar : (data.calendar || {});
 
-        setAccountLocalStorage(userId, 'memos', currentMemos);
-        setAccountLocalStorage(userId, 'folders', currentFolders);
-        setAccountLocalStorage(userId, 'trash', data.trash || []);
-        setAccountLocalStorage(userId, 'macros', data.macros || []);
-        setAccountLocalStorage(userId, 'calendar', currentCalendar);
-        setAccountLocalStorage(userId, 'activities', data.activities || []);
-        setAccountLocalStorage(userId, 'widgets', data.settings?.widgets || ['StatsGrid', 'QuickActions', 'RecentActivity']);
-        setAccountLocalStorage(userId, 'displayCount', data.settings?.displayCount || 5);
+        // Firestore에서 로드한 데이터이므로 synced: true로 저장
+        setAccountLocalStorageWithTTL(userId, 'memos', currentMemos, { synced: true });
+        setAccountLocalStorageWithTTL(userId, 'folders', currentFolders, { synced: true });
+        setAccountLocalStorageWithTTL(userId, 'trash', data.trash || [], { synced: true });
+        setAccountLocalStorageWithTTL(userId, 'macros', data.macros || [], { synced: true });
+        setAccountLocalStorageWithTTL(userId, 'calendar', currentCalendar, { synced: true });
+        setAccountLocalStorageWithTTL(userId, 'activities', data.activities || [], { synced: true });
+
+        // 설정은 영구 보존 (TTL 정책에 따라)
+        setAccountLocalStorageWithTTL(userId, 'widgets', data.settings?.widgets || ['StatsGrid', 'QuickActions', 'RecentActivity'], { synced: true });
+        setAccountLocalStorageWithTTL(userId, 'displayCount', data.settings?.displayCount || 5, { synced: true });
 
         // 닉네임은 별도 nicknames 컬렉션에서 가져오기
         try {
@@ -323,34 +348,38 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
   }, [userId, enabled, migrated]);
 
   // localStorage 즉시 동기화 (데이터 손실 방지)
+  // ⚠️ 캘린더는 제외 - Firestore가 단일 진실 공급원(Single Source of Truth)
+  // ⚠️ TTL 정책: memos, folders는 synced 플래그로 관리, 나머지는 TTL 기반
   useEffect(() => {
     if (!userId || !enabled || !migrated) return;
 
     try {
-      setAccountLocalStorage(userId, 'memos', memos);
-      setAccountLocalStorage(userId, 'folders', folders);
-      setAccountLocalStorage(userId, 'trash', trash);
-      setAccountLocalStorage(userId, 'macros', macros);
-      setAccountLocalStorage(userId, 'calendar', calendar);
-      setAccountLocalStorage(userId, 'activities', activities);
+      // synced: false로 저장 (Firestore 저장 완료 후 true로 변경됨)
+      setAccountLocalStorageWithTTL(userId, 'memos', memos, { synced: false });
+      setAccountLocalStorageWithTTL(userId, 'folders', folders, { synced: false });
+      setAccountLocalStorageWithTTL(userId, 'trash', trash, { synced: false });
+      setAccountLocalStorageWithTTL(userId, 'macros', macros, { synced: false });
+      // calendar는 Firestore에만 저장 (localStorage 사용 안 함)
+      setAccountLocalStorageWithTTL(userId, 'activities', activities, { synced: false });
     } catch (error) {
       console.error('localStorage 동기화 실패:', error);
     }
   }, [userId, enabled, migrated, memos, folders, trash, macros, calendar, activities]);
 
   // 브라우저 종료 시 긴급 백업 (데이터 손실 최종 방어선)
+  // ⚠️ 캘린더는 제외 - Firestore가 단일 진실 공급원
   useEffect(() => {
     if (!userId || !enabled) return;
 
     const handleBeforeUnload = () => {
-      // localStorage 긴급 저장 (동기)
+      // localStorage 긴급 저장 (동기) - synced: false로 저장
       try {
-        setAccountLocalStorage(userId, 'memos', memos);
-        setAccountLocalStorage(userId, 'folders', folders);
-        setAccountLocalStorage(userId, 'trash', trash);
-        setAccountLocalStorage(userId, 'macros', macros);
-        setAccountLocalStorage(userId, 'calendar', calendar);
-        setAccountLocalStorage(userId, 'activities', activities);
+        setAccountLocalStorageWithTTL(userId, 'memos', memos, { synced: false });
+        setAccountLocalStorageWithTTL(userId, 'folders', folders, { synced: false });
+        setAccountLocalStorageWithTTL(userId, 'trash', trash, { synced: false });
+        setAccountLocalStorageWithTTL(userId, 'macros', macros, { synced: false });
+        // calendar는 Firestore에만 저장 (localStorage 긴급 백업 제외)
+        setAccountLocalStorageWithTTL(userId, 'activities', activities, { synced: false });
         console.log('✅ 브라우저 종료 전 긴급 백업 완료');
       } catch (error) {
         console.error('❌ 긴급 백업 실패:', error);

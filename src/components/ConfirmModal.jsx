@@ -1,6 +1,5 @@
 // src/components/ConfirmModal.jsx
 
-import React from 'react';
 import styled from 'styled-components';
 
 const Overlay = styled.div`
@@ -72,7 +71,7 @@ const Title = styled.h2`
 const Message = styled.p`
     margin: 0 0 24px 0;
     font-size: 15px;
-    color: #b0b0b0;
+    color: #ffffff;
     text-align: center;
     line-height: 1.7;
     white-space: pre-line;

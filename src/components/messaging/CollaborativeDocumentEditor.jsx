@@ -22,6 +22,7 @@ import { getUserNickname } from '../../services/nicknameService';
 import { getAbsoluteOffset, getNodeAndOffset, rangeToAbsoluteOffset, absoluteOffsetToRange } from '../../utils/rangeUtils';
 import MarkerCommentsModal from './MarkerCommentsModal';
 import CollaborationMemoModal from './CollaborationMemoModal';
+import PinchZoomImageViewer from '../PinchZoomImageViewer';
 import * as S from './CollaborativeDocumentEditor.styles';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
 
@@ -3753,7 +3754,7 @@ const CollaborativeDocumentEditor = ({
   return (
     <S.EditorContainer $collapsed={collapsed}>
       {/* 헤더 */}
-      <S.EditorHeader onClick={() => !collapsed && setCollapsed(false)}>
+      <S.EditorHeader $collapsed={collapsed} onClick={() => !collapsed && setCollapsed(false)}>
         <S.HeaderLeft>
           <S.DocumentIcon>📄</S.DocumentIcon>
           {!content && !title && !currentDocId ? (
@@ -5840,16 +5841,13 @@ const CollaborativeDocumentEditor = ({
         onCancel={() => setShowNewMemoModal(false)}
       />
 
-      {/* 이미지 뷰어 모달 */}
+      {/* 이미지 뷰어 모달 (핀치 줌 지원) */}
       {showImageViewer && (
-        <S.ImageViewerOverlay onClick={handleCloseImageViewer}>
-          <S.ImageViewerContent onClick={(e) => e.stopPropagation()}>
-            <S.ImageViewerImage src={viewerImageSrc} alt="Full size" />
-            <S.ImageViewerCloseButton onClick={handleCloseImageViewer}>
-              <X size={24} />
-            </S.ImageViewerCloseButton>
-          </S.ImageViewerContent>
-        </S.ImageViewerOverlay>
+        <PinchZoomImageViewer
+          src={viewerImageSrc}
+          alt="Full size"
+          onClose={handleCloseImageViewer}
+        />
       )}
     </S.EditorContainer>
   );

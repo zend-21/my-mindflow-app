@@ -8,6 +8,7 @@ import { useSwipeable } from 'react-swipeable';
 import { useTrashContext } from '../../contexts/TrashContext';
 import { AUTO_DELETE_DAYS, ALARM_COLORS } from './alarm/constants/alarmConstants';
 import { hasAlarm, hasActiveAlarm, isAutoDeleted, getRepeatedAnniversaries } from './utils';
+import { saveCalendarDateToFirestore } from '../../services/userData';
 import * as S from './Calendar.styles';
 
 // 개인 기념일
@@ -693,7 +694,7 @@ const Calendar = ({
         const entry = schedules[key];
         const specialDate = specialDates[key];
 
-        if (entry && entry.text.trim().length > 0) {
+        if (entry && entry.text && entry.text.trim().length > 0) {
             setScheduleText(entry.text);
             setOriginalTextOnEdit(entry.text);
             setIsHolidayText(false);
@@ -999,102 +1000,104 @@ const Calendar = ({
         });
     };
 
-    // 알람 삭제 실행 함수 (내부)
+    // 알람 삭제 실행 함수 (내부) - React state를 직접 사용
     const executeDeleteAlarmOnly = () => {
         // 일반 알람만 삭제, 기념일 알람과 일정 텍스트는 보존
         if (!currentEntry || !currentEntry.alarm) return;
 
-        const key = format(selectedDate, 'yyyy-MM-dd');
+        const dateKey = format(selectedDate, 'yyyy-MM-dd');
 
-        setSchedules((prevSchedules) => {
-            const updatedSchedules = { ...prevSchedules };
+        try {
+            // 현재 React state에서 알람 가져오기
+            const currentAlarms = currentEntry.alarm.registeredAlarms || [];
+            console.log('🔍 삭제 전 전체 알람:', currentAlarms);
 
-            if (updatedSchedules[key] && updatedSchedules[key].alarm) {
-                // 기념일 알람만 필터링하여 남김
-                const anniversaryAlarms = updatedSchedules[key].alarm.registeredAlarms?.filter(alarm =>
-                    alarm.isAnniversary
-                ) || [];
+            // 기념일 알람만 남기기 (일반 알람 모두 삭제)
+            const alarmsToSave = currentAlarms.filter(alarm => {
+                const isAnniv = alarm.isAnniversary || alarm.isRepeated || alarm.anniversaryRepeat;
+                console.log(`🔍 알람 "${alarm.title}": isAnniversary=${alarm.isAnniversary}, isRepeated=${alarm.isRepeated}, anniversaryRepeat=${alarm.anniversaryRepeat} => 보존=${isAnniv}`);
+                return isAnniv;
+            });
 
-                if (anniversaryAlarms.length > 0) {
-                    // 기념일 알람이 있으면 기념일 알람만 보존
-                    updatedSchedules[key] = {
-                        ...updatedSchedules[key],
-                        alarm: {
-                            ...updatedSchedules[key].alarm,
-                            registeredAlarms: anniversaryAlarms
-                        },
-                        updatedAt: Date.now()
-                    };
-                } else {
-                    // 기념일 알람이 없으면 alarm 필드 완전히 제거
-                    const { alarm, ...restOfEntry } = updatedSchedules[key];
+            console.log('✅ 저장할 알람들 (기념일만):', alarmsToSave);
 
-                    // 일정 텍스트도 없으면 엔트리 전체 삭제
-                    if (!restOfEntry.text || !restOfEntry.text.trim()) {
-                        delete updatedSchedules[key];
-                    } else {
-                        // 일정 텍스트가 있으면 알람만 제거하고 유지
-                        updatedSchedules[key] = {
-                            ...restOfEntry,
-                            updatedAt: Date.now()
-                        };
-                    }
+            // 새로운 스케줄 객체 생성
+            const updatedSchedule = {
+                ...currentEntry,
+                alarm: {
+                    ...currentEntry.alarm,
+                    registeredAlarms: alarmsToSave
                 }
-            }
+            };
 
-            return updatedSchedules;
-        });
+            // React state 업데이트 (이것만으로 useFirestoreSync가 자동으로 Firestore 동기화 처리)
+            const updatedSchedules = { ...schedules, [dateKey]: updatedSchedule };
+            setSchedules(updatedSchedules);
 
-        showToast('일반 알람이 삭제되었습니다.');
+            // ⚠️ localStorage와 동기화 마커는 useFirestoreSync가 자동으로 처리하므로
+            // 수동으로 업데이트하지 않음 (수동 업데이트 시 변경 감지 실패로 Firestore 동기화 안 됨)
+
+            showToast('일반 알람이 삭제되었습니다.');
+        } catch (error) {
+            console.error('알람 삭제 오류:', error);
+            showToast('알람 삭제 중 오류가 발생했습니다.');
+        }
     };
 
-    // 비활성화된 알람만 삭제 (과거 날짜용)
+    // 비활성화된 알람만 삭제 (과거 날짜용) - AlarmModal의 confirmDelete와 동일한 방식
     const executeDeleteDisabledAlarmsOnly = () => {
-        const key = format(selectedDate, 'yyyy-MM-dd');
-        const currentSchedule = schedules[key];
+        const dateKey = format(selectedDate, 'yyyy-MM-dd');
+        const currentSchedule = schedules[dateKey];
 
         if (!currentSchedule || !currentSchedule.alarm) return;
 
-        // 기념일 알람과 활성화된 알람만 유지
-        const remainingAlarms = currentSchedule.alarm.registeredAlarms?.filter(alarm =>
-            alarm.isAnniversary || alarm.enabled !== false
-        ) || [];
+        try {
+            // ⚠️ CRITICAL FIX: 올바른 localStorage 키 사용 (AlarmModal과 동일)
+            const userId = localStorage.getItem('currentUser');
+            const calendarKey = userId ? `user_${userId}_calendar` : 'calendarSchedules_shared';
 
-        if (remainingAlarms.length === currentSchedule.alarm.registeredAlarms.length) {
-            showToast('삭제할 종료된 알람이 없습니다.');
-            return;
-        }
+            const allSchedulesStr = localStorage.getItem(calendarKey);
+            const allSchedules = allSchedulesStr ? JSON.parse(allSchedulesStr) : {};
 
-        // 남은 알람이 있으면 알람만 업데이트, 없으면 처리
-        if (remainingAlarms.length > 0) {
-            onSave(key, {
-                ...currentSchedule,
-                alarm: {
-                    ...currentSchedule.alarm,
-                    registeredAlarms: remainingAlarms
-                }
-            });
-        } else {
-            // 남은 알람이 없으면 alarm 필드 제거
-            const { alarm, ...restOfEntry } = currentSchedule;
+            if (!allSchedules[dateKey] || !allSchedules[dateKey].alarm) return;
 
-            // 일정 텍스트도 없으면 엔트리 전체 삭제
-            if (!restOfEntry.text || !restOfEntry.text.trim()) {
-                setSchedules((prevSchedules) => {
-                    const updatedSchedules = { ...prevSchedules };
-                    delete updatedSchedules[key];
-                    return updatedSchedules;
-                });
-            } else {
-                // 일정 텍스트가 있으면 알람만 제거하고 유지
-                onSave(key, {
-                    ...restOfEntry,
-                    updatedAt: Date.now()
-                });
+            // 기념일 알람과 활성화된 알람만 유지 (종료된 알람 삭제)
+            const currentAlarms = allSchedules[dateKey].alarm.registeredAlarms || [];
+            const alarmsToSave = currentAlarms.filter(alarm =>
+                alarm.isAnniversary || alarm.enabled !== false
+            );
+
+            if (alarmsToSave.length === currentAlarms.length) {
+                showToast('삭제할 종료된 알람이 없습니다.');
+                return;
             }
-        }
 
-        showToast('종료된 알람이 삭제되었습니다.');
+            console.log('localStorage에 저장할 알람들 (종료되지 않은 알람):', alarmsToSave);
+            allSchedules[dateKey].alarm.registeredAlarms = alarmsToSave;
+            localStorage.setItem(calendarKey, JSON.stringify(allSchedules));
+
+            // ✅ 동기화 마커 업데이트 (AlarmModal과 동일)
+            if (allSchedules[dateKey] && (allSchedules[dateKey].text || alarmsToSave.length > 0)) {
+                // 텍스트나 남은 알람이 있으면 최신 상태를 마커에 기록
+                localStorage.setItem(`firestore_saved_calendar_${dateKey}`, JSON.stringify(allSchedules[dateKey]));
+                console.log('✅ 동기화 마커 업데이트 완료');
+            } else {
+                // 텍스트도 알람도 없으면 DELETED 마커
+                localStorage.setItem(`firestore_saved_calendar_${dateKey}`, 'DELETED');
+                console.log('✅ DELETED 마커 설정 완료');
+            }
+
+            // localStorage 업데이트 후 schedules 상태를 다시 로드 (AlarmModal과 동일한 방식)
+            const reloadedSchedules = JSON.parse(localStorage.getItem(calendarKey));
+
+            // onSave 호출하여 부모 컴포넌트가 Firestore 동기화 처리하도록 함 (AlarmModal과 동일)
+            setSchedules(reloadedSchedules);
+
+            showToast('종료된 알람이 삭제되었습니다.');
+        } catch (error) {
+            console.error('알람 삭제 오류:', error);
+            showToast('알람 삭제 중 오류가 발생했습니다.');
+        }
     };
 
     // 알람 삭제 버튼 클릭 핸들러 (확인 모달 표시)
@@ -1308,6 +1311,46 @@ const Calendar = ({
 
                         <div style={{ textAlign: "center" }}>
                         {format(selectedDate, 'yyyy년 M월 d일', { locale: ko })} 스케줄
+                        {/* 반복 기념일 제목 표시 */}
+                        {(() => {
+                            if (!selectedDate) return null;
+
+                            try {
+                                // ⚠️ CRITICAL FIX: localStorage 대신 React state schedules 사용
+                                const repeatedAnniversaries = getRepeatedAnniversaries(selectedDate, schedules);
+
+                                console.log('🔍 [Preview Header] 반복 기념일:', {
+                                    selectedDate: format(selectedDate, 'yyyy-MM-dd'),
+                                    repeatedCount: repeatedAnniversaries.length,
+                                    repeated: repeatedAnniversaries.map(a => ({
+                                        id: a.id,
+                                        title: a.title,
+                                        anniversaryName: a.anniversaryName
+                                    }))
+                                });
+
+                                if (repeatedAnniversaries.length === 0) return null;
+
+                                return (
+                                    <div style={{
+                                        marginTop: '4px',
+                                        fontSize: '13px',
+                                        color: '#4a90e2',
+                                        fontWeight: '500'
+                                    }}>
+                                        {repeatedAnniversaries.map((alarm, index) => (
+                                            <span key={alarm.id}>
+                                                {alarm.anniversaryName || alarm.title}
+                                                {index < repeatedAnniversaries.length - 1 && ' · '}
+                                            </span>
+                                        ))}
+                                    </div>
+                                );
+                            } catch (error) {
+                                console.error('반복 기념일 표시 오류:', error);
+                                return null;
+                            }
+                        })()}
                         <S.SmallNote>(오늘: {format(today, 'yyyy년 M월 d일', { locale: ko })})</S.SmallNote>
                         </div>
 
@@ -1361,13 +1404,20 @@ const Calendar = ({
                                 const repeatedAnniversaryAlarms = (() => {
                                     if (!selectedDate) return [];
                                     try {
-                                        const allSchedulesStr = localStorage.getItem('calendarSchedules_shared');
-                                        if (!allSchedulesStr) return [];
-                                        const allSchedules = JSON.parse(allSchedulesStr);
+                                        // ⚠️ CRITICAL FIX: localStorage 대신 React state schedules 사용
+                                        const repeated = getRepeatedAnniversaries(selectedDate, schedules);
+                                        console.log('🔍 [Calendar Content] 반복 기념일 로드:', {
+                                            selectedDate: format(selectedDate, 'yyyy-MM-dd'),
+                                            repeatedCount: repeated.length,
+                                            repeated: repeated.map(a => ({
+                                                id: a.id,
+                                                title: a.title,
+                                                isRepeated: a.isRepeated,
+                                                anniversaryRepeat: a.anniversaryRepeat
+                                            }))
+                                        });
 
-                                        return getRepeatedAnniversaries(selectedDate, allSchedules).filter(alarm =>
-                                            !isAutoDeleted(alarm)
-                                        );
+                                        return repeated.filter(alarm => !isAutoDeleted(alarm));
                                     } catch (error) {
                                         console.error('반복 기념일 로드 오류:', error);
                                         return [];
@@ -1708,7 +1758,7 @@ const Calendar = ({
                                 const isPastDate = isBefore(selectedDay, today);
 
                                 const regularAlarms = currentEntry?.alarm?.registeredAlarms?.filter(alarm =>
-                                    !alarm.isAnniversary
+                                    !alarm.isAnniversary && !alarm.isRepeated && !alarm.anniversaryRepeat
                                 ) || [];
 
                                 // 과거 날짜든 현재/미래 날짜든 일반 알람이 있으면 삭제 버튼 표시

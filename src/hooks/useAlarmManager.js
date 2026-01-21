@@ -75,8 +75,27 @@ const useAlarmManager = (schedules) => {
 
   // 알람 트리거 (반복 포함)
   const triggerAlarm = useCallback((alarm, scheduleData, isAdvance = false) => {
-    const repeatInterval = alarm.repeatInterval || ALARM_REPEAT_CONFIG.defaultInterval;
-    const repeatCount = alarm.repeatCount || ALARM_REPEAT_CONFIG.defaultCount;
+    const repeatInterval = ALARM_REPEAT_CONFIG.fixedInterval;
+
+    // 개별 알람 옵션 우선, 없으면 기본 알람 옵션 사용
+    const effectiveRepeatCount = alarm.customRepeatCount !== undefined && alarm.customRepeatCount !== null
+      ? alarm.customRepeatCount
+      : (alarm.repeatCount || ALARM_REPEAT_CONFIG.defaultCount);
+
+    const effectiveNotificationType = alarm.customNotificationType !== undefined && alarm.customNotificationType !== null
+      ? alarm.customNotificationType
+      : (alarm.notificationType || 'sound');
+
+    console.log('🎯 [useAlarmManager] 알람 트리거:', {
+      alarmTitle: alarm.title,
+      customNotificationType: alarm.customNotificationType,
+      notificationType: alarm.notificationType,
+      effectiveNotificationType,
+      customRepeatCount: alarm.customRepeatCount,
+      repeatCount: alarm.repeatCount,
+      effectiveRepeatCount
+    });
+
     const alarmId = `${alarm.id}_${isAdvance ? 'advance' : 'ontime'}_${Date.now()}`;
 
     // 첫 번째 토스트 표시
@@ -86,19 +105,25 @@ const useAlarmManager = (schedules) => {
       content: alarm.content || scheduleData.text,
       soundFile: alarm.soundFile,
       volume: alarm.volume,
+      notificationType: effectiveNotificationType, // ⭐ 알림 유형 추가
       currentRepeat: 1,
-      totalRepeats: repeatCount
+      totalRepeats: effectiveRepeatCount,
+      // 삭제를 위한 원본 알람 정보 추가
+      originalAlarm: alarm,
+      scheduleDate: scheduleData.date
     };
+
+    console.log('📤 [useAlarmManager] 생성된 알람 데이터:', alarmData);
 
     setToastAlarms(prev => [...prev, alarmData]);
 
     // 반복 처리
-    if (repeatCount > 1) {
+    if (effectiveRepeatCount > 1) {
       let currentRepeat = 1;
       const timerId = setInterval(() => {
         currentRepeat++;
 
-        if (currentRepeat <= repeatCount) {
+        if (currentRepeat <= effectiveRepeatCount) {
           // 다음 반복 토스트 표시
           const nextAlarmData = {
             ...alarmData,

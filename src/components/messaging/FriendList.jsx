@@ -193,8 +193,7 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
       const userId = localStorage.getItem('firebaseUserId');
       const friendsList = await getMyFriends(userId);
 
-      console.log('📋 [DEBUG] 내 친구 목록:', friendsList);
-      console.log('📋 [DEBUG] Firebase 경로: users/' + userId + '/friends');
+      // 친구 목록 로드 완료
 
       // ⚡ 스마트 캐싱: 1분간 캐시 사용으로 데이터 사용량 90% 절감
       const CACHE_KEY = 'friendNicknamesCache';
@@ -280,8 +279,7 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
       const userId = localStorage.getItem('firebaseUserId');
       const requestsList = await getFriendRequests(userId);
 
-      console.log('📬 [DEBUG] 친구 요청 목록:', requestsList);
-      console.log('📬 [DEBUG] Firebase 경로: users/' + userId + '/friendRequests');
+      // 친구 요청 목록 로드 완료
 
       // ⚡ 스마트 캐싱: 1분간 캐시 사용 (친구 목록과 동일한 캐시)
       const CACHE_KEY = 'friendNicknamesCache';

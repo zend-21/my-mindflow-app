@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Fragment, useRef } from 'react';
 import Portal from './Portal';
 import RichTextEditor from './RichTextEditor';
+import PinchZoomImageViewer from './PinchZoomImageViewer';
 // 🗑️ COLLABORATION REMOVED - 협업방 기능 제거됨
 // import RoomSettingsModal from './collaboration/RoomSettingsModal';
 // import CollaborationRoom from './collaboration/CollaborationRoom';
@@ -10,6 +11,7 @@ import RichTextEditor from './RichTextEditor';
 import { useMemoFolders } from '../hooks/useMemoFolders';
 import * as S from './MemoDetailModal.styles';
 import { sanitizeHtml } from '../utils/sanitizeHtml';
+import { validateMemoSize } from '../utils/sizeLimit';
 
 // ========================================
 // ✨ 읽기/편집 모드 분리 구현 (메모 상세보기)
@@ -194,6 +196,30 @@ const MemoDetailModal = ({
     };   
 
     const executeSaveAndShowToast = () => {
+        // 메모 크기 검증
+        const memoData = {
+            id: memo.id,
+            content: editedContent,
+            isImportant,
+            folderId: selectedFolderId,
+            title: memo.title,
+            createdAt: memo.createdAt,
+            updatedAt: Date.now()
+        };
+
+        const validation = validateMemoSize(memoData);
+        if (!validation.valid) {
+            setConfirmModalState({
+                isOpen: true,
+                message: validation.message,
+                onConfirm: () => {
+                    setConfirmModalState({ isOpen: false });
+                },
+                showCancelButton: false
+            });
+            return;
+        }
+
         onSave(memo.id, editedContent, isImportant, selectedFolderId);
         setOriginalIsImportant(isImportant); // 저장 후 원본 중요도 업데이트
         setToastMessage("메모를 수정했습니다.");
@@ -860,16 +886,13 @@ const MemoDetailModal = ({
                 />
             )} */}
 
-            {/* 이미지 뷰어 모달 */}
+            {/* 이미지 뷰어 모달 (핀치 줌 지원) */}
             {showImageViewer && (
-                <S.ImageViewerOverlay onClick={handleCloseImageViewer}>
-                    <S.ImageViewerContent onClick={(e) => e.stopPropagation()}>
-                        <S.ImageViewerImage src={viewerImageSrc} alt="Full size" />
-                        <S.ImageViewerCloseButton onClick={handleCloseImageViewer}>
-                            <span className="material-icons">close</span>
-                        </S.ImageViewerCloseButton>
-                    </S.ImageViewerContent>
-                </S.ImageViewerOverlay>
+                <PinchZoomImageViewer
+                    src={viewerImageSrc}
+                    alt="Full size"
+                    onClose={handleCloseImageViewer}
+                />
             )}
         </Fragment>
       </Portal>

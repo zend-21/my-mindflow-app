@@ -272,7 +272,7 @@ export const updateGroupName = async (groupId, creatorId, newName) => {
 
     // 시스템 메시지
     const creatorName = groupData.membersInfo[creatorId]?.displayName || '알 수 없음';
-    await sendSystemMessage(groupId, `${creatorName}님이 그룹 이름을 "${newName}"(으)로 변경했습니다.`, {
+    await sendSystemMessage(groupId, `${creatorName}님이 그룹 이름을 변경했습니다.`, {
       action: 'group_name_changed',
       actorId: creatorId,
       newName

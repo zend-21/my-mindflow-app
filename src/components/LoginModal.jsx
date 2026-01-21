@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import styled from 'styled-components';
 import { useGoogleLogin, googleLogout } from '@react-oauth/google';
+import { Capacitor } from '@capacitor/core';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import Portal from './Portal';
 
 const ModalOverlay = styled.div`
@@ -107,33 +109,91 @@ const ModalDescription = styled.p`
 function LoginModal({ onSuccess, onError, onClose, setProfile }) {
     console.log('🔧 LoginModal 렌더링');
 
+    const isNative = Capacitor.isNativePlatform();
+
     // ✅ 모달이 열릴 때마다 Google 세션 초기화
     useEffect(() => {
         console.log('🔄 Google 세션 초기화 중...');
-        try {
-            // Google Identity Services 자동 선택 비활성화
-            googleLogout();
-            
-            // Google 계정 선택기 힌트 초기화
-            if (window.google?.accounts?.id) {
-                window.google.accounts.id.disableAutoSelect();
-                console.log('✅ Google disableAutoSelect 호출됨');
-            }
-        } catch (error) {
-            console.warn('⚠️ Google 세션 초기화 중 오류:', error);
-        }
-    }, []);
+        console.log('🔧 플랫폼:', isNative ? '네이티브 앱' : '웹');
 
-    // Google OAuth 로그인 설정
-    const login = useGoogleLogin({
+        if (isNative) {
+            // 네이티브 앱에서 GoogleAuth 초기화
+            GoogleAuth.initialize({
+                clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+                scopes: ['profile', 'email', 'https://www.googleapis.com/auth/drive.file'],
+                grantOfflineAccess: true,
+            });
+            console.log('✅ GoogleAuth 초기화 완료');
+        } else {
+            // 웹에서 Google 세션 초기화
+            try {
+                googleLogout();
+                if (window.google?.accounts?.id) {
+                    window.google.accounts.id.disableAutoSelect();
+                    console.log('✅ Google disableAutoSelect 호출됨');
+                }
+            } catch (error) {
+                console.warn('⚠️ Google 세션 초기화 중 오류:', error);
+            }
+        }
+    }, [isNative]);
+
+    // 네이티브 앱용 Google 로그인
+    const handleNativeLogin = async () => {
+        console.log('🔵 네이티브 Google 로그인 시작');
+        try {
+            const result = await GoogleAuth.signIn();
+            console.log('✅ 네이티브 Google 로그인 성공');
+            console.log('📦 전체 result 객체:', JSON.stringify(result, null, 2));
+            console.log('📦 result.id:', result.id);
+            console.log('📦 result.email:', result.email);
+            console.log('📦 result.authentication:', result.authentication);
+
+            // 네이티브 로그인 결과를 웹과 동일한 형식으로 변환
+            // @codetrix-studio/capacitor-google-auth의 응답 구조에 맞춤
+            const userInfo = {
+                sub: result.id || result.userId,
+                email: result.email,
+                name: result.name || result.displayName,
+                picture: result.imageUrl || result.photoUrl,
+                given_name: result.givenName || result.familyName,
+                family_name: result.familyName,
+            };
+
+            console.log('📦 변환된 userInfo:', JSON.stringify(userInfo, null, 2));
+
+            const expiresAt = Date.now() + 3600 * 1000; // 1시간
+
+            const successData = {
+                accessToken: result.authentication?.accessToken || result.accessToken,
+                refreshToken: result.authentication?.refreshToken || result.serverAuthCode,
+                userInfo: userInfo,
+                expiresAt: expiresAt,
+                expiresIn: 3600,
+            };
+
+            console.log('📦 onSuccess에 전달할 데이터:', JSON.stringify(successData, null, 2));
+
+            onClose();
+            onSuccess(successData);
+        } catch (error) {
+            console.error('❌ 네이티브 Google 로그인 실패:', error);
+            console.error('❌ 에러 타입:', typeof error);
+            console.error('❌ 에러 메시지:', error?.message);
+            console.error('❌ 에러 코드:', error?.code);
+            console.error('❌ 전체 에러:', JSON.stringify(error, null, 2));
+            onError();
+        }
+    };
+
+    // 웹용 Google OAuth 로그인 설정
+    const webLogin = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
             console.log('✅ Google OAuth 성공:', tokenResponse);
 
-            // ✅ Google 계정 선택이 완료되면 즉시 모달 닫기
             onClose();
 
             try {
-                // Access Token으로 사용자 정보 가져오기
                 const userInfoResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
                     headers: {
                         Authorization: `Bearer ${tokenResponse.access_token}`,
@@ -143,16 +203,14 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
                 const userInfo = await userInfoResponse.json();
                 console.log('사용자 정보:', userInfo);
 
-                // onSuccess 콜백 호출 (토큰 만료 시간 포함)
-                // Google OAuth 액세스 토큰은 기본적으로 3600초(1시간) 유효
                 const expiresAt = Date.now() + (tokenResponse.expires_in || 3600) * 1000;
 
                 onSuccess({
                     accessToken: tokenResponse.access_token,
-                    refreshToken: tokenResponse.refresh_token, // Refresh Token 추가
+                    refreshToken: tokenResponse.refresh_token,
                     userInfo: userInfo,
-                    expiresAt: expiresAt, // 만료 시간 추가
-                    expiresIn: tokenResponse.expires_in, // 만료 시간(초) 추가
+                    expiresAt: expiresAt,
+                    expiresIn: tokenResponse.expires_in,
                 });
             } catch (error) {
                 console.error('사용자 정보 가져오기 실패:', error);
@@ -165,6 +223,9 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
         },
         scope: 'https://www.googleapis.com/auth/drive.file',
     });
+
+    // 플랫폼에 따라 적절한 로그인 함수 선택
+    const login = isNative ? handleNativeLogin : webLogin;
 
     return (
         <ModalOverlay>

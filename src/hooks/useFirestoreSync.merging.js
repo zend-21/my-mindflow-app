@@ -174,12 +174,9 @@ export const mergeCalendar = (firestoreCalendar, localCalendar) => {
       } else {
         // ⚠️ 로컬 ≠ 마지막 저장 버전 → 타임스탬프 비교
         const firestoreTime = getTimestamp(firestoreSchedule);
-        const lastSavedSchedule = lastSaved ? JSON.parse(lastSaved) : {};
-        const lastSyncedTime = getTimestamp(lastSavedSchedule);
         const localTime = getTimestamp(localSchedule);
-        const effectiveSyncedTime = lastSaved ? lastSyncedTime : localTime;
 
-        if (firestoreTime > effectiveSyncedTime) {
+        if (firestoreTime > localTime) {
           console.log(`📥 캘린더 ${dateKey}: Firestore 우선`);
           mergedCalendar[dateKey] = firestoreSchedule;
         } else {

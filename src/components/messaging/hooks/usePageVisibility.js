@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import {
-  enterUnifiedChatRoom,
-  exitUnifiedChatRoom,
-  markUnifiedAsRead,
-  markAllUnifiedMessagesAsRead
+  enterChatRoom,
+  exitChatRoom,
+  markAsRead,
+  markAllMessagesAsRead
 } from '../../../services/unifiedChatService';
 
 /**
@@ -21,12 +21,12 @@ export function usePageVisibility(chatId, chatType, currentUserId) {
 
       if (visible) {
         // 페이지가 다시 보이면: inRoom = true로 설정 + 읽음 처리
-        await enterUnifiedChatRoom(chatId, chatType, currentUserId);
-        markUnifiedAsRead(chatId, chatType, currentUserId, true);
-        markAllUnifiedMessagesAsRead(chatId, chatType, currentUserId, true);
+        await enterChatRoom(chatId, chatType, currentUserId);
+        markAsRead(chatId, chatType, currentUserId, true);
+        markAllMessagesAsRead(chatId, chatType, currentUserId, true);
       } else {
         // 페이지가 숨겨지면: inRoom = false로 설정
-        await exitUnifiedChatRoom(chatId, chatType, currentUserId);
+        await exitChatRoom(chatId, chatType, currentUserId);
       }
     };
 
@@ -36,9 +36,9 @@ export function usePageVisibility(chatId, chatType, currentUserId) {
 
   // 채팅방 입장/퇴장 처리 (통합)
   useEffect(() => {
-    enterUnifiedChatRoom(chatId, chatType, currentUserId);
+    enterChatRoom(chatId, chatType, currentUserId);
     return () => {
-      exitUnifiedChatRoom(chatId, chatType, currentUserId);
+      exitChatRoom(chatId, chatType, currentUserId);
     };
   }, [chatId, chatType, currentUserId]);
 

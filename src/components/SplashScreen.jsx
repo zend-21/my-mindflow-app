@@ -88,13 +88,27 @@ const Tagline = styled.p`
     0 0 40px rgba(130, 200, 255, 0.3);
 `;
 
-const BottomText = styled.span`
+const BottomText = styled.div`
   position: absolute;
   bottom: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+`;
+
+const AppTitle = styled.span`
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.35);
   font-weight: 400;
   letter-spacing: 1px;
+`;
+
+const SinceText = styled.span`
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.25);
+  font-weight: 300;
+  letter-spacing: 1.5px;
 `;
 
 const SplashScreen = ({
@@ -130,7 +144,10 @@ const SplashScreen = ({
         <AppName>셰어노트</AppName>
         <Tagline>모두가 함께 만드는 공유노트</Tagline>
       </Content>
-      <BottomText>Share Note</BottomText>
+      <BottomText>
+        <AppTitle>Share Note</AppTitle>
+        <SinceText>SINCE 2026</SinceText>
+      </BottomText>
     </Container>
   );
 };

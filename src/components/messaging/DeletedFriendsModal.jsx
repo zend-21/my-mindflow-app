@@ -7,7 +7,7 @@ import {
   permanentlyDeleteFriend,
   blockUser,
 } from '../../services/userManagementService';
-import { addFriendInstantly } from '../../services/friendService';
+import { addFriendById } from '../../services/friendService';
 import ConfirmModal from '../ConfirmModal';
 
 const ModalOverlay = styled.div`
@@ -39,6 +39,12 @@ const ModalHeader = styled.div`
   padding: 20px 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const ModalHeaderTop = styled.div`
+  display: flex;
   align-items: center;
   justify-content: space-between;
 `;
@@ -47,6 +53,12 @@ const ModalTitle = styled.h2`
   font-size: 18px;
   font-weight: 600;
   color: #ffffff;
+  margin: 0;
+`;
+
+const ModalSubtitle = styled.p`
+  font-size: 12px;
+  color: #888;
   margin: 0;
 `;
 
@@ -213,11 +225,9 @@ const DeletedFriendsModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
       setActionLoading(friend.friendId);
       const userId = localStorage.getItem('firebaseUserId');
 
-      const result = await addFriendInstantly(userId, friend.friendWorkspaceCode);
+      const result = await addFriendById(userId, friend.friendId);
 
       if (result.success) {
-        // 삭제된 친구 목록에서 제거
-        await permanentlyDeleteFriend(userId, friend.friendId);
         showToast?.('✅ 친구가 다시 추가되었습니다');
         await loadDeletedFriends();
         onFriendAdded?.();
@@ -298,10 +308,13 @@ const DeletedFriendsModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
     <ModalOverlay onClick={onClose}>
       <ModalContainer onClick={(e) => e.stopPropagation()}>
         <ModalHeader>
-          <ModalTitle>친구 삭제 목록</ModalTitle>
-          <CloseButton onClick={onClose}>
-            <X size={20} />
-          </CloseButton>
+          <ModalHeaderTop>
+            <ModalTitle>친구 삭제 목록</ModalTitle>
+            <CloseButton onClick={onClose}>
+              <X size={20} />
+            </CloseButton>
+          </ModalHeaderTop>
+          <ModalSubtitle>영구삭제는 이 목록에서의 삭제를 의미합니다</ModalSubtitle>
         </ModalHeader>
 
         <ModalBody>

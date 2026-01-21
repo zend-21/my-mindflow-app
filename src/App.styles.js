@@ -110,8 +110,8 @@ export const ContentArea = styled.div`
     flex: 1;
     padding-left: ${props => props.$isSecretTab ? '0' : '24px'};
     padding-right: ${props => props.$isSecretTab ? '0' : '24px'};
-    padding-bottom: 80px;
-    padding-top: ${props => props.$showHeader ? '90px' : '20px'};
+    padding-bottom: calc(60px + env(safe-area-inset-bottom));
+    padding-top: ${props => props.$showHeader ? 'calc(90px + env(safe-area-inset-top))' : 'calc(20px + env(safe-area-inset-top))'};
     overflow-y: auto;
     position: relative;
     overscroll-behavior: none;
@@ -180,4 +180,43 @@ export const WidgetWrapper = styled.div`
         background-color: #fff4b7ff;
         border-radius: 16px;
     `}
+`;
+
+// 🔒 로그아웃 진행 중 오버레이 (다른 계정 데이터 노출 방지)
+export const LogoutOverlay = styled.div`
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(8px);
+    z-index: 99999; /* 모든 UI 위에 표시 */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    animation: ${fadeIn} 0.2s ease-out;
+`;
+
+export const LogoutMessage = styled.div`
+    color: #fff;
+    font-size: 18px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    &::before {
+        content: '';
+        width: 24px;
+        height: 24px;
+        border: 3px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
 `;

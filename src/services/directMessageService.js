@@ -181,6 +181,7 @@ export const getMyDMRooms = async () => {
 export const subscribeToMyDMRooms = (callback) => {
   if (!auth.currentUser) {
     console.error('로그인이 필요합니다');
+    callback([]);  // 빈 배열로 콜백 호출하여 로딩 상태 해제
     return () => {};
   }
 
@@ -350,14 +351,22 @@ export const sendMessage = async (roomId, text, roomData = null) => {
       // 나와의 대화인 경우 (otherUserId가 없음)
       if (!otherUserId) {
         await updateDoc(roomRef, {
-          lastMessage: text.trim(),
+          lastMessage: {
+            text: text.trim(),
+            senderId: auth.currentUser.uid,
+            createdAt: serverTimestamp()
+          },
           lastMessageTime: serverTimestamp()
         });
       } else {
         // 일반 1:1 대화
         // 상대방이 방에 없을 때만 unreadCount 증가
         const updateData = {
-          lastMessage: text.trim(),
+          lastMessage: {
+            text: text.trim(),
+            senderId: auth.currentUser.uid,
+            createdAt: serverTimestamp()
+          },
           lastMessageTime: serverTimestamp()
         };
 

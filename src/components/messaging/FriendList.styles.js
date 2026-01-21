@@ -190,6 +190,7 @@ export const VerifyButton = styled.button`
 export const FriendListContainer = styled.div`
   flex: 1;
   overflow-y: auto;
+  padding-bottom: 30px;
 
   &::-webkit-scrollbar {
     width: 6px;

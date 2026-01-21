@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import Portal from '../Portal';
 import * as S from './ChatRoom.styles';
-import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Settings, X, UserCog, UserPlus, Trash2, Mail, Copy, Shield, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, Send, MoreVertical, Users, Smile, FileText, Settings, X, UserCog, UserPlus, Trash2, Mail, Copy, Shield, Volume2, VolumeX, Edit3, Search, ChevronUp, ChevronDown } from 'lucide-react';
 // 🆕 통합 채팅 서비스 (1:1 + 그룹)
 import {
   sendMessage as sendUnifiedMessage,
@@ -16,18 +16,19 @@ import {
 } from '../../services/unifiedChatService';
 // 개별 서비스 (그룹 관리 기능용)
 import { subscribeToDMRoom } from '../../services/directMessageService';
-import { acceptInvitation, rejectInvitation, inviteMembersToGroup, transferRoomOwnership, removeMemberFromGroup, deleteGroupChat, cancelInvitation, updateGroupRoomType, appointSubManager, removeSubManager, updateGroupImage, subscribeToGroupRoom, muteUserInGroup, unmuteUserInGroup, getMutedUsersInGroup } from '../../services/groupChatService';
+import { acceptInvitation, rejectInvitation, inviteMembersToGroup, transferRoomOwnership, removeMemberFromGroup, deleteGroupChat, cancelInvitation, updateGroupRoomType, appointSubManager, removeSubManager, updateGroupImage, updateGroupName, subscribeToGroupRoom, muteUserInGroup, unmuteUserInGroup, getMutedUsersInGroup } from '../../services/groupChatService';
 import { getMyFriends, getUserByWorkspaceCode } from '../../services/friendService';
 import { getUserNickname } from '../../services/nicknameService';
-import { isUserBlocked } from '../../services/userManagementService';
-import { playChatMessageSound, notificationSettings } from '../../utils/notificationSounds';
+import { isUserBlocked, blockUser, unblockUser, getBlockedUsers } from '../../services/userManagementService';
+import { playChatMessageSound, getNotificationSettings, notificationSettings } from '../../utils/notificationSounds';
+import { setCurrentChatRoom, clearCurrentChatRoom } from '../../utils/currentChatRoom';
 import CollaborativeDocumentEditor from './CollaborativeDocumentEditor';
 import SharedMemoSelectorModal from './SharedMemoSelectorModal';
 import AppointSubManagerModal from './AppointSubManagerModal';
 import UserProfileModal from './UserProfileModal';
 import { db } from '../../firebase/config';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
-import { getCurrentUserId, getCurrentUserData } from '../../utils/userStorage';
+import { getCurrentUserId, getCurrentUserData, getRoomReceiveSoundMuted, setRoomReceiveSoundMuted } from '../../utils/userStorage';
 import { avatarList } from '../avatars/AvatarIcons';
 
 
@@ -47,6 +48,10 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   const [myMemberStatus, setMyMemberStatus] = useState(null); // 내 멤버 상태 (active/pending/rejected)
   const [showMemberListModal, setShowMemberListModal] = useState(false); // 참여자 목록 모달
   const [showMenuDropdown, setShowMenuDropdown] = useState(false); // 점 세개 드롭다운
+  const [showSearchBar, setShowSearchBar] = useState(false); // 검색창 표시 여부
+  const [searchQuery, setSearchQuery] = useState(''); // 검색어
+  const [searchResults, setSearchResults] = useState([]); // 검색 결과 (메시지 인덱스 배열)
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0); // 현재 검색 결과 인덱스
   const [showInviteMembersModal, setShowInviteMembersModal] = useState(false); // 멤버 초대 모달
   const [showTransferOwnerModal, setShowTransferOwnerModal] = useState(false); // 방장 위임 모달
   const [showAppointSubManagerModal, setShowAppointSubManagerModal] = useState(false); // 부방장 임명 모달
@@ -90,12 +95,52 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   const [loadingOlderMessages, setLoadingOlderMessages] = useState(false); // 이전 메시지 로딩 중
   const [initialMessageCount, setInitialMessageCount] = useState(0); // 초기 로드된 메시지 개수 (이전 대화 경계 표시용)
   const [hasLoadedOlderMessages, setHasLoadedOlderMessages] = useState(false); // 이전 메시지를 추가로 로드했는지 여부
-  const [showVolumeSettingModal, setShowVolumeSettingModal] = useState(false); // 개별 음량 설정 모달
-  const [roomMessageVolume, setRoomMessageVolume] = useState(10); // 단체방 메시지 알림음 음량 (0-100)
-  const [roomReceiveVolume, setRoomReceiveVolume] = useState(10); // 단체방 수신음 음량 (0-100)
+  const [dividerMessageIds, setDividerMessageIds] = useState([]); // 구분선을 표시할 메시지 ID 배열
   const [avatarContextMenu, setAvatarContextMenu] = useState({ show: false, x: 0, y: 0, messageId: null, senderId: null, senderName: '', isDeleted: false }); // 프사 컨텍스트 메뉴
   const [userProfileModal, setUserProfileModal] = useState({ show: false, userId: null, userName: '', profilePicture: null }); // 프로필 모달
-  const [mutedUsers, setMutedUsers] = useState([]); // 이 채팅방에서 내가 차단한 사용자 목록
+  const [mutedUsers, setMutedUsers] = useState([]); // 이 채팅방에서 내가 차단한 사용자 목록 (단체방 메시지 차단)
+  const [blockedUserIds, setBlockedUserIds] = useState([]); // 전체 앱에서 차단한 사용자 ID 목록
+  const [showRenameRoomModal, setShowRenameRoomModal] = useState(false); // 방 이름 변경 모달
+  const [newRoomName, setNewRoomName] = useState(''); // 새 방 이름
+  const [blockConfirmModal, setBlockConfirmModal] = useState({ show: false, userId: null, userName: '', isUnblock: false }); // 차단 확인 모달
+  const [isReceiveSoundMuted, setIsReceiveSoundMuted] = useState(false); // 채팅중 수신음 소거 상태
+  // 대화방 색상 설정
+  const [roomBgColor, setRoomBgColor] = useState(() => {
+    return localStorage.getItem('chatRoom_bgColor') || '#1a1a1a';
+  });
+  const [myBubbleColor, setMyBubbleColor] = useState(() => {
+    return localStorage.getItem('chatRoom_myBubbleColor') || '#4a90e2';
+  });
+  const [otherBubbleColor, setOtherBubbleColor] = useState(() => {
+    return localStorage.getItem('chatRoom_otherBubbleColor') || 'rgba(255, 255, 255, 0.08)';
+  });
+  const [myTextColor, setMyTextColor] = useState(() => {
+    return localStorage.getItem('chatRoom_myTextColor') || '#ffffff';
+  });
+  const [otherTextColor, setOtherTextColor] = useState(() => {
+    return localStorage.getItem('chatRoom_otherTextColor') || '#ffffff';
+  });
+  const [headerBgColor, setHeaderBgColor] = useState(() => {
+    return localStorage.getItem('chatRoom_headerBg') || '#2a2a2a';
+  });
+  const [headerTextColor, setHeaderTextColor] = useState(() => {
+    return localStorage.getItem('chatRoom_headerText') || '#ffffff';
+  });
+  const [inputBgColor, setInputBgColor] = useState(() => {
+    return localStorage.getItem('chatRoom_inputBg') || '#2a2a2a';
+  });
+  const [inputTextColor, setInputTextColor] = useState(() => {
+    return localStorage.getItem('chatRoom_inputText') || '#999999';
+  });
+  const [sendButtonBgColor, setSendButtonBgColor] = useState(() => {
+    return localStorage.getItem('chatRoom_sendButtonBg') || '#4a90e2';
+  });
+  const [sendButtonIconColor, setSendButtonIconColor] = useState(() => {
+    return localStorage.getItem('chatRoom_sendButtonIcon') || '#ffffff';
+  });
+  const [inputFieldBgColor, setInputFieldBgColor] = useState(() => {
+    return localStorage.getItem('chatRoom_inputFieldBg') || 'rgba(255, 255, 255, 0.05)';
+  });
   const longPressTimerRef = useRef(null); // 길게 누르기 타이머
   const messagesEndRef = useRef(null);
   const unreadMarkerRef = useRef(null); // 안 읽은 메시지 마커 참조
@@ -191,20 +236,56 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   // 선택된 이모지 카테고리 상태
   const [selectedEmojiCategory, setSelectedEmojiCategory] = useState('😊 표정');
 
-  // 🔊 단체방 개별 음량 설정 로드
+  // 🔇 채팅중 수신음 소거 상태 로드
   useEffect(() => {
-    if (!chat.id || chat.type !== 'group') return;
+    if (!chat.id) return;
 
-    try {
-      const roomVolumeSettings = JSON.parse(localStorage.getItem('roomVolumeSettings') || '{}');
-      if (roomVolumeSettings[chat.id]) {
-        setRoomMessageVolume(roomVolumeSettings[chat.id].messageVolume ?? 10);
-        setRoomReceiveVolume(roomVolumeSettings[chat.id].receiveVolume ?? 10);
-      }
-    } catch (error) {
-      console.error('개별 음량 설정 로드 실패:', error);
-    }
-  }, [chat.id, chat.type]);
+    // 방별 설정 확인
+    const isMuted = getRoomReceiveSoundMuted(chat.id);
+    setIsReceiveSoundMuted(isMuted);
+    console.log(`${isMuted ? '🔇' : '🔊'} [ChatRoom useEffect] 채팅방 ${chat.id} 수신음 상태 로드: ${isMuted ? '소거됨' : '활성화됨'} - localStorage 값:`, isMuted);
+  }, [chat.id]);
+
+  // 대화방 색상 설정 변경 감지
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const bgColor = localStorage.getItem('chatRoom_bgColor') || '#1a1a1a';
+      const myColor = localStorage.getItem('chatRoom_myBubbleColor') || '#4a90e2';
+      const otherColor = localStorage.getItem('chatRoom_otherBubbleColor') || 'rgba(255, 255, 255, 0.08)';
+      const myText = localStorage.getItem('chatRoom_myTextColor') || '#ffffff';
+      const otherText = localStorage.getItem('chatRoom_otherTextColor') || '#ffffff';
+      const headerBg = localStorage.getItem('chatRoom_headerBg') || '#2a2a2a';
+      const headerText = localStorage.getItem('chatRoom_headerText') || '#ffffff';
+      const inputBg = localStorage.getItem('chatRoom_inputBg') || '#2a2a2a';
+      const inputText = localStorage.getItem('chatRoom_inputText') || '#999999';
+      const sendBtnBg = localStorage.getItem('chatRoom_sendButtonBg') || '#4a90e2';
+      const sendBtnIcon = localStorage.getItem('chatRoom_sendButtonIcon') || '#ffffff';
+      const inputFieldBg = localStorage.getItem('chatRoom_inputFieldBg') || 'rgba(255, 255, 255, 0.05)';
+
+      setRoomBgColor(bgColor);
+      setMyBubbleColor(myColor);
+      setOtherBubbleColor(otherColor);
+      setMyTextColor(myText);
+      setOtherTextColor(otherText);
+      setHeaderBgColor(headerBg);
+      setHeaderTextColor(headerText);
+      setInputBgColor(inputBg);
+      setInputTextColor(inputText);
+      setSendButtonBgColor(sendBtnBg);
+      setSendButtonIconColor(sendBtnIcon);
+      setInputFieldBgColor(inputFieldBg);
+    };
+
+    // storage 이벤트 리스너 등록 (다른 탭에서의 변경 감지)
+    window.addEventListener('storage', handleStorageChange);
+    // 같은 탭에서의 변경 감지를 위한 커스텀 이벤트 리스너
+    window.addEventListener('chatRoomColorChange', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('chatRoomColorChange', handleStorageChange);
+    };
+  }, []);
 
   // ⚡ 권한 정보 실시간 구독 (그룹 채팅만) - 최적화: 2개 리스너 통합
   useEffect(() => {
@@ -483,12 +564,33 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     };
   }, [chat.id, chat.type]);
 
+  // 전체 앱 차단 사용자 목록 가져오기
+  useEffect(() => {
+    const fetchBlockedUsers = async () => {
+      try {
+        const blockedUsers = await getBlockedUsers(currentUserId);
+        setBlockedUserIds(blockedUsers.map(user => user.userId));
+      } catch (error) {
+        console.error('차단된 사용자 목록 조회 실패:', error);
+        setBlockedUserIds([]);
+      }
+    };
+
+    fetchBlockedUsers();
+  }, [currentUserId]);
+
+  // 🔥 메시지 개수 추적 (useRef로 변경하여 리렌더링 시에도 값 유지)
+  const prevMessageCountRef = useRef(0);
+  const lastMessageIdRef = useRef(null); // 마지막 메시지 ID 추적 (페이지네이션으로 개수가 고정되어도 새 메시지 감지)
+  const loadingOlderMessagesRef = useRef(false); // 이전 메시지 로드 중 플래그
+  const olderMessagesDividerRef = useRef(null); // 이전 대화 보기 구분선 참조
+  const shouldScrollToDividerRef = useRef(false); // 메시지 로드 후 구분선으로 스크롤해야 하는지 플래그
+
   // 메시지 실시간 구독
   useEffect(() => {
     if (!chat.id) return;
 
     let isMounted = true;
-    let prevMessageCount = 0;
     let unsubscribe = null;
 
     // 약간의 지연을 두고 구독 시작 (Firestore 내부 상태 안정화)
@@ -509,37 +611,16 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
             console.log('📊 더 많은 메시지 있음:', metadata.hasMore);
           }
 
-          // 새 메시지가 추가되었고, 내가 보낸 메시지가 아니면 효과음 재생
-          if (prevMessageCount > 0 && newMessages.length > prevMessageCount && notificationSettings.enabled) {
-            const latestMessage = newMessages[newMessages.length - 1];
-            // 상대방이 보낸 메시지인 경우만 효과음 재생
-            if (latestMessage?.senderId !== currentUserId) {
-              // 단체방인 경우 개별 음량 설정 적용
-              let customVolume = null;
-              if (chat.type === 'group') {
-                try {
-                  const roomVolumeSettings = JSON.parse(localStorage.getItem('roomVolumeSettings') || '{}');
-                  if (roomVolumeSettings[chat.id]?.receiveVolume !== undefined) {
-                    customVolume = roomVolumeSettings[chat.id].receiveVolume;
-                  }
-                } catch (e) {
-                  console.error('개별 음량 설정 읽기 실패:', e);
-                }
-              }
-              playChatMessageSound(customVolume);
-            }
-          }
-
           // 새 메시지 도착 시 페이지가 보이는 경우에만 읽음 처리
           // ⚠️ pending 상태(초대 수락 전)에서는 읽음 처리 안 함
           const myStatus = chat.membersInfo?.[currentUserId]?.status;
-          if (prevMessageCount > 0 && newMessages.length > prevMessageCount && myStatus !== 'pending') {
+          if (prevMessageCountRef.current > 0 && newMessages.length > prevMessageCountRef.current && myStatus !== 'pending') {
             markUnifiedAsRead(chat.id, chat.type, currentUserId, isPageVisible);
           }
 
         // ⭐ 첫 번째 안 읽은 메시지 인덱스 계산 (최초 입장 시에만)
         // 내가 보낸 메시지는 제외 - 상대가 보낸 메시지 중 내가 안 읽은 것만 마커 표시
-        if (prevMessageCount === 0 && newMessages.length > 0) {
+        if (prevMessageCountRef.current === 0 && newMessages.length > 0) {
           // chatRoomData에서 내 lastAccessTime 가져오기
           const myLastAccessTime = chatRoomData?.lastAccessTime?.[currentUserId];
 
@@ -584,7 +665,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
         }
 
         // 초기 로드된 메시지 개수 저장 (이전 대화 경계 표시용)
-        if (prevMessageCount === 0 && newMessages.length > 0) {
+        if (prevMessageCountRef.current === 0 && newMessages.length > 0) {
           setInitialMessageCount(newMessages.length);
           console.log('📊 초기 메시지 개수 저장:', newMessages.length);
         }
@@ -602,9 +683,82 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
               console.log('🚫 조용히 차단: 차단한 사용자의 메시지 필터링됨');
             }
           }
+        } else if (chat.type === 'group') {
+          // 🆕 단체방 차단 처리
+          // ⚠️ 중요: 차단은 일방향이지만, 메시지 필터링은 양방향으로 동작
+          // - A가 B를 차단하면: A는 B의 메시지를 "차단한 사용자의 메시지입니다"로 표시
+          // - 동시에 B는 A의 메시지를 전혀 볼 수 없음 (차단 사실을 모름)
+          //
+          // 구현 방법:
+          // - 각 사용자는 자신이 차단한 사람 목록만 확인 (다른 사람의 차단 목록은 읽지 않음)
+          // - 내가 차단한 사람의 메시지는 "차단한 사용자의 메시지입니다"로 표시 (렌더링 시 처리)
+          // - 내가 차단한 사람에게는 내 메시지가 보이지 않음
+          //   => 하지만 클라이언트에서는 상대방의 화면을 제어할 수 없으므로,
+          //   => 차단된 사람도 자신의 클라이언트에서 "내가 차단한 사람" 목록을 확인해야 함
+          //   => 즉, B의 클라이언트에서도 B가 차단한 사람 목록을 확인하고 필터링
+
+          // 실제로는 이 방법으로는 일방향 차단을 완벽하게 구현할 수 없습니다.
+          // 왜냐하면 B가 A의 메시지를 숨기려면, B가 "A가 나를 차단했는지" 확인해야 하는데,
+          // 이는 A의 차단 목록을 읽어야 하므로 차단 사실이 노출되기 때문입니다.
+
+          // 따라서 여기서는 차단을 확인하지 않고, 렌더링 시에만 "차단한 사용자의 메시지입니다"로 표시합니다.
+          // 차단된 사람에게 내 메시지를 숨기는 것은 메시지 전송 시 처리하거나,
+          // 서버 측(Cloud Functions)에서 처리해야 합니다.
         }
 
-        prevMessageCount = newMessages.length;
+        // 🔊 새 메시지 감지 및 효과음 재생
+        // ✅ 메시지 ID 기반 감지 (페이지네이션으로 개수가 고정되어도 새 메시지 감지 가능)
+        const latestMessage = newMessages.length > 0 ? newMessages[newMessages.length - 1] : null;
+        const latestMessageId = latestMessage?.id;
+        // 초기 로드 판단: 메시지 카운트가 0이거나 lastMessageId가 null인 경우 (방금 입장한 경우)
+        const isInitialLoad = prevMessageCountRef.current === 0 || lastMessageIdRef.current === null;
+        const isNewMessage = !isInitialLoad && latestMessageId && latestMessageId !== lastMessageIdRef.current;
+
+        console.log('🔍 [ChatRoom] 메시지 수신 감지:', {
+          isInitialLoad,
+          isNewMessage,
+          prevCount: prevMessageCountRef.current,
+          newCount: newMessages.length,
+          lastMessageId: lastMessageIdRef.current,
+          latestMessageId,
+          currentUserId,
+          latestSenderId: latestMessage?.senderId
+        });
+
+        // 새 메시지가 도착했고, 내가 보낸 메시지가 아니면 효과음 재생
+        if (isNewMessage && latestMessage?.senderId !== currentUserId) {
+          // ⚠️ React state가 아닌 localStorage에서 직접 최신 값을 가져와서 체크 (상태 업데이트 타이밍 이슈 해결)
+          const currentMuteState = getRoomReceiveSoundMuted(chat.id);
+
+          console.log('🔍 [ChatRoom] 새 메시지 감지 (상대방):', {
+            latestMessageId: latestMessage?.id,
+            latestSenderId: latestMessage?.senderId,
+            chatType: chat.type,
+            currentMuteState,
+            chatId: chat.id
+          });
+
+          // 방별 소거가 활성화되어 있으면 재생 안 함 (localStorage 직접 체크)
+          if (currentMuteState) {
+            console.log('🔇 [ChatRoom] 방별 수신음 소거됨 - 재생 안 함 (localStorage 확인)');
+          } else {
+            console.log('💬 [ChatRoom] 채팅중 수신음 재생!');
+            playChatMessageSound(null); // 전체 설정 음량 사용 (playChatMessageSound 내부에서 전역 설정 체크)
+          }
+        } else if (isNewMessage && latestMessage?.senderId === currentUserId) {
+          console.log('🚫 [ChatRoom] 내가 보낸 메시지 - 소리 재생 안 함');
+        }
+
+        // ✅ 메시지 개수 및 마지막 메시지 ID 업데이트
+        if (newMessages.length !== prevMessageCountRef.current) {
+          console.log('📊 [ChatRoom] 메시지 카운트 업데이트:', prevMessageCountRef.current, '->', newMessages.length);
+          prevMessageCountRef.current = newMessages.length;
+        }
+        if (latestMessageId !== lastMessageIdRef.current) {
+          console.log('📊 [ChatRoom] 마지막 메시지 ID 업데이트:', lastMessageIdRef.current, '->', latestMessageId);
+          lastMessageIdRef.current = latestMessageId;
+        }
+
         setMessages(filteredMessages);
 
         // 🆕 메시지 발신자들의 닉네임 동적 로드
@@ -634,16 +788,25 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             if (isMounted) {
-              const isInitialLoad = prevMessageCount === 0;
+              const isInitialLoad = prevMessageCountRef.current === newMessages.length;
               const container = messagesContainerRef.current;
 
               if (!container) return;
 
+              // 이전 메시지 로드 중이면 스크롤 위치 유지 (자동 스크롤 안 함)
+              if (loadingOlderMessagesRef.current) {
+                console.log('⏸️ 이전 메시지 로드 중 - 스크롤 위치 유지');
+                return;
+              }
+
               // 최초 입장 시 안 읽은 메시지가 5개 이상이면 unreadMarkerRef로 스크롤
               if (isInitialLoad && firstUnreadIndex >= 0 && unreadMarkerRef.current) {
-                // 마커 위치로 직접 스크롤 (애니메이션 없음)
+                // 마커 위치로 부드럽게 스크롤
                 const markerTop = unreadMarkerRef.current.offsetTop;
-                container.scrollTop = markerTop - 100; // 상단 여백 100px
+                container.scrollTo({
+                  top: markerTop - 100,
+                  behavior: 'smooth'
+                });
               } else if (isInitialLoad) {
                 // 초기 로드 - 즉시 맨 아래로
                 container.scrollTop = container.scrollHeight;
@@ -679,13 +842,57 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
         }
       }
     };
-  }, [chat.id, currentUserId, userNicknames, userDisplayNames, chatRoomData, firstUnreadIndex, messageLimit]);
+  }, [chat.id, chat.type, currentUserId, messageLimit]); // 🔥 불필요한 의존성 제거 (userNicknames, userDisplayNames, chatRoomData 제거 - Firestore 중복 조회 방지)
 
-  // 채팅방 참여자 프로필 사진 로드 (페이지 로드 시 1회만)
+  // 이전 메시지 로드 후 구분선으로 스크롤 (메시지 업데이트 감지)
   useEffect(() => {
+    if (!shouldScrollToDividerRef.current) return;
+    if (!loadingOlderMessagesRef.current) return;
+
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    // 이전 메시지 로드 버튼을 눌렀을 때만 구분선으로 스크롤
+    if (!shouldScrollToDividerRef.current) return;
+
+    // 메시지가 실제로 업데이트되었는지 확인 (메시지 개수 변경 감지)
+    const scrollToTopDivider = () => {
+      // 이미지 로드 등을 기다리기 위해 약간의 지연 추가
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const dividers = container.querySelectorAll('[data-older-messages-divider]');
+
+            if (dividers.length > 0) {
+              // 가장 첫 번째(최상단) 구분선으로 스크롤
+              const topDivider = dividers[0];
+              const containerRect = container.getBoundingClientRect();
+              const dividerRect = topDivider.getBoundingClientRect();
+              const relativeTop = dividerRect.top - containerRect.top;
+
+              const targetScrollTop = container.scrollTop + relativeTop - 25;
+              container.scrollTop = targetScrollTop;
+
+              console.log('📍 [useEffect] 최상단 "이전 대화 보기" 구분선으로 스크롤:', targetScrollTop, '| 총', dividers.length, '개 구분선');
+
+              // 플래그 초기화
+              shouldScrollToDividerRef.current = false;
+              loadingOlderMessagesRef.current = false;
+              setLoadingOlderMessages(false);
+            }
+          });
+        });
+      }, 50); // 50ms 지연
+    };
+
+    scrollToTopDivider();
+  }, [messages.length]); // 메시지 개수 변경 시 실행
+
+  // 🔥 참여자 ID 목록을 안정적인 문자열로 메모이제이션 (프로필 로드용)
+  const profileIdsKey = useMemo(() => {
     const userIds = new Set();
 
-    // 본인 ID 추가 (항상 포함)
+    // 본인 ID 추가
     if (currentUserId) {
       userIds.add(currentUserId);
     }
@@ -694,13 +901,22 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     if (chat.type !== 'group') {
       chat.participants?.forEach(userId => userIds.add(userId));
     } else {
-      // 그룹 채팅인 경우 - 모든 멤버 (pending, rejected 포함 - 참여자 목록에 표시되므로)
+      // 그룹 채팅인 경우
       Object.keys(chat.membersInfo || {}).forEach(userId => {
         userIds.add(userId);
       });
     }
 
-    // 각 참여자의 프로필 설정 로드 (1회만)
+    return Array.from(userIds).sort().join(',');
+  }, [chat.type, chat.participants, chat.membersInfo, currentUserId]);
+
+  // 채팅방 참여자 프로필 사진 로드 (참여자가 실제로 변경될 때만 실행)
+  useEffect(() => {
+    const userIds = profileIdsKey ? new Set(profileIdsKey.split(',')) : new Set();
+
+    if (userIds.size === 0) return;
+
+    // 각 참여자의 프로필 설정 로드
     const loadProfiles = async () => {
       const { getProfileImageUrl } = await import('../../utils/storageService');
 
@@ -760,25 +976,31 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     };
 
     loadProfiles();
-  }, [chat.id, chat.type, chat.participants, chat.membersInfo, currentUserId]);
+  }, [profileIdsKey]);
+
+  // 🔥 참여자 ID 목록을 안정적인 문자열로 메모이제이션 (불필요한 재실행 방지)
+  const participantIdsKey = useMemo(() => {
+    const userIds = new Set();
+
+    if (chat.type !== 'group') {
+      chat.participants?.forEach(userId => userIds.add(userId));
+    } else {
+      Object.keys(chat.membersInfo || {}).forEach(userId => {
+        userIds.add(userId);
+      });
+    }
+
+    // 정렬된 ID 배열을 문자열로 변환 (참여자가 실제로 바뀔 때만 변경됨)
+    return Array.from(userIds).sort().join(',');
+  }, [chat.type, chat.participants, chat.membersInfo]);
 
   // 🆕 채팅방 참여자만 닉네임 실시간 구독 (효율적) - 초기 로드 후 실시간 구독
   useEffect(() => {
     // 닉네임 로딩 상태 초기화
     setNicknamesLoaded(false);
 
-    // 채팅방 참여자만 수집
-    const userIds = new Set();
-
-    // 1:1 채팅인 경우
-    if (chat.type !== 'group') {
-      chat.participants?.forEach(userId => userIds.add(userId));
-    } else {
-      // 그룹 채팅인 경우 - 모든 멤버 (pending, rejected 포함 - 참여자 목록에 표시되므로)
-      Object.keys(chat.membersInfo || {}).forEach(userId => {
-        userIds.add(userId);
-      });
-    }
+    // 참여자 ID를 키에서 다시 파싱
+    const userIds = participantIdsKey ? new Set(participantIdsKey.split(',')) : new Set();
 
     if (userIds.size === 0) {
       setNicknamesLoaded(true); // 참여자가 없으면 로딩 완료 처리
@@ -888,7 +1110,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
         }
       });
     };
-  }, [chat.id, chat.type, chat.participants, chat.membersInfo]);
+  }, [participantIdsKey]);
 
   // 🆕 chat.isPublic이 변경되면 selectedRoomType 자동 업데이트
   useEffect(() => {
@@ -905,28 +1127,22 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     ? (chatRoomData.creatorId === currentUserId || chatRoomData.createdBy === currentUserId) // creatorId와 createdBy 둘 다 체크
     : true; // DM은 모두 편집 가능
 
-  // 사용자 역할 확인 함수
+  // 사용자 역할 확인 함수 (그룹 채팅방 역할만 표시)
   const getUserRole = (userId) => {
     // 1:1 채팅은 역할 표시 안 함
     if (chat.type !== 'group') return null;
 
-    // 방장 체크 (최우선)
-    if (chat.createdBy === userId) {
-      return { type: 'owner', icon: '🪄', label: '방장' };
+    // 그룹 채팅방 방장 체크
+    if (chatRoomData?.creatorId === userId) {
+      return { type: 'owner', icon: <UserCog size={10} color="#fbbf24" />, label: '방장' };
     }
 
-    // 문서 매니저 체크 (문서를 업로드한 사람)
-    // 방장과 매니저가 같으면 매니저 표시 우선
-    if (permissions.manager === userId) {
-      return { type: 'manager', icon: '💪', label: '매니저' };
+    // 그룹 채팅방 부방장 체크
+    if (chatRoomData?.subManagers?.[userId]) {
+      return { type: 'subManager', icon: <Shield size={10} color="#60a5fa" />, label: '부방장' };
     }
 
-    // 편집 권한자 체크
-    if (permissions.editors?.includes(userId)) {
-      return { type: 'editor', icon: '✏️', label: '편집권한자' };
-    }
-
-    // 일반 참여자는 아이콘 없음
+    // 일반 멤버는 배지 없음
     return null;
   };
 
@@ -999,9 +1215,27 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
 
   // 🆕 채팅방 입장/퇴장 처리 (통합)
   useEffect(() => {
-    enterUnifiedChatRoom(chat.id, chat.type, currentUserId);
+    // enterUnifiedChatRoom이 완료될 때까지 기다린 후 setCurrentChatRoom 호출
+    // 이렇게 하면 inRoom 상태가 Firestore에 반영된 후 메시지 구독이 시작됨
+    const enterRoom = async () => {
+      await enterUnifiedChatRoom(chat.id, chat.type, currentUserId);
+      setCurrentChatRoom(chat.id); // 현재 채팅방 ID 저장 (포그라운드 알림 소리 제어용)
+
+      // 🎵 AudioContext 활성화 (사용자 제스처 후 실행되므로 안전)
+      try {
+        const { initializeAudioContext } = await import('../../utils/notificationSounds');
+        await initializeAudioContext();
+        console.log('✅ [ChatRoom] AudioContext 활성화 완료');
+      } catch (error) {
+        console.warn('⚠️ [ChatRoom] AudioContext 활성화 실패:', error);
+      }
+    };
+
+    enterRoom();
+
     return () => {
       exitUnifiedChatRoom(chat.id, chat.type, currentUserId);
+      clearCurrentChatRoom(); // 채팅방 나갈 때 ID 제거
     };
   }, [chat.id, chat.type, currentUserId]);
 
@@ -1009,30 +1243,32 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   const handleLoadMoreMessages = () => {
     if (loadingOlderMessages) return;
 
-    // 현재 스크롤 위치 저장 (맨 위에서의 거리)
     const container = messagesContainerRef.current;
-    if (container) {
-      const scrollBefore = container.scrollHeight - container.scrollTop;
+    if (!container) return;
 
-      setLoadingOlderMessages(true);
-      setHasLoadedOlderMessages(true); // 이전 메시지 로드 플래그 설정
-      // 30개씩 추가로 불러오기
-      setMessageLimit(prev => {
-        const newLimit = prev + 30;
-        console.log('📊 메시지 로드 한도 증가:', prev, '→', newLimit);
-        return newLimit;
+    // 현재 가장 오래된 메시지 ID를 구분선 위치로 저장
+    const oldestMessageId = messages.length > 0 ? messages[0].id : null;
+    console.log('📊 이전 대화 로드 시작 - 가장 오래된 메시지 ID:', oldestMessageId);
+
+    setLoadingOlderMessages(true);
+    loadingOlderMessagesRef.current = true;
+    setHasLoadedOlderMessages(true);
+    shouldScrollToDividerRef.current = true; // 메시지 업데이트 후 스크롤하도록 플래그 설정
+
+    // 가장 오래된 메시지 ID를 구분선 위치로 추가
+    if (oldestMessageId) {
+      setDividerMessageIds(prev => {
+        console.log('📊 구분선 메시지 ID 추가:', oldestMessageId, '| 기존:', prev);
+        return [...prev, oldestMessageId];
       });
-
-      // 스크롤 위치 복원 (새 메시지 로드 후)
-      setTimeout(() => {
-        if (container) {
-          const scrollAfter = container.scrollHeight - scrollBefore;
-          container.scrollTop = scrollAfter;
-          console.log('📍 스크롤 위치 복원:', scrollAfter);
-        }
-        setLoadingOlderMessages(false);
-      }, 300);
     }
+
+    // 30개씩 추가로 불러오기
+    setMessageLimit(prev => {
+      const newLimit = prev + 30;
+      console.log('📊 메시지 로드 한도 증가:', prev, '→', newLimit);
+      return newLimit;
+    });
   };
 
   // 메시지 전송 (통합)
@@ -1080,6 +1316,72 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     setInputText(prev => prev + emoji);
     setShowEmojiPicker(false);
     inputRef.current?.focus();
+  };
+
+  // 대화 검색
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+
+    if (!query.trim()) {
+      setSearchResults([]);
+      setCurrentSearchIndex(0);
+      return;
+    }
+
+    const lowerQuery = query.toLowerCase();
+    const results = [];
+
+    messages.forEach((msg, index) => {
+      const messageText = msg.text || msg.content || '';
+      if (messageText.toLowerCase().includes(lowerQuery)) {
+        results.push(index);
+      }
+    });
+
+    setSearchResults(results);
+    setCurrentSearchIndex(results.length > 0 ? 0 : -1);
+
+    // 첫 번째 검색 결과로 스크롤
+    if (results.length > 0) {
+      scrollToSearchResult(results[0]);
+    }
+  };
+
+  // 검색 결과로 스크롤
+  const scrollToSearchResult = (messageIndex) => {
+    const messageElement = document.querySelector(`[data-message-index="${messageIndex}"]`);
+    if (messageElement) {
+      messageElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // 하이라이트 효과
+      messageElement.style.backgroundColor = 'rgba(74, 144, 226, 0.2)';
+      setTimeout(() => {
+        messageElement.style.backgroundColor = '';
+      }, 2000);
+    }
+  };
+
+  // 다음 검색 결과
+  const handleNextSearch = () => {
+    if (searchResults.length === 0) return;
+    const nextIndex = (currentSearchIndex + 1) % searchResults.length;
+    setCurrentSearchIndex(nextIndex);
+    scrollToSearchResult(searchResults[nextIndex]);
+  };
+
+  // 이전 검색 결과
+  const handlePrevSearch = () => {
+    if (searchResults.length === 0) return;
+    const prevIndex = currentSearchIndex === 0 ? searchResults.length - 1 : currentSearchIndex - 1;
+    setCurrentSearchIndex(prevIndex);
+    scrollToSearchResult(searchResults[prevIndex]);
+  };
+
+  // 검색창 닫기
+  const handleCloseSearch = () => {
+    setShowSearchBar(false);
+    setSearchQuery('');
+    setSearchResults([]);
+    setCurrentSearchIndex(0);
   };
 
   // 문서창 토글 (처음 열 때 빈 문서로 시작)
@@ -1150,13 +1452,20 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     if (!timestamp) return '';
 
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+
+    // 오늘과 어제를 정확히 비교하기 위해 시간을 00:00:00으로 설정
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) {
+    const messageDate = new Date(date);
+    messageDate.setHours(0, 0, 0, 0);
+
+    if (messageDate.getTime() === today.getTime()) {
       return '오늘';
-    } else if (date.toDateString() === yesterday.toDateString()) {
+    } else if (messageDate.getTime() === yesterday.getTime()) {
       return '어제';
     } else {
       return date.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -1491,10 +1800,59 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     showToast?.(`${targetUserName}님과의 1:1 대화 기능은 준비 중입니다`);
   };
 
-  // 프로필 모달에서 차단하기
-  const handleBlockFromProfile = async (targetUserId, targetUserName) => {
-    // TODO: 차단 확인 모달 표시
-    showToast?.(`${targetUserName}님 차단 기능은 준비 중입니다`);
+  // 프로필 모달에서 차단하기 (확인 모달 표시)
+  const handleBlockFromProfile = (targetUserId, targetUserName) => {
+    setBlockConfirmModal({
+      show: true,
+      userId: targetUserId,
+      userName: targetUserName,
+      isUnblock: false
+    });
+  };
+
+  // 프로필 모달에서 차단 해제하기 (확인 모달 표시)
+  const handleUnblockFromProfile = (targetUserId, targetUserName) => {
+    setBlockConfirmModal({
+      show: true,
+      userId: targetUserId,
+      userName: targetUserName,
+      isUnblock: true
+    });
+  };
+
+  // 차단 확인 모달에서 확인 버튼 클릭
+  const handleConfirmBlock = async () => {
+    const { userId: targetUserId, userName: targetUserName, isUnblock } = blockConfirmModal;
+
+    try {
+      if (isUnblock) {
+        // 차단 해제
+        await unblockUser(currentUserId, targetUserId);
+        showToast?.(`${targetUserName}님을 차단 해제했습니다`);
+
+        // blockedUserIds 업데이트
+        setBlockedUserIds(prev => prev.filter(id => id !== targetUserId));
+      } else {
+        // 차단
+        const targetUserDoc = await getDoc(doc(db, 'users', targetUserId));
+        const targetUserData = targetUserDoc.exists() ? targetUserDoc.data() : {};
+
+        await blockUser(currentUserId, targetUserId, {
+          userName: targetUserName,
+          userEmail: targetUserData.email || '',
+          userWorkspaceCode: targetUserData.workspaceCode || ''
+        });
+        showToast?.(`${targetUserName}님을 차단했습니다`);
+
+        // blockedUserIds 업데이트
+        setBlockedUserIds(prev => [...prev, targetUserId]);
+      }
+    } catch (error) {
+      console.error('차단 처리 실패:', error);
+      showToast?.(isUnblock ? '차단 해제에 실패했습니다' : '차단에 실패했습니다');
+    } finally {
+      setBlockConfirmModal({ show: false, userId: null, userName: '', isUnblock: false });
+    }
   };
 
   // 단체방 상단 프로필 이미지 변경 핸들러
@@ -1537,6 +1895,29 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
 
     // input 초기화
     e.target.value = '';
+  };
+
+  // 방 이름 변경 핸들러
+  const handleRenameRoom = async () => {
+    if (!newRoomName.trim()) {
+      showToast?.('방 이름을 입력해주세요');
+      return;
+    }
+
+    if (newRoomName.trim().length > 12) {
+      showToast?.('방 이름은 12자 이내로 입력해주세요');
+      return;
+    }
+
+    try {
+      await updateGroupName(chat.id, currentUserId, newRoomName.trim());
+      showToast?.('방 이름이 변경되었습니다');
+      setShowRenameRoomModal(false);
+      setNewRoomName('');
+    } catch (error) {
+      console.error('방 이름 변경 실패:', error);
+      showToast?.(error.message || '방 이름 변경에 실패했습니다');
+    }
   };
 
   // 방장 위임 핸들러 - 최종 확인 모달 표시
@@ -1709,6 +2090,22 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     }
   };
 
+  // 채팅중 수신음 소거/소거해제 핸들러
+  const handleToggleReceiveSound = async () => {
+    const newMutedState = !isReceiveSoundMuted;
+
+    // 상태 업데이트
+    setIsReceiveSoundMuted(newMutedState);
+
+    // localStorage에 저장
+    await setRoomReceiveSoundMuted(chat.id, newMutedState);
+
+    // 메뉴 닫기
+    setShowMenuDropdown(false);
+
+    console.log(`${newMutedState ? '🔇' : '🔊'} [handleToggleReceiveSound] 채팅방 ${chat.id} 수신음 ${newMutedState ? '소거' : '소거 해제'} - 상태 저장 완료`);
+  };
+
   // 단체방 삭제 핸들러
   const handleDeleteGroup = () => {
     setShowDeleteGroupModal(true);
@@ -1730,23 +2127,6 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     } catch (error) {
       console.error('단체방 삭제 실패:', error);
       showToast?.(error.message || '단체방 삭제에 실패했습니다');
-    }
-  };
-
-  // 🔊 단체방 개별 음량 설정 저장
-  const handleSaveRoomVolume = () => {
-    try {
-      const roomVolumeSettings = JSON.parse(localStorage.getItem('roomVolumeSettings') || '{}');
-      roomVolumeSettings[chat.id] = {
-        messageVolume: roomMessageVolume,
-        receiveVolume: roomReceiveVolume
-      };
-      localStorage.setItem('roomVolumeSettings', JSON.stringify(roomVolumeSettings));
-      showToast?.('음량 설정이 저장되었습니다');
-      setShowVolumeSettingModal(false);
-    } catch (error) {
-      console.error('음량 설정 저장 실패:', error);
-      showToast?.('음량 설정 저장에 실패했습니다');
     }
   };
 
@@ -1848,9 +2228,9 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   };
 
   return createPortal(
-    <S.FullScreenContainer>
+    <S.FullScreenContainer $bgColor={roomBgColor}>
       {/* 헤더 */}
-      <S.Header>
+      <S.Header $bgColor={headerBgColor} $textColor={headerTextColor}>
         <S.HeaderLeft>
           <S.BackButton onClick={onClose}>
             <ArrowLeft size={24} />
@@ -1870,14 +2250,18 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
           >
             {!chat.groupImage && !userProfilePictures[otherUser.userId] && !otherUser.isGroup && userAvatarSettings[otherUser.userId] && renderAvatarIcon(otherUser.userId)}
             {!chat.groupImage && !userProfilePictures[otherUser.userId] && !userAvatarSettings[otherUser.userId] && (otherUser.isGroup ? <Users size={20} /> : (nicknamesLoaded ? otherUser.name.charAt(0).toUpperCase() : '...'))}
+            {/* ⚠️ 공개방/비공개방 배지 임시 비활성화 (2026-01-16)
+                - 현재 공개방 기능을 사용하지 않아 자물쇠 표시 불필요
+                - 향후 공개방 운영 시 아래 주석 해제하여 재활성화 가능
             {otherUser.isGroup && (
               <S.AvatarBadge title={chat.isPublic ? '공개방' : '비공개방'}>
                 {chat.isPublic ? '🌐' : '🔒'}
               </S.AvatarBadge>
             )}
+            */}
           </S.Avatar>
           <S.ChatInfo>
-            <S.ChatName>
+            <S.ChatName $textColor={headerTextColor}>
               {nicknamesLoaded
                 ? (otherUser.name.length > 10 ? otherUser.name.substring(0, 10) + '...' : otherUser.name)
                 : '로딩 중...'}
@@ -1898,21 +2282,34 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
               <FileText size={20} />
             </S.MenuButton>
           )}
-          {chat.type === 'group' && (
-            <div style={{ position: 'relative' }}>
-              <S.MenuButton
-                onClick={() => {
-                  setShowMenuDropdown(!showMenuDropdown);
-                }}
-                title="메뉴"
-              >
-                <MoreVertical size={20} />
-              </S.MenuButton>
-              {/* 드롭다운 메뉴 */}
-              {showMenuDropdown && (
-                <S.DropdownMenu onClick={(e) => e.stopPropagation()}>
-                  {/* 방장 전용 메뉴 */}
-                  {isRoomOwner && (
+          <div style={{ position: 'relative' }}>
+            <S.MenuButton
+              onClick={() => {
+                setShowMenuDropdown(!showMenuDropdown);
+              }}
+              title="메뉴"
+            >
+              <MoreVertical size={20} />
+            </S.MenuButton>
+            {/* 드롭다운 메뉴 */}
+            {showMenuDropdown && (
+              <S.DropdownMenu onClick={(e) => e.stopPropagation()}>
+                {/* 대화 검색 (공통) */}
+                <S.DropdownItem
+                  onClick={() => {
+                    setShowSearchBar(true);
+                    setShowMenuDropdown(false);
+                  }}
+                >
+                  <Search size={16} />
+                  대화 검색
+                </S.DropdownItem>
+
+                {chat.type === 'group' && (
+                  <>
+                    <S.DropdownDivider />
+                    {/* 방장 전용 메뉴 */}
+                    {isRoomOwner && (
                     <>
                       {/* 멤버 초대 */}
                       <S.DropdownItem
@@ -1944,15 +2341,21 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                         <Shield size={16} />
                         부방장 임명
                       </S.DropdownItem>
-                      {/* 개별 알림음 설정 */}
+                      {/* 그룹명 변경 */}
                       <S.DropdownItem
                         onClick={() => {
-                          setShowVolumeSettingModal(true);
+                          setNewRoomName(otherUser.name);
+                          setShowRenameRoomModal(true);
                           setShowMenuDropdown(false);
                         }}
                       >
-                        <Volume2 size={16} />
-                        알림음 설정
+                        <Edit3 size={16} />
+                        그룹명 변경
+                      </S.DropdownItem>
+                      {/* 수신음 소거/소거해제 */}
+                      <S.DropdownItem onClick={handleToggleReceiveSound}>
+                        {isReceiveSoundMuted ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                        {isReceiveSoundMuted ? '수신음 소거해제' : '수신음 소거'}
                       </S.DropdownItem>
                       {/* 구분자 */}
                       <S.DropdownDivider />
@@ -1973,15 +2376,10 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   {/* 일반 참여자용 메뉴 */}
                   {!isRoomOwner && (
                     <>
-                      {/* 개별 알림음 설정 */}
-                      <S.DropdownItem
-                        onClick={() => {
-                          setShowVolumeSettingModal(true);
-                          setShowMenuDropdown(false);
-                        }}
-                      >
-                        <Volume2 size={16} />
-                        알림음 설정
+                      {/* 수신음 소거/소거해제 */}
+                      <S.DropdownItem onClick={handleToggleReceiveSound}>
+                        {isReceiveSoundMuted ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                        {isReceiveSoundMuted ? '수신음 소거해제' : '수신음 소거'}
                       </S.DropdownItem>
                       {/* 구분자 */}
                       <S.DropdownDivider />
@@ -1998,12 +2396,42 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                       </S.DropdownItem>
                     </>
                   )}
-                </S.DropdownMenu>
-              )}
-            </div>
-          )}
+                  </>
+                )}
+              </S.DropdownMenu>
+            )}
+          </div>
         </S.HeaderRight>
       </S.Header>
+
+      {/* 검색창 */}
+      {showSearchBar && (
+        <S.SearchBar>
+          <S.SearchInput
+            type="text"
+            placeholder="대화 내용 검색..."
+            value={searchQuery}
+            onChange={(e) => handleSearch(e.target.value)}
+            autoFocus
+          />
+          {searchResults.length > 0 && (
+            <S.SearchResultInfo>
+              {currentSearchIndex + 1} / {searchResults.length}
+            </S.SearchResultInfo>
+          )}
+          <S.SearchButtons>
+            <S.SearchButton onClick={handlePrevSearch} disabled={searchResults.length === 0} title="이전">
+              <ChevronUp size={18} />
+            </S.SearchButton>
+            <S.SearchButton onClick={handleNextSearch} disabled={searchResults.length === 0} title="다음">
+              <ChevronDown size={18} />
+            </S.SearchButton>
+            <S.SearchButton onClick={handleCloseSearch} title="닫기">
+              <X size={18} />
+            </S.SearchButton>
+          </S.SearchButtons>
+        </S.SearchBar>
+      )}
 
       {/* 초대 수락/거부 배너 (pending 상태일 때만 표시) */}
       {chat.type === 'group' && myMemberStatus === 'pending' && (
@@ -2166,7 +2594,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
               // 시스템 메시지인 경우
               if (message.type === 'system') {
                 return (
-                  <div key={message.id}>
+                  <div key={message.id} data-message-id={message.id}>
                     {showDate && (
                       <S.DateSeparator>
                         <S.DateText>{formatDate(message.createdAt)}</S.DateText>
@@ -2182,19 +2610,25 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                       <div style={{
                         flex: 1,
                         height: '1px',
-                        background: 'rgba(255, 255, 255, 0.2)'
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        minWidth: '12px'
                       }} />
                       <div style={{
                         fontSize: '13px',
                         color: '#999',
-                        whiteSpace: 'nowrap'
+                        wordBreak: 'break-word',
+                        wordWrap: 'break-word',
+                        overflowWrap: 'break-word',
+                        textAlign: 'center',
+                        maxWidth: '80%'
                       }}>
                         {message.content}
                       </div>
                       <div style={{
                         flex: 1,
                         height: '1px',
-                        background: 'rgba(255, 255, 255, 0.2)'
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        minWidth: '12px'
                       }} />
                     </div>
                   </div>
@@ -2204,8 +2638,9 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
               // 삭제된 메시지인지 확인
               const isDeleted = message.deleted === true;
 
-              // 차단된 사용자의 메시지인지 확인 (그룹 채팅에서만)
-              const isMutedUser = chat.type === 'group' && mutedUsers.includes(message.senderId);
+              // 차단 상태 확인 (그룹 채팅에서만)
+              const isMutedUser = chat.type === 'group' && mutedUsers.includes(message.senderId); // 그룹 메시지 차단
+              const isBlockedUser = chat.type === 'group' && blockedUserIds.includes(message.senderId); // 전체 앱 차단
 
               // 일반 메시지
               // 삭제된 메시지: 본인에게는 "관리자에 의해", 다른 사람에게는 삭제자 이름 표시
@@ -2214,9 +2649,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                 : `${message.deletedByName || '관리자'}님에 의해 메시지가 삭제되었습니다`;
               const messageText = isDeleted
                 ? deletedText
-                : isMutedUser
+                : isBlockedUser
                   ? '차단한 사용자의 메시지입니다'
-                  : (message.text || message.content || '');
+                  : isMutedUser
+                    ? '메시지를 차단했습니다'
+                    : (message.text || message.content || '');
               const isCollapsible = !isDeleted && collapsibleMessages.has(message.id);
 
               const handleShowFullMessage = () => {
@@ -2242,16 +2679,16 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
               };
 
               return (
-                <div key={message.id}>
+                <div key={message.id} data-message-id={message.id} data-message-index={index}>
                   {showDate && (
                     <S.DateSeparator>
                       <S.DateText>{formatDate(message.createdAt)}</S.DateText>
                     </S.DateSeparator>
                   )}
-                  {/* ⭐ 이전 대화 경계 구분선 (추가 로드된 메시지의 시작점) - "더 보기"를 눌렀을 때만 표시 */}
-                  {hasLoadedOlderMessages && index === initialMessageCount && initialMessageCount > 0 && messages.length > initialMessageCount && (
-                    <S.OlderMessagesDivider>
-                      <S.OlderMessagesDividerText>────── 이전 대화 보기 ──────</S.OlderMessagesDividerText>
+                  {/* ⭐ 이전 대화 경계 구분선들 (메시지 ID 기반) */}
+                  {hasLoadedOlderMessages && dividerMessageIds.includes(message.id) && (
+                    <S.OlderMessagesDivider data-older-messages-divider>
+                      <S.OlderMessagesDividerText>══════ 이전 대화 보기 ══════</S.OlderMessagesDividerText>
                     </S.OlderMessagesDivider>
                   )}
                   {/* ⭐ 안 읽은 메시지 마커 표시 */}
@@ -2290,21 +2727,29 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                         <div style={{ position: 'relative' }}>
                           <S.MessageBubble
                             $isMine={isMine}
+                            $myBubbleColor={myBubbleColor}
+                            $otherBubbleColor={otherBubbleColor}
+                            $myTextColor={myTextColor}
+                            $otherTextColor={otherTextColor}
                             $collapsed={isCollapsible}
                             data-message-id={message.id}
-                            style={isDeleted ? { background: 'rgba(180, 60, 60, 0.25)', border: '1px dashed rgba(255, 100, 100, 0.3)' } : isMutedUser ? { background: 'rgba(100, 100, 100, 0.3)', border: '1px dashed rgba(255, 255, 255, 0.2)' } : {}}
+                            style={isDeleted ? { background: 'rgba(180, 60, 60, 0.25)', border: '1px dashed rgba(255, 100, 100, 0.3)' } : isBlockedUser ? { background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)' } : isMutedUser ? { background: 'rgba(100, 100, 100, 0.3)', border: '1px dashed rgba(255, 255, 255, 0.2)' } : {}}
                           >
                             <S.MessageTextContent
-                              ref={(isDeleted || isMutedUser) ? undefined : handleTextContentRef}
+                              ref={(isDeleted || isMutedUser || isBlockedUser) ? undefined : handleTextContentRef}
                               $collapsed={isCollapsible}
                               $isMine={isMine}
-                              style={isDeleted ? { color: '#e57373', fontStyle: 'italic', fontSize: '13px' } : isMutedUser ? { color: '#888', fontStyle: 'italic', fontSize: '13px' } : {}}
+                              style={isDeleted ? { color: '#e57373', fontStyle: 'italic', fontSize: '13px' } : isBlockedUser ? { color: '#ef4444', fontStyle: 'italic', fontSize: '13px' } : isMutedUser ? { color: '#888', fontStyle: 'italic', fontSize: '13px' } : {}}
                             >
                               {messageText}
                             </S.MessageTextContent>
                           </S.MessageBubble>
                           {isCollapsible && (
-                            <S.ShowMoreOverlay $isMine={isMine}>
+                            <S.ShowMoreOverlay
+                              $isMine={isMine}
+                              $myBubbleColor={myBubbleColor}
+                              $otherBubbleColor={otherBubbleColor}
+                            >
                               <S.ShowMoreButton
                                 onClick={handleShowFullMessage}
                                 $isMine={isMine}
@@ -2389,7 +2834,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       </S.MessagesContainer>
 
       {/* 입력 영역 */}
-      <S.InputContainer>
+      <S.InputContainer $bgColor={inputBgColor}>
         {/* 차단된 경우 메시지 표시 (DM 전용) */}
         {chat.type !== 'group' && isOtherUserBlocked ? (
           <S.BlockedMessage>
@@ -2436,7 +2881,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
 
             <S.InputWrapper>
               <S.InputGroup>
-                <S.TextInputWrapper>
+                <S.TextInputWrapper $bgColor={inputFieldBgColor}>
                   <S.IconButton
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                     title="이모티콘"
@@ -2451,12 +2896,15 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                     placeholder="메시지를 입력하세요..."
                     rows={1}
                     disabled={sending}
+                    $textColor={inputTextColor}
                   />
                 </S.TextInputWrapper>
               </S.InputGroup>
               <S.SendButton
                 onClick={handleSendMessage}
                 disabled={!inputText.trim() || sending}
+                $bgColor={sendButtonBgColor}
+                $iconColor={sendButtonIconColor}
               >
                 <Send size={20} />
               </S.SendButton>
@@ -2563,16 +3011,19 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                         handleShowMemberDetail(memberId, displayName);
                       }}
                     >
-                      <S.MemberAvatar
-                        $color={getAvatarColor(memberId)}
-                        style={{
-                          opacity: shouldDim ? 0.6 : 1,
-                          ...(userProfilePictures[memberId] ? { backgroundImage: `url(${userProfilePictures[memberId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {})
-                        }}
-                      >
-                        {!userProfilePictures[memberId] && userAvatarSettings[memberId] && renderAvatarIcon(memberId)}
-                        {!userProfilePictures[memberId] && !userAvatarSettings[memberId] && displayName.charAt(0).toUpperCase()}
-                      </S.MemberAvatar>
+                      <S.MemberAvatarWrapper>
+                        <S.MemberAvatar
+                          $color={getAvatarColor(memberId)}
+                          style={{
+                            opacity: shouldDim ? 0.6 : 1,
+                            ...(userProfilePictures[memberId] ? { backgroundImage: `url(${userProfilePictures[memberId]})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {})
+                          }}
+                        >
+                          {!userProfilePictures[memberId] && userAvatarSettings[memberId] && renderAvatarIcon(memberId)}
+                          {!userProfilePictures[memberId] && !userAvatarSettings[memberId] && displayName.charAt(0).toUpperCase()}
+                        </S.MemberAvatar>
+                        {blockedUserIds.includes(memberId) && <S.BlockedBadge />}
+                      </S.MemberAvatarWrapper>
                       <S.MemberInfo>
                         <S.MemberName style={{ opacity: shouldDim ? 0.7 : 1 }}>
                           {displayName}{isMe && ' (나)'}
@@ -2665,7 +3116,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   <>
                     {/* 검색 바 */}
                     <S.SearchBarWrapper>
-                      <S.SearchInput
+                      <S.FriendSearchInput
                         type="text"
                         placeholder="친구의 아이디나 닉네임으로 검색..."
                         value={searchQueryInvite}
@@ -2760,12 +3211,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                       onKeyPress={(e) => e.key === 'Enter' && handleSearchUserById()}
                       maxLength={6}
                     />
-                    <S.SearchButton
+                    <S.IdSearchButton
                       onClick={handleSearchUserById}
                       disabled={searchingUser || workspaceIdInput.trim().length !== 6}
                     >
                       {searchingUser ? '검색 중...' : '검색'}
-                    </S.SearchButton>
+                    </S.IdSearchButton>
                   </S.IdInputWrapper>
 
                   {searchedUser && (
@@ -3088,6 +3539,26 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                     )}
                   </div>
                 </div>
+
+                {/* 차단된 사용자 알림 */}
+                {blockedUserIds.includes(selectedMemberDetail.id) && (
+                  <div style={{
+                    padding: '12px 16px',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    border: '1px solid rgba(239, 68, 68, 0.3)',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    color: '#ef4444',
+                    fontWeight: '500',
+                    lineHeight: '1.5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span style={{ flexShrink: 0 }}>🚫</span>
+                    <span>차단한 사용자입니다</span>
+                  </div>
+                )}
 
                 {/* 안내 메시지 */}
                 {selectedMemberDetail.workspaceId !== '정보 없음' && (
@@ -3722,127 +4193,113 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
         </S.ModalOverlay>
       )}
 
-      {/* 🔊 현 단체방 음량 개별 설정 모달 */}
-      {showVolumeSettingModal && (
-        <S.ModalOverlay onClick={() => setShowVolumeSettingModal(false)}>
-          <S.ModalContainer onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+      {/* 🔊 현 단체방 알림음 설정 모달 */}
+      {/* 그룹명 변경 모달 */}
+      {showRenameRoomModal && (
+        <S.ModalOverlay onClick={() => setShowRenameRoomModal(false)}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()}>
             <S.ModalHeader>
-              <S.ModalTitle>
-                <Volume2 size={24} />
-                현 단체방 음량 개별 설정
-              </S.ModalTitle>
-              <S.CloseButton onClick={() => setShowVolumeSettingModal(false)}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '600', color: '#ffffff' }}>그룹명 변경</h3>
+              <S.CloseButton onClick={() => setShowRenameRoomModal(false)}>
                 <X size={20} />
               </S.CloseButton>
             </S.ModalHeader>
-            <S.ModalContent style={{ padding: '24px' }}>
-              {/* 메시지 알림음 */}
-              <div style={{ marginBottom: '24px' }}>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '12px'
+            <S.ModalContent>
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{
+                  display: 'block',
+                  marginBottom: '8px',
+                  fontSize: '14px',
+                  color: '#e0e0e0',
+                  fontWeight: '500'
                 }}>
-                  <span style={{ fontSize: '14px', color: '#e0e0e0', fontWeight: '500' }}>
-                    메시지 알림음
-                  </span>
-                  <span style={{ fontSize: '13px', color: '#667eea', fontWeight: '600' }}>
-                    {roomMessageVolume}%
-                  </span>
+                  새 그룹명
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    value={newRoomName}
+                    onChange={(e) => setNewRoomName(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handleRenameRoom();
+                      }
+                    }}
+                    placeholder="그룹명을 입력하세요 (최대 12자)"
+                    maxLength={12}
+                    autoFocus
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      paddingRight: newRoomName.length > 0 ? '40px' : '12px',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: '#ffffff',
+                      fontSize: '14px',
+                      outline: 'none'
+                    }}
+                  />
+                  {newRoomName.length > 0 && (
+                    <button
+                      onClick={() => setNewRoomName('')}
+                      style={{
+                        position: 'absolute',
+                        right: '8px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        border: 'none',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        color: '#888',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.background = 'rgba(255, 255, 255, 0.2)';
+                        e.target.style.color = '#ffffff';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                        e.target.style.color = '#888';
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={roomMessageVolume}
-                  onChange={(e) => setRoomMessageVolume(Number(e.target.value))}
-                  style={{
-                    width: '100%',
-                    height: '6px',
-                    borderRadius: '3px',
-                    background: `linear-gradient(to right, #667eea 0%, #667eea ${roomMessageVolume}%, rgba(255,255,255,0.1) ${roomMessageVolume}%, rgba(255,255,255,0.1) 100%)`,
-                    outline: 'none',
-                    cursor: 'pointer',
-                    WebkitAppearance: 'none'
-                  }}
-                />
                 <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  marginTop: '4px',
-                  fontSize: '11px',
-                  color: '#666'
+                  marginTop: '6px',
+                  fontSize: '12px',
+                  color: '#888',
+                  textAlign: 'right'
                 }}>
-                  <span>음소거</span>
-                  <span>최대</span>
-                </div>
-              </div>
-
-              {/* 메시지 수신음 */}
-              <div>
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: '12px'
-                }}>
-                  <span style={{ fontSize: '14px', color: '#e0e0e0', fontWeight: '500' }}>
-                    메시지 수신음
-                  </span>
-                  <span style={{ fontSize: '13px', color: '#667eea', fontWeight: '600' }}>
-                    {roomReceiveVolume}%
-                  </span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={roomReceiveVolume}
-                  onChange={(e) => setRoomReceiveVolume(Number(e.target.value))}
-                  style={{
-                    width: '100%',
-                    height: '6px',
-                    borderRadius: '3px',
-                    background: `linear-gradient(to right, #667eea 0%, #667eea ${roomReceiveVolume}%, rgba(255,255,255,0.1) ${roomReceiveVolume}%, rgba(255,255,255,0.1) 100%)`,
-                    outline: 'none',
-                    cursor: 'pointer',
-                    WebkitAppearance: 'none'
-                  }}
-                />
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  marginTop: '4px',
-                  fontSize: '11px',
-                  color: '#666'
-                }}>
-                  <span>음소거</span>
-                  <span>최대</span>
+                  {newRoomName.length} / 12
                 </div>
               </div>
-
-              {/* 안내 문구 */}
               <div style={{
-                marginTop: '20px',
                 padding: '12px',
                 background: 'rgba(102, 126, 234, 0.1)',
                 borderRadius: '8px',
                 fontSize: '12px',
                 color: '#888',
-                lineHeight: '1.5',
-                textAlign: 'center'
+                lineHeight: '1.5'
               }}>
-                이 설정은 현재 단체방에만 적용됩니다.<br />
-                기본값은 전체 설정(10%)과 동일합니다.
+                • 그룹명은 한글기준 12자까지 가능합니다<br />
+                • 특수문자와 이모지를 사용할 수 있습니다
               </div>
             </S.ModalContent>
             <S.ModalFooter>
-              <S.CancelButton onClick={() => setShowVolumeSettingModal(false)}>
+              <S.CancelButton onClick={() => setShowRenameRoomModal(false)}>
                 취소
               </S.CancelButton>
-              <S.ConfirmButton onClick={handleSaveRoomVolume}>
-                저장
+              <S.ConfirmButton onClick={handleRenameRoom}>
+                변경
               </S.ConfirmButton>
             </S.ModalFooter>
           </S.ModalContainer>
@@ -3859,8 +4316,55 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
         isGroupChat={chat?.type === 'group'}
         onStartDM={handleStartDMFromProfile}
         onBlockUser={handleBlockFromProfile}
+        onUnblockUser={handleUnblockFromProfile}
+        blockedUserIds={blockedUserIds}
         currentUserId={currentUserId}
+        showToast={showToast}
       />
+
+      {/* 차단 확인 모달 */}
+      {blockConfirmModal.show && (
+        <S.ModalOverlay onClick={() => setBlockConfirmModal({ show: false, userId: null, userName: '', isUnblock: false })}>
+          <S.ModalContainer onClick={(e) => e.stopPropagation()}>
+            <S.ModalHeader>
+              <S.ModalTitle>
+                {blockConfirmModal.isUnblock ? '차단 해제' : '사용자 차단'}
+              </S.ModalTitle>
+            </S.ModalHeader>
+            <S.ModalContent>
+              {blockConfirmModal.isUnblock ? (
+                <div>
+                  <strong>{blockConfirmModal.userName}</strong>님을 차단 해제하시겠습니까?
+                  <br /><br />
+                  차단을 해제하면 이 사용자와 다시 상호작용할 수 있습니다.
+                </div>
+              ) : (
+                <div>
+                  <strong>{blockConfirmModal.userName}</strong>님을 차단하시겠습니까?
+                  <br /><br />
+                  차단하면:
+                  <ul style={{ marginTop: '8px', paddingLeft: '20px', lineHeight: '1.6' }}>
+                    <li>친구 목록에서 제거됩니다</li>
+                    <li>1:1 대화에서 메시지를 주고받을 수 없습니다</li>
+                    <li>단체방에서 상대의 메시지가 차단됩니다</li>
+                  </ul>
+                  <div style={{ marginTop: '12px', marginLeft: '8px', fontSize: '13px', color: '#ff9800', lineHeight: '1.5', paddingLeft: '1.5em', textIndent: '-1.5em' }}>
+                    ⚠️ 주의: 단체방에서 차단된 상대가 내 메시지를 볼 수 있습니다
+                  </div>
+                </div>
+              )}
+            </S.ModalContent>
+            <S.ModalFooter>
+              <S.CancelButton onClick={() => setBlockConfirmModal({ show: false, userId: null, userName: '', isUnblock: false })}>
+                취소
+              </S.CancelButton>
+              <S.ConfirmButton onClick={handleConfirmBlock}>
+                {blockConfirmModal.isUnblock ? '차단 해제' : '차단하기'}
+              </S.ConfirmButton>
+            </S.ModalFooter>
+          </S.ModalContainer>
+        </S.ModalOverlay>
+      )}
     </S.FullScreenContainer>,
     document.body
   );

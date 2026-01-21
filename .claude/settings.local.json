@@ -56,7 +56,19 @@
       "Bash(npx wrangler pages deploy:*)",
       "Bash(npx wrangler login)",
       "Bash(npx firebase deploy:*)",
-      "Bash(npx firebase:*)"
+      "Bash(npx firebase:*)",
+      "Bash(npx cap init:*)",
+      "Bash(npx cap:*)",
+      "Bash(gradlew assembleDebug:*)",
+      "Bash(.gradlew.bat assembleDebug)",
+      "Bash(cmd /c \"cd /d \"\"f:\\\\React test\\\\share-note\\\\android\"\" && gradlew.bat assembleDebug\")",
+      "Bash(cmd /c \"f: && cd \"\"f:\\\\React test\\\\share-note\\\\android\"\" && gradlew.bat assembleDebug\")",
+      "Bash(./gradlew signingReport:*)",
+      "Bash(./gradlew assembleDebug:*)",
+      "Bash(where:*)",
+      "Bash(grep:*)",
+      "Bash(./gradlew assembleRelease:*)",
+      "Bash(firebase functions:delete:*)"
     ],
     "deny": [],
     "ask": []

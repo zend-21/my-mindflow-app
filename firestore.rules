@@ -16,6 +16,28 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    // 관리자 설정 가져오기
+    function getAdminConfig() {
+      return get(/databases/$(database)/documents/systemConfig/adminSettings).data;
+    }
+
+    // 관리자 확인 (최고 관리자 또는 부관리자)
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/systemConfig/adminSettings) &&
+        (request.auth.uid == getAdminConfig().superAdmin ||
+         request.auth.uid in getAdminConfig().subAdmins.keys());
+    }
+
+    // 특정 권한 확인 (부관리자용)
+    function hasPermission(permission) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/systemConfig/adminSettings) &&
+        (request.auth.uid == getAdminConfig().superAdmin ||
+         (request.auth.uid in getAdminConfig().subAdmins.keys() &&
+          permission in getAdminConfig().subAdmins[request.auth.uid].permissions));
+    }
+
     // ========================================
     // 기존 레스토랑/리뷰 - 공개 읽기
     // ========================================
@@ -67,8 +89,11 @@ service cloud.firestore {
         // 생성: 다른 사람이 나에게 친구 요청을 보내는 경우
         allow create: if isSignedIn();
 
-        // 수정/삭제: 본인의 친구 요청만 (수락/거부 처리)
-        allow update, delete: if isSignedIn() && request.auth.uid == userId;
+        // 수정: 요청을 보낸 사람(requestId)이거나 받는 사람(userId)
+        allow update: if isSignedIn() && (request.auth.uid == userId || request.auth.uid == requestId);
+
+        // 삭제: 본인의 친구 요청만 (수락/거부 처리)
+        allow delete: if isSignedIn() && request.auth.uid == userId;
       }
 
       // 🆕 차단된 사용자 서브컬렉션
@@ -108,6 +133,48 @@ service cloud.firestore {
 
         // 삭제: 금지 (약관 동의 기록 보존)
         allow delete: if false;
+      }
+
+      // 🆕 문의 서브컬렉션 (users/{userId}/inquiries)
+      match /inquiries/{inquiryId} {
+        // 읽기: 본인 또는 관리자
+        allow read: if isSignedIn() && (
+          request.auth.uid == userId ||
+          isAdmin()
+        );
+
+        // 생성: 본인만 (사용자가 문의 작성)
+        allow create: if isSignedIn() && request.auth.uid == userId;
+
+        // 수정: 본인 또는 관리자 (관리자는 상태만 변경 가능)
+        allow update: if isSignedIn() && (
+          request.auth.uid == userId ||
+          isAdmin()
+        );
+
+        // 삭제: 본인 또는 delete 권한이 있는 관리자
+        allow delete: if isSignedIn() && (
+          request.auth.uid == userId ||
+          hasPermission('delete')
+        );
+
+        // 답변 서브컬렉션
+        match /replies/{replyId} {
+          // 읽기: 본인 또는 관리자
+          allow read: if isSignedIn() && (
+            request.auth.uid == userId ||
+            isAdmin()
+          );
+
+          // 생성: reply 권한이 있는 관리자만
+          allow create: if hasPermission('reply');
+
+          // 수정: edit 권한이 있는 관리자만
+          allow update: if hasPermission('edit');
+
+          // 삭제: delete 권한이 있는 관리자만
+          allow delete: if hasPermission('delete');
+        }
       }
     }
 
@@ -480,6 +547,107 @@ service cloud.firestore {
       allow update: if isSignedIn() && firebaseUID == request.auth.uid;
       // 삭제: 본인만
       allow delete: if isSignedIn() && firebaseUID == request.auth.uid;
+    }
+
+    // ========================================
+    // 시스템 설정 (System Config) - 관리자 설정
+    // ========================================
+    match /systemConfig/adminSettings {
+      // ⚠️ 읽기: 로그인한 사용자 (관리자 확인용)
+      // 주의: 민감한 정보가 포함되어 있으므로 클라이언트 측에서 로그 출력 금지
+      allow read: if isSignedIn();
+
+      // 🔐 쓰기: 최고 관리자만 가능 (부관리자 추가/수정/삭제)
+      // 문서가 존재하지 않으면 누구나 생성 가능 (초기 설정)
+      allow create: if isSignedIn();
+
+      // 수정/삭제: 최고 관리자 또는 문서를 덮어쓰는 경우 (초기 설정 복구)
+      allow update, delete: if isSignedIn() && (
+        request.auth.uid == resource.data.superAdmin ||
+        request.auth.uid == request.resource.data.superAdmin
+      );
+    }
+
+    // 다른 시스템 설정은 읽기만 가능
+    match /systemConfig/{configId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // ========================================
+    // 사용자 문의 (User Inquiries) - 1:1 문의 시스템
+    // ========================================
+    match /userInquiries/{userId} {
+      // 읽기: 본인 또는 관리자
+      allow read: if isSignedIn() && (
+        request.auth.uid == userId ||
+        isAdmin()
+      );
+
+      // 쓰기: 본인만
+      allow write: if isSignedIn() && request.auth.uid == userId;
+
+      // 문의 서브컬렉션
+      match /inquiries/{inquiryId} {
+        // 읽기: 본인 또는 관리자
+        allow read: if isSignedIn() && (
+          request.auth.uid == userId ||
+          isAdmin()
+        );
+
+        // 생성: 본인만 (사용자가 문의 작성)
+        allow create: if isSignedIn() && request.auth.uid == userId;
+
+        // 수정: 본인 또는 관리자 (관리자는 상태만 변경 가능)
+        allow update: if isSignedIn() && (
+          request.auth.uid == userId ||
+          isAdmin()
+        );
+
+        // 삭제: 본인만 가능 (답변 대기 중인 경우만)
+        allow delete: if isSignedIn() && request.auth.uid == userId;
+
+        // 답변 서브컬렉션
+        match /replies/{replyId} {
+          // 읽기: 본인 또는 관리자
+          allow read: if isSignedIn() && (
+            request.auth.uid == userId ||
+            isAdmin()
+          );
+
+          // 생성: reply 권한이 있는 관리자만
+          allow create: if hasPermission('reply');
+
+          // 수정: edit 권한이 있는 관리자만
+          allow update: if hasPermission('edit');
+
+          // 삭제: delete 권한이 있는 관리자만
+          allow delete: if hasPermission('delete');
+        }
+      }
+    }
+
+    // ========================================
+    // CollectionGroup 쿼리: 모든 문의 조회 (관리자 전용)
+    // ========================================
+    match /{path=**}/inquiries/{inquiryId} {
+      // 관리자만 조회 가능
+      allow read: if isAdmin();
+    }
+
+    // 사용자별 알림 서브컬렉션
+    match /users/{userId}/notifications/{notificationId} {
+      // 읽기: 본인만
+      allow read: if isSignedIn() && request.auth.uid == userId;
+
+      // 생성: 시스템 또는 관리자 (문의 알림용)
+      allow create: if isSignedIn();
+
+      // 수정: 본인만 (읽음 처리)
+      allow update: if isSignedIn() && request.auth.uid == userId;
+
+      // 삭제: 본인만
+      allow delete: if isSignedIn() && request.auth.uid == userId;
     }
   }
 }

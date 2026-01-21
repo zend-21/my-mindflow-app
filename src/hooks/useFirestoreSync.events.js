@@ -5,6 +5,7 @@
  */
 
 import { getUserData } from '../utils/userStorage';
+import { getAccountLocalStorageWithTTL } from './useFirestoreSync.utils';
 import {
   saveMemoToFirestore,
   saveCalendarDateToFirestore,
@@ -36,11 +37,11 @@ export const createVisibilityChangeHandler = (userId, enabled, migrated, setSync
 
       try {
         // ⚡ 최적화: Firestore 전체 조회 없이 localStorage만 확인
-        const localMemos = JSON.parse(getUserData(userId, 'memos') || '[]');
-        const localCalendar = JSON.parse(getUserData(userId, 'calendar') || '{}');
+        const localMemos = getAccountLocalStorageWithTTL(userId, 'memos', false) || [];
+        const localCalendar = getAccountLocalStorageWithTTL(userId, 'calendar', false) || {};
 
         // localStorage에서 저장 실패 마크가 있는 항목만 찾기
-        const unsyncedMemos = localMemos.filter(localMemo => {
+        const unsyncedMemos = Array.isArray(localMemos) ? localMemos.filter(localMemo => {
           // 방어 코드: 유효하지 않은 메모 스킵
           if (!localMemo || !localMemo.id) {
             console.warn('⚠️ 유효하지 않은 메모 발견 - 스킵:', localMemo);
@@ -48,11 +49,12 @@ export const createVisibilityChangeHandler = (userId, enabled, migrated, setSync
           }
           const lastSaved = localStorage.getItem(`firestore_saved_memo_${localMemo.id}`);
           return !lastSaved; // 한 번도 저장 안 된 것만
-        });
+        }) : [];
 
         const unsyncedCalendar = Object.keys(localCalendar).filter(dateKey => {
           const lastSaved = localStorage.getItem(`firestore_saved_calendar_${dateKey}`);
-          return !lastSaved; // 한 번도 저장 안 된 것만
+          // 'DELETED' 마커가 있으면 제외 (삭제된 항목은 재업로드하지 않음)
+          return !lastSaved || lastSaved === 'DELETED' ? false : true;
         });
 
         // 미동기화 항목 자동 업로드
@@ -120,11 +122,11 @@ export const createOnlineHandler = (userId, enabled, migrated, setSyncStatus) =>
       console.log('🌐 네트워크 온라인 복귀 - 미동기화 항목 업로드 시작');
 
       try {
-        // localStorage에서 모든 항목 가져오기
-        const localMemos = JSON.parse(getUserData(userId, 'memos') || '[]');
-        const localCalendar = JSON.parse(getUserData(userId, 'calendar') || '{}');
-        const localFolders = JSON.parse(getUserData(userId, 'folders') || '[]');
-        const localMacros = JSON.parse(getUserData(userId, 'macros') || '[]');
+        // localStorage에서 모든 항목 가져오기 (TTL 기반)
+        const localMemos = getAccountLocalStorageWithTTL(userId, 'memos', false) || [];
+        const localCalendar = getAccountLocalStorageWithTTL(userId, 'calendar', false) || {};
+        const localFolders = getAccountLocalStorageWithTTL(userId, 'folders', false) || [];
+        const localMacros = getAccountLocalStorageWithTTL(userId, 'macros', false) || [];
 
         // 미동기화 항목 찾기 (firestore_saved가 없거나 다른 것들)
         const pendingItems = [];
@@ -138,6 +140,8 @@ export const createOnlineHandler = (userId, enabled, migrated, setSyncStatus) =>
 
         Object.entries(localCalendar).forEach(([dateKey, schedule]) => {
           const lastSaved = localStorage.getItem(`firestore_saved_calendar_${dateKey}`);
+          // 'DELETED' 마커가 있으면 제외 (삭제된 항목)
+          if (lastSaved === 'DELETED') return;
           if (!lastSaved || lastSaved !== JSON.stringify(schedule)) {
             pendingItems.push({ type: 'calendar', id: dateKey, data: schedule });
           }
@@ -241,12 +245,12 @@ export const createManualSync = (userId, enabled, setSyncStatus) => {
     setSyncStatus('syncing');
 
     try {
-      // localStorage에서 모든 항목 가져오기
-      const localMemos = JSON.parse(getUserData(userId, 'memos') || '[]');
-      const localCalendar = JSON.parse(getUserData(userId, 'calendar') || '{}');
-      const localFolders = JSON.parse(getUserData(userId, 'folders') || '[]');
-      const localMacros = JSON.parse(getUserData(userId, 'macros') || '[]');
-      const localTrash = JSON.parse(localStorage.getItem('trashMemos_shared') || '[]');
+      // localStorage에서 모든 항목 가져오기 (TTL 기반)
+      const localMemos = getAccountLocalStorageWithTTL(userId, 'memos', false) || [];
+      const localCalendar = getAccountLocalStorageWithTTL(userId, 'calendar', false) || {};
+      const localFolders = getAccountLocalStorageWithTTL(userId, 'folders', false) || [];
+      const localMacros = getAccountLocalStorageWithTTL(userId, 'macros', false) || [];
+      const localTrash = getAccountLocalStorageWithTTL(userId, 'trash', false) || [];
 
       // 미동기화 항목 찾기
       const pendingItems = [];
@@ -260,6 +264,8 @@ export const createManualSync = (userId, enabled, setSyncStatus) => {
 
       Object.entries(localCalendar).forEach(([dateKey, schedule]) => {
         const lastSaved = localStorage.getItem(`firestore_saved_calendar_${dateKey}`);
+        // 'DELETED' 마커가 있으면 제외 (삭제된 항목)
+        if (lastSaved === 'DELETED') return;
         if (!lastSaved || lastSaved !== JSON.stringify(schedule)) {
           pendingItems.push({ type: 'calendar', id: dateKey, data: schedule });
         }

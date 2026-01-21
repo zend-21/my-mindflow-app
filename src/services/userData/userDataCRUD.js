@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { convertTimestampsToMillis, removeUndefinedValues } from './userDataHelpers';
 import { showAlert } from '../../utils/alertModal';
+import { localStorageService } from '../../utils/localStorageService';
 
 // ========================================
 // 메모 데이터 (개별 문서)
@@ -245,11 +246,20 @@ export const saveTrashItemToFirestore = async (userId, trashItem) => {
 
 /**
  * Firestore에서 단일 휴지통 항목 영구 삭제 (Hard Delete)
+ * trash 컬렉션과 memos 컬렉션에서 모두 삭제
  */
 export const deleteTrashItemFromFirestore = async (userId, trashId) => {
   try {
-    const docRef = doc(db, 'mindflowUsers', userId, 'trash', trashId);
-    await deleteDoc(docRef);
+    // 1. trash 컬렉션에서 삭제
+    const trashDocRef = doc(db, 'mindflowUsers', userId, 'trash', trashId);
+    await deleteDoc(trashDocRef);
+    console.log(`✅ trash 컬렉션에서 삭제 완료: ${trashId}`);
+
+    // 2. memos 컬렉션에서도 삭제 (deleted: true인 원본 문서 제거)
+    const memoDocRef = doc(db, 'mindflowUsers', userId, 'memos', trashId);
+    await deleteDoc(memoDocRef);
+    console.log(`✅ memos 컬렉션에서 삭제 완료: ${trashId}`);
+
     console.log(`✅ 휴지통 항목 영구 삭제 완료: ${trashId}`);
   } catch (error) {
     console.error('휴지통 항목 삭제 실패:', error);
@@ -395,6 +405,83 @@ export const deleteCalendarDateFromFirestore = async (userId, dateKey) => {
     console.error('캘린더 일정 삭제 실패:', error);
     throw error;
   }
+};
+
+/**
+ * Firestore에서 삭제된 문서 완전 삭제 (Hard Delete)
+ *
+ * 정리 규칙:
+ * 1. Secret Documents: deleted: true && deletedAt이 7일 이상 경과 시 삭제 (민감 정보 신속 제거)
+ * 2. 일반 문서들: deleted: true && deletedAt이 10일 이상 경과 시 삭제 (휴지통 7일 + 안전 마진 3일)
+ * 3. 대상 컬렉션: memos, folders, calendar, trash, activities, macros, secretDocs
+ *
+ * @param {string} userId - 사용자 ID
+ * @returns {Promise<number>} - 삭제된 문서 수
+ */
+export const cleanupDeletedFirestoreDocuments = async (userId) => {
+  if (!userId) return 0;
+
+  console.log('🧹 Firestore 삭제된 문서 정리 시작...');
+
+  const sevenDaysInMs = 7 * 24 * 60 * 60 * 1000;   // Secret documents: 7일
+  const tenDaysInMs = 10 * 24 * 60 * 60 * 1000;    // 일반 문서: 10일
+  const now = Date.now();
+  let totalDeleted = 0;
+
+  // 정리 대상 컬렉션 (컬렉션명, 유예기간)
+  const collections = [
+    { name: 'memos', gracePeriod: tenDaysInMs },
+    { name: 'folders', gracePeriod: tenDaysInMs },
+    { name: 'calendar', gracePeriod: tenDaysInMs },
+    { name: 'trash', gracePeriod: tenDaysInMs },
+    { name: 'activities', gracePeriod: tenDaysInMs },
+    { name: 'macros', gracePeriod: tenDaysInMs },
+    { name: 'secretDocs', gracePeriod: sevenDaysInMs }  // 🔐 민감 정보는 7일로 단축
+  ];
+
+  for (const { name: collectionName, gracePeriod } of collections) {
+    try {
+      const colRef = collection(db, 'mindflowUsers', userId, collectionName);
+      const snapshot = await getDocs(colRef);
+
+      let deletedInCollection = 0;
+
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+
+        // deleted: true이고 deletedAt이 있는 문서만 대상
+        if (data.deleted === true && data.deletedAt) {
+          // Firestore Timestamp를 밀리초로 변환
+          const deletedAtMs = data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt;
+          const timeSinceDeletion = now - deletedAtMs;
+
+          // 유예 기간 경과한 문서 완전 삭제
+          if (timeSinceDeletion > gracePeriod) {
+            await deleteDoc(doc(db, 'mindflowUsers', userId, collectionName, docSnap.id));
+            deletedInCollection++;
+            const daysElapsed = Math.floor(timeSinceDeletion / (24 * 60 * 60 * 1000));
+            const graceDays = Math.floor(gracePeriod / (24 * 60 * 60 * 1000));
+            console.log(`  🗑️ ${collectionName}/${docSnap.id} 완전 삭제 (${daysElapsed}일 경과, 유예기간: ${graceDays}일)`);
+          }
+        }
+      }
+
+      if (deletedInCollection > 0) {
+        console.log(`✅ ${collectionName}: ${deletedInCollection}개 문서 완전 삭제`);
+        totalDeleted += deletedInCollection;
+      }
+    } catch (error) {
+      console.error(`❌ ${collectionName} 정리 실패:`, error);
+    }
+  }
+
+  if (totalDeleted > 0) {
+    console.log(`✅ Firestore 정리 완료: 총 ${totalDeleted}개 문서 완전 삭제`);
+  } else {
+    console.log('✅ 정리할 만료 문서 없음');
+  }
+
+  return totalDeleted;
 };
 
 /**
@@ -744,14 +831,14 @@ export const deleteAllUserData = async (userId) => {
       }
     });
 
-    // ⚠️ 마이그레이션 방지: 빈 배열로 설정하여 재마이그레이션 차단
-    localStorage.setItem(`user_${userId}_memos`, JSON.stringify([]));
-    localStorage.setItem(`user_${userId}_folders`, JSON.stringify([]));
-    localStorage.setItem(`user_${userId}_trash`, JSON.stringify([]));
-    localStorage.setItem(`user_${userId}_activities`, JSON.stringify([]));
-    localStorage.setItem(`user_${userId}_calendar`, JSON.stringify({}));
-    localStorage.setItem(`user_${userId}_macros`, JSON.stringify([]));
-    console.log('✅ 마이그레이션 방지 플래그 설정 완료 (빈 데이터로 초기화)');
+    // ⚠️ 마이그레이션 방지: TTL 기반 빈 데이터로 설정 (synced: true)
+    localStorageService.save(userId, 'memos', [], { synced: true });
+    localStorageService.save(userId, 'folders', [], { synced: true });
+    localStorageService.save(userId, 'trash', [], { synced: true });
+    localStorageService.save(userId, 'activities', [], { synced: true });
+    localStorageService.save(userId, 'calendar', {}, { synced: true });
+    localStorageService.save(userId, 'macros', [], { synced: true });
+    console.log('✅ 마이그레이션 방지 플래그 설정 완료 (TTL 기반 빈 데이터로 초기화)');
 
     return deleteCounts;
   } catch (error) {

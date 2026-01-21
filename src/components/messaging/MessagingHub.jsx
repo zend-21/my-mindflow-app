@@ -1,5 +1,5 @@
 // 💬 대화 탭 - 메시징 허브 (채팅, 친구)
-import { useState, useCallback } from 'react';
+import { useState, useCallback, forwardRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { Settings } from 'lucide-react';
 import ChatList from './ChatList';
@@ -120,7 +120,7 @@ const Content = styled.div`
   flex: 1;
   overflow-y: auto;
   padding: 0;
-  margin-bottom: 130px; /* 푸터(80px) + 광고 배너(50px) = 130px */
+  margin-bottom: 110px; /* 푸터(60px) + 광고 배너(50px) = 110px */
 
   /* 스크롤바 스타일 */
   &::-webkit-scrollbar {
@@ -148,11 +148,18 @@ const TabContent = styled.div`
   height: 100%;
 `;
 
-const MessagingHub = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag, syncMemo }) => {
+const MessagingHub = forwardRef(({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag, syncMemo, resetToChat }, ref) => {
   const [activeTab, setActiveTab] = useState('chat'); // chat, friends
   const [showSettings, setShowSettings] = useState(false);
   const [unreadChatCount, setUnreadChatCount] = useState(0); // 읽지 않은 채팅 수
   const [friendRequestCount, setFriendRequestCount] = useState(0); // 친구 요청 수
+
+  // 다른 카테고리에서 대화 카테고리로 돌아올 때 항상 채팅 목록으로 리셋
+  useEffect(() => {
+    if (resetToChat) {
+      setActiveTab('chat');
+    }
+  }, [resetToChat]);
 
   // ChatList로부터 읽지 않은 메시지 수 업데이트
   const handleUnreadCountChange = useCallback((count) => {
@@ -196,7 +203,7 @@ const MessagingHub = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingF
       <Content>
         {/* 두 컴포넌트를 모두 마운트하여 실시간 구독 유지, display로 보이기/숨기기 */}
         <TabContent $active={activeTab === 'chat'}>
-          <ChatList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={onUpdateMemoPendingFlag} onUnreadCountChange={handleUnreadCountChange} syncMemo={syncMemo} />
+          <ChatList ref={ref} showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={onUpdateMemoPendingFlag} onUnreadCountChange={handleUnreadCountChange} syncMemo={syncMemo} />
         </TabContent>
         <TabContent $active={activeTab === 'friends'}>
           <FriendList showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onFriendRequestCountChange={handleFriendRequestCountChange} />
@@ -217,6 +224,6 @@ const MessagingHub = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingF
       )}
     </Container>
   );
-};
+});
 
 export default MessagingHub;

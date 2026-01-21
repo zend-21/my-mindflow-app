@@ -5,6 +5,7 @@ import styled from 'styled-components';
 import { fadeInUp } from '../styles.js';
 import { subscribeToMyDMRooms } from '../services/directMessageService';
 import { subscribeToMyGroupChats } from '../services/groupChatService';
+import { setBadgeCount } from '../utils/badgeUtils';
 
 const NavContainer = styled.nav`
     display: flex;
@@ -17,7 +18,7 @@ const NavContainer = styled.nav`
     width: 100%;
     max-width: 450px;
     z-index: 9999;
-    height: 80px;
+    height: 60px;
     background: rgba(31, 34, 41, 0.95);
     backdrop-filter: blur(10px);
     border-top: 1px solid rgba(255, 255, 255, 0.05);
@@ -53,21 +54,11 @@ const NavItem = styled.div`
 
 // 아이콘을 감싸는 컴포넌트로 아이콘 크기를 직접 조절합니다.
 const NavIcon = styled.div`
-    font-size: 30px; /* 아이콘 크기를 더 확실하게 키웠습니다. */
-    margin-bottom: 4px;
+    font-size: 30px;
     color: ${props => props.$active ? '#f093fb' : '#808080'};
     transition: all 0.3s ease;
-
-    /* ★★★ 아래 두 줄 추가 ★★★ */
-    /* 활성화($active)되면 흑백 필터(grayscale)를 0%로, 비활성화되면 100%(흑백)로 설정 */
     filter: grayscale(${props => props.$active ? '0%' : '100%'});
-
-    /* 비활성화 시 연하게 보이도록 투명도(opacity) 조절 */
     opacity: ${props => props.$active ? 1 : 0.4};
-`;
-
-const NavLabel = styled.span`
-    font-size: 12px; /* 라벨 폰트 크기 별도 관리 */
 `;
 
 const Badge = styled.div`
@@ -115,22 +106,50 @@ const BottomNav = ({ activeTab, onSwitchTab }) => {
         let groupUnread = 0;
 
         const updateTotal = () => {
-            setTotalUnreadCount(dmUnread + groupUnread);
+            const total = dmUnread + groupUnread;
+            // ⚠️ 중요: 0 이하의 값은 모두 0으로 처리 (음수 방지 및 모두 읽었을 때 배지 제거)
+            const finalCount = total > 0 ? total : 0;
+            console.log('📊 [BottomNav] 배지 업데이트:', { dmUnread, groupUnread, total, finalCount });
+            setTotalUnreadCount(finalCount);
         };
 
         // 1:1 채팅 구독
         const unsubscribeDM = subscribeToMyDMRooms((rooms) => {
+            const dmRoomsDetail = rooms.map(r => ({
+                id: r.id,
+                myUnreadCount: r.unreadCount?.[currentUserId] || 0,
+                fullUnreadCountObject: r.unreadCount  // Firestore의 전체 unreadCount 객체 표시
+            }));
+            console.log('📊 [BottomNav] DM 방 목록 (상세):', dmRoomsDetail);
+
             dmUnread = rooms.reduce((sum, room) => {
-                return sum + (room.unreadCount?.[currentUserId] || 0);
+                const count = room.unreadCount?.[currentUserId] || 0;
+                if (count > 0) {
+                    console.log(`   🔴 방 ${room.id}: unreadCount = ${count}, 전체 객체:`, room.unreadCount);
+                }
+                return sum + count;
             }, 0);
+            console.log('📊 [BottomNav] DM 총 안 읽음:', dmUnread);
             updateTotal();
         });
 
         // 그룹 채팅 구독
         const unsubscribeGroup = subscribeToMyGroupChats((groups) => {
+            const groupRoomsDetail = groups.map(g => ({
+                id: g.id,
+                myUnreadCount: g.unreadCount?.[currentUserId] || 0,
+                fullUnreadCountObject: g.unreadCount  // Firestore의 전체 unreadCount 객체 표시
+            }));
+            console.log('📊 [BottomNav] 그룹 방 목록 (상세):', groupRoomsDetail);
+
             groupUnread = groups.reduce((sum, group) => {
-                return sum + (group.unreadCount?.[currentUserId] || 0);
+                const count = group.unreadCount?.[currentUserId] || 0;
+                if (count > 0) {
+                    console.log(`   🔴 방 ${group.id}: unreadCount = ${count}, 전체 객체:`, group.unreadCount);
+                }
+                return sum + count;
             }, 0);
+            console.log('📊 [BottomNav] 그룹 총 안 읽음:', groupUnread);
             updateTotal();
         });
 
@@ -139,6 +158,11 @@ const BottomNav = ({ activeTab, onSwitchTab }) => {
             if (unsubscribeGroup) unsubscribeGroup();
         };
     }, [currentUserId]);
+
+    // 앱 아이콘 배지 업데이트
+    useEffect(() => {
+        setBadgeCount(totalUnreadCount);
+    }, [totalUnreadCount]);
 
     return (
         <NavContainer>
@@ -149,7 +173,6 @@ const BottomNav = ({ activeTab, onSwitchTab }) => {
                         onClick={() => onSwitchTab(tab.name)}
                     >
                         <NavIcon $active={activeTab === tab.name}>{tab.icon}</NavIcon>
-                        <NavLabel>{tab.label}</NavLabel>
                     </NavItem>
                     {tab.name === 'chat' && totalUnreadCount > 0 && (
                         <Badge>{totalUnreadCount > 99 ? '99+' : totalUnreadCount}</Badge>

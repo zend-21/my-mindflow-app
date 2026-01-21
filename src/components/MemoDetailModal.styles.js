@@ -761,10 +761,30 @@ export const ReadModeContainer = styled.div`
         object-fit: contain;
     }
 
-    /* YouTube 영상 스타일 - 화면에 맞춤 */
-    iframe {
+    /* YouTube 영상 반응형 컨테이너 */
+    .video-container {
+        position: relative;
+        width: 100%;
+        padding-bottom: 56.25%; /* 16:9 비율 */
+        height: 0;
+        overflow: hidden;
+        margin: 1em 0;
+        border-radius: 8px;
+    }
+
+    .video-container iframe {
+        position: absolute;
+        top: 0;
+        left: 0;
         width: 100% !important;
+        height: 100% !important;
+        border-radius: 8px;
+    }
+
+    /* 컨테이너 없이 직접 삽입된 iframe도 대응 */
+    iframe {
         max-width: 100% !important;
+        width: 100% !important;
         height: auto !important;
         aspect-ratio: 16 / 9 !important;
         border-radius: 8px;

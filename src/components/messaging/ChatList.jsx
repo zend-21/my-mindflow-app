@@ -1,15 +1,16 @@
 // 💬 채팅 탭 - 최근 대화 목록 (1:1 + 그룹)
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import styled from 'styled-components';
 import { subscribeToMyDMRooms } from '../../services/directMessageService';
 import { subscribeToMyGroupChats } from '../../services/groupChatService';
-import { playNewMessageNotification, notificationSettings } from '../../utils/notificationSounds';
 import { getUserDisplayName } from '../../services/nicknameService';
 import { Search, Pin, Users, Mail, X } from 'lucide-react';
 import CreateGroupModal from './CreateGroupModal';
 import JoinGroupModal from './JoinGroupModal';
 import ChatRoom from './ChatRoom';
 import { avatarList } from '../avatars/AvatarIcons';
+import { playNewMessageNotification, getNotificationSettings } from '../../utils/notificationSounds';
+import { getCurrentChatRoom } from '../../utils/currentChatRoom';
 
 // 컨테이너
 const Container = styled.div`
@@ -127,7 +128,7 @@ const NewGroupButton = styled.button`
 const ChatListContainer = styled.div`
   flex: 1;
   overflow-y: auto;
-  padding: 8px 0;
+  padding: 8px 0 30px 0;
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -319,7 +320,7 @@ const EmptyDescription = styled.div`
   line-height: 1.5;
 `;
 
-const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag, onUnreadCountChange, syncMemo }) => {
+const ChatList = forwardRef(({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag, onUnreadCountChange, syncMemo }, ref) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [chatRooms, setChatRooms] = useState([]);
   const [groupChats, setGroupChats] = useState([]);
@@ -332,8 +333,27 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag,
   const [userProfilePictures, setUserProfilePictures] = useState({}); // userId -> profilePictureUrl 매핑
   const [userAvatarSettings, setUserAvatarSettings] = useState({}); // userId -> {selectedAvatarId, avatarBgColor} 매핑
 
-  // 이전 읽지 않은 메시지 개수 추적 (알림음 재생 여부 판단)
-  const prevUnreadCountRef = useRef({});
+  // 🔔 이전 방들의 마지막 메시지 타임스탬프 추적 (알림음 중복 방지)
+  const prevLastMessageTimes = useRef({});
+
+  // 외부에서 채팅방을 열 수 있도록 메서드 노출
+  useImperativeHandle(ref, () => ({
+    openChatRoom: (roomId) => {
+      console.log('🔔 외부에서 채팅방 열기 요청:', roomId);
+
+      // 모든 채팅방 목록에서 roomId와 일치하는 채팅방 찾기
+      const allChats = [...chatRooms, ...groupChats];
+      const targetChat = allChats.find(chat => chat.id === roomId);
+
+      if (targetChat) {
+        console.log('✅ 채팅방 찾음:', targetChat);
+        setSelectedChat(targetChat);
+      } else {
+        console.warn('⚠️ 채팅방을 찾을 수 없습니다:', roomId);
+        showToast?.('채팅방을 찾을 수 없습니다', 'error');
+      }
+    }
+  }), [chatRooms, groupChats, showToast]);
 
   // 대화방 참여자들의 앱 닉네임 가져오기
   const fetchNicknamesForRooms = async (rooms, currentUserId) => {
@@ -384,23 +404,68 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag,
     let groupLoaded = false;
     const currentUserId = localStorage.getItem('firebaseUserId');
 
+    // 🎵 AudioContext 초기화 (ChatList 마운트 시 - 사용자가 채팅 탭에 들어왔으므로 안전)
+    const initAudio = async () => {
+      try {
+        const { initializeAudioContext } = await import('../../utils/notificationSounds');
+        await initializeAudioContext();
+        console.log('✅ [ChatList] AudioContext 초기화 완료');
+      } catch (error) {
+        console.warn('⚠️ [ChatList] AudioContext 초기화 실패:', error);
+      }
+    };
+    initAudio();
+
     // 1:1 대화방 목록 실시간 구독
     const unsubscribeDM = subscribeToMyDMRooms((rooms) => {
+      // 🔔 새 메시지 알림음 재생 (ChatList에서 - 다른 방이나 다른 페이지에 있을 때)
+      rooms.forEach(room => {
+        const prevTime = prevLastMessageTimes.current[room.id];
 
-      // 새 메시지 알림음 재생 (읽지 않은 메시지가 증가한 경우)
-      if (dmLoaded && notificationSettings.enabled && currentUserId) {
-        rooms.forEach(room => {
-          const currentUnread = room.unreadCount?.[currentUserId] || 0;
-          const prevUnread = prevUnreadCountRef.current[room.id] || 0;
+        // ⚠️ lastMessage 전체 구조 확인
+        console.log('🔍 [ChatList] lastMessage 전체 구조:', room.id, room.lastMessage);
 
-          // 읽지 않은 메시지가 증가했으면 알림음 재생
-          if (currentUnread > prevUnread && currentUnread > 0) {
+        const currentTime = room.lastMessage?.createdAt?.toMillis?.() || 0;
+
+        // 새 메시지가 도착했고, 내가 보낸 게 아니며, 현재 그 방에 없을 때
+        // prevTime이 있고 시간이 증가한 경우만 (초기 로드 제외)
+        const hasNewMessage = prevTime !== undefined && currentTime > prevTime;
+
+        console.log('🔍 [ChatList] DM 방 메시지 확인:', {
+          roomId: room.id,
+          prevTime,
+          prevTimeType: typeof prevTime,
+          currentTime,
+          currentTimeType: typeof currentTime,
+          'prevTime !== undefined': prevTime !== undefined,
+          'currentTime > prevTime': currentTime > prevTime,
+          hasNewMessage,
+          lastMessageSenderId: room.lastMessage?.senderId,
+          currentUserId,
+          currentChatRoom: getCurrentChatRoom()
+        });
+
+        if (hasNewMessage) {
+          const isMyMessage = room.lastMessage?.senderId === currentUserId;
+          const isInThisRoom = getCurrentChatRoom() === room.id;
+
+          console.log('🔍 [ChatList] 새 메시지 조건 확인:', {
+            roomId: room.id,
+            isMyMessage,
+            isInThisRoom,
+            shouldPlaySound: !isMyMessage && !isInThisRoom
+          });
+
+          if (!isMyMessage && !isInThisRoom) {
+            // 🔔 알림음 재생 (playNewMessageNotification 내부에서 페이지 가시성 체크)
+            console.log('🔔 [ChatList] 1:1방 새 메시지 감지:', room.id);
             playNewMessageNotification();
           }
+        }
 
-          prevUnreadCountRef.current[room.id] = currentUnread;
-        });
-      }
+        // 현재 시간을 저장 (다음 비교용)
+        prevLastMessageTimes.current[room.id] = currentTime;
+      });
 
       setChatRooms(rooms);
 
@@ -417,19 +482,67 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag,
       console.log('📁 [ChatList] 그룹 채팅방 목록 업데이트:', groups);
       console.log('📊 [ChatList] 받은 그룹 개수:', groups.length);
 
-      // 그룹 채팅도 동일하게 알림음 재생
-      if (groupLoaded && notificationSettings.enabled && currentUserId) {
-        groups.forEach(group => {
-          const currentUnread = group.unreadCount?.[currentUserId] || 0;
-          const prevUnread = prevUnreadCountRef.current[group.id] || 0;
+      // 🔔 새 메시지 알림음 재생 (그룹방)
+      groups.forEach(group => {
+        const prevTime = prevLastMessageTimes.current[group.id];
 
-          if (currentUnread > prevUnread && currentUnread > 0) {
-            playNewMessageNotification();
-          }
+        // ⚠️ lastMessage 전체 구조 확인
+        console.log('🔍 [ChatList] 그룹 lastMessage 전체 구조:', group.id, group.lastMessage);
 
-          prevUnreadCountRef.current[group.id] = currentUnread;
+        const currentTime = group.lastMessage?.createdAt?.toMillis?.() || 0;
+
+        // 새 메시지가 도착했고, 내가 보낸 게 아니며, 현재 그 방에 없을 때
+        // prevTime이 있고 시간이 증가한 경우만 (초기 로드 제외)
+        const hasNewMessage = prevTime !== undefined && currentTime > prevTime;
+
+        console.log('🔍 [ChatList] 그룹방 메시지 확인:', {
+          groupId: group.id,
+          prevTime,
+          prevTimeType: typeof prevTime,
+          currentTime,
+          currentTimeType: typeof currentTime,
+          'prevTime !== undefined': prevTime !== undefined,
+          'currentTime > prevTime': currentTime > prevTime,
+          hasNewMessage,
+          lastMessageSenderId: group.lastMessage?.senderId,
+          currentUserId,
+          currentChatRoom: getCurrentChatRoom()
         });
-      }
+
+        if (hasNewMessage) {
+          const isMyMessage = group.lastMessage?.senderId === currentUserId;
+          const isInThisRoom = getCurrentChatRoom() === group.id;
+
+          console.log('🔍 [ChatList] 그룹방 새 메시지 조건 확인:', {
+            groupId: group.id,
+            isMyMessage,
+            isInThisRoom,
+            shouldPlaySound: !isMyMessage && !isInThisRoom
+          });
+
+          if (!isMyMessage && !isInThisRoom) {
+            // 그룹방 개별 음소거 설정 확인
+            let roomMessageMuted = false;
+            try {
+              const roomSoundSettings = JSON.parse(localStorage.getItem('roomSoundSettings') || '{}');
+              roomMessageMuted = roomSoundSettings[group.id]?.messageMuted ?? false;
+            } catch (error) {
+              console.error('그룹방 음소거 설정 로드 실패:', error);
+            }
+
+            // 🔔 알림음 재생 (음소거되지 않은 경우만, playNewMessageNotification 내부에서 페이지 가시성 체크)
+            if (!roomMessageMuted) {
+              console.log('🔔 [ChatList] 그룹방 새 메시지 감지:', group.id);
+              playNewMessageNotification();
+            } else {
+              console.log('🚫 [ChatList] 그룹방 음소거됨 - 알림음 재생 안 함:', group.id);
+            }
+          }
+        }
+
+        // 현재 시간을 저장 (다음 비교용)
+        prevLastMessageTimes.current[group.id] = currentTime;
+      });
 
       setGroupChats(groups);
       groupLoaded = true;
@@ -806,7 +919,7 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag,
                               <ChatTime>{formatTime(chat.lastMessageTime)}</ChatTime>
                             </ChatHeader>
                             <ChatPreview $unread={unreadCount > 0}>
-                              {chat.lastMessage || '대화를 시작해보세요'}
+                              {typeof chat.lastMessage === 'object' ? chat.lastMessage?.text : chat.lastMessage || '대화를 시작해보세요'}
                             </ChatPreview>
                           </ChatInfo>
                         </ChatItemContent>
@@ -837,9 +950,13 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag,
                           >
                             {!chat.groupImage && <Users size={24} />}
                           </Avatar>
+                          {/* ⚠️ 공개방/비공개방 배지 임시 비활성화 (2026-01-16)
+                              - 현재 공개방 기능을 사용하지 않아 자물쇠 표시 불필요
+                              - 향후 공개방 운영 시 아래 주석 해제하여 재활성화 가능
                           <AvatarBadge title={isPublic ? '공개방' : '비공개방'}>
                             {isPublic ? '🌐' : '🔒'}
                           </AvatarBadge>
+                          */}
                         </AvatarContainer>
                         <ChatInfo>
                           <ChatHeader>
@@ -853,7 +970,7 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag,
                             <ChatTime>{formatTime(chat.lastMessageTime)}</ChatTime>
                           </ChatHeader>
                           <ChatPreview $unread={unreadCount > 0}>
-                            {chat.lastMessage || '대화를 시작해보세요'}
+                            {typeof chat.lastMessage === 'object' ? chat.lastMessage?.text : chat.lastMessage || '대화를 시작해보세요'}
                           </ChatPreview>
                         </ChatInfo>
                       </ChatItemContent>
@@ -905,7 +1022,7 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag,
                               <ChatTime>{formatTime(chat.lastMessageTime)}</ChatTime>
                             </ChatHeader>
                             <ChatPreview $unread={unreadCount > 0}>
-                              {chat.lastMessage || '대화를 시작해보세요'}
+                              {typeof chat.lastMessage === 'object' ? chat.lastMessage?.text : chat.lastMessage || '대화를 시작해보세요'}
                             </ChatPreview>
                           </ChatInfo>
                         </ChatItemContent>
@@ -936,9 +1053,13 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag,
                           >
                             {!chat.groupImage && <Users size={24} />}
                           </Avatar>
+                          {/* ⚠️ 공개방/비공개방 배지 임시 비활성화 (2026-01-16)
+                              - 현재 공개방 기능을 사용하지 않아 자물쇠 표시 불필요
+                              - 향후 공개방 운영 시 아래 주석 해제하여 재활성화 가능
                           <AvatarBadge title={isPublic ? '공개방' : '비공개방'}>
                             {isPublic ? '🌐' : '🔒'}
                           </AvatarBadge>
+                          */}
                         </AvatarContainer>
                         <ChatInfo>
                           <ChatHeader>
@@ -952,7 +1073,7 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag,
                             <ChatTime>{formatTime(chat.lastMessageTime)}</ChatTime>
                           </ChatHeader>
                           <ChatPreview $unread={unreadCount > 0}>
-                            {chat.lastMessage || '대화를 시작해보세요'}
+                            {typeof chat.lastMessage === 'object' ? chat.lastMessage?.text : chat.lastMessage || '대화를 시작해보세요'}
                           </ChatPreview>
                         </ChatInfo>
                       </ChatItemContent>
@@ -997,6 +1118,6 @@ const ChatList = ({ showToast, memos, requirePhoneAuth, onUpdateMemoPendingFlag,
       )}
     </Container>
   );
-};
+});
 
 export default ChatList;

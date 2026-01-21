@@ -4,6 +4,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { avatarList } from './avatars/AvatarIcons';
 import ConfirmationModal from './ConfirmationModal';
+import ConfirmModal from './ConfirmModal';
+import UserGuide from './UserGuide';
+import InfoPage from './InfoPage';
+import AdminPanel from './AdminPanel';
 
 // 문제를 단순화하기 위해, 일단 Roulette 컴포넌트는 잠시 제외했습니다.
 // 이 코드로 오류가 사라진다면, 문제는 Roulette.jsx 파일에 있을 수 있습니다.
@@ -250,10 +254,83 @@ const MenuItem = styled.div`
         border-bottom: none;
     }
 
+    &.danger-button {
+        color: rgba(255, 107, 107, 0.9);
+
+        &:hover, &:active {
+            background: linear-gradient(90deg,
+                rgba(255, 107, 107, 0.15),
+                rgba(229, 57, 53, 0.15)
+            );
+            color: #ff6b6b;
+        }
+    }
+
     &.logout-button {
         margin-top: auto;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
         border-bottom: none;
+    }
+
+    &.admin-menu {
+        background: linear-gradient(90deg,
+            rgba(103, 126, 234, 0.1),
+            rgba(118, 75, 162, 0.1)
+        );
+        border: 1px solid rgba(103, 126, 234, 0.2);
+        border-radius: 8px;
+        margin: 0 12px 8px 12px;
+
+        &:hover, &:active {
+            background: linear-gradient(90deg,
+                rgba(103, 126, 234, 0.2),
+                rgba(118, 75, 162, 0.2)
+            );
+        }
+    }
+`;
+
+const NotificationDot = styled.span`
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    background: #ff4444;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.5;
+        }
+    }
+`;
+
+const NotificationBadge = styled.span`
+    position: absolute;
+    right: 20px;
+    background: #e74c3c;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+    animation: pulse 2s infinite;
+
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.7;
+        }
     }
 `;
 
@@ -537,6 +614,7 @@ const SideMenu = ({
     onExport,
     onImport,
     profile,
+    userId,
     onProfileClick,
     onLogout,
     onLoginClick,
@@ -554,10 +632,83 @@ const SideMenu = ({
     // 협업 관련 상태
     const [backupGuideModal, setBackupGuideModal] = useState({ isOpen: false, action: null }); // 백업/복원 안내 모달
     const [deviceDeleteModal, setDeviceDeleteModal] = useState(false); // 기기 데이터 삭제 모달
+    const [showUserGuide, setShowUserGuide] = useState(false); // 사용설명서 모달
+    const [showInfoPage, setShowInfoPage] = useState(false); // 정보 페이지 모달
+
+    // 관리자 관련 상태
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+    const [adminPermissions, setAdminPermissions] = useState([]);
+    const [unreadInquiryCount, setUnreadInquiryCount] = useState(0);
+    const [showAdminPanel, setShowAdminPanel] = useState(false);
+    const [hasUnreadReplies, setHasUnreadReplies] = useState(false);
 
     const handleError = () => { // 에러 발생 시 상태 변경
         setImageError(true);
     };
+
+    // 관리자 상태 확인
+    React.useEffect(() => {
+        console.log('🔍 [관리자 상태 확인] useEffect 실행됨, userId:', userId);
+
+        if (!userId) {
+            console.log('⚠️ [관리자 상태 확인] userId가 없어서 종료됨');
+            return;
+        }
+
+        let unsubscribeInquiries;
+        let unsubscribeUserInquiries;
+
+        const checkAdmin = async () => {
+            try {
+                console.log('📡 [관리자 상태 확인] checkAdminStatus 호출 시작...');
+                const { checkAdminStatus } = await import('../services/adminManagementService');
+                const { subscribeToPendingInquiries } = await import('../services/adminInquiryService');
+                const { getUserInquiries } = await import('../services/inquiryService');
+                const { onSnapshot, collection } = await import('firebase/firestore');
+                const { db } = await import('../firebase/config');
+
+                const status = await checkAdminStatus(userId);
+                console.log('✅ [관리자 상태 확인] checkAdminStatus 결과:', status);
+
+                setIsAdmin(status.isAdmin);
+                setIsSuperAdmin(status.isSuperAdmin);
+                setAdminPermissions(status.permissions);
+
+                console.log('📝 [관리자 상태 확인] 상태 업데이트 완료 - isAdmin:', status.isAdmin, 'isSuperAdmin:', status.isSuperAdmin, 'permissions:', status.permissions);
+
+                // 관리자면 답변대기 문의 구독 (최고 관리자 또는 부관리자 모두)
+                if (status.isAdmin) {
+                    console.log('🔔 [관리자 상태 확인] 답변대기 문의 구독 시작...');
+                    unsubscribeInquiries = subscribeToPendingInquiries((count) => {
+                        console.log('📬 [문의 업데이트] 답변대기 문의 개수:', count);
+                        setUnreadInquiryCount(count);
+                    });
+                } else {
+                    // 일반 사용자: 읽지 않은 답변 여부 구독
+                    const inquiriesRef = collection(db, 'users', userId, 'inquiries');
+                    unsubscribeUserInquiries = onSnapshot(inquiriesRef, async () => {
+                        try {
+                            const inquiries = await getUserInquiries(userId);
+                            const hasUnread = inquiries.some(inquiry => inquiry.hasUnreadReplies);
+                            setHasUnreadReplies(hasUnread);
+                        } catch (error) {
+                            console.error('문의 목록 조회 오류:', error);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('❌ [관리자 상태 확인] 오류 발생:', error);
+            }
+        };
+
+        checkAdmin();
+
+        return () => {
+            if (unsubscribeInquiries) unsubscribeInquiries();
+            if (unsubscribeUserInquiries) unsubscribeUserInquiries();
+        };
+    }, [userId]);
 
     // Firestore 실시간 리스너: 프로필 설정 변경 감지
     React.useEffect(() => {
@@ -881,6 +1032,23 @@ const SideMenu = ({
                         </MenuHeader>
 
                         <MenuItemsWrapper>
+                            {/* 🔐 관리자 메뉴 (관리자만 표시) */}
+                            {isAdmin && (
+                                <MenuGroup>
+                                    <MenuItem
+                                        className="admin-menu"
+                                        onClick={() => {
+                                            setShowAdminPanel(true);
+                                            onClose();
+                                        }}
+                                    >
+                                        <span className="icon">👨‍💼</span>
+                                        {isSuperAdmin ? '최고 관리자' : '부관리자'}
+                                        {unreadInquiryCount > 0 && <NotificationDot />}
+                                    </MenuItem>
+                                </MenuGroup>
+                            )}
+
                             {/* 🔧 그룹 1: 도구 */}
                             <MenuGroup>
                                 <MenuItem onClick={() => {
@@ -924,22 +1092,22 @@ const SideMenu = ({
                             <MenuGroup>
                                 <MenuItem onClick={() => {
                                     onClose();
-                                    // TODO: 사용설명서 열기
-                                }}>
-                                    <span className="icon">📖</span> 사용설명서
-                                </MenuItem>
-                                <MenuItem onClick={() => {
-                                    onClose();
                                     if (onOpenTrash) onOpenTrash();
                                 }}>
                                     <span className="icon">🗑️</span> 휴지통
                                 </MenuItem>
-                            </MenuGroup>
-
-                            {/* ⚙️ 그룹 5: 설정 */}
-                            <MenuGroup>
-                                <MenuItem>
-                                    <span className="icon">⚙️</span> 설정
+                                <MenuItem onClick={() => {
+                                    setShowUserGuide(true);
+                                    onClose();
+                                }}>
+                                    <span className="icon">📖</span> 사용설명서
+                                </MenuItem>
+                                <MenuItem onClick={() => {
+                                    setShowInfoPage(true);
+                                    onClose();
+                                }}>
+                                    <span className="icon">ℹ️</span> 정보
+                                    {!isAdmin && hasUnreadReplies && <NotificationDot />}
                                 </MenuItem>
                             </MenuGroup>
 
@@ -969,6 +1137,31 @@ const SideMenu = ({
                     isOpen={true}
                     onConfirm={handleDeviceDataDelete}
                     onCancel={() => setDeviceDeleteModal(false)}
+                />
+            )}
+
+            {/* 사용설명서 모달 */}
+            <UserGuide
+                isOpen={showUserGuide}
+                onClose={() => setShowUserGuide(false)}
+            />
+
+            {/* 정보 페이지 모달 */}
+            <InfoPage
+                isOpen={showInfoPage}
+                onClose={() => setShowInfoPage(false)}
+                userId={userId}
+                showToast={showToast}
+            />
+
+            {/* 관리자 패널 */}
+            {isAdmin && (
+                <AdminPanel
+                    isOpen={showAdminPanel}
+                    onClose={() => setShowAdminPanel(false)}
+                    userId={userId}
+                    isSuperAdmin={isSuperAdmin}
+                    unreadInquiryCount={unreadInquiryCount}
                 />
             )}
         </>

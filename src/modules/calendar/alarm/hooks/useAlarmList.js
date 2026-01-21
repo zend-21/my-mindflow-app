@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
+import { cancelNativeScheduleAlarm } from '../../../../services/scheduleAlarmService';
 
 export const useAlarmList = (scheduleData) => {
   // 알람 리스트 상태
@@ -107,6 +108,8 @@ export const useAlarmList = (scheduleData) => {
   const deleteAlarm = (id, type = 'registered') => {
     if (type === 'registered') {
       setRegisteredAlarms(prev => prev.filter(alarm => alarm.id !== id));
+      // 🔔 네이티브 알람 취소
+      cancelNativeScheduleAlarm(id);
     } else if (type === 'pending') {
       setPendingAlarms(prev => prev.filter(alarm => alarm.id !== id));
 
@@ -201,6 +204,15 @@ export const useAlarmList = (scheduleData) => {
           : alarm
       );
       setRegisteredAlarms(updatedAlarms);
+
+      // 🔔 네이티브 알람 처리
+      if (!currentEnabled) {
+        // 비활성화 → 활성화: 네이티브 알람 다시 등록 필요 (여기서는 취소만 하고 재등록은 외부에서)
+        // 재등록은 AlarmModal의 onSave에서 처리됨
+      } else {
+        // 활성화 → 비활성화: 네이티브 알람 취소
+        cancelNativeScheduleAlarm(id);
+      }
 
       return { updatedAlarms, isCurrentlyDisabled: currentEnabled };
     }

@@ -8,6 +8,8 @@ import { jwtDecode } from 'jwt-decode';
 import { GoogleAuthProvider, signInWithCredential, signOut, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from './firebase/config';
+import { initializeFCM } from './services/fcmService';
+import { LocalNotifications } from '@capacitor/local-notifications';
 import { initializeGapiClient, setAccessToken, syncToGoogleDrive, loadFromGoogleDrive, loadProfilePictureFromGoogleDrive, syncProfilePictureToGoogleDrive } from './utils/googleDriveSync';
 import { backupToGoogleDrive } from './utils/googleDriveBackup';
 import { DndContext, closestCenter, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
@@ -58,7 +60,8 @@ import AlarmModal from './modules/calendar/AlarmModal.jsx';
 import AlarmToast from './modules/calendar/AlarmToast.jsx';
 import DateSelectorModal from './modules/calendar/DateSelectorModal.jsx';
 import LoginModal from './components/LoginModal.jsx';
-import FortuneFlow from './components/FortuneFlow.jsx';
+// ⚠️ 운세 기능 비활성화 (src/features/fortune으로 이동)
+// import FortuneFlow from './features/fortune/components/FortuneFlow.jsx';
 import ProfilePage from './components/ProfilePage.jsx';
 import Timer from './components/Timer.jsx';
 import MacroModal from './components/MacroModal.jsx';
@@ -139,7 +142,8 @@ function App() {
     const [previousTab, setPreviousTab] = useState('home'); // 프로필 페이지 이전 탭 저장
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isMacroModalOpen, setIsMacroModalOpen] = useState(false);
-    const [isFortuneFlowOpen, setIsFortuneFlowOpen] = useState(false);
+    // ⚠️ 운세 기능 비활성화
+    // const [isFortuneFlowOpen, setIsFortuneFlowOpen] = useState(false);
     const [isTimerOpen, setIsTimerOpen] = useState(false);
     const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
     const [restoreType, setRestoreType] = useState('phone'); // 'phone' or 'google'
@@ -149,6 +153,9 @@ function App() {
 
     // ✅ 추가: 앱 활성 상태 (포커스 여부)
     const [isAppActive, setIsAppActive] = useState(true);
+
+    // 🔒 로그아웃 진행 중 상태 (UI 차단용)
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     const [isUserIdle, setIsUserIdle] = useState(false);
     const idleTimerRef = useRef(null);
@@ -161,6 +168,7 @@ function App() {
     const IDLE_TIMEOUT = 5 * 60 * 1000; // 5분
 
     const contentRef = useRef(null);
+    const messagingHubRef = useRef(null); // 채팅방 열기용 ref
 
     // 기존 useEffect (앱 활성 상태 리스너)
     useEffect(() => {
@@ -174,6 +182,48 @@ function App() {
         };
     }, []);
 
+    // 🔔 백그라운드 알림 탭 → 채팅방 이동 이벤트 리스너
+    useEffect(() => {
+        const handleOpenChatRoom = (event) => {
+            const { roomId } = event.detail;
+            console.log('🔔 채팅방 열기 이벤트 수신:', roomId);
+
+            // 채팅 탭으로 이동
+            setActiveTab('chat');
+
+            // MessagingHub의 openChatRoom 메서드 호출
+            if (messagingHubRef.current?.openChatRoom) {
+                messagingHubRef.current.openChatRoom(roomId);
+            } else {
+                console.warn('⚠️ messagingHubRef가 아직 준비되지 않았습니다');
+            }
+        };
+
+        const handleNavigateToTab = (event) => {
+            const { tab, scheduleDate } = event.detail;
+            console.log('🔔 탭 이동 이벤트 수신:', tab, scheduleDate);
+            setActiveTab(tab);
+
+            // 스케줄 알람인 경우 해당 날짜로 이동
+            if (tab === 'calendar' && scheduleDate) {
+                // Calendar 컴포넌트에 날짜 정보 전달 (CustomEvent)
+                setTimeout(() => {
+                    window.dispatchEvent(new CustomEvent('navigateToScheduleDate', {
+                        detail: { date: scheduleDate }
+                    }));
+                }, 100);
+            }
+        };
+
+        window.addEventListener('openChatRoom', handleOpenChatRoom);
+        window.addEventListener('navigateToTab', handleNavigateToTab);
+
+        return () => {
+            window.removeEventListener('openChatRoom', handleOpenChatRoom);
+            window.removeEventListener('navigateToTab', handleNavigateToTab);
+        };
+    }, []);
+
     // 🔥 Firebase Auth 상태 리스너
     useEffect(() => {
         console.log('🔥 Firebase Auth 리스너 등록');
@@ -181,6 +231,11 @@ function App() {
             if (user) {
                 console.log('✅ Firebase Auth 사용자 감지:', user.uid);
                 setFirebaseUser(user);
+
+                // 📱 FCM 초기화
+                initializeFCM(user.uid).catch(error => {
+                    console.error('❌ FCM 초기화 실패:', error);
+                });
 
                 // 🔐 계정별 localStorage 관리
                 const currentLocalUserId = getCurrentUserId();
@@ -301,6 +356,35 @@ function App() {
         });
 
         return () => unsubscribe();
+    }, []);
+
+    // 🔔 로컬 알림 탭 리스너 (타이머 알림 처리)
+    useEffect(() => {
+        const setupNotificationListener = async () => {
+            try {
+                // 알림 탭 이벤트 리스너
+                await LocalNotifications.addListener('localNotificationActionPerformed', (notification) => {
+                    console.log('🔔 로컬 알림 탭됨:', notification);
+
+                    // 타이머 알림인지 확인
+                    const extra = notification.notification.extra;
+                    if (extra?.type === 'timer' && extra?.action === 'open_timer') {
+                        console.log('⏰ 타이머 화면 열기');
+                        setIsTimerOpen(true);
+                    }
+                });
+                console.log('✅ 로컬 알림 리스너 등록 완료');
+            } catch (error) {
+                console.error('❌ 로컬 알림 리스너 등록 실패:', error);
+            }
+        };
+
+        setupNotificationListener();
+
+        return () => {
+            // 리스너 제거
+            LocalNotifications.removeAllListeners();
+        };
     }, []);
 
     // userId와 isAuthenticated 계산
@@ -586,8 +670,7 @@ function App() {
     };
 
     const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
-    const contentAreaRef = useRef(null);
-    
+
     const [isCalendarEditorOpen, setIsCalendarEditorOpen] = useState(false);
     const [calendarModalData, setCalendarModalData] = useState({ date: new Date(), text: '' });
     
@@ -672,19 +755,20 @@ function App() {
         setUser(null);
     };
 
-    const handleOpenFortune = () => {
-        setIsFortuneFlowOpen(true);
-        // 사이드 메뉴는 이미 SideMenu.jsx 내부에서 닫혔다고 가정
-    };
+    // ⚠️ 운세 기능 비활성화
+    // const handleOpenFortune = () => {
+    //     setIsFortuneFlowOpen(true);
+    //     // 사이드 메뉴는 이미 SideMenu.jsx 내부에서 닫혔다고 가정
+    // };
 
     const addActivity = (type, description, memoId = null) => {
-        const allowedTypes = ['메모 작성', '메모 수정', '메모 삭제', '백업', '복원', '스케줄 등록', '스케줄 수정', '스케줄 삭제', '리뷰 작성', '동기화'];
+        const allowedTypes = ['메모 작성', '메모 수정', '메모 삭제', '백업', '복원', '스케줄 등록', '스케줄 수정', '스케줄 삭제', '알람 등록', '알람 수정', '알람 삭제', '리뷰 작성', '동기화'];
         if (!allowedTypes.includes(type)) {
             return;
         }
 
-        // 스케줄 관련은 23글자, 나머지는 20글자
-        const maxLength = type.includes('스케줄') ? 23 : 20;
+        // 스케줄/알람 관련은 23글자, 나머지는 20글자
+        const maxLength = (type.includes('스케줄') || type.includes('알람')) ? 23 : 20;
 
         // 이모지를 올바르게 카운트
         const chars = [...description];
@@ -782,29 +866,38 @@ function App() {
 
         console.log('🔍 [handleSaveAlarm] 시작:', { key, alarmSettings, actionType });
 
-        // 2. localStorage에서 최신 데이터 읽기 (AlarmModal이 직접 수정한 데이터 포함)
-        const allSchedulesStr = localStorage.getItem('calendarSchedules_shared');
-        const updatedSchedules = allSchedulesStr ? JSON.parse(allSchedulesStr) : { ...calendarSchedules };
+        // ⚠️ CRITICAL FIX: delete/edit 액션에서는 localStorage에서 최신 데이터 읽기
+        // AlarmModal에서 이미 localStorage를 직접 업데이트했으므로,
+        // React state(calendarSchedules)가 아닌 localStorage의 최신 데이터를 사용해야 함
+        let updatedSchedules;
 
-        console.log('🔍 [handleSaveAlarm] localStorage 읽기:', updatedSchedules[key]);
-
-        // 3. 해당 날짜의 스케줄에 'alarm' 객체를 추가하거나 업데이트합니다.
-        const targetSchedule = updatedSchedules[key];
-        if (targetSchedule) {
-            // 기존 일정이 있는 경우
-            updatedSchedules[key] = {
-                ...targetSchedule,
-                alarm: alarmSettings
-            };
+        if (actionType === 'delete' || actionType === 'edit') {
+            // localStorage에서 최신 데이터 읽기
+            const currentUserId = localStorage.getItem('currentUser');
+            const calendarKey = currentUserId ? `user_${currentUserId}_calendar` : 'calendarSchedules_shared';
+            const storedData = localStorage.getItem(calendarKey);
+            updatedSchedules = storedData ? JSON.parse(storedData) : { ...calendarSchedules };
+            console.log('🔍 [handleSaveAlarm] localStorage에서 최신 데이터 로드 (delete/edit)');
         } else {
-            // 일정이 없는 경우 알람만 저장 (createdAt/updatedAt은 실제 일정 저장 시에만 생성)
-            updatedSchedules[key] = {
-                text: '',  // 빈 일정
-                alarm: alarmSettings
-            };
+            // 그 외 액션은 기존 방식대로 React state 사용
+            updatedSchedules = { ...calendarSchedules };
+
+            // 해당 날짜의 스케줄에 'alarm' 객체를 추가하거나 업데이트
+            const targetSchedule = updatedSchedules[key];
+            if (targetSchedule) {
+                updatedSchedules[key] = {
+                    ...targetSchedule,
+                    alarm: alarmSettings
+                };
+            } else {
+                updatedSchedules[key] = {
+                    text: '',
+                    alarm: alarmSettings
+                };
+            }
         }
 
-        console.log('🔍 [handleSaveAlarm] 업데이트된 스케줄:', updatedSchedules[key]);
+        console.log('🔍 [handleSaveAlarm] 현재 스케줄:', updatedSchedules[key]);
         console.log('🔍 [handleSaveAlarm] 전체 알람 수:', alarmSettings.registeredAlarms?.length);
 
         syncCalendar(updatedSchedules);
@@ -817,17 +910,21 @@ function App() {
 
         if (hasAlarms) {
             const alarmType = alarmSettings.alarmType; // 'anniversary' or 'normal'
+            const alarmTitle = alarmSettings.registeredAlarms?.[0]?.title || scheduleForAlarm?.text || '알람';
 
             switch (actionType) {
                 case 'register':
                     message = alarmType === 'anniversary' ? '기념일을 등록하였습니다. 🔔' : '알람을 등록하였습니다. 🔔';
+                    addActivity('알람 등록', `${key} - ${alarmTitle}`);
                     break;
                 case 'update':
                 case 'edit':
                     message = alarmType === 'anniversary' ? '기념일을 수정하였습니다.' : '알람을 수정하였습니다.';
+                    addActivity('알람 수정', `${key} - ${alarmTitle}`);
                     break;
                 case 'delete':
                     message = alarmType === 'anniversary' ? '기념일을 삭제하였습니다.' : '알람을 삭제하였습니다.';
+                    addActivity('알람 삭제', `${key} - ${alarmTitle}`);
                     break;
                 case 'toggle_on':
                     message = alarmType === 'anniversary' ? '기념일 알람이 활성화 되었습니다.' : '알람이 활성화 되었습니다.';
@@ -2572,6 +2669,17 @@ function App() {
                         console.error('❌ 백그라운드 동기화 실패:', error);
                     }
                 }
+            } else {
+                // 🔄 포그라운드 복귀 시 inRoom 상태 초기화
+                if (userId && isAuthenticated) {
+                    try {
+                        const { initializeInRoomStatus } = await import('./services/messageService');
+                        await initializeInRoomStatus(userId);
+                        console.log('✅ 포그라운드 복귀 - inRoom 상태 초기화 완료');
+                    } catch (error) {
+                        console.error('❌ inRoom 초기화 실패:', error);
+                    }
+                }
             }
             // ⚠️ 포그라운드 복귀 시 데이터 로드 제거 - 실시간 리스너가 이미 동기화 중
             // 불필요한 fetchAllUserData() 호출로 Firestore quota 낭비 방지
@@ -2673,139 +2781,200 @@ function App() {
 
     // ✅ 로그아웃 (확장됨)
     const handleLogout = async () => {
-        // 🔥 로그아웃 전 Firestore에 즉시 저장
+        // 🔴 가장 먼저 로그 기록 (크래시 위치 파악용)
+        localStorage.setItem('__logout_debug_log__', '0ms | handleLogout 함수 진입');
+
+        const logoutStartTime = Date.now();
+        const logLines = ['0ms | handleLogout 함수 진입'];
+
+        // 로그를 콘솔과 배열에 동시에 기록하는 헬퍼 함수
+        const log = (msg) => {
+            console.log(msg);
+            logLines.push(`${Date.now() - logoutStartTime}ms | ${msg}`);
+            localStorage.setItem('__logout_debug_log__', logLines.join('\n'));
+        };
+
+        // 플랫폼 체크를 먼저 수행
+        log('📍 플랫폼 체크 시작');
+        let isNativePlatform = false;
         try {
-            // userId(휴대폰 번호) 또는 firebaseUserId로 저장 시도
+            const { Capacitor } = await import('@capacitor/core');
+            isNativePlatform = Capacitor.isNativePlatform();
+            log(`📍 플랫폼 체크 완료: ${isNativePlatform ? '네이티브' : '웹'}`);
+        } catch (e) {
+            isNativePlatform = false;
+            log(`📍 플랫폼 체크 오류: ${e.message}`);
+        }
+
+        log('🚀 ========== 로그아웃 프로세스 시작 ==========');
+        log(`🕐 시작 시간: ${new Date().toISOString()}`);
+        log(`📱 플랫폼: ${isNativePlatform ? '네이티브 앱' : '웹'}`);
+
+        // 🔒 로그아웃 시작 - UI 즉시 차단
+        log('📍 [1/10] setIsLoggingOut(true) 호출');
+        setIsLoggingOut(true);
+
+        // 🔥 로그아웃 전 Firestore에 즉시 저장
+        log('📍 [2/10] Firestore 데이터 저장 시작');
+        try {
             const firebaseUserId = localStorage.getItem('firebaseUserId');
+            log(`   - userId: ${userId}, firebaseUserId: ${firebaseUserId}, isAuthenticated: ${isAuthenticated}`);
             if ((userId || firebaseUserId) && isAuthenticated) {
-                console.log('💾 로그아웃 전 데이터 저장 중...');
+                log('   💾 로그아웃 전 데이터 저장 중...');
                 await saveImmediately();
-                console.log('✅ 데이터 저장 완료');
+                log('   ✅ 데이터 저장 완료');
             } else {
-                console.log('⚠️ 로그인 상태가 아니므로 저장 생략');
+                log('   ⚠️ 로그인 상태가 아니므로 저장 생략');
             }
         } catch (error) {
-            console.error('데이터 저장 오류:', error);
+            log(`   ❌ 데이터 저장 오류: ${error.message}`);
         }
+
+        // 📱 네이티브 GoogleAuth.signOut()은 맨 마지막에 fire-and-forget으로 실행
+        // (여기서 await으로 호출하면 Activity Context 상실로 앱 크래시 발생)
+        log('📍 [3/10] 네이티브 Google 로그아웃 - 맨 마지막으로 연기됨');
 
         // 🔥 Firebase Auth 로그아웃
+        log('📍 [4/10] Firebase Auth 로그아웃 시작');
         try {
             if (auth) {
+                log(`   - auth.currentUser: ${auth.currentUser?.uid}`);
                 await signOut(auth);
-                console.log('🔥 Firebase 로그아웃 완료');
+                log('   🔥 Firebase 로그아웃 완료');
+            } else {
+                log('   ⚠️ auth 객체가 없음');
             }
         } catch (error) {
-            console.error('Firebase 로그아웃 오류:', error);
+            log(`   ❌ Firebase 로그아웃 오류: ${error.message}`);
         }
 
-        // 🔑 Google OAuth 토큰 revoke 및 세션 초기화
-        try {
-            // 1. @react-oauth/google 라이브러리 로그아웃
-            googleLogout();
-            console.log('✅ googleLogout() 호출 완료');
+        // 🔑 Google OAuth 토큰 revoke (웹에서만 실행 - 네이티브에서는 스킵)
+        log('📍 [5/10] Google OAuth 토큰 revoke');
+        if (!isNativePlatform) {
+            try {
+                log('   - googleLogout() 호출 중...');
+                googleLogout();
+                log('   ✅ googleLogout() 호출 완료');
 
-            // 2. Google Identity Services 자동 선택 비활성화
-            if (window.google?.accounts?.id) {
-                window.google.accounts.id.disableAutoSelect();
-                console.log('✅ disableAutoSelect() 호출 완료');
-            }
-
-            // 3. 토큰 Revoke (API 호출)
-            if (accessToken) {
-                try {
-                    const response = await fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-type': 'application/x-www-form-urlencoded'
-                        }
-                    });
-
-                    if (response.ok) {
-                        console.log('🔑 Google OAuth 토큰 revoke 완료');
-                    } else {
-                        console.warn('⚠️ 토큰 revoke 실패 (무시 가능):', response.status);
-                    }
-                } catch (revokeError) {
-                    // 네트워크 에러 등으로 revoke 실패 시 경고만 표시하고 계속 진행
-                    console.warn('⚠️ 토큰 revoke 중 오류 (무시 가능):', revokeError.message);
+                if (window.google?.accounts?.id) {
+                    window.google.accounts.id.disableAutoSelect();
+                    log('   ✅ disableAutoSelect() 호출 완료');
                 }
+
+                if (accessToken) {
+                    try {
+                        log('   - 토큰 revoke API 호출 중...');
+                        const response = await fetch(`https://oauth2.googleapis.com/revoke?token=${accessToken}`, {
+                            method: 'POST',
+                            headers: { 'Content-type': 'application/x-www-form-urlencoded' }
+                        });
+                        if (response.ok) {
+                            log('   🔑 Google OAuth 토큰 revoke 완료');
+                        } else {
+                            log(`   ⚠️ 토큰 revoke 실패: ${response.status}`);
+                        }
+                    } catch (revokeError) {
+                        log(`   ⚠️ 토큰 revoke 중 오류: ${revokeError.message}`);
+                    }
+                }
+            } catch (error) {
+                log(`   ❌ Google OAuth 로그아웃 오류: ${error.message}`);
             }
-        } catch (error) {
-            console.error('Google OAuth 로그아웃 오류:', error);
+        } else {
+            log('   ⏭️ 네이티브 앱이므로 웹 OAuth revoke 스킵');
         }
 
         // 상태 초기화
+        log('📍 [6/10] React 상태 초기화');
         setProfile(null);
         setAccessTokenState(null);
+        log('   - setProfile(null), setAccessTokenState(null) 완료');
 
-        // 🔐 계정별 localStorage 정리 (새 방식)
+        // 🔐 계정별 localStorage 정리
+        log('📍 [7/10] localStorage 정리 시작');
+        log('   - userStorageLogout() 호출');
         userStorageLogout();
-
-        // 🧹 공유 키 정리 (보안: 이전 사용자 데이터 노출 방지)
+        log('   - cleanupSharedKeys() 호출');
         cleanupSharedKeys();
 
-        // localStorage 완전 정리 (민감 정보 삭제 - Notion 방식)
-        // 계정별 캐시(user_{userId}_*)는 유지 (다음 로그인 시 빠른 로드)
-        localStorage.removeItem('userProfile');
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('tokenExpiresAt');
-        localStorage.removeItem('lastSyncTime');
-        localStorage.removeItem('firebaseUserId');
-        localStorage.removeItem('userInfo');
-        localStorage.removeItem('userPicture');
-        localStorage.removeItem('lastLoginTime');
-        localStorage.removeItem('mindflowUserId');
-        localStorage.removeItem('isPhoneVerified');
-        localStorage.removeItem('userNickname');
-        localStorage.removeItem('userDisplayName');
-        localStorage.removeItem('profileImageType');
-        localStorage.removeItem('selectedAvatarId');
-        localStorage.removeItem('avatarBgColor');
-        localStorage.removeItem('customProfilePicture');
-        localStorage.removeItem('customProfilePictureHash');
+        const keysToRemove = [
+            'userProfile', 'accessToken', 'tokenExpiresAt', 'lastSyncTime',
+            'firebaseUserId', 'userInfo', 'userPicture', 'lastLoginTime',
+            'mindflowUserId', 'isPhoneVerified', 'userNickname', 'userDisplayName',
+            'profileImageType', 'selectedAvatarId', 'avatarBgColor',
+            'customProfilePicture', 'customProfilePictureHash'
+        ];
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        log(`   - localStorage에서 ${keysToRemove.length}개 키 삭제`);
 
-        // sessionStorage 완전 정리 (Google OAuth 세션 포함)
+        // sessionStorage 완전 정리
+        log('📍 [8/10] sessionStorage 정리');
         sessionStorage.clear();
-        console.log('✅ sessionStorage 정리 완료');
+        log('   ✅ sessionStorage 정리 완료');
 
-        // IndexedDB 정리 (Firebase Auth + Google Identity Services)
-        try {
-            const databases = await window.indexedDB.databases();
-            databases.forEach(db => {
-                if (db.name && (
-                    db.name.includes('google') ||
-                    db.name.includes('gsi') ||
-                    db.name.includes('oauth') ||
-                    db.name.includes('firebase') // Firebase Auth 세션 삭제
-                )) {
-                    window.indexedDB.deleteDatabase(db.name);
-                    console.log(`🗑️ IndexedDB 삭제: ${db.name}`);
-                }
-            });
-        } catch (error) {
-            console.warn('IndexedDB 정리 실패 (무시 가능):', error);
+        // IndexedDB 정리 (웹에서만 - 네이티브에서는 Firebase가 자체 정리하도록)
+        log('📍 [9/10] IndexedDB 정리');
+        if (!isNativePlatform) {
+            try {
+                const databases = await window.indexedDB.databases();
+                log(`   - 전체 IndexedDB: ${databases.map(db => db.name).join(', ') || '없음'}`);
+                let deletedCount = 0;
+                databases.forEach(db => {
+                    if (db.name && (db.name.includes('google') || db.name.includes('gsi') ||
+                        db.name.includes('oauth') || db.name.includes('firebase'))) {
+                        window.indexedDB.deleteDatabase(db.name);
+                        log(`   🗑️ IndexedDB 삭제: ${db.name}`);
+                        deletedCount++;
+                    }
+                });
+                log(`   - 삭제된 DB 수: ${deletedCount}`);
+            } catch (error) {
+                log(`   ⚠️ IndexedDB 정리 실패: ${error.message || error}`);
+            }
+        } else {
+            log('   ⏭️ 네이티브 앱: IndexedDB 강제 삭제 스킵 (Firebase 자체 정리)');
         }
 
         showToast("✓ 로그아웃되었습니다");
         setIsMenuOpen(false);
         setIsLoginModalOpen(false);
 
-        // 자동 동기화 중지
         if (syncIntervalRef.current) {
             clearInterval(syncIntervalRef.current);
+            log('   - syncInterval 정리됨');
         }
 
-        console.log('✅ 로그아웃 완료 - 상태 초기화됨');
-
-        // LoginModal 강제 리마운트를 위해 key 변경
+        log('✅ 로그아웃 완료 - 상태 초기화됨');
         setLoginKey(prev => prev + 1);
 
-        // Google OAuth 완전 초기화를 위해 페이지 강제 새로고침 (캐시 무시)
-        // (토스트 메시지가 보인 후 새로고침)
+        // 페이지 초기화 (300ms 대기로 상태 반영 시간 확보)
+        log('📍 [10/10] 페이지 초기화 (setTimeout 300ms)');
+
         setTimeout(() => {
-            // 캐시를 무시하고 서버에서 페이지를 다시 로드
-            window.location.href = window.location.origin + window.location.pathname;
-        }, 800);
+            log('   🔄 setTimeout 콜백 실행됨');
+            log(`   - isNativePlatform: ${isNativePlatform}`);
+
+            if (isNativePlatform) {
+                // 🔑 핵심: 네이티브 앱에서는 window.location.replace를 절대 사용하지 않음
+                // WebView에서 location.replace는 Activity 종료로 인식되어 앱이 닫힘
+                log('   - 네이티브 앱: setIsLoggingOut(false) 호출');
+                setIsLoggingOut(false);
+                log('   - 네이티브 앱: 새로고침 없이 React 상태 초기화만 수행');
+
+                // 📱 GoogleAuth.signOut() 완전 제거
+                // Firebase signOut만으로 세션이 끊어지며, 다음 로그인 시 GoogleAuth가 자동으로 새 세션 생성
+                // GoogleAuth.signOut()은 Activity Context 문제로 앱 크래시 유발하므로 호출하지 않음
+                log('   - 네이티브 앱: GoogleAuth.signOut() 스킵 (Firebase signOut만으로 충분)');
+
+                log('🏁 ========== 로그아웃 프로세스 종료 (네이티브) ==========');
+                localStorage.setItem('__logout_debug_log__', logLines.join('\n'));
+            } else {
+                log('   - 웹: window.location.href 호출 직전');
+                log('🏁 ========== 로그아웃 프로세스 종료 (웹) ==========');
+                localStorage.setItem('__logout_debug_log__', logLines.join('\n'));
+                window.location.href = window.location.origin + window.location.pathname;
+            }
+        }, 300);
     };
     
     useEffect(() => {
@@ -2813,46 +2982,180 @@ function App() {
     }, [showHeader]);
 
     const lastScrollYRef = useRef(0);
-    
-    // ★★★ 스크롤 임계값 변수를 정의합니다. ★★★
-    const HIDE_THRESHOLD = 80; // 이 값 이상 스크롤해야 헤더가 숨겨집니다.
-    const SHOW_THRESHOLD = 5; // 이 값 이하로 스크롤해야 헤더가 다시 나타납니다.
+    const scrollDirectionRef = useRef(0); // 스크롤 방향 누적값 (양수: 아래, 음수: 위)
+    const showHeaderRef = useRef(showHeader); // showHeader 최신 상태 추적
 
+    // showHeader 상태 변경 시 ref 업데이트
     useEffect(() => {
-    const handleScroll = () => {
-        const currentY = contentAreaRef.current.scrollTop;
+        showHeaderRef.current = showHeader;
+    }, [showHeader]);
 
-        // 1. 스크롤 다운 (숨기기) 로직
-        // 현재 스크롤 위치가 이전에 저장된 값보다 크고, 숨김 임계값보다 크면 숨깁니다.
-        if (currentY > lastScrollYRef.current && currentY > HIDE_THRESHOLD) { 
-            setShowHeader(false);
-        } 
-        // 2. 스크롤 업 (보이기) 로직
-        // 현재 스크롤 위치가 이전에 저장된 값보다 작고, 보이기 임계값보다 작으면 보이게 합니다.
-        // 스크롤을 '위로' 올릴 때만 반응하도록 lastScrollYRef.current도 체크합니다.
-        else if (currentY < lastScrollYRef.current && currentY <= SHOW_THRESHOLD) { 
-            setShowHeader(true);
+    // 스크롤 감지 임계값 (부드러운 마그네틱 효과)
+    const SCROLL_THRESHOLD = 150; // 이 거리만큼 스크롤해야 헤더가 반응 (아이폰 스타일 자석 효과)
+    const MIN_SCROLL_Y = 10; // 최소 스크롤 위치 (맨 위에선 항상 헤더 표시)
+
+    // 스크롤 이벤트 핸들러 함수 (useRef로 저장하여 재생성 방지)
+    const handleScrollRef = useRef(null);
+
+    if (!handleScrollRef.current) {
+        handleScrollRef.current = () => {
+            if (!contentRef.current) return;
+
+            const currentY = contentRef.current.scrollTop;
+            const scrollDelta = currentY - lastScrollYRef.current;
+
+            // 스크롤 방향이 바뀌면 누적값 리셋 (마그네틱 효과)
+            if ((scrollDirectionRef.current > 0 && scrollDelta < 0) ||
+                (scrollDirectionRef.current < 0 && scrollDelta > 0)) {
+                scrollDirectionRef.current = 0;
+            }
+
+            // 스크롤 방향 누적
+            scrollDirectionRef.current += scrollDelta;
+
+            // 맨 위에 가까우면 항상 헤더 표시
+            if (currentY < MIN_SCROLL_Y) {
+                if (!showHeaderRef.current) {
+                    console.log('🔼 맨 위 도달 - 헤더 표시');
+                    setShowHeader(true);
+                }
+                scrollDirectionRef.current = 0;
+            }
+            // 아래로 스크롤 (헤더 숨김)
+            else if (scrollDirectionRef.current > SCROLL_THRESHOLD) {
+                if (showHeaderRef.current) {
+                    console.log('🔽 아래 스크롤 감지 - 헤더 숨김');
+                    setShowHeader(false);
+                }
+                scrollDirectionRef.current = 0;
+            }
+            // 위로 스크롤 (헤더 표시)
+            else if (scrollDirectionRef.current < -SCROLL_THRESHOLD) {
+                if (!showHeaderRef.current) {
+                    console.log('🔼 위 스크롤 감지 - 헤더 표시');
+                    setShowHeader(true);
+                }
+                scrollDirectionRef.current = 0;
+            }
+
+            lastScrollYRef.current = currentY;
+        };
+    }
+
+    // 터치 스크롤 추적을 위한 ref (Android WebView 대응)
+    const touchStartYRef = useRef(0);
+    const isTouchScrollingRef = useRef(false);
+
+    // 터치 시작 핸들러
+    const handleTouchStartRef = useRef(null);
+    if (!handleTouchStartRef.current) {
+        handleTouchStartRef.current = (e) => {
+            touchStartYRef.current = e.touches[0].clientY;
+            isTouchScrollingRef.current = true;
+            console.log('👆 터치 시작:', touchStartYRef.current);
+        };
+    }
+
+    // 터치 이동 핸들러 (스크롤 감지)
+    const handleTouchMoveRef = useRef(null);
+    if (!handleTouchMoveRef.current) {
+        handleTouchMoveRef.current = (e) => {
+            if (!isTouchScrollingRef.current || !contentRef.current) return;
+
+            const touchY = e.touches[0].clientY;
+            const touchDelta = touchStartYRef.current - touchY; // 양수: 아래로 스크롤, 음수: 위로 스크롤
+
+            // 실제 스크롤 위치 확인
+            const currentY = contentRef.current.scrollTop;
+            const scrollDelta = currentY - lastScrollYRef.current;
+
+            // 스크롤이 실제로 발생했을 때만 처리
+            if (Math.abs(scrollDelta) > 1) {
+                // 스크롤 방향이 바뀌면 누적값 리셋
+                if ((scrollDirectionRef.current > 0 && scrollDelta < 0) ||
+                    (scrollDirectionRef.current < 0 && scrollDelta > 0)) {
+                    scrollDirectionRef.current = 0;
+                }
+
+                // 스크롤 방향 누적
+                scrollDirectionRef.current += scrollDelta;
+
+                console.log('👆📜 터치 스크롤:', {
+                    currentY,
+                    lastY: lastScrollYRef.current,
+                    delta: scrollDelta,
+                    touchDelta,
+                    accumulated: scrollDirectionRef.current,
+                    showHeader: showHeaderRef.current
+                });
+
+                // 맨 위에 가까우면 항상 헤더 표시
+                if (currentY < MIN_SCROLL_Y) {
+                    if (!showHeaderRef.current) {
+                        console.log('🔼 맨 위 도달 - 헤더 표시 (터치)');
+                        setShowHeader(true);
+                    }
+                    scrollDirectionRef.current = 0;
+                }
+                // 아래로 스크롤 (헤더 숨김)
+                else if (scrollDirectionRef.current > SCROLL_THRESHOLD) {
+                    if (showHeaderRef.current) {
+                        console.log('🔽 아래 스크롤 감지 - 헤더 숨김 (터치)');
+                        setShowHeader(false);
+                    }
+                    scrollDirectionRef.current = 0;
+                }
+                // 위로 스크롤 (헤더 표시)
+                else if (scrollDirectionRef.current < -SCROLL_THRESHOLD) {
+                    if (!showHeaderRef.current) {
+                        console.log('🔼 위 스크롤 감지 - 헤더 표시 (터치)');
+                        setShowHeader(true);
+                    }
+                    scrollDirectionRef.current = 0;
+                }
+
+                lastScrollYRef.current = currentY;
+            }
+        };
+    }
+
+    // 터치 종료 핸들러
+    const handleTouchEndRef = useRef(null);
+    if (!handleTouchEndRef.current) {
+        handleTouchEndRef.current = () => {
+            isTouchScrollingRef.current = false;
+            console.log('👆 터치 종료');
+        };
+    }
+
+    // ref callback으로 스크롤 및 터치 이벤트 리스너 등록
+    const setContentRef = useRef((node) => {
+        // 기존 ref 정리
+        if (contentRef.current) {
+            contentRef.current.removeEventListener('scroll', handleScrollRef.current);
+            contentRef.current.removeEventListener('touchstart', handleTouchStartRef.current);
+            contentRef.current.removeEventListener('touchmove', handleTouchMoveRef.current);
+            contentRef.current.removeEventListener('touchend', handleTouchEndRef.current);
+            contentRef.current.removeEventListener('touchcancel', handleTouchEndRef.current);
+            console.log('🧹 스크롤 및 터치 이벤트 리스너 제거됨');
         }
 
-        lastScrollYRef.current = currentY; 
-    };
+        // 새 ref 설정 및 이벤트 리스너 등록
+        contentRef.current = node;
 
-    const timer = setTimeout(() => {
-        const contentArea = contentAreaRef.current;
-        if (contentArea) {
-        contentArea.addEventListener('scroll', handleScroll);
-        console.log('✅ 스크롤 이벤트 리스너 등록됨');
-        }
-    }, 100);
+        if (node) {
+            // 스크롤 이벤트 (웹 브라우저용)
+            node.addEventListener('scroll', handleScrollRef.current, { passive: true });
 
-    return () => {
-        clearTimeout(timer);
-        const contentArea = contentAreaRef.current;
-        if (contentArea) {
-        contentArea.removeEventListener('scroll', handleScroll);
+            // 터치 이벤트 (Android WebView용 대응)
+            node.addEventListener('touchstart', handleTouchStartRef.current, { passive: true });
+            node.addEventListener('touchmove', handleTouchMoveRef.current, { passive: true });
+            node.addEventListener('touchend', handleTouchEndRef.current, { passive: true });
+            node.addEventListener('touchcancel', handleTouchEndRef.current, { passive: true });
+
+            console.log('✅ 스크롤 및 터치 이벤트 리스너 등록됨 (passive: true)');
         }
-    };
-    }, []);
+    }).current;
 
     const executeCalendarDelete = () => {
         if (!dateToDelete) return;
@@ -2887,8 +3190,8 @@ function App() {
     
     
     useEffect(() => {
-        if (contentAreaRef.current) {
-            contentAreaRef.current.scrollTop = 0;
+        if (contentRef.current) {
+            contentRef.current.scrollTop = 0;
         }
     }, [activeTab]);
     
@@ -3085,7 +3388,7 @@ function App() {
     return (
         <AppRouter>
             <UserProvider>
-                <TrashProvider autoDeleteDays={30} trashedItems={trash} setTrashedItems={syncTrash}>
+                <TrashProvider autoDeleteDays={7} trashedItems={trash} setTrashedItems={syncTrash}>
                     <AppContent>
                     <GlobalStyle />
 
@@ -3093,8 +3396,15 @@ function App() {
                     <SplashScreen
                         show={showSplash}
                         onComplete={() => setShowSplash(false)}
-                        duration={2000}
+                        duration={1500}
                     />
+
+                {/* 🔒 로그아웃 진행 중 오버레이 (다른 계정 데이터 노출 방지) */}
+                {isLoggingOut && (
+                    <S.LogoutOverlay>
+                        <S.LogoutMessage>로그아웃 중...</S.LogoutMessage>
+                    </S.LogoutOverlay>
+                )}
 
                 {/* 스플래시 중에는 메인 컨텐츠 숨김 */}
                 {!showSplash && (
@@ -3113,7 +3423,7 @@ function App() {
                     />
 
                     <S.ContentArea
-                        ref={contentRef}
+                        ref={setContentRef}
                         $showHeader={showHeader}
                         $isSecretTab={activeTab === 'secret'}
                     >
@@ -3187,7 +3497,7 @@ function App() {
                         {/* 채팅은 상태 유지를 위해 항상 렌더링하되 CSS로 숨김 (로그인한 경우만) */}
                         {profile ? (
                             <div style={{ display: activeTab === 'chat' ? 'block' : 'none', height: '100%' }}>
-                                <MessagingHub showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={handleUpdateMemoPendingFlag} syncMemo={syncMemo} />
+                                <MessagingHub ref={messagingHubRef} showToast={showToast} memos={memos} requirePhoneAuth={requirePhoneAuth} onUpdateMemoPendingFlag={handleUpdateMemoPendingFlag} syncMemo={syncMemo} resetToChat={activeTab === 'chat'} />
                             </div>
                         ) : (
                             activeTab === 'chat' && (
@@ -3220,7 +3530,8 @@ function App() {
                             setIsMenuOpen(false);
                             setIsMacroModalOpen(true);
                         }}
-                        onOpenFortune={handleOpenFortune}
+                        // ⚠️ 운세 기능 비활성화
+                        // onOpenFortune={handleOpenFortune}
                         onExport={handleDataExport}
                         onImport={handleDataImport}
                         onRestoreFromDrive={handleRestoreFromDrive}
@@ -3228,6 +3539,7 @@ function App() {
                         onManualSync={manualSync}
                         syncStatus={syncStatus}
                         profile={profile}
+                        userId={userId}
                         wsCode={wsCode}
                         onProfileClick={handleProfileClick}
                         onLogout={handleLogout}
@@ -3414,6 +3726,7 @@ function App() {
             <AlarmModal
                 isOpen={isAlarmModalOpen}
                 scheduleData={scheduleForAlarm}
+                allSchedules={calendarSchedules}
                 onSave={handleSaveAlarm}
                 onClose={() => setIsAlarmModalOpen(false)}
             />
@@ -3424,8 +3737,8 @@ function App() {
                     onSave={syncMacros}
                 />
             )}
-            {/* ✨ 🔮 오늘의 운세 전체 플로우 컴포넌트 */}
-            {isFortuneFlowOpen && (
+            {/* ⚠️ 운세 기능 비활성화 (src/features/fortune으로 이동) */}
+            {/* {isFortuneFlowOpen && (
                 <FortuneFlow
                     onClose={() => setIsFortuneFlowOpen(false)}
                     profile={profile}
@@ -3434,7 +3747,7 @@ function App() {
                     fetchFortuneProfileFromFirestore={fetchFortuneProfileFromFirestore}
                     // 운세 결과 및 기타 상태를 FortuneFlow 내부에서 관리
                 />
-            )}
+            )} */}
 
             {/* ⏱️ 타이머 모달 */}
             {isTimerOpen && (
@@ -3481,6 +3794,69 @@ function App() {
                     isVisible={true}
                     alarmData={alarm}
                     onClose={() => dismissToast(alarm.id)}
+                    onDelete={() => {
+                        // 알람 영구 삭제 로직 (AlarmModal의 confirmDelete와 동일)
+                        try {
+                            const originalAlarm = alarm.originalAlarm;
+                            const scheduleDate = alarm.scheduleDate;
+
+                            if (!originalAlarm || !scheduleDate) {
+                                console.warn('알람 삭제 실패: 원본 알람 정보 없음');
+                                dismissToast(alarm.id);
+                                return;
+                            }
+
+                            const userId = localStorage.getItem('currentUser');
+                            const calendarKey = userId ? `user_${userId}_calendar` : 'calendarSchedules_shared';
+                            const allSchedulesStr = localStorage.getItem(calendarKey);
+                            const allSchedules = allSchedulesStr ? JSON.parse(allSchedulesStr) : {};
+
+                            // 반복 기념일인 경우 원본 날짜에서 삭제
+                            if (originalAlarm.isRepeated) {
+                                const originalDateStr = format(originalAlarm.originalDate, 'yyyy-MM-dd');
+                                const originalDayData = allSchedules[originalDateStr];
+
+                                if (originalDayData?.alarm?.registeredAlarms) {
+                                    const originalAlarms = originalDayData.alarm.registeredAlarms.filter(
+                                        a => a.id !== originalAlarm.id
+                                    );
+                                    allSchedules[originalDateStr].alarm.registeredAlarms = originalAlarms;
+                                    localStorage.setItem(calendarKey, JSON.stringify(allSchedules));
+                                }
+                            } else {
+                                // 일반 알람 또는 원본 기념일 삭제
+                                const dateKey = format(new Date(scheduleDate), 'yyyy-MM-dd');
+
+                                if (!allSchedules[dateKey]) {
+                                    allSchedules[dateKey] = {};
+                                }
+                                if (!allSchedules[dateKey].alarm) {
+                                    allSchedules[dateKey].alarm = {};
+                                }
+
+                                const currentAlarms = allSchedules[dateKey].alarm.registeredAlarms || [];
+                                const alarmsToSave = currentAlarms.filter(a => a.id !== originalAlarm.id);
+                                allSchedules[dateKey].alarm.registeredAlarms = alarmsToSave;
+                                localStorage.setItem(calendarKey, JSON.stringify(allSchedules));
+
+                                // 동기화 마커 업데이트
+                                if (allSchedules[dateKey] && (allSchedules[dateKey].text || alarmsToSave.length > 0)) {
+                                    localStorage.setItem(`firestore_saved_calendar_${dateKey}`, JSON.stringify(allSchedules[dateKey]));
+                                } else {
+                                    localStorage.setItem(`firestore_saved_calendar_${dateKey}`, 'DELETED');
+                                }
+                            }
+
+                            // 캘린더 스케줄 업데이트
+                            setCalendarSchedules(allSchedules);
+
+                            // 토스트 닫기
+                            dismissToast(alarm.id);
+                        } catch (error) {
+                            console.error('알람 삭제 오류:', error);
+                            dismissToast(alarm.id);
+                        }
+                    }}
                 />
             ))}
 

@@ -100,7 +100,11 @@ export const sendGroupMessage = async (groupId, senderId, content, type = 'text'
     });
 
     await updateDoc(groupRef, {
-      lastMessage: content,
+      lastMessage: {
+        text: content,
+        senderId: senderId,
+        createdAt: serverTimestamp()
+      },
       lastMessageTime: serverTimestamp(),
       updatedAt: serverTimestamp(),
       messageCount: increment(1),

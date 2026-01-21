@@ -168,7 +168,7 @@ export const markAllMessagesAsRead = async (chatId, chatType, userId, isPageVisi
 export const enterChatRoom = (chatId, chatType, userId) => {
   const type = detectChatType(chatId, chatType);
   const collectionName = type === 'group' ? 'groupChats' : 'directMessages';
-  const resetUnreadCount = true; // 항상 읽음으로 표시
+  const resetUnreadCount = false; // ⚠️ 입장 시에는 unreadCount를 초기화하지 않음 (markAsRead에서 처리)
 
   return enterRoom(collectionName, chatId, userId, resetUnreadCount);
 };

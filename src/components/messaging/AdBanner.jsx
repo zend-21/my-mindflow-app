@@ -4,7 +4,7 @@ import styled from 'styled-components';
 
 const BannerContainer = styled.div`
   position: fixed;
-  bottom: 80px; /* 푸터 위에 위치 (푸터 높이 80px) */
+  bottom: 60px; /* 푸터 위에 위치 (푸터 높이 60px) */
   left: 50%;
   transform: translateX(-50%);
   width: 100%;
@@ -19,7 +19,7 @@ const BannerContainer = styled.div`
   backdrop-filter: blur(10px);
 
   @media (max-width: 768px) {
-    bottom: 80px; /* 모바일 푸터 높이 80px에 맞춤 */
+    bottom: 60px; /* 모바일 푸터 높이 60px에 맞춤 */
   }
 `;
 

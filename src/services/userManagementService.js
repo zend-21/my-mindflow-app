@@ -97,9 +97,11 @@ export const blockUser = async (myUserId, targetUserId, userData) => {
 
     // 친구 목록에서 삭제
     try {
+      console.log('🗑️ 친구 목록에서 삭제 시도:', { myUserId, targetUserId });
       await deleteDoc(doc(db, 'users', myUserId, 'friends', targetUserId));
+      console.log('✅ 친구 목록에서 삭제 완료');
     } catch (error) {
-      console.warn('친구 목록에서 삭제 실패 (이미 삭제됨 또는 없음):', error);
+      console.warn('⚠️ 친구 목록에서 삭제 실패 (이미 삭제됨 또는 없음):', error);
     }
 
     // 삭제된 친구 목록에서도 삭제
@@ -107,6 +109,15 @@ export const blockUser = async (myUserId, targetUserId, userData) => {
       await deleteDoc(doc(db, 'users', myUserId, 'deletedFriends', targetUserId));
     } catch (error) {
       console.warn('삭제된 친구 목록에서 삭제 실패 (없음):', error);
+    }
+
+    // 상대방의 friendRequests에서 내 요청 삭제 (재추가 시 충돌 방지)
+    try {
+      console.log('🗑️ 상대방 friendRequests에서 삭제 시도:', { targetUserId, myUserId });
+      await deleteDoc(doc(db, 'users', targetUserId, 'friendRequests', myUserId));
+      console.log('✅ 상대방 friendRequests에서 삭제 완료');
+    } catch (error) {
+      console.warn('⚠️ 상대방 friendRequests 삭제 실패 (없음):', error);
     }
 
     // 카카오톡 방식: DM 방은 유지 (메시지 전송만 차단)

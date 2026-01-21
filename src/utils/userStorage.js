@@ -253,6 +253,40 @@ export const getProfileSetting = (key) => {
 };
 
 /**
+ * 특정 채팅방의 채팅중 수신음 소거 상태 가져오기
+ * @param {string} roomId - 채팅방 ID
+ * @returns {boolean} true: 소거됨, false: 활성화됨 (기본값)
+ */
+export const getRoomReceiveSoundMuted = (roomId) => {
+  const userId = getCurrentUserId();
+  if (!userId || !roomId) {
+    console.log('⚠️ [getRoomReceiveSoundMuted] userId 또는 roomId 없음:', { userId, roomId });
+    return false; // 기본값: 소리 활성화
+  }
+  const value = getUserData(userId, `room_${roomId}_receiveSoundMuted`);
+  const isMuted = value === 'true';
+  console.log(`🔍 [getRoomReceiveSoundMuted] 채팅방 ${roomId} 수신음 소거 상태:`, isMuted, '(localStorage 값:', value, ')');
+  return isMuted;
+};
+
+/**
+ * 특정 채팅방의 채팅중 수신음 소거 상태 설정
+ * @param {string} roomId - 채팅방 ID
+ * @param {boolean} isMuted - true: 소거, false: 활성화
+ */
+export const setRoomReceiveSoundMuted = async (roomId, isMuted) => {
+  const userId = getCurrentUserId();
+  if (!userId || !roomId) {
+    console.error('⚠️ [setRoomReceiveSoundMuted] userId 또는 roomId 없음:', { userId, roomId });
+    return;
+  }
+
+  // localStorage에 저장
+  setUserData(userId, `room_${roomId}_receiveSoundMuted`, isMuted ? 'true' : 'false');
+  console.log(`${isMuted ? '🔇' : '🔊'} [setRoomReceiveSoundMuted] 채팅방 ${roomId} 수신음: ${isMuted ? '소거' : '활성화'} - localStorage 저장 완료`);
+};
+
+/**
  * 🧪 공유 키 목록 확인 (테스트용 - 삭제하지 않고 로그만 출력)
  */
 export const testCleanupSharedKeys = () => {

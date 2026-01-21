@@ -7,7 +7,7 @@ export const FullScreenContainer = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(180deg, #1a1a1a 0%, #0f0f0f 100%);
+  background: ${props => props.$bgColor || '#1a1a1a'};
   z-index: 100000; /* 모든 요소보다 높게 - 전체화면 채팅 */
   display: flex;
   flex-direction: column;
@@ -19,7 +19,8 @@ export const Header = styled.div`
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  background: rgba(26, 26, 26, 0.95);
+  background: ${props => props.$bgColor || 'rgba(26, 26, 26, 0.95)'};
+  color: ${props => props.$textColor || '#ffffff'};
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   position: sticky;
@@ -113,7 +114,7 @@ export const ChatInfo = styled.div`
 export const ChatName = styled.div`
   font-size: 16px;
   font-weight: 600;
-  color: #ffffff;
+  color: ${props => props.$textColor || '#ffffff'};
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -193,10 +194,11 @@ export const MessagesContainer = styled.div`
   flex: 1;
   overflow-y: auto;
   padding: 20px;
-  padding-bottom: 80px;  /* 🔥 나가기 버튼 영역 확보 */
+  padding-bottom: 30px;  /* 🔥 나가기 버튼 영역 확보 */
   display: flex;
   flex-direction: column;
   gap: 17px;
+  scroll-behavior: smooth;
 
   /* 초대 수락 전 블러 처리 */
   ${props => props.$blurred && `
@@ -415,9 +417,11 @@ export const SenderName = styled.div`
 
 export const MessageBubble = styled.div`
   background: ${props => props.$isMine
-    ? 'linear-gradient(135deg, #4a90e2, #357abd)'
-    : 'rgba(255, 255, 255, 0.08)'};
-  color: #ffffff;
+    ? (props.$myBubbleColor || '#4a90e2')
+    : (props.$otherBubbleColor || 'rgba(255, 255, 255, 0.08)')};
+  color: ${props => props.$isMine
+    ? (props.$myTextColor || '#ffffff')
+    : (props.$otherTextColor || '#ffffff')};
   padding: 10px 14px;
   border-radius: ${props => props.$isMine
     ? '16px 4px 16px 16px'
@@ -475,7 +479,7 @@ export const UnreadBadge = styled.div`
 // 입력 영역
 export const InputContainer = styled.div`
   padding: 16px 20px;
-  background: rgba(26, 26, 26, 0.95);
+  background: ${props => props.$bgColor || 'rgba(26, 26, 26, 0.95)'};
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   backdrop-filter: blur(10px);
   position: sticky;
@@ -512,7 +516,7 @@ export const TextInputWrapper = styled.div`
   display: flex;
   gap: 8px;
   align-items: flex-end;
-  background: rgba(255, 255, 255, 0.05);
+  background: ${props => props.$bgColor || 'rgba(255, 255, 255, 0.05)'};
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 24px;
   padding: 8px 12px;
@@ -551,7 +555,7 @@ export const TextInput = styled.textarea`
   flex: 1;
   background: transparent;
   border: none;
-  color: #e0e0e0;
+  color: ${props => props.$textColor || '#e0e0e0'};
   padding: 8px 4px;
   font-size: 15px;
   font-family: inherit;
@@ -582,7 +586,7 @@ export const TextInput = styled.textarea`
 // 이모티콘 선택기
 export const EmojiPicker = styled.div`
   position: absolute;
-  bottom: 80px;
+  bottom: 60px;
   left: 20px;
   right: 20px;
   background: rgba(26, 26, 26, 0.98);
@@ -703,9 +707,9 @@ export const EmojiButton = styled.button`
 export const SendButton = styled.button`
   background: ${props => props.disabled
     ? 'rgba(74, 144, 226, 0.3)'
-    : 'linear-gradient(135deg, #4a90e2, #357abd)'};
+    : props.$bgColor || 'linear-gradient(135deg, #4a90e2, #357abd)'};
   border: none;
-  color: #ffffff;
+  color: ${props => props.$iconColor || '#ffffff'};
   padding: 12px;
   border-radius: 50%;
   cursor: ${props => props.disabled ? 'not-allowed' : 'pointer'};
@@ -892,6 +896,11 @@ export const MemberItem = styled.div`
   }
 `;
 
+export const MemberAvatarWrapper = styled.div`
+  position: relative;
+  flex-shrink: 0;
+`;
+
 export const MemberAvatar = styled.div`
   width: 40px;
   height: 40px;
@@ -905,6 +914,26 @@ export const MemberAvatar = styled.div`
   color: #ffffff;
   flex-shrink: 0;
   border: 2px solid rgba(255, 255, 255, 0.1);
+`;
+
+export const BlockedBadge = styled.div`
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 16px;
+  height: 16px;
+  background: #ef4444;
+  border: 2px solid #1a1a1a;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+
+  &::after {
+    content: '🚫';
+    font-size: 8px;
+  }
 `;
 
 export const MemberInfo = styled.div`
@@ -1109,7 +1138,7 @@ export const IdInput = styled.input`
   }
 `;
 
-export const SearchButton = styled.button`
+export const IdSearchButton = styled.button`
   background: #667eea;
   border: none;
   color: white;
@@ -1163,7 +1192,7 @@ export const InviteButton = styled.button`
   }
 `;
 
-export const SearchInput = styled.input`
+export const FriendSearchInput = styled.input`
   width: 100%;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -1400,8 +1429,8 @@ export const ShowMoreOverlay = styled.div`
   left: 0;
   right: 0;
   background: ${props => props.$isMine
-    ? 'linear-gradient(135deg, #4a90e2, #357abd)'
-    : 'rgba(255, 255, 255, 0.08)'};
+    ? (props.$myBubbleColor || '#4a90e2')
+    : (props.$otherBubbleColor || 'rgba(255, 255, 255, 0.08)')};
   border-top: 1px dotted ${props => props.$isMine ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.2)'};
   display: flex;
   flex-direction: column;
@@ -1413,5 +1442,83 @@ export const ShowMoreOverlay = styled.div`
 
   button {
     pointer-events: all;
+  }
+`;
+
+
+// 검색창
+export const SearchBar = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(26, 26, 26, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+`;
+
+export const SearchResultInfo = styled.div`
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  padding: 0 4px;
+  flex-shrink: 0;
+`;
+
+export const SearchButtons = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+`;
+
+export const SearchInput = styled.input`
+  flex: 1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  padding: 6px 10px;
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+  min-width: 0;
+
+  &:focus {
+    border-color: rgba(74, 144, 226, 0.5);
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  &::placeholder {
+    color: #666;
+  }
+`;
+
+export const SearchButton = styled.button`
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #888;
+  transition: all 0.2s;
+  flex-shrink: 0;
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  &:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
   }
 `;

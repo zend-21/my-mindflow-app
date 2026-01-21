@@ -85,26 +85,33 @@ const FloatingButtonContainer = styled.div`
     border: none;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1);
 
-    /* ★★★ 수정: position을 absolute로 변경하여 앱 컨테이너 내부에 고정 ★★★ */
-    position: absolute;
+    /* fixed 포지션으로 변경하여 스크롤 시 떨림 방지 */
+    position: fixed;
     bottom: 90px;
     right: 24px;
     z-index: 1000;
 
     user-select: none;
-    touch-action: none; 
-    
+    touch-action: none;
+
+    /* GPU 가속으로 모바일 WebView 렌더링 성능 향상 */
+    will-change: transform;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+
     animation: ${fadeInUp} 0.6s ease forwards;
     animation-delay: 0.5s;
 
     ${props => props.$isDragging && `
         animation: none !important;
-        transform: translateY(${props.$offsetY}px) !important;
+        transform: translateZ(0) translateY(${props.$offsetY}px) !important;
     `}
-    
+
     ${props => !props.$isDragging && props.$hasBeenDragged && `
         animation: none !important;
-        transform: translateY(${props.$offsetY}px);
+        transform: translateZ(0) translateY(${props.$offsetY}px);
         transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
     `}
 

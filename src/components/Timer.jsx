@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import * as S from './Timer.styles';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 const Timer = ({ onClose }) => {
     const [seconds, setSeconds] = useState(0);
@@ -459,8 +460,56 @@ const Timer = ({ onClose }) => {
         setIsAlarmPlaying(false);
     };
 
+    // 로컬 알림 예약 (백그라운드 알람용 - 소리 없이 알림만)
+    const scheduleLocalNotification = async (delaySeconds) => {
+        try {
+            // 알림 권한 요청
+            const permission = await LocalNotifications.requestPermissions();
+            if (permission.display !== 'granted') {
+                console.log('⚠️ 알림 권한이 거부되었습니다');
+                return;
+            }
+
+            // 기존 알림 취소
+            await LocalNotifications.cancel({ notifications: [{ id: 1 }] });
+
+            // 새 알림 예약 (timer_alarm.mp3 사운드 사용)
+            await LocalNotifications.schedule({
+                notifications: [
+                    {
+                        id: 1,
+                        title: '타이머 완료!',
+                        body: '설정한 시간이 종료되었습니다',
+                        schedule: { at: new Date(Date.now() + delaySeconds * 1000) },
+                        smallIcon: 'ic_stat_icon_config_sample',
+                        iconColor: '#1a1a2e',
+                        channelId: 'timer_channel', // 타이머 전용 채널 (timer_alarm.mp3 사용)
+                        // extra 데이터로 타이머 알림임을 표시
+                        extra: {
+                            type: 'timer',
+                            action: 'open_timer'
+                        }
+                    }
+                ]
+            });
+            console.log('✅ 로컬 알림 예약 완료:', delaySeconds, '초 후');
+        } catch (error) {
+            console.error('❌ 로컬 알림 예약 실패:', error);
+        }
+    };
+
+    // 로컬 알림 취소
+    const cancelLocalNotification = async () => {
+        try {
+            await LocalNotifications.cancel({ notifications: [{ id: 1 }] });
+            console.log('✅ 로컬 알림 취소 완료');
+        } catch (error) {
+            console.error('❌ 로컬 알림 취소 실패:', error);
+        }
+    };
+
     // 타이머 시작/정지
-    const toggleTimer = () => {
+    const toggleTimer = async () => {
         // 알람이 울리는 중에 STOP 버튼을 누르면 알람 중지하고 타이머 완전 종료
         if (isAlarmPlaying) {
             stopAlarm();
@@ -468,6 +517,7 @@ const Timer = ({ onClose }) => {
             setSeconds(0); // 타이머를 완전히 리셋
             releaseWakeLock();
             notificationSentAt10s.current = false;
+            await cancelLocalNotification();
             return;
         }
 
@@ -478,16 +528,19 @@ const Timer = ({ onClose }) => {
             requestWakeLock();
             requestNotificationPermission(); // 알림 권한 요청
             notificationSentAt10s.current = false; // 10초 알림 플래그 초기화
+            // 🔔 로컬 알림 예약 (백그라운드에서만 알림 표시)
+            await scheduleLocalNotification(seconds);
         } else {
             // 타이머 일시정지 시
             releaseWakeLock();
+            await cancelLocalNotification();
         }
 
         setIsRunning(prev => !prev);
     };
 
     // 리셋
-    const resetTimer = () => {
+    const resetTimer = async () => {
         setIsRunning(false);
         setSeconds(0);
         if (intervalRef.current) {
@@ -501,6 +554,8 @@ const Timer = ({ onClose }) => {
         releaseWakeLock();
         // 10초 알림 플래그 초기화
         notificationSentAt10s.current = false;
+        // 로컬 알림 취소
+        await cancelLocalNotification();
     };
 
     // 타이머 카운트다운
@@ -517,8 +572,16 @@ const Timer = ({ onClose }) => {
                     if (prev <= 1) {
                         // 타이머 종료 알림 전송
                         sendTimerNotification('타이머 종료!', '설정한 시간이 종료되었습니다');
-                        // 타이머는 멈추지만 isRunning은 true로 유지
-                        playAlarm();
+                        // 포그라운드인 경우에만 타이머 알람 재생
+                        // 백그라운드인 경우 알림음으로 충분
+                        if (!document.hidden) {
+                            console.log('🔊 포그라운드 - 타이머 알람 재생');
+                            playAlarm();
+                        } else {
+                            console.log('🔇 백그라운드 - 알림음만 재생 (타이머 알람 생략)');
+                            // 백그라운드에서는 알람이 울리지 않으므로 isRunning을 false로 설정
+                            setIsRunning(false);
+                        }
                         return 0;
                     }
                     return prev - 1;
@@ -571,6 +634,11 @@ const Timer = ({ onClose }) => {
 
             audio.loop = false; // loop 대신 ended 이벤트 사용
             audio.volume = volume; // 볼륨 설정
+
+            // ⚠️ Android 백그라운드 재생을 위한 중요 속성
+            audio.setAttribute('preload', 'auto');
+            audio.setAttribute('playsinline', 'true');
+
             audioRef.current = audio;
 
             // 알람이 끝나면 0.2초 텀을 두고 재생
@@ -585,9 +653,57 @@ const Timer = ({ onClose }) => {
                 }, 300); // 0.3초 = 300ms (원하는 간격으로 조절 가능)
             });
 
-            audio.play().catch(() => {
-                // 오디오 재생 실패 (사용자 제스처 필요 등)
+            console.log('🔊 타이머 알람 시작', {
+                volume: audio.volume,
+                loop: audio.loop,
+                readyState: audio.readyState,
+                src: audio.src,
+                backgroundMode: document.hidden
             });
+
+            // 오디오가 충분히 로드될 때까지 기다린 후 재생
+            const playWhenReady = () => {
+                if (audio.readyState >= 2) {
+                    // HAVE_CURRENT_DATA 이상이면 재생 가능
+                    console.log('🎬 즉시 재생 시도 (readyState >= 2)');
+                    audio.play()
+                        .then(() => {
+                            console.log('✅ 타이머 알람 재생 성공!');
+                        })
+                        .catch((error) => {
+                            console.error('❌ 타이머 알람 재생 실패:', error);
+                            console.log('📱 오디오 상태:', {
+                                readyState: audio.readyState,
+                                paused: audio.paused,
+                                volume: audio.volume,
+                                src: audio.src,
+                                error: error.message
+                            });
+                        });
+                } else {
+                    // 아직 로드 중이면 canplay 이벤트를 기다림
+                    console.log('⏳ 오디오 로딩 대기 중... (readyState:', audio.readyState + ')');
+                    audio.addEventListener('canplay', () => {
+                        console.log('✅ 오디오 로드 완료, 재생 시작 시도');
+                        audio.play()
+                            .then(() => {
+                                console.log('✅ 타이머 알람 재생 성공!');
+                            })
+                            .catch((error) => {
+                                console.error('❌ 타이머 알람 재생 실패 (canplay 후):', error);
+                                console.log('📱 오디오 상태:', {
+                                    readyState: audio.readyState,
+                                    paused: audio.paused,
+                                    volume: audio.volume,
+                                    src: audio.src,
+                                    error: error.message
+                                });
+                            });
+                    }, { once: true });
+                }
+            };
+
+            playWhenReady();
         }
     };
 
@@ -598,14 +714,14 @@ const Timer = ({ onClose }) => {
         preloadAudio.load();
         preloadedAudioRef.current = preloadAudio;
 
-        // Page Visibility API - 전화/알림 등으로 백그라운드 갔다가 돌아올 때 처리
+        // Page Visibility API - 백그라운드/포그라운드 전환 처리
         const handleVisibilityChange = () => {
             if (document.hidden) {
-                // 백그라운드로 갔을 때
-                console.log('📱 타이머 백그라운드로 이동');
-                // 알람이 울리는 중이면 일시정지 (전화 등)
-                if (isAlarmPlayingRef.current && audioRef.current) {
+                // 백그라운드로 갔을 때 - 알람음 중지 (조용히)
+                console.log('📱 타이머 백그라운드로 이동 - 알람음 일시정지');
+                if (audioRef.current && !audioRef.current.paused) {
                     audioRef.current.pause();
+                    console.log('🔇 백그라운드에서 알람음 일시정지');
                 }
             } else {
                 // 다시 포그라운드로 돌아왔을 때
@@ -614,12 +730,9 @@ const Timer = ({ onClose }) => {
                 if (isRunning || isAlarmPlaying) {
                     requestWakeLock();
                 }
-                // 알람이 울리는 중이었으면 재개
-                if (isAlarmPlayingRef.current && audioRef.current) {
-                    audioRef.current.play().catch(() => {
-                        console.log('알람 재개 실패');
-                    });
-                }
+                // ⚠️ 백그라운드에서 알림음이 울렸으면 포그라운드에서는 타이머 알람을 울리지 않음
+                // (백그라운드 알림음으로 충분)
+                console.log('🔇 포그라운드 복귀 - 백그라운드에서 알림음이 울렸으므로 타이머 알람 생략');
             }
         };
 

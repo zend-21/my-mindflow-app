@@ -93,9 +93,8 @@ export const useAlarmSound = () => {
   // 사운드 미리듣기
   const handlePlaySound = () => {
     if (soundFile === 'default') {
-      // 기본 사운드 재생 (브라우저 기본 알림음)
-      const audio = new Audio();
-      audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBDGH0fPTgjMGHm7A7+OZURE=';
+      // 기본 사운드 재생 (schedule_alarm.mp3) - 캐시 무효화
+      const audio = new Audio(`/sound/Schedule_alarm/default.mp3?v=${Date.now()}`);
       audio.volume = volume / 100;
       audio.play().catch(err => console.error('사운드 재생 실패:', err));
     } else {

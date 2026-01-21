@@ -1,31 +1,31 @@
 // src/modules/calendar/AlarmToast.jsx
 // ✨ 간결한 토스트 알림 컴포넌트 (3초 표시, 탭으로 중지)
 
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
 import Portal from '../../components/Portal';
 import { loadAudioFile } from '../../utils/audioStorage';
 import { ALARM_REPEAT_CONFIG } from './alarm/constants/alarmConstants';
 
-// 애니메이션
+// 애니메이션 - 화면 중앙 위에서 아래로 슬라이드
 const slideDown = keyframes`
   from {
-    transform: translateY(-100%);
+    transform: translate(-50%, -150%);
     opacity: 0;
   }
   to {
-    transform: translateY(0);
+    transform: translate(-50%, 0);
     opacity: 1;
   }
 `;
 
 const slideUp = keyframes`
   from {
-    transform: translateY(0);
+    transform: translate(-50%, 0);
     opacity: 1;
   }
   to {
-    transform: translateY(-100%);
+    transform: translate(-50%, -150%);
     opacity: 0;
   }
 `;
@@ -35,47 +35,35 @@ const ToastContainer = styled.div`
   position: fixed;
   top: 20px;
   left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: rgba(50, 50, 50, 0.95);
   color: white;
   padding: 16px 24px;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
   z-index: 13000;
-  animation: ${props => props.$isClosing ? slideUp : slideDown} 0.3s ease-out;
+  animation: ${props => props.$isClosing ? slideUp : slideDown} 0.3s ease-out forwards;
   cursor: pointer;
   user-select: none;
   max-width: 90vw;
-  min-width: 300px;
+  min-width: 250px;
 `;
 
 const ToastTitle = styled.div`
   font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 4px;
+  font-weight: 500;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-`;
-
-const ToastContent = styled.div`
-  font-size: 14px;
-  opacity: 0.9;
-  margin-bottom: 6px;
-  max-height: 60px;
-  overflow-y: auto;
-`;
-
-const ToastHint = styled.div`
-  font-size: 12px;
-  opacity: 0.7;
+  white-space: normal;
+  word-break: break-word;
   text-align: center;
 `;
 
 /**
  * 토스트 알림 컴포넌트
  * @param {boolean} isVisible - 표시 여부
- * @param {object} alarmData - 알람 데이터 { title, content, soundFile, volume }
+ * @param {object} alarmData - 알람 데이터 { title, soundFile, volume }
  * @param {function} onClose - 닫기 콜백 (탭 시 호출, 남은 반복 모두 취소)
  */
 const AlarmToast = ({ isVisible, alarmData, onClose }) => {
@@ -88,18 +76,59 @@ const AlarmToast = ({ isVisible, alarmData, onClose }) => {
     if (isVisible) {
       setIsClosing(false);
 
-      // 소리 재생
-      playAlarmSound();
+      // notificationType에 따라 소리/진동 제어
+      const notificationType = alarmData?.notificationType || 'sound';
+      console.log('🔔 [AlarmToast] 알람 데이터:', {
+        title: alarmData?.title,
+        notificationType,
+        vibrateSupported: 'vibrate' in navigator,
+        fullAlarmData: alarmData
+      });
 
-      // 진동
-      if ('vibrate' in navigator) {
-        navigator.vibrate(500);
+      // 소리 재생 ('sound' 또는 'both')
+      if (notificationType === 'sound' || notificationType === 'both') {
+        console.log('🔊 [AlarmToast] 소리 재생');
+        playAlarmSound();
+      }
+
+      // 진동 ('vibrate' 또는 'both')
+      if ((notificationType === 'vibrate' || notificationType === 'both') && 'vibrate' in navigator) {
+        console.log('📳 [AlarmToast] 진동 시작:', [500, 200, 500]);
+        // 알람 진동 패턴: [진동ms, 정지ms, 진동ms, 정지ms, ...]
+        // 500ms 진동 → 200ms 정지 → 500ms 진동
+        const vibrateResult = navigator.vibrate([500, 200, 500]);
+        console.log('📳 [AlarmToast] 진동 결과:', vibrateResult);
+      } else {
+        console.log('❌ [AlarmToast] 진동 불가:', {
+          condition1: notificationType === 'vibrate' || notificationType === 'both',
+          condition2: 'vibrate' in navigator,
+          notificationType
+        });
       }
 
       // 3초 후 자동 닫기
       autoCloseTimerRef.current = setTimeout(() => {
         handleClose();
       }, ALARM_REPEAT_CONFIG.toastDuration);
+
+      // 백그라운드에서도 알람이 계속 재생되도록 Page Visibility 이벤트 리스너 추가
+      const handleVisibilityChange = () => {
+        if (!document.hidden) {
+          // 포그라운드로 복귀 시 알람이 멈췄다면 재개
+          if (audioRef.current && audioRef.current.paused) {
+            audioRef.current.play().catch((err) => {
+              console.log('알람 재개 실패:', err);
+            });
+          }
+        }
+        // 백그라운드로 갈 때는 아무것도 하지 않음 (계속 재생)
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
     }
 
     return () => {
@@ -177,14 +206,6 @@ const AlarmToast = ({ isVisible, alarmData, onClose }) => {
         <ToastTitle>
           🔔 {alarmData.title || '알람'}
         </ToastTitle>
-        {alarmData.content && (
-          <ToastContent>
-            {alarmData.content}
-          </ToastContent>
-        )}
-        <ToastHint>
-          탭하여 중지
-        </ToastHint>
       </ToastContainer>
     </Portal>
   );

@@ -1,7 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">MindFlow</string>
-    <string name="title_activity_main">MindFlow</string>
-    <string name="package_name">com.mindflow.app</string>
-    <string name="custom_url_scheme">com.mindflow.app</string>
+    <string name="app_name">ShareNote</string>
+    <string name="title_activity_main">ShareNote</string>
+    <string name="package_name">com.sharenote.app</string>
+    <string name="custom_url_scheme">com.sharenote.app</string>
+    <!-- Google Sign-In 설정 -->
+    <string name="server_client_id">983598708482-8kackp0e1ti8nq3r67tpjj64slc3rf3p.apps.googleusercontent.com</string>
 </resources>

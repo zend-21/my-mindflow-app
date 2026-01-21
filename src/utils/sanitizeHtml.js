@@ -41,13 +41,28 @@ export const sanitizeHtml = (html) => {
     return '';
   }
 
-  return DOMPurify.sanitize(html, {
-    ADD_TAGS: ['iframe'],
-    ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'src', 'width', 'height'],
+  const config = {
+    ADD_TAGS: ['iframe', 'img'],
+    ADD_ATTR: ['allow', 'allowfullscreen', 'frameborder', 'scrolling', 'src', 'width', 'height', 'alt', 'title', 'loading'],
     ALLOW_DATA_ATTR: true,
     FORBID_TAGS: ['script', 'style'],
-    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur']
-  });
+    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur'],
+    ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|data|blob):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+  };
+
+  const sanitized = DOMPurify.sanitize(html, config);
+
+  // 디버깅: 이미지가 제거되었는지 확인
+  if (html.includes('<img') && !sanitized.includes('<img')) {
+    console.warn('⚠️ [sanitizeHtml] 이미지 태그가 제거됨:', {
+      originalHasImg: html.includes('<img'),
+      sanitizedHasImg: sanitized.includes('<img'),
+      originalLength: html.length,
+      sanitizedLength: sanitized.length
+    });
+  }
+
+  return sanitized;
 };
 
 /**

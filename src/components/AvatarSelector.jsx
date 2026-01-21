@@ -3,7 +3,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { avatarList, getRecommendedAvatar } from './avatars/AvatarIcons';
-import { getUserProfile } from '../utils/fortuneLogic';
+// ⚠️ 운세 기능 비활성화
+// import { getUserProfile } from '../features/fortune/utils/fortuneLogic';
 import * as S from './AvatarSelector.styles';
 import { toast } from '../utils/toast';
 
@@ -80,28 +81,28 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
     const scrollRef = React.useRef(null);
 
     useEffect(() => {
-        // 운세 프로필에서 띠와 별자리 가져오기
-        const fortuneProfile = getUserProfile();
-        console.log('🔍 운세 프로필:', fortuneProfile);
+        // ⚠️ 운세 기능 비활성화 - 운세 프로필 기반 추천 기능 제거
+        // const fortuneProfile = getUserProfile();
+        // console.log('🔍 운세 프로필:', fortuneProfile);
 
-        if (fortuneProfile) {
-            // 사용자 이름 저장
-            setUserName(fortuneProfile.name || '');
+        // if (fortuneProfile) {
+        //     // 사용자 이름 저장
+        //     setUserName(fortuneProfile.name || '');
 
-            // 띠 추천 (fortuneProfile.zodiacAnimal은 한글 이름: "쥐", "소" 등)
-            if (fortuneProfile.zodiacAnimal) {
-                const zodiacAvatar = avatarList.find(avatar => avatar.name === fortuneProfile.zodiacAnimal);
-                console.log('🐉 띠 추천:', zodiacAvatar);
-                setRecommendedZodiacAvatar(zodiacAvatar);
-            }
+        //     // 띠 추천 (fortuneProfile.zodiacAnimal은 한글 이름: "쥐", "소" 등)
+        //     if (fortuneProfile.zodiacAnimal) {
+        //         const zodiacAvatar = avatarList.find(avatar => avatar.name === fortuneProfile.zodiacAnimal);
+        //         console.log('🐉 띠 추천:', zodiacAvatar);
+        //         setRecommendedZodiacAvatar(zodiacAvatar);
+        //     }
 
-            // 별자리 추천 (fortuneProfile.zodiacSign은 한글 이름: "양자리", "황소자리" 등)
-            if (fortuneProfile.zodiacSign) {
-                const signAvatar = avatarList.find(avatar => avatar.name === fortuneProfile.zodiacSign);
-                console.log('⭐ 별자리 추천:', signAvatar);
-                setRecommendedSignAvatar(signAvatar);
-            }
-        }
+        //     // 별자리 추천 (fortuneProfile.zodiacSign은 한글 이름: "양자리", "황소자리" 등)
+        //     if (fortuneProfile.zodiacSign) {
+        //         const signAvatar = avatarList.find(avatar => avatar.name === fortuneProfile.zodiacSign);
+        //         console.log('⭐ 별자리 추천:', signAvatar);
+        //         setRecommendedSignAvatar(signAvatar);
+        //     }
+        // }
     }, [isOpen]);
 
     useEffect(() => {

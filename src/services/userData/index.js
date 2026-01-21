@@ -51,6 +51,7 @@ export {
   deleteCalendarDateFromFirestore,
   deleteBase64ImagesFromCalendar,
   saveCalendarToFirestore,
+  cleanupDeletedFirestoreDocuments,
 
   // Activities
   fetchActivitiesFromFirestore,

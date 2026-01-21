@@ -1,12 +1,11 @@
 // src/components/messaging/BlockedUsersModal.jsx
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { X, UserPlus, Shield } from 'lucide-react';
+import { X, Copy, Shield } from 'lucide-react';
 import {
   getBlockedUsers,
   unblockUser,
 } from '../../services/userManagementService';
-import { addFriendInstantly } from '../../services/friendService';
 import ConfirmModal from '../ConfirmModal';
 
 const ModalOverlay = styled.div`
@@ -170,7 +169,7 @@ const getAvatarColor = (userId) => {
   return colors[hash % colors.length];
 };
 
-const BlockedUsersModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
+const BlockedUsersModal = ({ isOpen, onClose, showToast }) => {
   const [blockedUsers, setBlockedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
@@ -224,27 +223,14 @@ const BlockedUsersModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
     }
   };
 
-  const handleAddFriend = async (user) => {
+  const handleCopyId = async (user) => {
     try {
-      setActionLoading(user.userId);
-      const myUserId = localStorage.getItem('firebaseUserId');
-
-      const result = await addFriendInstantly(myUserId, user.userWorkspaceCode);
-
-      if (result.success) {
-        // 차단도 자동으로 해제
-        await unblockUser(myUserId, user.userId);
-        showToast?.('✅ 친구가 추가되고 차단이 해제되었습니다');
-        await loadBlockedUsers();
-        onFriendAdded?.();
-      } else {
-        showToast?.(`❌ ${result.error}`);
-      }
+      const idToCopy = user.userWorkspaceCode?.replace('WS-', '') || '';
+      await navigator.clipboard.writeText(idToCopy);
+      showToast?.('✅ ID가 복사되었습니다');
     } catch (error) {
-      console.error('친구 추가 오류:', error);
-      showToast?.('친구 추가에 실패했습니다');
-    } finally {
-      setActionLoading(null);
+      console.error('ID 복사 실패:', error);
+      showToast?.('❌ 복사에 실패했습니다');
     }
   };
 
@@ -278,9 +264,15 @@ const BlockedUsersModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
                 </Avatar>
                 <UserInfo>
                   <UserName>{user.userName}</UserName>
-                  <UserMeta>WS {user.userWorkspaceCode}</UserMeta>
+                  <UserMeta>{user.userWorkspaceCode?.replace('WS-', '') || ''}</UserMeta>
                 </UserInfo>
                 <ActionButtons>
+                  <ActionButton
+                    onClick={() => handleCopyId(user)}
+                  >
+                    <Copy size={14} />
+                    ID복사
+                  </ActionButton>
                   <ActionButton
                     $variant="primary"
                     onClick={() => handleUnblock(user)}
@@ -288,13 +280,6 @@ const BlockedUsersModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
                   >
                     <Shield size={14} />
                     차단해제
-                  </ActionButton>
-                  <ActionButton
-                    onClick={() => handleAddFriend(user)}
-                    disabled={actionLoading === user.userId}
-                  >
-                    <UserPlus size={14} />
-                    친구추가
                   </ActionButton>
                 </ActionButtons>
               </UserItem>
@@ -307,7 +292,7 @@ const BlockedUsersModal = ({ isOpen, onClose, showToast, onFriendAdded }) => {
         <ConfirmModal
           icon="🔓"
           title="차단 해제"
-          message={`${unblockConfirm.user?.userName}님의 차단을 해제하시겠습니까?`}
+          message={`${unblockConfirm.user?.userName}님의 차단을 해제하시겠습니까?\n친구로 추가할 예정이라면 ID를 반드시 복사하세요.`}
           confirmText="해제"
           cancelText="취소"
           onConfirm={confirmUnblock}

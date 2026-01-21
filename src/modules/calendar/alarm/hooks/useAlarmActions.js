@@ -2,6 +2,7 @@
 // 알람 등록/수정/삭제 등의 액션 처리
 
 import { format, addDays, addHours, addMinutes, subDays, subHours, subMinutes } from 'date-fns';
+import { registerNativeScheduleAlarm } from '../../../../services/scheduleAlarmService';
 
 export const useAlarmActions = ({
   scheduleData,
@@ -169,6 +170,9 @@ export const useAlarmActions = ({
     };
     onSave(alarmSettings, 'register');
 
+    // 🔔 네이티브 알람 등록 (백그라운드 알림)
+    registerNativeScheduleAlarm(newAlarm, format(scheduleData.date, 'yyyy-MM-dd'));
+
     // 입력 초기화
     setAlarmTitle('');
     setHourInput('');
@@ -242,6 +246,9 @@ export const useAlarmActions = ({
     };
     onSave(alarmSettings, 'register');
 
+    // 🔔 네이티브 알람 등록 (백그라운드 알림)
+    registerNativeScheduleAlarm(newAlarm, format(scheduleData.date, 'yyyy-MM-dd'));
+
     // 입력 초기화
     setAlarmTitle('');
     setHourInput('');
@@ -313,6 +320,9 @@ export const useAlarmActions = ({
       anniversaryRepeat,
     };
     onSave(alarmSettings, 'register');
+
+    // 🔔 네이티브 알람 등록 (백그라운드 알림)
+    registerNativeScheduleAlarm(newAlarm, format(scheduleData.date, 'yyyy-MM-dd'));
 
     // 입력 초기화
     setAlarmTitle('');

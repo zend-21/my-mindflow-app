@@ -10,17 +10,19 @@ export const EditorContainer = styled.div`
   overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   height: ${props => props.$collapsed ? '56px' : 'auto'};
+  display: block;
+  z-index: 1;
 `;
 
 export const EditorHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
+  position: relative;
+  padding: 0 16px;
+  height: 56px;
   background: rgba(255, 255, 255, 0.03);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: ${props => props.$collapsed ? 'none' : '1px solid rgba(255, 255, 255, 0.1)'};
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, border-bottom 0.2s;
+  flex-shrink: 0;
 
   &:hover {
     background: rgba(255, 255, 255, 0.05);
@@ -28,16 +30,27 @@ export const EditorHeader = styled.div`
 `;
 
 export const HeaderLeft = styled.div`
+  position: absolute;
+  left: 16px;
+  top: 12px;
   display: flex;
   align-items: center;
   gap: 12px;
-  flex: 1;
-  min-width: 0;
+  height: 32px;
+  /* 버튼 영역을 침범하지 않도록 최대 너비 제한 */
+  max-width: calc(100% - 136px);
+  pointer-events: none; /* 클릭 이벤트가 자식에게만 전달되도록 */
+
+  & > * {
+    pointer-events: auto; /* 자식 요소는 클릭 가능 */
+  }
 `;
 
 export const DocumentIcon = styled.div`
   width: 32px;
   height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   background: linear-gradient(135deg, #4a90e2, #357abd);
   border-radius: 8px;
   display: flex;
@@ -45,12 +58,13 @@ export const DocumentIcon = styled.div`
   justify-content: center;
   font-size: 16px;
   flex-shrink: 0;
+  align-self: center;
 `;
 
 export const TitleInput = styled.input`
   flex: 1;
   max-width: 300px;
-  background: transparent;
+  background: transparent; /* 배경 제거 */
   border: none;
   color: #ffffff;
   font-size: 15px;
@@ -72,15 +86,21 @@ export const TitleInput = styled.input`
   }
 
   &:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
+    cursor: default;
+    opacity: 1;
+    background: transparent; /* disabled 상태에서도 배경 없음 */
   }
 `;
 
 export const HeaderRight = styled.div`
+  position: absolute;
+  right: 16px;
+  top: 6px;
   display: flex;
   align-items: center;
   gap: 8px;
+  height: 44px;
+  z-index: 100;
 `;
 
 export const PermissionBadge = styled.div`
@@ -107,17 +127,31 @@ export const IconButton = styled.button`
   background: transparent;
   border: none;
   color: #888;
-  padding: 6px;
-  border-radius: 6px;
+  /* 모바일 터치에 적합한 크기 (최소 44x44px) */
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
+  /* z-index로 확실히 위에 표시 */
+  position: relative;
+  z-index: 100;
 
   &:hover {
     background: rgba(255, 255, 255, 0.1);
     color: #ffffff;
+  }
+
+  &:active {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(0.95);
   }
 
   &:disabled {
@@ -130,7 +164,12 @@ export const ToggleButton = styled(IconButton)`
   color: #4a90e2;
 
   &:hover {
-    background: rgba(74, 144, 226, 0.15);
+    background: transparent;
+  }
+
+  &:active {
+    background: transparent;
+    transform: none;
   }
 `;
 
@@ -319,6 +358,37 @@ export const ContentEditableArea = styled.div`
     &:hover {
       opacity: 0.9;
     }
+  }
+
+  /* YouTube 영상 반응형 컨테이너 (편집 모드) */
+  .video-container {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 비율 */
+    height: 0;
+    overflow: hidden;
+    margin: 1em 0;
+    border-radius: 8px;
+  }
+
+  .video-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 8px;
+  }
+
+  /* 컨테이너 없이 직접 삽입된 iframe도 대응 (편집 모드) */
+  iframe {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 16 / 9 !important;
+    border-radius: 8px;
+    margin: 1em 0;
+    box-sizing: border-box;
   }
 
   /* 비디오 문서 너비에 맞춤 */
@@ -670,6 +740,37 @@ export const FullScreenEditArea = styled.div`
     &:hover {
       opacity: 0.9;
     }
+  }
+
+  /* YouTube 영상 반응형 컨테이너 */
+  .video-container {
+    position: relative;
+    width: 100%;
+    padding-bottom: 56.25%; /* 16:9 비율 */
+    height: 0;
+    overflow: hidden;
+    margin: 1em 0;
+    border-radius: 8px;
+  }
+
+  .video-container iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 8px;
+  }
+
+  /* 컨테이너 없이 직접 삽입된 iframe도 대응 */
+  iframe {
+    max-width: 100% !important;
+    width: 100% !important;
+    height: auto !important;
+    aspect-ratio: 16 / 9 !important;
+    border-radius: 8px;
+    margin: 1em 0;
+    box-sizing: border-box;
   }
 
   /* 비디오 자동 리사이징 */

@@ -9,6 +9,7 @@ import { getProfileSetting } from '../utils/userStorage';
 const HeaderWrapper = styled.header`
   background: linear-gradient(180deg, #2a2d35 0%, #1f2229 100%);
   padding: 16px 24px;
+  padding-top: calc(16px + env(safe-area-inset-top));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -16,11 +17,12 @@ const HeaderWrapper = styled.header`
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   z-index: 500;
   position: fixed;
-  top: ${props => props.$isHidden ? '-100px' : '0'};
+  top: 0;
+  transform: ${props => props.$isHidden ? 'translateY(-100%)' : 'translateY(0)'};
   opacity: ${props => props.$isHidden ? 0 : 1};
-  transition:
-    top 1.1s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.6s ease-in-out;
+  transition: transform 0.9s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.7s ease-out;
+  transition-delay: ${props => props.$isHidden ? '0.1s' : '0.15s'};
+  will-change: transform, opacity;
   width: 100%;
   max-width: 450px;
 
@@ -131,9 +133,30 @@ const ActionButton = styled.button`
     padding: 0;
     line-height: 1;
     font-size: 24px;
+    position: relative;
 
     &:hover {
         color: #ffffff;
+    }
+`;
+
+const NotificationDot = styled.span`
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    background: #ff4444;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.5;
+        }
     }
 `;
 
@@ -162,6 +185,9 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
     const [selectedAvatarId, setSelectedAvatarId] = useState(null);
     const [avatarBgColor, setAvatarBgColor] = useState('none');
     const [customPicture, setCustomPicture] = useState(null);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [unreadInquiryCount, setUnreadInquiryCount] = useState(0);
+    const [hasUnreadReplies, setHasUnreadReplies] = useState(false);
 
     // Firestore 실시간 리스너: 프로필 설정 변경 감지
     useEffect(() => {
@@ -334,6 +360,58 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
         return <AvatarComponent />;
     };
 
+    // 관리자 권한 및 답변대기 문의 수 확인
+    useEffect(() => {
+        const userId = localStorage.getItem('firebaseUserId');
+        if (!userId) return;
+
+        let unsubscribeAdmin;
+        let unsubscribeInquiries;
+        let unsubscribeUserInquiries;
+
+        const checkAdmin = async () => {
+            try {
+                const { checkAdminStatus } = await import('../services/adminManagementService');
+                const { subscribeToPendingInquiries } = await import('../services/adminInquiryService');
+                const { getUserInquiries } = await import('../services/inquiryService');
+                const { onSnapshot, collection } = await import('firebase/firestore');
+                const { db } = await import('../firebase/config');
+
+                const adminStatus = await checkAdminStatus(userId);
+                setIsAdmin(adminStatus.isAdmin);
+
+                if (adminStatus.isAdmin) {
+                    // 관리자: 답변대기 문의 수 구독
+                    unsubscribeInquiries = subscribeToPendingInquiries((count) => {
+                        setUnreadInquiryCount(count);
+                    });
+                } else {
+                    // 일반 사용자: 읽지 않은 답변 여부 구독
+                    const inquiriesRef = collection(db, 'users', userId, 'inquiries');
+                    unsubscribeUserInquiries = onSnapshot(inquiriesRef, async () => {
+                        try {
+                            const inquiries = await getUserInquiries(userId);
+                            const hasUnread = inquiries.some(inquiry => inquiry.hasUnreadReplies);
+                            setHasUnreadReplies(hasUnread);
+                        } catch (error) {
+                            console.error('문의 목록 조회 오류:', error);
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('관리자 권한 확인 오류:', error);
+            }
+        };
+
+        checkAdmin();
+
+        return () => {
+            if (unsubscribeAdmin) unsubscribeAdmin();
+            if (unsubscribeInquiries) unsubscribeInquiries();
+            if (unsubscribeUserInquiries) unsubscribeUserInquiries();
+        };
+    }, [profile]);
+
     // 하루에 한 번 인사말 업데이트
     useEffect(() => {
         setGreeting(getDailyGreeting());
@@ -437,6 +515,7 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
                 </ActionButton>
                 <ActionButton onClick={onMenuClick}>
                     ☰
+                    {((isAdmin && unreadInquiryCount > 0) || (!isAdmin && hasUnreadReplies)) && <NotificationDot />}
                 </ActionButton>
             </RightContainer>
         </HeaderWrapper>

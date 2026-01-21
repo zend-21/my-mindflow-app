@@ -39,14 +39,30 @@ export const convertTimestampsToMillis = (data) => {
 export const removeUndefinedValues = (obj) => {
   if (!obj || typeof obj !== 'object') return obj;
 
+  // 배열 처리
+  if (Array.isArray(obj)) {
+    return obj
+      .filter(item => item !== undefined)
+      .map(item => removeUndefinedValues(item));
+  }
+
+  // 객체 처리
   const cleaned = {};
   Object.keys(obj).forEach(key => {
     const value = obj[key];
     if (value !== undefined) {
-      // 중첩된 객체도 재귀적으로 처리
-      if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date)) {
+      // 배열인 경우
+      if (Array.isArray(value)) {
+        cleaned[key] = value
+          .filter(item => item !== undefined)
+          .map(item => removeUndefinedValues(item));
+      }
+      // 중첩된 객체인 경우
+      else if (value && typeof value === 'object' && !(value instanceof Date)) {
         cleaned[key] = removeUndefinedValues(value);
-      } else {
+      }
+      // 일반 값
+      else {
         cleaned[key] = value;
       }
     }

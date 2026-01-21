@@ -84,13 +84,7 @@ export const addFriendInstantly = async (myUserId, targetWorkspaceCode) => {
       throw new Error('자기 자신은 추가할 수 없습니다');
     }
 
-    // 2. 이미 친구인지 확인
-    const alreadyFriend = await isFriend(myUserId, targetUser.id);
-    if (alreadyFriend) {
-      throw new Error('이미 친구로 등록된 사용자입니다');
-    }
-
-    // 2-1. 내가 차단한 사용자인지 확인
+    // 2-1. 내가 차단한 사용자인지 확인 (친구 확인보다 먼저)
     try {
       const { isUserBlocked } = await import('./userManagementService');
       const isBlocked = await isUserBlocked(myUserId, targetUser.id);
@@ -103,6 +97,29 @@ export const addFriendInstantly = async (myUserId, targetWorkspaceCode) => {
         throw error;
       }
       console.warn('차단 확인 실패 (무시):', error);
+    }
+
+    // 2-2. 상대방이 나를 차단했는지 확인
+    try {
+      const { isUserBlocked } = await import('./userManagementService');
+      const isBlockedByTarget = await isUserBlocked(targetUser.id, myUserId);
+      console.log('🔍 상대방 차단 확인:', { targetUserId: targetUser.id, myUserId, isBlockedByTarget });
+      if (isBlockedByTarget) {
+        throw new Error('이 사용자가 회원님을 차단했습니다. 친구 추가를 할 수 없습니다.');
+      }
+    } catch (error) {
+      // isUserBlocked 에러가 아닌 경우만 재throw
+      if (error.message.includes('차단')) {
+        throw error;
+      }
+      console.warn('상대방 차단 확인 실패 (무시):', error);
+    }
+
+    // 2. 이미 친구인지 확인
+    const alreadyFriend = await isFriend(myUserId, targetUser.id);
+    console.log('🔍 친구 확인 결과:', { myUserId, targetUserId: targetUser.id, alreadyFriend });
+    if (alreadyFriend) {
+      throw new Error('이미 친구로 등록된 사용자입니다');
     }
 
     // 3. 내 정보 가져오기
@@ -142,6 +159,7 @@ export const addFriendInstantly = async (myUserId, targetWorkspaceCode) => {
     }
 
     // 5. 내 친구 목록에만 추가 (일방향)
+    console.log('✍️ 내 친구 목록에 추가 시도:', { myUserId, targetUserId: targetUser.id });
     await setDoc(doc(db, 'users', myUserId, 'friends', targetUser.id), {
       friendId: targetUser.id,
       friendName: targetDisplayName,
@@ -149,8 +167,10 @@ export const addFriendInstantly = async (myUserId, targetWorkspaceCode) => {
       friendWorkspaceCode: targetWorkspaceCode,
       addedAt: timestamp,
     });
+    console.log('✅ 내 친구 목록에 추가 완료');
 
     // 6. 상대방의 friendRequests에 내가 추가했다는 알림 (상대방은 아직 친구 아님)
+    console.log('✍️ 상대방 friendRequests에 추가 시도:', { targetUserId: targetUser.id, myUserId });
     await setDoc(doc(db, 'users', targetUser.id, 'friendRequests', myUserId), {
       requesterId: myUserId,
       requesterName: myDisplayName,
@@ -158,6 +178,7 @@ export const addFriendInstantly = async (myUserId, targetWorkspaceCode) => {
       requesterWorkspaceCode: myWorkspaceCode,
       requestedAt: timestamp,
     });
+    console.log('✅ 상대방 friendRequests에 추가 완료');
 
     // 7. deletedFriends에서 삭제 (재추가하는 경우)
     try {
@@ -179,6 +200,126 @@ export const addFriendInstantly = async (myUserId, targetWorkspaceCode) => {
         id: targetUser.id,
         name: targetUser.displayName || targetUser.email || '익명',
         workspaceCode: targetWorkspaceCode,
+      }
+    };
+  } catch (error) {
+    console.error('❌ 친구 추가 실패:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+};
+
+/**
+ * friendId로 직접 친구 추가 (삭제된 친구 복구용)
+ * @param {string} myUserId - 내 사용자 ID
+ * @param {string} friendId - 친구 사용자 ID
+ */
+export const addFriendById = async (myUserId, friendId) => {
+  try {
+    console.log('🔄 친구 ID로 직접 추가 시작:', { myUserId, friendId });
+
+    // 1. 친구 정보 가져오기
+    const friendDoc = await getDoc(doc(db, 'users', friendId));
+    if (!friendDoc.exists()) {
+      throw new Error('존재하지 않는 사용자입니다');
+    }
+
+    const friendData = friendDoc.data();
+
+    // 2. 이미 친구인지 확인
+    const alreadyFriend = await isFriend(myUserId, friendId);
+    if (alreadyFriend) {
+      throw new Error('이미 친구로 등록된 사용자입니다');
+    }
+
+    // 3. 내가 차단한 사용자인지 확인
+    try {
+      const { isUserBlocked } = await import('./userManagementService');
+      const isBlocked = await isUserBlocked(myUserId, friendId);
+      if (isBlocked) {
+        throw new Error('차단한 사용자입니다. 차단을 해제한 후 친구 추가해 주세요.');
+      }
+    } catch (error) {
+      if (error.message.includes('차단한 사용자')) {
+        throw error;
+      }
+      console.warn('차단 확인 실패 (무시):', error);
+    }
+
+    // 4. 내 정보 가져오기
+    const myUserDoc = await getDoc(doc(db, 'users', myUserId));
+    if (!myUserDoc.exists()) {
+      throw new Error('내 정보를 찾을 수 없습니다');
+    }
+
+    const myUserData = myUserDoc.data();
+
+    // 5. 워크스페이스 정보 가져오기
+    const myWorkspaceQuery = query(
+      collection(db, 'workspaces'),
+      where('userId', '==', myUserId)
+    );
+    const myWorkspaceSnapshot = await getDocs(myWorkspaceQuery);
+    const myWorkspaceCode = myWorkspaceSnapshot.docs[0]?.data().workspaceCode;
+
+    const friendWorkspaceQuery = query(
+      collection(db, 'workspaces'),
+      where('userId', '==', friendId)
+    );
+    const friendWorkspaceSnapshot = await getDocs(friendWorkspaceQuery);
+    const friendWorkspaceCode = friendWorkspaceSnapshot.docs[0]?.data().workspaceCode;
+
+    const timestamp = Timestamp.now();
+
+    // 6. 닉네임 가져오기
+    let friendDisplayName = friendData.displayName || friendData.email || '익명';
+    let myDisplayName = myUserData.displayName || myUserData.email || '익명';
+
+    try {
+      const { getUserDisplayName } = await import('./nicknameService');
+      friendDisplayName = await getUserDisplayName(friendId, friendData.displayName);
+      myDisplayName = await getUserDisplayName(myUserId, myUserData.displayName);
+    } catch (error) {
+      console.warn('닉네임 조회 실패:', error);
+    }
+
+    // 7. 내 친구 목록에 추가
+    await setDoc(doc(db, 'users', myUserId, 'friends', friendId), {
+      friendId: friendId,
+      friendName: friendDisplayName,
+      friendEmail: friendData.email || '',
+      friendWorkspaceCode: friendWorkspaceCode,
+      addedAt: timestamp,
+    });
+
+    // 8. 상대방의 friendRequests에 추가
+    await setDoc(doc(db, 'users', friendId, 'friendRequests', myUserId), {
+      requesterId: myUserId,
+      requesterName: myDisplayName,
+      requesterEmail: myUserData.email || '',
+      requesterWorkspaceCode: myWorkspaceCode,
+      requestedAt: timestamp,
+    });
+
+    // 9. deletedFriends에서 삭제 (재추가하는 경우)
+    try {
+      const { permanentlyDeleteFriend } = await import('./userManagementService');
+      await permanentlyDeleteFriend(myUserId, friendId);
+      console.log('🗑️ deletedFriends에서 제거 완료');
+    } catch (error) {
+      console.warn('deletedFriends 삭제 실패 (무시):', error);
+    }
+
+    console.log('✅ 친구 추가 완료:', friendDisplayName);
+
+    return {
+      success: true,
+      friend: {
+        id: friendId,
+        name: friendDisplayName,
+        workspaceCode: friendWorkspaceCode,
       }
     };
   } catch (error) {

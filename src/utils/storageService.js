@@ -19,6 +19,7 @@
 import { storage } from '../firebase/config';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { validateFileSize, validateImageSize } from './sizeLimit';
 
 // 환경변수로 스토리지 제공자 선택
 // Production에서는 무조건 R2 사용
@@ -33,6 +34,17 @@ const STORAGE_PROVIDER = 'r2';  // 임시로 하드코딩
  * @returns {Promise<string>} 업로드된 파일의 URL
  */
 export const uploadImage = async (file, folder = 'images', originalFileName = null) => {
+  // 이미지 크기 검증 (최대 10MB, 권장 5MB)
+  const validation = validateImageSize(file);
+  if (!validation.valid) {
+    throw new Error(validation.message);
+  }
+
+  // 권장 크기 초과 시 경고 로그
+  if (validation.warning) {
+    console.warn('⚠️ ' + validation.warning);
+  }
+
   if (STORAGE_PROVIDER === 'r2') {
     return await uploadToR2(file, folder, originalFileName);
   } else {
@@ -190,6 +202,17 @@ const deleteFromR2 = async (url) => {
 export const uploadProfileImage = async (file, userId) => {
   if (!userId) {
     throw new Error('userId is required for profile image upload');
+  }
+
+  // 프로필 이미지 크기 검증 (최대 10MB)
+  const validation = validateImageSize(file);
+  if (!validation.valid) {
+    throw new Error(validation.message);
+  }
+
+  // 권장 크기 초과 시 경고 로그
+  if (validation.warning) {
+    console.warn('⚠️ ' + validation.warning);
   }
 
   try {
