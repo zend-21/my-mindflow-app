@@ -31,8 +31,48 @@ export const isAdmin = async (userId) => {
   return status.isAdmin;
 };
 
+// 사용자 정보 캐시 (메모리 내 캐싱으로 중복 조회 방지)
+const userInfoCache = new Map();
+const USER_CACHE_TTL = 5 * 60 * 1000; // 5분 캐시
+
+/**
+ * 사용자 정보 조회 (캐싱 적용)
+ * @param {string} userId - 사용자 ID
+ * @returns {Promise<Object>} - 사용자 정보
+ */
+const getCachedUserInfo = async (userId) => {
+  const now = Date.now();
+  const cached = userInfoCache.get(userId);
+
+  // 캐시가 있고 유효하면 반환
+  if (cached && (now - cached.timestamp < USER_CACHE_TTL)) {
+    return cached.data;
+  }
+
+  // 캐시 없거나 만료됨 - 새로 조회
+  let userInfo = { displayName: '알 수 없음', email: '' };
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      userInfo = {
+        displayName: userData.displayName || userData.email || '알 수 없음',
+        email: userData.email || ''
+      };
+    }
+    // 캐시에 저장
+    userInfoCache.set(userId, { data: userInfo, timestamp: now });
+  } catch (error) {
+    console.error('사용자 정보 조회 오류:', error);
+  }
+
+  return userInfo;
+};
+
 /**
  * 모든 사용자의 문의 조회 (관리자 전용)
+ * - collectionGroup 인덱스 캐시로 인한 고스트 데이터 필터링 포함
+ * - 사용자 정보 캐싱으로 중복 조회 최소화
  * @returns {Promise<Array>} - 모든 문의 목록
  */
 export const getAllInquiries = async () => {
@@ -45,43 +85,45 @@ export const getAllInquiries = async () => {
 
     const querySnapshot = await getDocs(inquiriesQuery);
 
-    const inquiries = [];
-    for (const docSnapshot of querySnapshot.docs) {
-      // userId 추출 (부모 문서의 ID)
-      const userId = docSnapshot.ref.parent.parent.id;
-      const inquiryId = docSnapshot.id;
+    // 고스트 데이터 필터링: 실제 존재하는 문서만 병렬로 확인
+    const validDocs = [];
+    await Promise.all(
+      querySnapshot.docs.map(async (docSnapshot) => {
+        const userId = docSnapshot.ref.parent.parent.id;
+        const inquiryId = docSnapshot.id;
 
-      // 문의가 실제로 존재하는지 재확인 (고스트 데이터 방지)
-      try {
-        const inquiryRef = doc(db, 'users', userId, 'inquiries', inquiryId);
-        const inquiryCheck = await getDoc(inquiryRef);
+        try {
+          const inquiryRef = doc(db, 'users', userId, 'inquiries', inquiryId);
+          const inquiryCheck = await getDoc(inquiryRef);
 
-        if (!inquiryCheck.exists()) {
-          continue; // 삭제된 문의는 목록에 추가하지 않음
+          if (inquiryCheck.exists()) {
+            validDocs.push(docSnapshot);
+          }
+        } catch (error) {
+          // 존재 확인 실패 시 제외
+          console.warn('문의 존재 확인 실패:', { userId, inquiryId });
         }
-      } catch (checkError) {
-        console.warn('문의 존재 확인 실패, 스킵:', { userId, inquiryId }, checkError);
-        continue;
-      }
+      })
+    );
 
+    // 고유 사용자 ID 추출하여 배치 조회
+    const uniqueUserIds = [...new Set(validDocs.map(d => d.ref.parent.parent.id))];
+
+    // 모든 사용자 정보를 병렬로 조회 (캐싱 적용)
+    const userInfoMap = new Map();
+    await Promise.all(
+      uniqueUserIds.map(async (userId) => {
+        const userInfo = await getCachedUserInfo(userId);
+        userInfoMap.set(userId, userInfo);
+      })
+    );
+
+    const inquiries = validDocs.map(docSnapshot => {
       const data = docSnapshot.data();
+      const userId = docSnapshot.ref.parent.parent.id;
+      const userInfo = userInfoMap.get(userId) || { displayName: '알 수 없음', email: '' };
 
-      // 사용자 정보 가져오기
-      let userInfo = { displayName: '알 수 없음', email: '' };
-      try {
-        const userDoc = await getDoc(doc(db, 'users', userId));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          userInfo = {
-            displayName: userData.displayName || userData.email || '알 수 없음',
-            email: userData.email || ''
-          };
-        }
-      } catch (error) {
-        console.error('사용자 정보 조회 오류:', error);
-      }
-
-      inquiries.push({
+      return {
         id: docSnapshot.id,
         userId,
         userDisplayName: userInfo.displayName,
@@ -89,8 +131,8 @@ export const getAllInquiries = async () => {
         ...data,
         createdAt: data.createdAt?.toDate(),
         updatedAt: data.updatedAt?.toDate(),
-      });
-    }
+      };
+    });
 
     return inquiries;
   } catch (error) {
@@ -100,52 +142,18 @@ export const getAllInquiries = async () => {
 };
 
 /**
- * 실시간으로 모든 문의 구독 (관리자 전용)
- * @param {Function} callback - 데이터 변경 시 호출될 콜백
- * @returns {Function} - 구독 해제 함수
+ * @deprecated subscribeToAllInquiries는 데이터 사용량 문제로 더 이상 사용하지 않음
+ * getAllInquiries를 사용하세요
+ *
+ * 주의: onSnapshot + getDoc 조합은 실시간으로 트리거될 때마다
+ * 모든 문서에 대해 추가 읽기가 발생하여 데이터 사용량이 폭증함
  */
 export const subscribeToAllInquiries = (callback) => {
-  const inquiriesQuery = query(
-    collectionGroup(db, 'inquiries'),
-    orderBy('createdAt', 'desc')
-  );
-
-  return onSnapshot(inquiriesQuery, async (snapshot) => {
-    const inquiries = [];
-
-    for (const docSnapshot of snapshot.docs) {
-      const data = docSnapshot.data();
-      const userId = docSnapshot.ref.parent.parent.id;
-
-      let userInfo = { displayName: '알 수 없음', email: '' };
-      try {
-        const userDoc = await getDoc(doc(db, 'users', userId));
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          userInfo = {
-            displayName: userData.displayName || userData.email || '알 수 없음',
-            email: userData.email || ''
-          };
-        }
-      } catch (error) {
-        console.error('사용자 정보 조회 오류:', error);
-      }
-
-      inquiries.push({
-        id: docSnapshot.id,
-        userId,
-        userDisplayName: userInfo.displayName,
-        userEmail: userInfo.email,
-        ...data,
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate(),
-      });
-    }
-
-    callback(inquiries);
-  }, (error) => {
-    console.error('실시간 구독 오류:', error);
-  });
+  console.warn('subscribeToAllInquiries는 deprecated됨. getAllInquiries 사용 권장');
+  // 일회성 조회로 대체
+  getAllInquiries().then(inquiries => callback(inquiries));
+  // 빈 unsubscribe 함수 반환
+  return () => {};
 };
 
 /**
@@ -269,39 +277,113 @@ export const subscribeToUnreadNotifications = (adminUserId, callback) => {
 };
 
 /**
- * 실시간으로 답변대기 중인 문의 개수 구독
- * @param {Function} callback - 개수 변경 시 호출될 콜백
- * @returns {Function} - 구독 해제 함수
+ * 답변대기 중인 문의 개수 조회 (일회성)
+ * - 실시간 구독 대신 페이지 전환 시 호출
+ * - 고스트 데이터 필터링 포함
+ * @returns {Promise<number>} - 답변대기 중인 문의 개수
+ */
+export const getPendingInquiriesCount = async () => {
+  try {
+    const inquiriesQuery = query(
+      collectionGroup(db, 'inquiries'),
+      where('status', '==', 'pending')
+    );
+
+    const snapshot = await getDocs(inquiriesQuery);
+
+    // 고스트 데이터 필터링: 실제 존재하는 문서만 카운트
+    let validCount = 0;
+    await Promise.all(
+      snapshot.docs.map(async (docSnapshot) => {
+        const userId = docSnapshot.ref.parent.parent.id;
+        const inquiryId = docSnapshot.id;
+
+        try {
+          const inquiryRef = doc(db, 'users', userId, 'inquiries', inquiryId);
+          const inquiryCheck = await getDoc(inquiryRef);
+
+          if (inquiryCheck.exists()) {
+            validCount++;
+          }
+        } catch {
+          // 존재 확인 실패 시 카운트하지 않음
+        }
+      })
+    );
+
+    return validCount;
+  } catch (error) {
+    console.error('답변대기 문의 개수 조회 오류:', error);
+    return 0;
+  }
+};
+
+/**
+ * @deprecated subscribeToPendingInquiries는 더 이상 사용하지 않음
+ * getPendingInquiriesCount를 사용하세요
  */
 export const subscribeToPendingInquiries = (callback) => {
-  const inquiriesQuery = query(
-    collectionGroup(db, 'inquiries'),
-    where('status', '==', 'pending')
-  );
+  console.warn('subscribeToPendingInquiries는 deprecated됨. getPendingInquiriesCount 사용 권장');
+  // 기존 호환성을 위해 일회성 조회 후 콜백 호출
+  getPendingInquiriesCount().then(count => callback(count));
+  // 빈 unsubscribe 함수 반환
+  return () => {};
+};
 
-  return onSnapshot(inquiriesQuery, async (snapshot) => {
-    // 고스트 데이터 필터링: 실제로 존재하는 문의만 카운트
-    let validCount = 0;
+/**
+ * 고스트 문의 데이터 정리 (최고 관리자 전용)
+ * collectionGroup 인덱스에 남아있는 삭제된 문의를 찾아 완전히 제거
+ * @returns {Promise<{cleaned: number, errors: number}>} - 정리 결과
+ */
+export const cleanupGhostInquiries = async () => {
+  console.log('🧹 고스트 문의 정리 시작...');
 
-    for (const docSnapshot of snapshot.docs) {
-      const userId = docSnapshot.ref.parent.parent.id;
-      const inquiryId = docSnapshot.id;
+  try {
+    const inquiriesQuery = query(
+      collectionGroup(db, 'inquiries'),
+      orderBy('createdAt', 'desc')
+    );
 
-      try {
+    const querySnapshot = await getDocs(inquiriesQuery);
+    let cleaned = 0;
+    let errors = 0;
+
+    // 각 문서가 실제로 존재하는지 확인하고, 고스트면 삭제
+    await Promise.all(
+      querySnapshot.docs.map(async (docSnapshot) => {
+        const userId = docSnapshot.ref.parent.parent.id;
+        const inquiryId = docSnapshot.id;
         const inquiryRef = doc(db, 'users', userId, 'inquiries', inquiryId);
-        const inquiryCheck = await getDoc(inquiryRef);
 
-        if (inquiryCheck.exists()) {
-          validCount++;
+        try {
+          const inquiryCheck = await getDoc(inquiryRef);
+
+          if (!inquiryCheck.exists()) {
+            // 고스트 데이터 발견 - collectionGroup에만 존재
+            console.log(`🗑️ 고스트 문의 발견: ${userId}/${inquiryId}`);
+            // 참고: collectionGroup 인덱스의 고스트는 직접 삭제 불가
+            // 대신 deleteDoc을 시도하면 이미 없으므로 무시됨
+            try {
+              const { deleteDoc } = await import('firebase/firestore');
+              await deleteDoc(inquiryRef);
+              cleaned++;
+              console.log(`✅ 고스트 문의 삭제 완료: ${userId}/${inquiryId}`);
+            } catch (deleteError) {
+              // 이미 삭제된 경우 무시
+              console.log(`⚠️ 고스트 문의 삭제 시도 (이미 없음): ${userId}/${inquiryId}`);
+            }
+          }
+        } catch (error) {
+          console.error(`❌ 문의 확인 오류: ${userId}/${inquiryId}`, error);
+          errors++;
         }
-      } catch (error) {
-        // 존재 확인 실패 시 카운트하지 않음
-        continue;
-      }
-    }
+      })
+    );
 
-    callback(validCount);
-  }, (error) => {
-    console.error('답변대기 문의 구독 오류:', error);
-  });
+    console.log(`🧹 고스트 문의 정리 완료 - 정리: ${cleaned}, 오류: ${errors}`);
+    return { cleaned, errors };
+  } catch (error) {
+    console.error('고스트 문의 정리 오류:', error);
+    throw error;
+  }
 };

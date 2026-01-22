@@ -39,8 +39,6 @@ const NavItem = styled.div`
     font-weight: 600;
     transition: all 0.3s ease;
 
-    /* 기존 폰트 크기 설정을 제거하여 아이콘 크기가 부모에 영향을 받지 않도록 합니다. */
-
     svg {
         width: 24px;
         height: 24px;

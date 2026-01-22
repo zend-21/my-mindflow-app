@@ -1,6 +1,6 @@
 # 보안 개요
 
-**나의 비망록(MindFlow)**는 사용자의 개인정보와 데이터 보안을 최우선으로 생각합니다.
+**셰어노트(ShareNote)**는 사용자의 개인정보와 데이터 보안을 최우선으로 생각합니다.
 
 ## 데이터 보호
 
@@ -66,9 +66,9 @@
 ## 문의하기
 
 보안 관련 문의사항이 있으시면 언제든지 연락주세요:
-- GitHub Issues: [MindFlow 보안 이슈](https://github.com/your-repo/issues)
-- 이메일: security@mindflow.app (예시)
+- GitHub Issues: [ShareNote 보안 이슈](https://github.com/your-repo/issues)
+- 이메일: security@sharenote.app
 
 ---
 
-**최종 업데이트**: 2025년 12월 16일
+**최종 업데이트**: 2026년 2월 3일

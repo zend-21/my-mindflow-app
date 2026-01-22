@@ -1,6 +1,7 @@
 // src/components/Header.jsx
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import styled from 'styled-components';
 import { getDailyGreeting } from '../utils/greetingMessages';
 import { avatarList } from './avatars/AvatarIcons';
@@ -179,6 +180,7 @@ const BACKGROUND_COLORS = {
 
 // Header 컴포넌트
 const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLoginClick, onProfileClick }) => {
+    const location = useLocation();
     const [imageError, setImageError] = useState(false);
     const [greeting, setGreeting] = useState('');
     const [profileImageType, setProfileImageType] = useState('avatar');
@@ -360,57 +362,63 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
         return <AvatarComponent />;
     };
 
-    // 관리자 권한 및 답변대기 문의 수 확인
+    // 문의 수 체크 함수 (일회성 조회)
+    const checkInquiryStatus = useCallback(async (userId, adminStatus) => {
+        try {
+            if (adminStatus.isAdmin) {
+                // 관리자: 답변대기 문의 수 조회 (일회성)
+                const { getPendingInquiriesCount } = await import('../services/adminInquiryService');
+                const count = await getPendingInquiriesCount();
+                setUnreadInquiryCount(count);
+            } else {
+                // 일반 사용자: 읽지 않은 답변 여부 조회 (일회성)
+                const { getUserInquiries } = await import('../services/inquiryService');
+                const inquiries = await getUserInquiries(userId);
+                const hasUnread = inquiries.some(inquiry => inquiry.hasUnreadReplies);
+                setHasUnreadReplies(hasUnread);
+            }
+        } catch (error) {
+            console.error('문의 상태 확인 오류:', error);
+        }
+    }, []);
+
+    // 관리자 권한 확인 (최초 마운트 시)
     useEffect(() => {
         const userId = localStorage.getItem('firebaseUserId');
         if (!userId) return;
 
-        let unsubscribeAdmin;
-        let unsubscribeInquiries;
-        let unsubscribeUserInquiries;
-
         const checkAdmin = async () => {
             try {
                 const { checkAdminStatus } = await import('../services/adminManagementService');
-                const { subscribeToPendingInquiries } = await import('../services/adminInquiryService');
-                const { getUserInquiries } = await import('../services/inquiryService');
-                const { onSnapshot, collection } = await import('firebase/firestore');
-                const { db } = await import('../firebase/config');
-
                 const adminStatus = await checkAdminStatus(userId);
                 setIsAdmin(adminStatus.isAdmin);
-
-                if (adminStatus.isAdmin) {
-                    // 관리자: 답변대기 문의 수 구독
-                    unsubscribeInquiries = subscribeToPendingInquiries((count) => {
-                        setUnreadInquiryCount(count);
-                    });
-                } else {
-                    // 일반 사용자: 읽지 않은 답변 여부 구독
-                    const inquiriesRef = collection(db, 'users', userId, 'inquiries');
-                    unsubscribeUserInquiries = onSnapshot(inquiriesRef, async () => {
-                        try {
-                            const inquiries = await getUserInquiries(userId);
-                            const hasUnread = inquiries.some(inquiry => inquiry.hasUnreadReplies);
-                            setHasUnreadReplies(hasUnread);
-                        } catch (error) {
-                            console.error('문의 목록 조회 오류:', error);
-                        }
-                    });
-                }
+                // 최초 마운트 시 문의 상태 체크
+                await checkInquiryStatus(userId, adminStatus);
             } catch (error) {
                 console.error('관리자 권한 확인 오류:', error);
             }
         };
 
         checkAdmin();
+    }, [profile, checkInquiryStatus]);
 
-        return () => {
-            if (unsubscribeAdmin) unsubscribeAdmin();
-            if (unsubscribeInquiries) unsubscribeInquiries();
-            if (unsubscribeUserInquiries) unsubscribeUserInquiries();
+    // 라우트 변경 시 문의 상태 체크 (페이지 전환)
+    useEffect(() => {
+        const userId = localStorage.getItem('firebaseUserId');
+        if (!userId) return;
+
+        const checkOnRouteChange = async () => {
+            try {
+                const { checkAdminStatus } = await import('../services/adminManagementService');
+                const adminStatus = await checkAdminStatus(userId);
+                await checkInquiryStatus(userId, adminStatus);
+            } catch (error) {
+                console.error('라우트 변경 시 문의 상태 확인 오류:', error);
+            }
         };
-    }, [profile]);
+
+        checkOnRouteChange();
+    }, [location.pathname, checkInquiryStatus]);
 
     // 하루에 한 번 인사말 업데이트
     useEffect(() => {
@@ -419,11 +427,23 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
 
     // 앱이 포그라운드로 돌아올 때 인사말 업데이트
     useEffect(() => {
-        const handleVisibilityChange = () => {
+        const handleVisibilityChange = async () => {
             // 앱이 다시 보이게 되면 (백그라운드 → 포그라운드)
             if (!document.hidden) {
-                console.log('📱 앱이 포그라운드로 복귀 - 인사말 갱신');
+                console.log('📱 앱이 포그라운드로 복귀 - 인사말 갱신 및 문의 상태 체크');
                 setGreeting(getDailyGreeting());
+
+                // 포그라운드 복귀 시 문의 상태도 체크
+                const userId = localStorage.getItem('firebaseUserId');
+                if (userId) {
+                    try {
+                        const { checkAdminStatus } = await import('../services/adminManagementService');
+                        const adminStatus = await checkAdminStatus(userId);
+                        await checkInquiryStatus(userId, adminStatus);
+                    } catch (error) {
+                        console.error('포그라운드 복귀 시 문의 상태 확인 오류:', error);
+                    }
+                }
             }
         };
 
@@ -432,7 +452,7 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
         return () => {
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
-    }, []);
+    }, [checkInquiryStatus]);
 
     const handleImageError = () => {
         console.log('⚠️ 프로필 이미지 로드 실패 - Placeholder 표시');

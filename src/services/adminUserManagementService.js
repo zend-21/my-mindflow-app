@@ -111,10 +111,11 @@ export const getUserStats = async () => {
  */
 export const searchUserByShareNoteId = async (shareNoteId) => {
   try {
-    // ws- 접두사 자동 추가
-    const normalizedId = shareNoteId.toLowerCase().startsWith('ws-')
-      ? shareNoteId
-      : `ws-${shareNoteId}`;
+    // 입력값 정규화: ws- 제거 후 대문자로 변환, 다시 ws- 추가
+    const cleanId = shareNoteId.toUpperCase().replace(/^WS-/, '');
+    const normalizedId = `WS-${cleanId}`;
+
+    console.log('🔍 [AdminUser] ShareNote ID 검색:', { 입력값: shareNoteId, 정규화: normalizedId });
 
     // workspaces에서 userId 찾기
     const workspacesRef = collection(db, 'workspaces');
@@ -160,6 +161,18 @@ export const searchUserByShareNoteId = async (shareNoteId) => {
       console.warn('문의 건수 조회 실패:', error);
     }
 
+    // 프로필 설정 조회 (커스텀 아바타/이미지)
+    let profileSettings = null;
+    try {
+      const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
+      const settingsDoc = await getDoc(settingsRef);
+      if (settingsDoc.exists()) {
+        profileSettings = settingsDoc.data();
+      }
+    } catch (error) {
+      console.warn('프로필 설정 조회 실패:', error);
+    }
+
     return {
       userId,
       shareNoteId: normalizedId,
@@ -170,7 +183,12 @@ export const searchUserByShareNoteId = async (shareNoteId) => {
       createdAt: userData.createdAt,
       deletedAt: userData.deletedAt || null,
       inquiryCount,
-      isDeleted: !!userData.deletedAt
+      isDeleted: !!userData.deletedAt,
+      // 프로필 설정 추가
+      profileImageType: profileSettings?.profileImageType || 'google',
+      selectedAvatarId: profileSettings?.selectedAvatarId || null,
+      avatarBgColor: profileSettings?.avatarBgColor || 'none',
+      profileImageVersion: profileSettings?.profileImageVersion || null
     };
   } catch (error) {
     console.error('사용자 검색 실패:', error);

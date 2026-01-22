@@ -1,5 +1,5 @@
 // 👥 친구 탭 - 친구 관리 (카카오톡 스타일)
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { UserPlus, MessageCircle, UserMinus, /* Shield, */ ChevronRight, X, UserCheck, MoreHorizontal, Copy, Ban, EyeOff } from 'lucide-react'; // Shield는 MVP에서 본인인증 제외로 미사용
 import { getMyFriends, removeFriend, getFriendRequests, acceptFriendRequest, rejectFriendRequest } from '../../services/friendService';
 import { blockUser } from '../../services/userManagementService';
@@ -54,19 +54,24 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
   }, [friendRequests, onFriendRequestCountChange]);
 
   // 본인 + 친구들 + 친구 요청자들의 프로필 사진 실시간 구독
-  // 친구 목록은 실시간 업데이트가 중요하므로 onSnapshot 사용
-  useEffect(() => {
+  // 최적화: 사용자 ID를 문자열로 변환하여 불필요한 재구독 방지
+  const profileUserIds = useMemo(() => {
     const myUserId = localStorage.getItem('firebaseUserId');
     const friendIds = friends.map(f => f.friendId);
     const requesterIds = friendRequests.map(r => r.requesterId);
-
-    // 본인 ID + 친구 ID + 요청자 ID 모두 포함
     const allUserIds = myUserId ? [myUserId, ...friendIds, ...requesterIds] : [...friendIds, ...requesterIds];
+    // 중복 제거 및 정렬하여 안정적인 문자열 생성
+    return [...new Set(allUserIds)].sort().join(',');
+  }, [friends, friendRequests]);
+
+  useEffect(() => {
+    const allUserIds = profileUserIds ? profileUserIds.split(',').filter(Boolean) : [];
     if (allUserIds.length === 0) {
       return;
     }
 
     const unsubscribers = [];
+    let isMounted = true;
 
     // 각 유저의 프로필 설정 실시간 구독
     const setupListeners = async () => {
@@ -75,10 +80,12 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
       const { getProfileImageUrl } = await import('../../utils/storageService');
 
       for (const userId of allUserIds) {
+        if (!isMounted) break;
         try {
           const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
 
           const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
+            if (!isMounted) return;
             if (docSnap.exists()) {
               const settings = docSnap.data();
               const imageType = settings.profileImageType || 'avatar';
@@ -88,28 +95,28 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
 
               if (imageType === 'photo') {
                 const imageUrl = getProfileImageUrl(userId, version);
-                setUserProfilePictures(prev => ({
-                  ...prev,
-                  [userId]: imageUrl
-                }));
-                // 아바타 설정 제거
+                setUserProfilePictures(prev => {
+                  if (prev[userId] === imageUrl) return prev;
+                  return { ...prev, [userId]: imageUrl };
+                });
                 setUserAvatarSettings(prev => {
+                  if (!prev[userId]) return prev;
                   const newState = { ...prev };
                   delete newState[userId];
                   return newState;
                 });
               } else {
-                // 아바타 모드면 프로필 사진 제거, 아바타 설정 저장
                 setUserProfilePictures(prev => {
+                  if (!prev[userId]) return prev;
                   const newState = { ...prev };
                   delete newState[userId];
                   return newState;
                 });
                 if (selectedAvatarId) {
-                  setUserAvatarSettings(prev => ({
-                    ...prev,
-                    [userId]: { selectedAvatarId, avatarBgColor }
-                  }));
+                  setUserAvatarSettings(prev => {
+                    if (prev[userId]?.selectedAvatarId === selectedAvatarId && prev[userId]?.avatarBgColor === avatarBgColor) return prev;
+                    return { ...prev, [userId]: { selectedAvatarId, avatarBgColor } };
+                  });
                 }
               }
             }
@@ -125,13 +132,14 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
     setupListeners();
 
     return () => {
+      isMounted = false;
       unsubscribers.forEach(unsubscribe => {
         if (typeof unsubscribe === 'function') {
           unsubscribe();
         }
       });
     };
-  }, [friends, friendRequests]);
+  }, [profileUserIds]); // 안정적인 문자열로 의존성 최소화
 
   // 드롭다운 메뉴 외부 클릭 시 닫기
   useEffect(() => {
@@ -156,23 +164,42 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
   const loadMyProfile = async () => {
     try {
       const userId = localStorage.getItem('firebaseUserId');
+      if (!userId) {
+        console.warn('firebaseUserId가 없습니다');
+        return;
+      }
 
-      // ⚡ nicknames 컬렉션에서 앱 닉네임 로드, 없으면 구글 displayName 사용
-      let nickname = localStorage.getItem('userName'); // 구글 displayName fallback
+      // ⚡ nicknames 컬렉션에서 앱 닉네임 로드
+      let nickname = null;
 
       try {
         const { getUserNickname } = await import('../../services/nicknameService');
-        const appNickname = await getUserNickname(userId);
-
-        if (appNickname) {
-          nickname = appNickname;
-          // localStorage에 캐싱
-          localStorage.setItem('userNickname', appNickname);
-        }
+        nickname = await getUserNickname(userId);
+        console.log('📝 내 닉네임 로드:', nickname);
       } catch (error) {
         console.error('닉네임 로드 실패:', error);
-        // 실패 시 localStorage fallback
+      }
+
+      // 닉네임이 없으면 Firestore settings에서 displayName 가져오기
+      if (!nickname) {
+        try {
+          const { doc, getDoc } = await import('firebase/firestore');
+          const { db } = await import('../../firebase/config');
+          const settingsRef = doc(db, 'mindflowUsers', userId, 'userData', 'settings');
+          const settingsSnap = await getDoc(settingsRef);
+          if (settingsSnap.exists()) {
+            nickname = settingsSnap.data().displayName || null;
+            console.log('📝 settings에서 displayName 로드:', nickname);
+          }
+        } catch (error) {
+          console.error('settings에서 displayName 로드 실패:', error);
+        }
+      }
+
+      // 여전히 없으면 localStorage fallback
+      if (!nickname) {
         nickname = localStorage.getItem('userNickname') || localStorage.getItem('userName');
+        console.log('📝 localStorage fallback:', nickname);
       }
 
       // 본인인증 상태 확인 - MVP에서 제외
@@ -183,6 +210,35 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
         nickname,
         userId
       });
+
+      // 본인 프로필 사진도 즉시 로드 (프로필 구독이 아직 설정되지 않았을 수 있음)
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const { db } = await import('../../firebase/config');
+        const { getProfileImageUrl } = await import('../../utils/storageService');
+
+        const profileRef = doc(db, 'users', userId, 'settings', 'profile');
+        const profileSnap = await getDoc(profileRef);
+
+        if (profileSnap.exists()) {
+          const settings = profileSnap.data();
+          const imageType = settings.profileImageType || 'avatar';
+          const version = settings.profileImageVersion || null;
+          const selectedAvatarId = settings.selectedAvatarId || null;
+          const avatarBgColor = settings.avatarBgColor || 'none';
+
+          console.log('📸 내 프로필 설정 로드:', { imageType, selectedAvatarId });
+
+          if (imageType === 'photo') {
+            const imageUrl = getProfileImageUrl(userId, version);
+            setUserProfilePictures(prev => ({ ...prev, [userId]: imageUrl }));
+          } else if (selectedAvatarId) {
+            setUserAvatarSettings(prev => ({ ...prev, [userId]: { selectedAvatarId, avatarBgColor } }));
+          }
+        }
+      } catch (error) {
+        console.error('내 프로필 사진 로드 실패:', error);
+      }
     } catch (error) {
       console.error('프로필 로드 오류:', error);
     }
@@ -357,7 +413,19 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
       }
 
       // hidden이 true인 요청은 제외 (숨긴 요청)
-      const visibleRequests = requestsWithLatestNicknames.filter(request => request.hidden !== true);
+      // 이미 친구인 사람도 제외 (중복 방지)
+      const { collection, getDocs } = await import('firebase/firestore');
+      const myFriendsRef = collection(db, 'users', userId, 'friends');
+      const myFriendsSnapshot = await getDocs(myFriendsRef);
+      const myFriendIds = new Set(myFriendsSnapshot.docs.map(d => d.id));
+
+      const visibleRequests = requestsWithLatestNicknames.filter(request => {
+        // hidden이면 제외
+        if (request.hidden === true) return false;
+        // 이미 친구로 등록된 사람이면 제외
+        if (myFriendIds.has(request.requesterId)) return false;
+        return true;
+      });
 
       setFriendRequests(visibleRequests);
     } catch (error) {

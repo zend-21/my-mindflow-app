@@ -202,8 +202,8 @@ const CloseButton = styled.button`
 `;
 
 const MenuItem = styled.div`
-    padding: 18px 24px;
-    font-size: 17px;
+    padding: 14px 24px;
+    font-size: 16px;
     color: #d0d0d0;
     cursor: pointer;
     display: flex;
@@ -340,8 +340,8 @@ const FileInput = styled.input`
 
 const MenuGroup = styled.div`
     position: relative;
-    margin-bottom: 8px;
-    padding-bottom: 8px;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
 
     &::after {
         content: '';
@@ -619,7 +619,6 @@ const SideMenu = ({
     onLogout,
     onLoginClick,
     onOpenMacro,
-    onOpenTimer,
     onOpenTrash,
     showToast
 }) => {
@@ -647,7 +646,28 @@ const SideMenu = ({
         setImageError(true);
     };
 
-    // 관리자 상태 확인
+    // 문의 상태 확인 함수 (일회성 조회)
+    const checkInquiryStatus = React.useCallback(async (userId, adminStatus) => {
+        try {
+            if (adminStatus.isAdmin) {
+                // 관리자: 답변대기 문의 수 조회 (일회성)
+                const { getPendingInquiriesCount } = await import('../services/adminInquiryService');
+                const count = await getPendingInquiriesCount();
+                console.log('📬 [문의 상태] 답변대기 문의 개수:', count);
+                setUnreadInquiryCount(count);
+            } else {
+                // 일반 사용자: 읽지 않은 답변 여부 조회 (일회성)
+                const { getUserInquiries } = await import('../services/inquiryService');
+                const inquiries = await getUserInquiries(userId);
+                const hasUnread = inquiries.some(inquiry => inquiry.hasUnreadReplies);
+                setHasUnreadReplies(hasUnread);
+            }
+        } catch (error) {
+            console.error('문의 상태 확인 오류:', error);
+        }
+    }, []);
+
+    // 관리자 상태 확인 (최초 마운트 시)
     React.useEffect(() => {
         console.log('🔍 [관리자 상태 확인] useEffect 실행됨, userId:', userId);
 
@@ -656,17 +676,10 @@ const SideMenu = ({
             return;
         }
 
-        let unsubscribeInquiries;
-        let unsubscribeUserInquiries;
-
         const checkAdmin = async () => {
             try {
                 console.log('📡 [관리자 상태 확인] checkAdminStatus 호출 시작...');
                 const { checkAdminStatus } = await import('../services/adminManagementService');
-                const { subscribeToPendingInquiries } = await import('../services/adminInquiryService');
-                const { getUserInquiries } = await import('../services/inquiryService');
-                const { onSnapshot, collection } = await import('firebase/firestore');
-                const { db } = await import('../firebase/config');
 
                 const status = await checkAdminStatus(userId);
                 console.log('✅ [관리자 상태 확인] checkAdminStatus 결과:', status);
@@ -677,38 +690,32 @@ const SideMenu = ({
 
                 console.log('📝 [관리자 상태 확인] 상태 업데이트 완료 - isAdmin:', status.isAdmin, 'isSuperAdmin:', status.isSuperAdmin, 'permissions:', status.permissions);
 
-                // 관리자면 답변대기 문의 구독 (최고 관리자 또는 부관리자 모두)
-                if (status.isAdmin) {
-                    console.log('🔔 [관리자 상태 확인] 답변대기 문의 구독 시작...');
-                    unsubscribeInquiries = subscribeToPendingInquiries((count) => {
-                        console.log('📬 [문의 업데이트] 답변대기 문의 개수:', count);
-                        setUnreadInquiryCount(count);
-                    });
-                } else {
-                    // 일반 사용자: 읽지 않은 답변 여부 구독
-                    const inquiriesRef = collection(db, 'users', userId, 'inquiries');
-                    unsubscribeUserInquiries = onSnapshot(inquiriesRef, async () => {
-                        try {
-                            const inquiries = await getUserInquiries(userId);
-                            const hasUnread = inquiries.some(inquiry => inquiry.hasUnreadReplies);
-                            setHasUnreadReplies(hasUnread);
-                        } catch (error) {
-                            console.error('문의 목록 조회 오류:', error);
-                        }
-                    });
-                }
+                // 최초 마운트 시 문의 상태 체크
+                await checkInquiryStatus(userId, status);
             } catch (error) {
                 console.error('❌ [관리자 상태 확인] 오류 발생:', error);
             }
         };
 
         checkAdmin();
+    }, [userId, checkInquiryStatus]);
 
-        return () => {
-            if (unsubscribeInquiries) unsubscribeInquiries();
-            if (unsubscribeUserInquiries) unsubscribeUserInquiries();
+    // 사이드메뉴가 열릴 때마다 문의 상태 체크
+    React.useEffect(() => {
+        if (!isOpen || !userId) return;
+
+        const checkOnOpen = async () => {
+            try {
+                const { checkAdminStatus } = await import('../services/adminManagementService');
+                const adminStatus = await checkAdminStatus(userId);
+                await checkInquiryStatus(userId, adminStatus);
+            } catch (error) {
+                console.error('사이드메뉴 열기 시 문의 상태 확인 오류:', error);
+            }
         };
-    }, [userId]);
+
+        checkOnOpen();
+    }, [isOpen, userId, checkInquiryStatus]);
 
     // Firestore 실시간 리스너: 프로필 설정 변경 감지
     React.useEffect(() => {
@@ -1056,12 +1063,6 @@ const SideMenu = ({
                                     if (onOpenMacro) onOpenMacro();
                                 }}>
                                     <span className="icon">⚙️</span> 매크로
-                                </MenuItem>
-                                <MenuItem onClick={() => {
-                                    onClose();
-                                    if (onOpenTimer) onOpenTimer();
-                                }}>
-                                    <span className="icon">⏱️</span> 타이머
                                 </MenuItem>
                             </MenuGroup>
 

@@ -1048,3 +1048,45 @@ export const SecurityLinkButton = styled.button`
         border-color: rgba(255, 255, 255, 0.15);
     }
 `;
+
+export const AgreementStatusBox = styled.div`
+    margin-top: 12px;
+    padding: 14px 16px;
+    background: rgba(46, 213, 115, 0.08);
+    border: 1px solid rgba(46, 213, 115, 0.25);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+`;
+
+export const AgreementCheckIcon = styled.div`
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(46, 213, 115, 0.2);
+    color: #2ed573;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+`;
+
+export const AgreementText = styled.div`
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.4;
+
+    strong {
+        color: #2ed573;
+        font-weight: 600;
+    }
+`;
+
+export const AgreementDate = styled.div`
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 2px;
+`;

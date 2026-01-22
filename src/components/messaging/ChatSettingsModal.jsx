@@ -1,7 +1,7 @@
 // 채팅 설정 모달
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { X, Volume2, VolumeX, Bell, ChevronDown, ChevronUp, Vibrate, Palette } from 'lucide-react';
+import { X, Volume2, VolumeX, Bell, ChevronDown, ChevronUp, Vibrate, Palette, Type } from 'lucide-react';
 import {
   notificationSettings,
   toggleNotification,
@@ -770,15 +770,17 @@ const ChatSettingsModal = ({ onClose }) => {
   const [soundEnabled, setSoundEnabled] = useState(notificationSettings.soundEnabled);
   const [vibrationEnabled, setVibrationEnabled] = useState(notificationSettings.vibrationEnabled);
   const [volume, setVolume] = useState(notificationSettings.volume * 100);
-  const [isSoundSectionOpen, setIsSoundSectionOpen] = useState(() => {
-    const saved = localStorage.getItem('chatSettings_soundSectionOpen');
-    return saved !== null ? saved === 'true' : false;
-  });
+  // 모달이 열릴 때 항상 접힌 상태로 시작
+  const [isSoundSectionOpen, setIsSoundSectionOpen] = useState(false);
 
-  // 대화방 설정 상태
-  const [isRoomSectionOpen, setIsRoomSectionOpen] = useState(() => {
-    const saved = localStorage.getItem('chatSettings_roomSectionOpen');
-    return saved !== null ? saved === 'true' : false;
+  // 대화방 설정 상태 - 항상 접힌 상태로 시작
+  const [isRoomSectionOpen, setIsRoomSectionOpen] = useState(false);
+
+  // 매크로 버튼 설정 상태 - 항상 접힌 상태로 시작
+  const [isMacroSectionOpen, setIsMacroSectionOpen] = useState(false);
+  const [showMacroButton, setShowMacroButton] = useState(() => {
+    const saved = localStorage.getItem('chatRoom_showMacroButton');
+    return saved !== 'false'; // 기본값: true (ON)
   });
 
   // 대화방 색상 설정
@@ -865,15 +867,23 @@ const ChatSettingsModal = ({ onClose }) => {
   }, []);
 
   const toggleSoundSection = () => {
-    const newState = !isSoundSectionOpen;
-    setIsSoundSectionOpen(newState);
-    localStorage.setItem('chatSettings_soundSectionOpen', newState.toString());
+    setIsSoundSectionOpen(!isSoundSectionOpen);
   };
 
   const toggleRoomSection = () => {
-    const newState = !isRoomSectionOpen;
-    setIsRoomSectionOpen(newState);
-    localStorage.setItem('chatSettings_roomSectionOpen', newState.toString());
+    setIsRoomSectionOpen(!isRoomSectionOpen);
+  };
+
+  const toggleMacroSection = () => {
+    setIsMacroSectionOpen(!isMacroSectionOpen);
+  };
+
+  const handleToggleMacroButton = () => {
+    const newValue = !showMacroButton;
+    setShowMacroButton(newValue);
+    localStorage.setItem('chatRoom_showMacroButton', newValue.toString());
+    // ChatRoom에서 즉시 반영되도록 커스텀 이벤트 발생
+    window.dispatchEvent(new Event('chatRoomMacroButtonChange'));
   };
 
   const handleRoomBgColorChange = (color) => {
@@ -1236,6 +1246,32 @@ const ChatSettingsModal = ({ onClose }) => {
                     </ThumbnailFooter>
                   </ChatRoomThumbnail>
                 </div>
+              </SettingItem>
+            </SectionContent>
+          </Section>
+
+          {/* 매크로 버튼 설정 */}
+          <Section>
+            <SectionTitle onClick={toggleMacroSection}>
+              <SectionTitleLeft>
+                <Type size={18} />
+                매크로 버튼 설정
+              </SectionTitleLeft>
+              {isMacroSectionOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </SectionTitle>
+
+            <SectionContent $isOpen={isMacroSectionOpen}>
+              <SettingItem>
+                <SettingHeader>
+                  <SettingLabel>macro 버튼 표시</SettingLabel>
+                  <ToggleSwitch
+                    $active={showMacroButton}
+                    onClick={handleToggleMacroButton}
+                  />
+                </SettingHeader>
+                <SettingDescription>
+                  대화방 입력창에 매크로 버튼을 표시합니다.
+                </SettingDescription>
               </SettingItem>
             </SectionContent>
           </Section>

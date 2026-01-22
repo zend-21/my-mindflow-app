@@ -4,9 +4,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 import { Html5Qrcode } from 'html5-qrcode';
-import { Image } from 'lucide-react';
+import { Search } from 'lucide-react';
 import Portal from '../Portal';
-import { addFriendInstantly } from '../../services/friendService';
+import { Capacitor } from '@capacitor/core';
+import { Camera } from '@capacitor/camera';
 
 const ModalOverlay = styled.div`
     position: fixed;
@@ -114,98 +115,190 @@ const InfoText = styled.div`
     margin-bottom: 16px;
 `;
 
-const GalleryButton = styled.button`
+const SearchSection = styled.div`
+    margin-top: 16px;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+`;
+
+const SearchLabel = styled.div`
+    font-size: 13px;
+    color: #81c784;
+    margin-bottom: 8px;
+    text-align: left;
+`;
+
+const SearchInputWrapper = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+`;
+
+const SearchInput = styled.input`
+    flex: 1;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #e0e0e0;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    text-align: center;
+
+    &::placeholder {
+        color: #666;
+        text-transform: none;
+        letter-spacing: normal;
+        font-weight: 400;
+    }
+
+    &:focus {
+        outline: none;
+        border-color: #4a90e2;
+    }
+`;
+
+const SearchButton = styled.button`
     width: 100%;
+    background: rgba(74, 144, 226, 0.2);
+    border: 1px solid rgba(74, 144, 226, 0.4);
+    color: #4a90e2;
+    padding: 14px 20px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    padding: 14px 20px;
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 12px;
-    color: #e0e0e0;
-    font-size: 15px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s;
 
-    &:hover {
-        background: rgba(255, 255, 255, 0.12);
-        border-color: rgba(255, 255, 255, 0.25);
+    &:hover:not(:disabled) {
+        background: rgba(74, 144, 226, 0.3);
     }
 
     &:active {
         transform: scale(0.98);
     }
-
-    &:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
 `;
 
-const HiddenInput = styled.input`
-    display: none;
-`;
-
-function QRScannerModal({ userId, onClose, onFriendAdded, onCodeScanned }) {
+function QRScannerModal({ onClose, onCodeScanned }) {
     const scannerRef = useRef(null);
-    const fileInputRef = useRef(null);
     const html5QrCodeRef = useRef(null);
     const [scanning, setScanning] = useState(false);
     const [message, setMessage] = useState(null);
-    const [processingImage, setProcessingImage] = useState(false);
+    const [scannedCode, setScannedCode] = useState(''); // 스캔된 6자리 코드
 
-    // QR 코드 인식 후 처리 함수
-    const handleQRCodeResult = async (decodedText) => {
+    // 콜백을 ref로 저장하여 useEffect 재실행 방지
+    const onCloseRef = useRef(onClose);
+    const onCodeScannedRef = useRef(onCodeScanned);
+
+    // ref 동기화
+    useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+    useEffect(() => { onCodeScannedRef.current = onCodeScanned; }, [onCodeScanned]);
+
+    // QR 코드에서 6자리 코드만 추출 (ws- 또는 WS- 접두사 제거)
+    const extractCode = (rawText) => {
+        // 대소문자 무관하게 ws- 또는 WS- 접두사 제거
+        const cleaned = rawText.replace(/^[wW][sS]-/i, '');
+        // 6자리만 추출 (공백, 하이픈 등 제거)
+        return cleaned.replace(/[-\s]/g, '').substring(0, 6).toUpperCase();
+    };
+
+    // QR 코드 인식 후 처리 함수 - 6자리 코드만 추출해서 검색창에 표시
+    const handleQRCodeResult = (decodedText) => {
         console.log('✅ QR 스캔 성공:', decodedText);
 
-        // WS 코드 형식 검증 (예: WS-A3B7-9X)
-        if (!decodedText.startsWith('WS-')) {
+        // WS 코드 형식 검증 (예: WS-A3B7-9X 또는 ws-a3b79x)
+        if (!decodedText.toUpperCase().startsWith('WS-')) {
             setMessage({ type: 'error', text: '올바른 WS 코드가 아닙니다' });
             return false;
         }
 
-        // onCodeScanned 콜백이 있으면 코드만 전달하고 종료 (친구 찾기 모드)
-        if (onCodeScanned) {
-            onCodeScanned(decodedText);
-            onClose();
-            return true;
+        // 6자리 코드 추출
+        const extractedCode = extractCode(decodedText);
+        console.log('📝 추출된 코드:', extractedCode);
+
+        // 검색창에 코드 표시
+        setScannedCode(extractedCode);
+        setMessage({ type: 'success', text: 'QR 코드에서 ID를 추출했습니다!' });
+        return true;
+    };
+
+    // 검색 버튼 클릭 - 부모 컴포넌트로 코드 전달
+    const handleSearch = () => {
+        if (!scannedCode) {
+            setMessage({ type: 'error', text: 'QR 코드를 먼저 스캔해주세요' });
+            return;
         }
 
-        // 친구 추가 시도 (즉시 추가 모드)
-        setMessage({ type: 'info', text: '친구 추가 중...' });
-
-        const result = await addFriendInstantly(userId, decodedText);
-
-        if (result.success) {
-            setMessage({
-                type: 'success',
-                text: `${result.friend.name}님이 친구로 추가되었습니다!`
-            });
-
-            // 1.5초 후 모달 닫기
-            setTimeout(() => {
-                if (onFriendAdded) {
-                    onFriendAdded(result.friend);
-                }
-                onClose();
-            }, 1500);
-            return true;
-        } else {
-            setMessage({
-                type: 'error',
-                text: result.error || '친구 추가에 실패했습니다'
-            });
-            return false;
+        if (onCodeScannedRef.current) {
+            onCodeScannedRef.current(scannedCode);
         }
+        onCloseRef.current();
     };
 
     useEffect(() => {
+        console.log('🔄 QRScannerModal useEffect 시작');
+
         let html5QrCode = null;
+        let isMounted = true;
+        let scannerStarted = false;
+
+        const requestCameraPermission = async () => {
+            // Capacitor 네이티브 앱인 경우 권한 요청
+            if (Capacitor.isNativePlatform()) {
+                try {
+                    console.log('📷 카메라 권한 요청 시작...');
+                    const permission = await Camera.requestPermissions({ permissions: ['camera'] });
+                    console.log('📷 카메라 권한 상태:', permission.camera);
+                    if (permission.camera !== 'granted') {
+                        setMessage({
+                            type: 'error',
+                            text: '카메라 권한을 허용해주세요'
+                        });
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('카메라 권한 요청 실패:', error);
+                }
+            } else {
+                console.log('🌐 웹 환경 - 브라우저 권한 사용');
+            }
+            return true;
+        };
 
         const startScanner = async () => {
+            console.log('🚀 startScanner 호출 - isMounted:', isMounted);
+
+            // 컴포넌트가 언마운트되었으면 시작하지 않음
+            if (!isMounted) {
+                console.log('❌ 컴포넌트 언마운트됨 - 스캐너 시작 취소');
+                return;
+            }
+
+            // DOM 요소가 준비될 때까지 대기
+            const qrReaderElement = document.getElementById('qr-reader');
+            if (!qrReaderElement) {
+                console.log('⏳ qr-reader 요소 대기 중...');
+                setTimeout(startScanner, 100);
+                return;
+            }
+            console.log('✅ qr-reader DOM 요소 발견');
+
+            // 먼저 카메라 권한 요청
+            const hasPermission = await requestCameraPermission();
+            console.log('📷 권한 결과:', hasPermission, 'isMounted:', isMounted);
+            if (!hasPermission || !isMounted) {
+                console.log('❌ 권한 없음 또는 언마운트됨 - 스캐너 시작 취소');
+                return;
+            }
+
             try {
                 html5QrCode = new Html5Qrcode("qr-reader");
                 html5QrCodeRef.current = html5QrCode;
@@ -220,18 +313,28 @@ function QRScannerModal({ userId, onClose, onFriendAdded, onCodeScanned }) {
                     { facingMode: "environment" },
                     config,
                     async (decodedText) => {
+                        if (!isMounted) return;
+
                         // 스캔 중지
                         setScanning(false);
-                        await html5QrCode.stop();
+                        scannerStarted = false;
+
+                        try {
+                            await html5QrCode.stop();
+                        } catch (stopErr) {
+                            console.log('스캐너 중지 중 오류 (무시):', stopErr);
+                        }
                         html5QrCodeRef.current = null;
 
-                        const success = await handleQRCodeResult(decodedText);
+                        const success = handleQRCodeResult(decodedText);
 
                         // 실패 시 3초 후 다시 스캔 시작
-                        if (!success) {
+                        if (!success && isMounted) {
                             setTimeout(() => {
-                                setMessage(null);
-                                startScanner();
+                                if (isMounted) {
+                                    setMessage(null);
+                                    startScanner();
+                                }
                             }, 3000);
                         }
                     },
@@ -240,73 +343,54 @@ function QRScannerModal({ userId, onClose, onFriendAdded, onCodeScanned }) {
                     }
                 );
 
-                setScanning(true);
-                console.log('📸 QR 스캐너 시작');
+                scannerStarted = true;
+                if (isMounted) {
+                    setScanning(true);
+                    console.log('📸 QR 스캐너 시작');
+                }
             } catch (error) {
                 console.error('❌ QR 스캐너 시작 실패:', error);
-                setMessage({
-                    type: 'error',
-                    text: '카메라 접근 권한이 필요합니다'
-                });
+                scannerStarted = false;
+                html5QrCodeRef.current = null;
+
+                if (isMounted) {
+                    // 권한 거부 에러인 경우
+                    if (error.name === 'NotAllowedError' || error.message?.includes('Permission denied')) {
+                        setMessage({
+                            type: 'error',
+                            text: '카메라 접근 권한이 필요합니다. 브라우저 설정에서 카메라 권한을 허용해주세요.'
+                        });
+                    } else {
+                        setMessage({
+                            type: 'error',
+                            text: '카메라를 시작할 수 없습니다'
+                        });
+                    }
+                }
             }
         };
 
-        startScanner();
+        // 약간의 딜레이 후 스캐너 시작 (DOM 렌더링 대기)
+        const timeoutId = setTimeout(startScanner, 100);
 
         // 컴포넌트 언마운트 시 스캐너 정지
         return () => {
-            if (html5QrCodeRef.current) {
+            console.log('🛑 QRScannerModal cleanup 호출 - scannerStarted:', scannerStarted);
+            isMounted = false;
+            clearTimeout(timeoutId);
+
+            if (html5QrCodeRef.current && scannerStarted) {
+                console.log('🛑 스캐너 중지 시도...');
                 html5QrCodeRef.current.stop().catch(err => {
-                    console.error('QR 스캐너 정지 오류:', err);
+                    // 이미 정지된 경우 무시
+                    if (!err.message?.includes('not running')) {
+                        console.log('QR 스캐너 정지 중:', err.message);
+                    }
                 });
-                html5QrCodeRef.current = null;
             }
+            html5QrCodeRef.current = null;
         };
-    }, [userId, onFriendAdded, onClose, onCodeScanned]);
-
-    // 갤러리에서 이미지 선택
-    const handleGalleryClick = () => {
-        fileInputRef.current?.click();
-    };
-
-    // 갤러리 이미지에서 QR 스캔
-    const handleFileSelect = async (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setProcessingImage(true);
-        setMessage({ type: 'info', text: '이미지에서 QR 코드를 찾는 중...' });
-
-        try {
-            // 카메라 스캐너 일시 중지
-            if (html5QrCodeRef.current && scanning) {
-                await html5QrCodeRef.current.stop();
-                setScanning(false);
-            }
-
-            // 이미지에서 QR 스캔
-            const html5QrCode = new Html5Qrcode("qr-reader-file");
-            const decodedText = await html5QrCode.scanFile(file, true);
-
-            await handleQRCodeResult(decodedText);
-        } catch (error) {
-            console.error('이미지 QR 스캔 실패:', error);
-            setMessage({
-                type: 'error',
-                text: '이미지에서 QR 코드를 찾을 수 없습니다'
-            });
-
-            // 3초 후 카메라 스캔 재시작
-            setTimeout(() => {
-                setMessage(null);
-                window.location.reload(); // 스캐너 재초기화를 위해 새로고침
-            }, 3000);
-        } finally {
-            setProcessingImage(false);
-            // input 초기화
-            e.target.value = '';
-        }
-    };
+    }, []); // 빈 배열 - 마운트/언마운트 시에만 실행
 
     const handleClose = () => {
         onClose();
@@ -334,27 +418,27 @@ function QRScannerModal({ userId, onClose, onFriendAdded, onCodeScanned }) {
                     </ScannerContainer>
 
                     <InfoText>
-                        {processingImage ? '이미지 처리 중...' :
-                         scanning ? '카메라를 QR 코드에 맞춰주세요' : '준비 중...'}
+                        {scanning ? '카메라를 QR 코드에 맞춰주세요' : '준비 중...'}
                     </InfoText>
 
-                    <GalleryButton
-                        onClick={handleGalleryClick}
-                        disabled={processingImage}
-                    >
-                        <Image size={20} />
-                        갤러리에서 QR 이미지 선택
-                    </GalleryButton>
-
-                    <HiddenInput
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileSelect}
-                    />
-
-                    {/* 파일 스캔용 숨김 div */}
-                    <div id="qr-reader-file" style={{ display: 'none' }}></div>
+                    {/* 스캔된 코드가 있으면 검색창 표시 */}
+                    {scannedCode && (
+                        <SearchSection>
+                            <SearchLabel>✅ 추출된 ID</SearchLabel>
+                            <SearchInputWrapper>
+                                <SearchInput
+                                    type="text"
+                                    value={scannedCode}
+                                    readOnly
+                                    placeholder="스캔된 ID"
+                                />
+                                <SearchButton onClick={handleSearch}>
+                                    <Search size={18} />
+                                    검색
+                                </SearchButton>
+                            </SearchInputWrapper>
+                        </SearchSection>
+                    )}
                 </ModalContent>
             </ModalOverlay>
         </Portal>

@@ -5,13 +5,18 @@ import android.util.Log;
 import com.getcapacitor.BridgeActivity;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.graphics.Color;
 import android.media.AudioAttributes;
 import android.net.Uri;
 import android.os.Build;
+import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 public class MainActivity extends BridgeActivity {
 
@@ -36,9 +41,54 @@ public class MainActivity extends BridgeActivity {
         handleEdgeToEdge();
         Log.d("MainActivity", "✅ handleEdgeToEdge() 호출 완료");
 
+        // 상태바/네비게이션바 색상 강제 적용
+        setupSystemBars();
+        Log.d("MainActivity", "✅ setupSystemBars() 호출 완료");
+
         // WebView 폰트 크기 고정 (시스템 폰트 크기 설정 무시)
         bridge.getWebView().getSettings().setTextZoom(100);
         Log.d("MainActivity", "✅ WebView 텍스트 줌 100%로 고정");
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // 앱이 포그라운드로 올 때마다 시스템바 색상 재적용 (플러그인 덮어쓰기 방지)
+        setupSystemBars();
+        Log.d("MainActivity", "✅ onResume - setupSystemBars() 재적용");
+    }
+
+    /**
+     * 상태바/네비게이션바 색상 강제 적용
+     * ============================================================
+     * - 상태바 배경색: #2a2d34 (헤더 상단과 동일)
+     * - 네비게이션바 배경색: #202126 (푸터와 동일)
+     * - 아이콘/텍스트: #ffffff (흰색)
+     * - 네비게이션 버튼: #ffffff (흰색)
+     *
+     * ⚠️ 사용자의 지시를 받기 전 변경 불가
+     * ============================================================
+     */
+    private void setupSystemBars() {
+        Window window = getWindow();
+
+        // 상태바 색상 설정: #2a2d34
+        window.setStatusBarColor(Color.parseColor("#2a2d34"));
+
+        // 네비게이션바 색상 설정: #202126
+        window.setNavigationBarColor(Color.parseColor("#202126"));
+
+        // WindowInsetsControllerCompat을 사용하여 아이콘 색상 제어
+        WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(window, window.getDecorView());
+        if (insetsController != null) {
+            // 상태바 아이콘을 밝은 색(흰색)으로 설정 (어두운 배경용)
+            insetsController.setAppearanceLightStatusBars(false);
+            // 네비게이션바 버튼을 밝은 색(흰색)으로 설정 (어두운 배경용)
+            insetsController.setAppearanceLightNavigationBars(false);
+            Log.d("MainActivity", "🎨 시스템바 아이콘 흰색으로 설정 완료");
+        }
+
+        Log.d("MainActivity", "🎨 상태바: #2a2d34, 네비게이션바: #202126");
     }
 
     /**

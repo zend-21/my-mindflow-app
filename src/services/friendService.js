@@ -169,16 +169,30 @@ export const addFriendInstantly = async (myUserId, targetWorkspaceCode) => {
     });
     console.log('✅ 내 친구 목록에 추가 완료');
 
-    // 6. 상대방의 friendRequests에 내가 추가했다는 알림 (상대방은 아직 친구 아님)
-    console.log('✍️ 상대방 friendRequests에 추가 시도:', { targetUserId: targetUser.id, myUserId });
-    await setDoc(doc(db, 'users', targetUser.id, 'friendRequests', myUserId), {
-      requesterId: myUserId,
-      requesterName: myDisplayName,
-      requesterEmail: myUserData.email || '',
-      requesterWorkspaceCode: myWorkspaceCode,
-      requestedAt: timestamp,
-    });
-    console.log('✅ 상대방 friendRequests에 추가 완료');
+    // 6. 상대방이 이미 나를 친구로 등록했는지 확인
+    const targetHasMeAsFriend = await isFriend(targetUser.id, myUserId);
+
+    if (targetHasMeAsFriend) {
+      // 상대방이 이미 나를 친구로 등록했다면 내 friendRequests에서 상대방 삭제
+      console.log('🔄 상대방이 이미 나를 친구로 등록함 - 내 friendRequests에서 삭제');
+      try {
+        await deleteDoc(doc(db, 'users', myUserId, 'friendRequests', targetUser.id));
+        console.log('✅ 내 friendRequests에서 삭제 완료');
+      } catch (err) {
+        console.warn('friendRequests 삭제 실패 (무시):', err);
+      }
+    } else {
+      // 상대방이 아직 나를 친구로 등록하지 않았다면 friendRequests에 추가
+      console.log('✍️ 상대방 friendRequests에 추가 시도:', { targetUserId: targetUser.id, myUserId });
+      await setDoc(doc(db, 'users', targetUser.id, 'friendRequests', myUserId), {
+        requesterId: myUserId,
+        requesterName: myDisplayName,
+        requesterEmail: myUserData.email || '',
+        requesterWorkspaceCode: myWorkspaceCode,
+        requestedAt: timestamp,
+      });
+      console.log('✅ 상대방 friendRequests에 추가 완료');
+    }
 
     // 7. deletedFriends에서 삭제 (재추가하는 경우)
     try {
@@ -294,14 +308,28 @@ export const addFriendById = async (myUserId, friendId) => {
       addedAt: timestamp,
     });
 
-    // 8. 상대방의 friendRequests에 추가
-    await setDoc(doc(db, 'users', friendId, 'friendRequests', myUserId), {
-      requesterId: myUserId,
-      requesterName: myDisplayName,
-      requesterEmail: myUserData.email || '',
-      requesterWorkspaceCode: myWorkspaceCode,
-      requestedAt: timestamp,
-    });
+    // 8. 상대방이 이미 나를 친구로 등록했는지 확인
+    const targetHasMeAsFriend = await isFriend(friendId, myUserId);
+
+    if (targetHasMeAsFriend) {
+      // 상대방이 이미 나를 친구로 등록했다면 내 friendRequests에서 상대방 삭제
+      console.log('🔄 상대방이 이미 나를 친구로 등록함 - 내 friendRequests에서 삭제');
+      try {
+        await deleteDoc(doc(db, 'users', myUserId, 'friendRequests', friendId));
+        console.log('✅ 내 friendRequests에서 삭제 완료');
+      } catch (err) {
+        console.warn('friendRequests 삭제 실패 (무시):', err);
+      }
+    } else {
+      // 상대방이 아직 나를 친구로 등록하지 않았다면 friendRequests에 추가
+      await setDoc(doc(db, 'users', friendId, 'friendRequests', myUserId), {
+        requesterId: myUserId,
+        requesterName: myDisplayName,
+        requesterEmail: myUserData.email || '',
+        requesterWorkspaceCode: myWorkspaceCode,
+        requestedAt: timestamp,
+      });
+    }
 
     // 9. deletedFriends에서 삭제 (재추가하는 경우)
     try {

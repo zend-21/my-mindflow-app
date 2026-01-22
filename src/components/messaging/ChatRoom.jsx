@@ -104,6 +104,12 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   const [newRoomName, setNewRoomName] = useState(''); // 새 방 이름
   const [blockConfirmModal, setBlockConfirmModal] = useState({ show: false, userId: null, userName: '', isUnblock: false }); // 차단 확인 모달
   const [isReceiveSoundMuted, setIsReceiveSoundMuted] = useState(false); // 채팅중 수신음 소거 상태
+  const [showMacroModal, setShowMacroModal] = useState(false); // 매크로 선택 모달
+  const [macros, setMacros] = useState([]); // 매크로 목록
+  const [showMacroButton, setShowMacroButton] = useState(() => {
+    const saved = localStorage.getItem('chatRoom_showMacroButton');
+    return saved !== 'false'; // 기본값: true (ON)
+  });
   // 대화방 색상 설정
   const [roomBgColor, setRoomBgColor] = useState(() => {
     return localStorage.getItem('chatRoom_bgColor') || '#1a1a1a';
@@ -287,6 +293,22 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     };
   }, []);
 
+  // 매크로 버튼 표시 설정 변경 감지
+  useEffect(() => {
+    const handleMacroButtonChange = () => {
+      const saved = localStorage.getItem('chatRoom_showMacroButton');
+      setShowMacroButton(saved !== 'false');
+    };
+
+    window.addEventListener('chatRoomMacroButtonChange', handleMacroButtonChange);
+    window.addEventListener('storage', handleMacroButtonChange);
+
+    return () => {
+      window.removeEventListener('chatRoomMacroButtonChange', handleMacroButtonChange);
+      window.removeEventListener('storage', handleMacroButtonChange);
+    };
+  }, []);
+
   // ⚡ 권한 정보 실시간 구독 (그룹 채팅만) - 최적화: 2개 리스너 통합
   useEffect(() => {
     if (!chat.id || chat.type !== 'group') return;
@@ -349,6 +371,17 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   }, [chat.id, chat.type]);
 
   // 🚨 그룹 삭제 감지 및 메시지 구독 (실시간)
+  // ref로 최신 값 유지 (의존성 배열에서 제외하여 리스너 재생성 방지)
+  const messagesRef = useRef(messages);
+  const membersInfoRef = useRef(chat.membersInfo);
+  const groupDeletionInfoRef = useRef(groupDeletionInfo);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  useEffect(() => { membersInfoRef.current = chat.membersInfo; }, [chat.membersInfo]);
+  useEffect(() => { groupDeletionInfoRef.current = groupDeletionInfo; }, [groupDeletionInfo]);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
   useEffect(() => {
     if (!chat.id || chat.type !== 'group') return;
 
@@ -364,15 +397,15 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
         // 그룹이 삭제된 경우
         if (!docSnapshot.exists()) {
           // 이미 카운트다운 중이면 무시 (중복 방지)
-          if (groupDeletionInfo) return;
+          if (groupDeletionInfoRef.current) return;
 
           // 마지막 메시지에서 삭제자 이름 확인
-          const lastMessage = messages[messages.length - 1];
+          const lastMessage = messagesRef.current[messagesRef.current.length - 1];
           let deleterName = '방장';
 
           if (lastMessage?.metadata?.action === 'group_deleted') {
             const deleterId = lastMessage.metadata.actorId;
-            deleterName = chat.membersInfo?.[deleterId]?.displayName || '방장';
+            deleterName = membersInfoRef.current?.[deleterId]?.displayName || '방장';
           }
 
           // 10초 카운트다운 시작
@@ -386,7 +419,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
             } else {
               clearInterval(countdownInterval);
               if (isMounted) {
-                onClose();
+                onCloseRef.current?.();
               }
             }
           }, 1000);
@@ -404,7 +437,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
         clearInterval(countdownInterval);
       }
     };
-  }, [chat.id, chat.type, chat.membersInfo, messages, groupDeletionInfo, onClose]);
+  }, [chat.id, chat.type]); // 핵심 식별자만 의존성으로 유지
 
   // 그룹 채팅에서 내 멤버 상태 확인 (초기값)
   useEffect(() => {
@@ -578,6 +611,32 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
 
     fetchBlockedUsers();
   }, [currentUserId]);
+
+  // 매크로 목록 로드
+  useEffect(() => {
+    const loadMacros = () => {
+      try {
+        const savedMacros = JSON.parse(localStorage.getItem('macroTexts') || '[]');
+        // 빈 문자열 제외하고 내용이 있는 매크로만 필터링
+        setMacros(savedMacros.filter(m => m && m.trim()).slice(0, 7));
+      } catch (error) {
+        console.error('매크로 로드 실패:', error);
+        setMacros([]);
+      }
+    };
+
+    loadMacros();
+
+    // localStorage 변경 감지 (다른 탭에서 매크로 수정 시)
+    const handleStorageChange = (e) => {
+      if (e.key === 'macroTexts') {
+        loadMacros();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
 
   // 🔥 메시지 개수 추적 (useRef로 변경하여 리렌더링 시에도 값 유지)
   const prevMessageCountRef = useRef(0);
@@ -938,6 +997,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
             const version = settings.profileImageVersion || null;
             const selectedAvatarId = settings.selectedAvatarId || null;
             const avatarBgColor = settings.avatarBgColor || 'none';
+            const avatarCustomColor = settings.avatarCustomColor || '#FF1493';
 
             // 'photo' 모드면 버전 기반 URL 사용
             if (imageType === 'photo') {
@@ -955,7 +1015,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
               });
             } else {
               // 아바타 모드면 아바타 설정 저장, 프로필 사진 제거
-              console.log(`⚠️ [ChatRoom] 아바타 모드:`, { userId, selectedAvatarId, avatarBgColor });
+              console.log(`⚠️ [ChatRoom] 아바타 모드:`, { userId, selectedAvatarId, avatarBgColor, avatarCustomColor });
               setUserProfilePictures(prev => {
                 const newState = { ...prev };
                 delete newState[userId];
@@ -964,7 +1024,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
               if (selectedAvatarId) {
                 setUserAvatarSettings(prev => ({
                   ...prev,
-                  [userId]: { selectedAvatarId, avatarBgColor }
+                  [userId]: { selectedAvatarId, avatarBgColor, avatarCustomColor }
                 }));
               }
             }
@@ -2179,11 +2239,6 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   const isLastMember = chat.type === 'group' && chat.membersInfo &&
     Object.values(chat.membersInfo).filter(memberInfo => memberInfo.status === 'active').length === 1;
 
-  // 아바타 색상 생성
-  const getAvatarColor = (userId) => {
-    return '#1E90FF'; // 선명한 파랑
-  };
-
   // 아바타 배경색 매핑
   const BACKGROUND_COLORS = {
     'none': 'transparent',
@@ -2199,6 +2254,35 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     'purple': '#9370DB',
   };
 
+  // 아바타 배경색 조회 헬퍼 함수
+  const getAvatarBgColor = (avatarSettings) => {
+    const bgColorKey = avatarSettings?.avatarBgColor || 'none';
+    // custom인 경우 avatarCustomColor 직접 사용
+    if (bgColorKey === 'custom') {
+      return avatarSettings?.avatarCustomColor || '#FF1493';
+    }
+    return BACKGROUND_COLORS[bgColorKey] || BACKGROUND_COLORS['none'];
+  };
+
+  // 사용자별 아바타 색상 캐싱 (불필요한 반복 계산 방지)
+  const userAvatarColors = useMemo(() => {
+    const colors = {};
+    Object.keys(userAvatarSettings).forEach(userId => {
+      const avatarSettings = userAvatarSettings[userId];
+      if (avatarSettings?.selectedAvatarId) {
+        colors[userId] = getAvatarBgColor(avatarSettings);
+      } else {
+        colors[userId] = '#1E90FF'; // 기본 파란색
+      }
+    });
+    return colors;
+  }, [userAvatarSettings]);
+
+  // 아바타 색상 조회 - 캐시된 값 사용
+  const getAvatarColor = (userId) => {
+    return userAvatarColors[userId] || '#1E90FF';
+  };
+
   // 아바타 아이콘 렌더링
   const renderAvatarIcon = (userId) => {
     const avatarSettings = userAvatarSettings[userId];
@@ -2208,7 +2292,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
     if (!avatar) return null;
 
     const AvatarComponent = avatar.component;
-    const bgColor = BACKGROUND_COLORS[avatarSettings.avatarBgColor] || BACKGROUND_COLORS['none'];
+    const bgColor = getAvatarBgColor(avatarSettings);
 
     return (
       <div style={{
@@ -2898,6 +2982,20 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                     disabled={sending}
                     $textColor={inputTextColor}
                   />
+                  {showMacroButton && (
+                    <S.MacroButton
+                      onClick={() => {
+                        if (macros.length > 0) {
+                          setShowMacroModal(true);
+                        } else {
+                          showToast?.('매크로가 등록되지 않았습니다.\n사이드 메뉴에서 매크로를 등록하세요');
+                        }
+                      }}
+                      title="매크로"
+                    >
+                      macro
+                    </S.MacroButton>
+                  )}
                 </S.TextInputWrapper>
               </S.InputGroup>
               <S.SendButton
@@ -2912,6 +3010,36 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
           </>
         )}
       </S.InputContainer>
+
+      {/* 매크로 선택 모달 */}
+      {showMacroModal && (
+        <S.MacroModalOverlay onClick={() => setShowMacroModal(false)}>
+          <S.MacroModalContent onClick={(e) => e.stopPropagation()}>
+            <S.MacroModalTitle>매크로 선택</S.MacroModalTitle>
+            <S.MacroGrid>
+              {macros.length > 0 ? (
+                macros.map((macroText, index) => (
+                  <S.MacroItem
+                    key={index}
+                    onClick={() => {
+                      setInputText(prev => prev + macroText);
+                      setShowMacroModal(false);
+                      inputRef.current?.focus();
+                    }}
+                  >
+                    {index + 1}. {macroText}
+                  </S.MacroItem>
+                ))
+              ) : (
+                <S.MacroEmptyMessage>
+                  등록된 매크로가 없습니다.<br />
+                  사이드 메뉴 → 매크로에서 등록하세요.
+                </S.MacroEmptyMessage>
+              )}
+            </S.MacroGrid>
+          </S.MacroModalContent>
+        </S.MacroModalOverlay>
+      )}
 
       {/* 공유 폴더 메모 선택 모달 */}
       {showSharedMemoSelector && (

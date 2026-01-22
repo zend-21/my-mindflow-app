@@ -1,7 +1,7 @@
 // 친구 추가 모달 (ID 입력 + QR 스캔)
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import styled from 'styled-components';
-import { X, Search, QrCode, UserPlus, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, Search, QrCode, UserPlus, AlertCircle, CheckCircle, Image } from 'lucide-react';
 import { getUserByWorkspaceCode, addFriendInstantly, isFriend } from '../../services/friendService';
 import { unblockUser, isUserBlocked } from '../../services/userManagementService';
 import QRScannerModal from '../collaboration/QRScannerModal';
@@ -246,6 +246,34 @@ const QRScanButton = styled.button`
   }
 `;
 
+const GalleryButton = styled.button`
+  width: 100%;
+  background: rgba(156, 39, 176, 0.15);
+  border: 2px dashed rgba(156, 39, 176, 0.3);
+  color: #ba68c8;
+  padding: 20px;
+  border-radius: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+
+  &:hover:not(:disabled) {
+    background: rgba(156, 39, 176, 0.25);
+    border-color: rgba(156, 39, 176, 0.5);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
 const InfoBox = styled.div`
   background: ${props =>
     props.$type === 'error' ? 'rgba(244, 67, 54, 0.1)' :
@@ -283,6 +311,8 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
   const [userAvatarSettings, setUserAvatarSettings] = useState(null);
   const [showUnblockConfirm, setShowUnblockConfirm] = useState(false); // 차단 해제 확인 모달
   const [blockedUserToAdd, setBlockedUserToAdd] = useState(null); // 차단 해제 후 추가할 사용자
+  const [processingImage, setProcessingImage] = useState(false); // 갤러리 이미지 처리 중
+  const galleryInputRef = useRef(null);
 
   const handleSearch = async () => {
     if (!searchId.trim()) {
@@ -407,48 +437,66 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
     setIsQRScannerOpen(true);
   };
 
-  const handleQRCodeScanned = async (wsCode) => {
+  const handleQRCodeScanned = (wsCode) => {
     console.log('QR 스캔 완료:', wsCode);
     setIsQRScannerOpen(false);
 
-    // QR 탭으로 전환하고 결과 처리
-    setActiveTab('qr');
-    setSearching(true);
+    // ID 탭으로 전환하고 검색창에 코드 자동 입력
+    setActiveTab('id');
+    setSearchId(wsCode);
+    setMessage({ type: 'info', text: 'QR 코드에서 ID를 추출했습니다. 검색 버튼을 눌러 친구를 찾아보세요.' });
+  };
+
+  // 갤러리에서 QR 이미지 선택
+  const handleGalleryClick = () => {
+    galleryInputRef.current?.click();
+  };
+
+  // 갤러리 이미지에서 QR 코드 스캔
+  const handleGalleryImageSelect = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setProcessingImage(true);
+    setMessage(null);
 
     try {
-      const result = await addFriendInstantly(userId, wsCode);
+      const { Html5Qrcode } = await import('html5-qrcode');
+      const html5QrCode = new Html5Qrcode('gallery-qr-reader-hidden');
 
-      if (result.success) {
-        setMessage({
-          type: 'success',
-          text: `${result.friend.name}님이 친구로 추가되었습니다!`
-        });
-        showToast?.(`✅ ${result.friend.name}님이 친구로 추가되었습니다`);
+      const result = await html5QrCode.scanFile(file, true);
+      console.log('갤러리 QR 스캔 결과:', result);
 
-        setTimeout(() => {
-          onFriendAdded?.();
-          onClose();
-        }, 1500);
-      } else {
-        // 차단한 사용자인 경우 차단 해제 확인 모달 표시
-        if (result.error && result.error.includes('차단한 사용자')) {
-          // QR로 스캔한 사용자 정보 가져오기
-          const user = await getUserByWorkspaceCode(wsCode);
-          if (user) {
-            setBlockedUserToAdd(user);
-            setShowUnblockConfirm(true);
-          } else {
-            setMessage({ type: 'error', text: result.error || '친구 추가에 실패했습니다' });
-          }
-        } else {
-          setMessage({ type: 'error', text: result.error || '친구 추가에 실패했습니다' });
+      // WS- 코드 추출
+      let wsCode = null;
+      if (result.includes('WS-')) {
+        const match = result.match(/WS-[A-Z0-9]{6}/i);
+        if (match) {
+          wsCode = match[0].toUpperCase();
         }
+      } else if (/^[A-Z0-9]{6}$/i.test(result.trim())) {
+        wsCode = result.trim().toUpperCase();
       }
+
+      if (wsCode) {
+        // ID 탭으로 전환하고 코드 입력
+        setActiveTab('id');
+        setSearchId(wsCode.replace('WS-', ''));
+        setMessage({ type: 'info', text: 'QR 코드에서 ID를 추출했습니다. 검색 버튼을 눌러 친구를 찾아보세요.' });
+      } else {
+        setMessage({ type: 'error', text: '유효한 친구 코드를 찾을 수 없습니다' });
+      }
+
+      await html5QrCode.clear();
     } catch (error) {
-      console.error('QR 친구 추가 오류:', error);
-      setMessage({ type: 'error', text: '친구 추가 중 오류가 발생했습니다' });
+      console.error('갤러리 QR 스캔 오류:', error);
+      setMessage({ type: 'error', text: 'QR 코드를 인식할 수 없습니다. 다른 이미지를 시도해주세요.' });
     } finally {
-      setSearching(false);
+      setProcessingImage(false);
+      // 입력 초기화
+      if (event.target) {
+        event.target.value = '';
+      }
     }
   };
 
@@ -634,6 +682,22 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
                   </div>
                 </QRScanButton>
 
+                <GalleryButton onClick={handleGalleryClick} disabled={processingImage}>
+                  <Image size={20} />
+                  {processingImage ? '처리 중...' : '갤러리에서 QR 이미지 선택'}
+                </GalleryButton>
+
+                <input
+                  ref={galleryInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleGalleryImageSelect}
+                  style={{ display: 'none' }}
+                />
+
+                {/* html5-qrcode 라이브러리용 숨겨진 div */}
+                <div id="gallery-qr-reader-hidden" style={{ display: 'none' }} />
+
                 {message && (
                   <InfoBox $type={message.type}>
                     {message.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
@@ -648,7 +712,6 @@ const AddFriendModal = ({ onClose, userId, showToast, onFriendAdded }) => {
 
       {isQRScannerOpen && (
         <QRScannerModal
-          userId={userId}
           onClose={() => setIsQRScannerOpen(false)}
           onCodeScanned={handleQRCodeScanned}
         />

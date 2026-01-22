@@ -480,7 +480,10 @@ const Timer = ({ onClose }) => {
                         id: 1,
                         title: '타이머 완료!',
                         body: '설정한 시간이 종료되었습니다',
-                        schedule: { at: new Date(Date.now() + delaySeconds * 1000) },
+                        schedule: {
+                            at: new Date(Date.now() + delaySeconds * 1000),
+                            allowWhileIdle: true  // Doze 모드에서도 알림 발생
+                        },
                         smallIcon: 'ic_stat_icon_config_sample',
                         iconColor: '#1a1a2e',
                         channelId: 'timer_channel', // 타이머 전용 채널 (timer_alarm.mp3 사용)

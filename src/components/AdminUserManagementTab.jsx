@@ -1,7 +1,7 @@
 // src/components/AdminUserManagementTab.jsx
 import { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { Users, UserPlus, UserMinus, Search, X, TrendingUp, Calendar, MessageCircle, Mail, User as UserIcon } from 'lucide-react';
+import { Users, UserPlus, UserMinus, Search, X, TrendingUp, MessageCircle, Copy } from 'lucide-react';
 import {
   getUserStats,
   searchUserByShareNoteId,
@@ -11,6 +11,8 @@ import {
 import { showAlert } from '../utils/alertModal';
 import ConfirmModal from './ConfirmModal';
 import InquiryDetail from './InquiryDetail';
+import { avatarList } from './avatars/AvatarIcons';
+import { getProfileImageUrl } from '../utils/storageService';
 
 const Container = styled.div`
   flex: 1;
@@ -229,23 +231,62 @@ const UserHeader = styled.div`
 `;
 
 const Avatar = styled.img`
-  width: 64px;
-  height: 64px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   object-fit: cover;
+  flex-shrink: 0;
 `;
 
-const AvatarPlaceholder = styled.div`
-  width: 64px;
-  height: 64px;
+const NicknameAvatar = styled.div`
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
+  background: #1E90FF;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #888;
-  font-size: 32px;
+  color: white;
+  font-size: 20px;
+  font-weight: 600;
+  flex-shrink: 0;
 `;
+
+const AvatarIconWrapper = styled.div`
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${props => props.$bgColor || 'transparent'};
+  flex-shrink: 0;
+`;
+
+const AvatarIconInner = styled.div`
+  width: 70%;
+  height: 70%;
+`;
+
+// 아바타 배경색 매핑
+const BACKGROUND_COLORS = {
+  'none': 'transparent',
+  'lavender': 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+  'sunset': 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+  'ocean': 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+  'forest': 'linear-gradient(135deg, #0ba360 0%, #3cba92 100%)',
+  'fire': 'linear-gradient(135deg, #ff6b6b 0%, #feca57 100%)',
+  'sky': 'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+  'rose': 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+  'mint': 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+  'peach': 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+  'pink': '#FF69B4',
+  'blue': '#4169E1',
+  'yellow': '#FFD700',
+  'green': '#32CD32',
+  'purple': '#9370DB',
+};
 
 const UserInfo = styled.div`
   flex: 1;
@@ -259,11 +300,15 @@ const UserName = styled.div`
 `;
 
 const UserEmail = styled.div`
-  font-size: 14px;
+  font-size: 13px;
   color: #888;
-  display: flex;
-  align-items: center;
-  gap: 6px;
+  word-break: break-all;
+  cursor: pointer;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #4a90e2;
+  }
 `;
 
 const UserDetails = styled.div`
@@ -287,9 +332,37 @@ const DetailLabel = styled.div`
 `;
 
 const DetailValue = styled.div`
-  font-size: 14px;
+  font-size: ${props => props.$small ? '13px' : '14px'};
   color: #e0e0e0;
   font-family: ${props => props.$mono ? "'Consolas', 'Monaco', monospace" : 'inherit'};
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  word-break: break-all;
+`;
+
+const CopyButton = styled.button`
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #888;
+  transition: all 0.2s;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(74, 144, 226, 0.2);
+    border-color: rgba(74, 144, 226, 0.4);
+    color: #4a90e2;
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
 `;
 
 const InquiryCount = styled.div`
@@ -312,6 +385,34 @@ const InquiryCount = styled.div`
   }
 `;
 
+const ButtonGroup = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 50px;
+  margin-top: 16px;
+`;
+
+const CopyAllButton = styled.button`
+  background: rgba(74, 144, 226, 0.2);
+  border: 1px solid rgba(74, 144, 226, 0.3);
+  color: #4a90e2;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+
+  &:hover {
+    background: rgba(74, 144, 226, 0.3);
+    border-color: rgba(74, 144, 226, 0.5);
+  }
+`;
+
 const DeleteButton = styled.button`
   background: rgba(255, 107, 107, 0.2);
   border: 1px solid rgba(255, 107, 107, 0.3);
@@ -322,7 +423,6 @@ const DeleteButton = styled.button`
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
-  margin-top: 16px;
 
   &:hover {
     background: rgba(255, 107, 107, 0.3);
@@ -460,17 +560,77 @@ const InquiryDate = styled.div`
   color: #888;
 `;
 
+const Toast = styled.div`
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(46, 213, 115, 0.95);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 9999;
+  animation: toastFadeIn 0.3s ease;
+
+  @keyframes toastFadeIn {
+    from {
+      opacity: 0;
+      transform: translateX(-50%) translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+  }
+`;
+
 const AdminUserManagementTab = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResult, setSearchResult] = useState(null);
   const [searching, setSearching] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteStep, setDeleteStep] = useState(0); // 0: 숨김, 1: 1단계, 2: 2단계, 3: 3단계
   const [showInquiryList, setShowInquiryList] = useState(false);
   const [userInquiries, setUserInquiries] = useState([]);
   const [selectedInquiry, setSelectedInquiry] = useState(null);
   const [showInquiryDetail, setShowInquiryDetail] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+
+  const copyToClipboard = (text, label) => {
+    navigator.clipboard.writeText(text);
+    setToastMessage(`${label} 복사됨`);
+    setTimeout(() => setToastMessage(''), 2000);
+  };
+
+  const copyAllUserInfo = () => {
+    if (!searchResult) return;
+
+    const formatDateForCopy = (timestamp) => {
+      if (!timestamp) return '-';
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    };
+
+    const lines = [
+      `닉네임: ${searchResult.nickname}`,
+      searchResult.email ? `이메일: ${searchResult.email}` : null,
+      searchResult.displayName ? `구글 사용자명: ${searchResult.displayName}` : null,
+      `ShareNote ID: ${searchResult.shareNoteId.replace(/^ws-/i, '')}`,
+      `UID: ${searchResult.userId}`,
+      `${searchResult.isDeleted ? '탈퇴일' : '가입일'}: ${formatDateForCopy(searchResult.isDeleted ? searchResult.deletedAt : searchResult.createdAt)}`
+    ].filter(Boolean).join('\n');
+
+    navigator.clipboard.writeText(lines);
+    setToastMessage('전체 정보 복사됨');
+    setTimeout(() => setToastMessage(''), 2000);
+  };
 
   useEffect(() => {
     loadStats();
@@ -538,7 +698,7 @@ const AdminUserManagementTab = () => {
     try {
       await deleteUser(searchResult.userId);
       showAlert('회원 탈퇴 처리가 완료되었습니다.', '완료');
-      setShowDeleteConfirm(false);
+      setDeleteStep(0);
       setSearchResult(null);
       setSearchTerm('');
       await loadStats();
@@ -656,18 +816,48 @@ const AdminUserManagementTab = () => {
             {searchResult && (
               <UserCard>
                 <UserHeader>
-                  {searchResult.photoURL ? (
-                    <Avatar src={searchResult.photoURL} alt={searchResult.nickname} />
-                  ) : (
-                    <AvatarPlaceholder>
-                      <UserIcon size={32} />
-                    </AvatarPlaceholder>
-                  )}
+                  {(() => {
+                    // 프로필 이미지 타입에 따른 렌더링
+                    const imageType = searchResult.profileImageType || 'google';
+                    const selectedAvatarId = searchResult.selectedAvatarId;
+                    const avatarBgColor = searchResult.avatarBgColor || 'none';
+                    const profileImageVersion = searchResult.profileImageVersion;
+
+                    // 1. 커스텀 업로드 이미지 (photo 타입)
+                    if (imageType === 'photo' && profileImageVersion) {
+                      const imageUrl = getProfileImageUrl(searchResult.userId, profileImageVersion);
+                      return <Avatar src={imageUrl} alt={searchResult.nickname} />;
+                    }
+
+                    // 2. 아바타 선택한 경우
+                    if (selectedAvatarId) {
+                      const avatar = avatarList.find(a => a.id === selectedAvatarId);
+                      if (avatar) {
+                        const AvatarComponent = avatar.component;
+                        const bgColor = BACKGROUND_COLORS[avatarBgColor] || BACKGROUND_COLORS['none'];
+                        return (
+                          <AvatarIconWrapper $bgColor={bgColor}>
+                            <AvatarIconInner>
+                              <AvatarComponent />
+                            </AvatarIconInner>
+                          </AvatarIconWrapper>
+                        );
+                      }
+                    }
+
+                    // 3. 닉네임 첫 글자 표시 (기본값)
+                    // 프로필 이미지를 설정하지 않은 경우 닉네임 첫 글자 표시
+                    const nickname = searchResult.nickname || searchResult.displayName || '?';
+                    return (
+                      <NicknameAvatar>
+                        {nickname.charAt(0).toUpperCase()}
+                      </NicknameAvatar>
+                    );
+                  })()}
                   <UserInfo>
                     <UserName>{searchResult.nickname}</UserName>
                     {searchResult.email && (
-                      <UserEmail>
-                        <Mail size={14} />
+                      <UserEmail onClick={() => copyToClipboard(searchResult.email, '이메일')}>
                         {searchResult.email}
                       </UserEmail>
                     )}
@@ -686,12 +876,22 @@ const AdminUserManagementTab = () => {
                   )}
                   <DetailItem>
                     <DetailLabel>ShareNote ID</DetailLabel>
-                    <DetailValue $mono>{searchResult.shareNoteId.replace(/^ws-/i, '')}</DetailValue>
+                    <DetailValue $mono>
+                      {searchResult.shareNoteId.replace(/^ws-/i, '')}
+                      <CopyButton onClick={() => copyToClipboard(searchResult.shareNoteId.replace(/^ws-/i, ''), 'ShareNote ID')} title="복사">
+                        <Copy size={12} />
+                      </CopyButton>
+                    </DetailValue>
                   </DetailItem>
                   {!searchResult.isDeleted && (
                     <DetailItem>
                       <DetailLabel>UID</DetailLabel>
-                      <DetailValue $mono>{searchResult.userId}</DetailValue>
+                      <DetailValue $mono $small>
+                        {searchResult.userId}
+                        <CopyButton onClick={() => copyToClipboard(searchResult.userId, 'UID')} title="복사">
+                          <Copy size={12} />
+                        </CopyButton>
+                      </DetailValue>
                     </DetailItem>
                   )}
                   <DetailItem>
@@ -711,27 +911,63 @@ const AdminUserManagementTab = () => {
                   )}
                 </UserDetails>
 
-                {!searchResult.isDeleted && (
-                  <DeleteButton onClick={() => setShowDeleteConfirm(true)}>
-                    회원 탈퇴 처리
-                  </DeleteButton>
-                )}
+                <ButtonGroup>
+                  <CopyAllButton onClick={copyAllUserInfo}>
+                    <Copy size={14} />
+                    전체 복사
+                  </CopyAllButton>
+                  {!searchResult.isDeleted && (
+                    <DeleteButton onClick={() => setDeleteStep(1)}>
+                      회원 탈퇴 처리
+                    </DeleteButton>
+                  )}
+                </ButtonGroup>
               </UserCard>
             )}
           </SearchSection>
         </Content>
       </Container>
 
-      {/* 탈퇴 확인 모달 */}
-      {showDeleteConfirm && searchResult && (
+      {/* 탈퇴 확인 모달 - 1단계 */}
+      {deleteStep === 1 && searchResult && (
         <ConfirmModal
-          isOpen={showDeleteConfirm}
-          onClose={() => setShowDeleteConfirm(false)}
-          onCancel={() => setShowDeleteConfirm(false)}
+          isOpen={true}
+          onClose={() => setDeleteStep(0)}
+          onCancel={() => setDeleteStep(0)}
+          onConfirm={() => setDeleteStep(2)}
+          title="⚠️ 회원 탈퇴 처리 (1/3)"
+          message={`${searchResult.nickname}님의 계정을 탈퇴 처리하시겠습니까?\n\n이 작업은 되돌릴 수 없으며, 사용자의 동의 없이 진행할 경우 법적 책임이 발생할 수 있습니다.`}
+          confirmText="다음 단계"
+          cancelText="취소"
+          showCancel={true}
+        />
+      )}
+
+      {/* 탈퇴 확인 모달 - 2단계 */}
+      {deleteStep === 2 && searchResult && (
+        <ConfirmModal
+          isOpen={true}
+          onClose={() => setDeleteStep(0)}
+          onCancel={() => setDeleteStep(0)}
+          onConfirm={() => setDeleteStep(3)}
+          title="⛔ 법적 경고 (2/3)"
+          message={`정말로 ${searchResult.nickname}님의 계정을 삭제하시겠습니까?\n\n• 문의 글을 제외한 모든 개인정보와 데이터가 영구 삭제됩니다\n• 개인정보보호법에 따라 무단 삭제 시 법적 처벌을 받을 수 있습니다\n• 사용자 본인의 요청 또는 정당한 사유가 있어야 합니다`}
+          confirmText="최종 확인으로"
+          cancelText="취소"
+          showCancel={true}
+        />
+      )}
+
+      {/* 탈퇴 확인 모달 - 3단계 (최종) */}
+      {deleteStep === 3 && searchResult && (
+        <ConfirmModal
+          isOpen={true}
+          onClose={() => setDeleteStep(0)}
+          onCancel={() => setDeleteStep(0)}
           onConfirm={handleDeleteUser}
-          title="⚠️ 회원 탈퇴 처리"
-          message={`${searchResult.nickname}님의 계정을 탈퇴 처리하시겠습니까?\n\n문의 글을 제외한 모든 개인정보와 데이터가 삭제되며, 이 작업은 되돌릴 수 없습니다.`}
-          confirmText="탈퇴 처리"
+          title="🚨 최종 확인 (3/3)"
+          message={`[최종 경고]\n\n${searchResult.nickname}님 (${searchResult.email || 'N/A'})\nShareNote ID: ${searchResult.shareNoteId.replace(/^ws-/i, '')}\n\n지금 "탈퇴처리하기"를 누르면 최종적으로 탈퇴 확정이 됩니다.\n\n이 작업은 취소할 수 없습니다.`}
+          confirmText="탈퇴처리하기"
           cancelText="취소"
           showCancel={true}
         />
@@ -781,6 +1017,9 @@ const AdminUserManagementTab = () => {
           }}
         />
       )}
+
+      {/* 토스트 메시지 */}
+      {toastMessage && <Toast>{toastMessage}</Toast>}
     </>
   );
 };

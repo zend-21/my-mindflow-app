@@ -22,10 +22,10 @@ import {
 import {
   setAccountLocalStorage,
   setAccountLocalStorageWithTTL,
+  getAccountLocalStorageWithTTL,
   markLocalStorageSynced,
   removeIfSynced
 } from './useFirestoreSync.utils';
-import { getUserData } from '../utils/userStorage';
 
 /**
  * 디바운스 저장 함수 생성 (TTL 및 synced 플래그 포함)
@@ -434,7 +434,8 @@ export const createSyncMacros = (userId, enabled, setMacros, debouncedSave) => {
     const hasValidMacro = newMacros.some(m => m && m.trim().length > 0);
     if (!hasValidMacro) {
       try {
-        const existing = JSON.parse(getUserData(userId, 'macros') || '[]');
+        const existingData = getAccountLocalStorageWithTTL(userId, 'macros', false);
+        const existing = Array.isArray(existingData) ? existingData : [];
         const hasExistingData = existing.some(m => m && m.trim().length > 0);
         if (hasExistingData) {
           console.warn('⚠️ syncMacros: Firestore 데이터가 비어있어 기존 localStorage 유지');
@@ -447,7 +448,8 @@ export const createSyncMacros = (userId, enabled, setMacros, debouncedSave) => {
 
     // 기존 데이터와 비교하여 변경된 경우에만 저장
     try {
-      const existing = JSON.parse(getUserData(userId, 'macros') || '[]');
+      const existingData = getAccountLocalStorageWithTTL(userId, 'macros', false);
+      const existing = Array.isArray(existingData) ? existingData : [];
       const hasChanged = newMacros.length !== existing.length ||
                         newMacros.some((macro, index) => macro !== existing[index]);
 

@@ -4,7 +4,6 @@ import styled from 'styled-components';
 import { X, Bell, MessageCircle, Clock, CheckCircle, AlertCircle, User, Mail, Search, Filter } from 'lucide-react';
 import {
   getAllInquiries,
-  subscribeToAllInquiries,
   getAdminNotifications,
   markNotificationAsRead,
   subscribeToUnreadNotifications
@@ -434,13 +433,8 @@ const AdminInquiryPanel = ({ isOpen, onClose, userId }) => {
 
   useEffect(() => {
     if (isOpen && userId) {
+      // 일회성 조회만 사용 (실시간 구독 제거 - 데이터 사용량 절감)
       loadInquiries();
-
-      // 실시간 구독
-      const unsubscribe = subscribeToAllInquiries((data) => {
-        setInquiries(data);
-        setLoading(false);
-      });
 
       // 읽지 않은 알림 개수 구독
       const unsubscribeNotifications = subscribeToUnreadNotifications(userId, (count) => {
@@ -448,7 +442,6 @@ const AdminInquiryPanel = ({ isOpen, onClose, userId }) => {
       });
 
       return () => {
-        unsubscribe();
         unsubscribeNotifications();
       };
     }

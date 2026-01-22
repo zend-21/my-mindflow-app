@@ -7,6 +7,7 @@ import { avatarList, getRecommendedAvatar } from './avatars/AvatarIcons';
 // import { getUserProfile } from '../features/fortune/utils/fortuneLogic';
 import * as S from './AvatarSelector.styles';
 import { toast } from '../utils/toast';
+import { setProfileSetting, getProfileSetting } from '../utils/userStorage';
 
 const BACKGROUND_COLORS = [
     // 첫 줄: 5개
@@ -68,50 +69,24 @@ const PRESET_COLORS = [
     '#A52A2A', // Brown
 ];
 
-const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear, birthMonth, birthDay }) => {
+const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId }) => {
     const [selectedId, setSelectedId] = useState(currentAvatarId || null);
-    const [recommendedZodiacAvatar, setRecommendedZodiacAvatar] = useState(null);
-    const [recommendedSignAvatar, setRecommendedSignAvatar] = useState(null);
-    const [userName, setUserName] = useState('');
-    const [selectedBgColor, setSelectedBgColor] = useState(localStorage.getItem('avatarBgColor') || 'none');
-    const [customColor, setCustomColor] = useState(localStorage.getItem('avatarCustomColor') || '#FF1493');
+    // 계정별 localStorage에서 배경색 로드
+    const [selectedBgColor, setSelectedBgColor] = useState(getProfileSetting('avatarBgColor') || 'none');
+    const [customColor, setCustomColor] = useState(getProfileSetting('avatarCustomColor') || '#FF1493');
     const [showCustomColorModal, setShowCustomColorModal] = useState(false);
     const [tempCustomColor, setTempCustomColor] = useState('#FF1493');
     const [hexInputValue, setHexInputValue] = useState('');
     const scrollRef = React.useRef(null);
 
     useEffect(() => {
-        // ⚠️ 운세 기능 비활성화 - 운세 프로필 기반 추천 기능 제거
-        // const fortuneProfile = getUserProfile();
-        // console.log('🔍 운세 프로필:', fortuneProfile);
-
-        // if (fortuneProfile) {
-        //     // 사용자 이름 저장
-        //     setUserName(fortuneProfile.name || '');
-
-        //     // 띠 추천 (fortuneProfile.zodiacAnimal은 한글 이름: "쥐", "소" 등)
-        //     if (fortuneProfile.zodiacAnimal) {
-        //         const zodiacAvatar = avatarList.find(avatar => avatar.name === fortuneProfile.zodiacAnimal);
-        //         console.log('🐉 띠 추천:', zodiacAvatar);
-        //         setRecommendedZodiacAvatar(zodiacAvatar);
-        //     }
-
-        //     // 별자리 추천 (fortuneProfile.zodiacSign은 한글 이름: "양자리", "황소자리" 등)
-        //     if (fortuneProfile.zodiacSign) {
-        //         const signAvatar = avatarList.find(avatar => avatar.name === fortuneProfile.zodiacSign);
-        //         console.log('⭐ 별자리 추천:', signAvatar);
-        //         setRecommendedSignAvatar(signAvatar);
-        //     }
-        // }
-    }, [isOpen]);
-
-    useEffect(() => {
         setSelectedId(currentAvatarId);
     }, [currentAvatarId]);
 
     useEffect(() => {
-        setSelectedBgColor(localStorage.getItem('avatarBgColor') || 'none');
-        setCustomColor(localStorage.getItem('avatarCustomColor') || '#FF1493');
+        // 모달 열릴 때 계정별 localStorage에서 로드
+        setSelectedBgColor(getProfileSetting('avatarBgColor') || 'none');
+        setCustomColor(getProfileSetting('avatarCustomColor') || '#FF1493');
     }, [isOpen]);
 
     const handleSelect = (avatarId) => {
@@ -127,9 +102,12 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
 
     const handleBgColorSelect = (colorId) => {
         setSelectedBgColor(colorId);
-        localStorage.setItem('avatarBgColor', colorId);
-        // 배경색 변경 이벤트 발생
-        window.dispatchEvent(new CustomEvent('avatarBgColorChanged', { detail: colorId }));
+        // 계정별 localStorage에 저장 (공유 localStorage 대신)
+        setProfileSetting('avatarBgColor', colorId);
+        // 배경색 변경 이벤트 발생 (일관된 형식 사용)
+        window.dispatchEvent(new CustomEvent('avatarBgColorChanged', {
+            detail: { type: colorId, customColor: null }
+        }));
     };
 
     const handleCustomColorClick = () => {
@@ -172,11 +150,14 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
         const hexRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
         if (hexRegex.test(tempCustomColor)) {
             setCustomColor(tempCustomColor);
-            localStorage.setItem('avatarCustomColor', tempCustomColor);
+            // 계정별 localStorage에 저장 (공유 localStorage 대신)
+            setProfileSetting('avatarCustomColor', tempCustomColor);
             setSelectedBgColor('custom');
-            localStorage.setItem('avatarBgColor', 'custom');
-            // 배경색 변경 이벤트 발생
-            window.dispatchEvent(new CustomEvent('avatarBgColorChanged', { detail: 'custom' }));
+            setProfileSetting('avatarBgColor', 'custom');
+            // 배경색 변경 이벤트 발생 (커스텀 색상값도 함께 전달)
+            window.dispatchEvent(new CustomEvent('avatarBgColorChanged', {
+                detail: { type: 'custom', customColor: tempCustomColor }
+            }));
             setShowCustomColorModal(false);
         } else {
             toast('유효한 색상 코드를 입력해주세요. (예: #FF1493)');
@@ -189,9 +170,9 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
 
     const handleApply = () => {
         if (selectedId) {
-            // 아바타 선택 저장
-            localStorage.setItem('selectedAvatarId', selectedId);
-            localStorage.setItem('profileImageType', 'avatar');
+            // 아바타 선택 저장 (계정별 localStorage에 저장)
+            setProfileSetting('selectedAvatarId', selectedId);
+            setProfileSetting('profileImageType', 'avatar');
 
             // 아바타 변경 이벤트 발생 (Header, SideMenu 업데이트용)
             window.dispatchEvent(new CustomEvent('avatarChanged', { detail: selectedId }));
@@ -203,9 +184,8 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
 
     if (!isOpen) return null;
 
-    // 십이지신, 별자리, 기타 동물 분리
+    // 십이지신, 기타 동물 분리 (별자리 제거됨)
     const zodiacAvatars = avatarList.filter(avatar => avatar.zodiacYear);
-    const zodiacSignAvatars = avatarList.filter(avatar => avatar.zodiacSign);
     const otherAvatars = avatarList.filter(avatar => !avatar.zodiacYear && !avatar.zodiacSign);
 
     // 현재 선택된 아바타 렌더링 함수
@@ -234,27 +214,6 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
                     <S.CloseButton onClick={onClose}>&times;</S.CloseButton>
                 </S.ModalHeader>
                 <S.ModalBody ref={scrollRef}>
-                    {(recommendedZodiacAvatar || recommendedSignAvatar) && (
-                        <S.RecommendationBanner>
-                            <S.RecommendationIcon>•</S.RecommendationIcon>
-                            <S.RecommendationText>
-                                {recommendedZodiacAvatar && recommendedSignAvatar ? (
-                                    <>
-                                        <strong>{userName}</strong>님은 <strong>{recommendedZodiacAvatar.name}</strong>(이)나 <strong>{recommendedSignAvatar.name}</strong>가 어울려요!
-                                    </>
-                                ) : recommendedZodiacAvatar ? (
-                                    <>
-                                        <strong>{userName}</strong>님은 <strong>{recommendedZodiacAvatar.name}</strong>이/가 어울려요!
-                                    </>
-                                ) : (
-                                    <>
-                                        <strong>{userName}</strong>님은 <strong>{recommendedSignAvatar.name}</strong>이/가 어울려요!
-                                    </>
-                                )}
-                            </S.RecommendationText>
-                        </S.RecommendationBanner>
-                    )}
-
                     {/* 미리보기 섹션 */}
                     <S.PreviewSection>
                         <S.PreviewTitle>미리보기</S.PreviewTitle>
@@ -299,18 +258,15 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
                     <S.AvatarGrid>
                         {zodiacAvatars.map(avatar => {
                             const AvatarComponent = avatar.component;
-                            const isRecommended = recommendedZodiacAvatar?.id === avatar.id;
                             const isSelected = selectedId === avatar.id;
 
                             return (
                                 <S.AvatarItem
                                     key={avatar.id}
                                     $isSelected={isSelected}
-                                    $isRecommended={isRecommended}
                                     onClick={() => handleSelect(avatar.id)}
                                 >
                                     {isSelected && <S.SelectedBadge>✓</S.SelectedBadge>}
-                                    {isRecommended && <S.RecommendedBadge>추천</S.RecommendedBadge>}
                                     <S.AvatarIcon>
                                         <AvatarComponent />
                                     </S.AvatarIcon>
@@ -320,30 +276,7 @@ const AvatarSelector = ({ isOpen, onClose, onSelect, currentAvatarId, birthYear,
                         })}
                     </S.AvatarGrid>
 
-                    <S.SectionTitle>별자리</S.SectionTitle>
-                    <S.AvatarGrid>
-                        {zodiacSignAvatars.map(avatar => {
-                            const AvatarComponent = avatar.component;
-                            const isRecommended = recommendedSignAvatar?.id === avatar.id;
-                            const isSelected = selectedId === avatar.id;
-
-                            return (
-                                <S.AvatarItem
-                                    key={avatar.id}
-                                    $isSelected={isSelected}
-                                    $isRecommended={isRecommended}
-                                    onClick={() => handleSelect(avatar.id)}
-                                >
-                                    {isSelected && <S.SelectedBadge>✓</S.SelectedBadge>}
-                                    {isRecommended && <S.RecommendedBadge>추천</S.RecommendedBadge>}
-                                    <S.AvatarIcon>
-                                        <AvatarComponent />
-                                    </S.AvatarIcon>
-                                    <S.AvatarName $isSelected={isSelected}>{avatar.name}</S.AvatarName>
-                                </S.AvatarItem>
-                            );
-                        })}
-                    </S.AvatarGrid>
+                    {/* 별자리 섹션 제거됨 (운세 기능 비활성화) */}
 
                     {otherAvatars.length > 0 && (
                         <>

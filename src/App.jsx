@@ -29,6 +29,9 @@ import './utils/cleanBase64'; // window.cleanInvalidMemos 등록용
 import MessagingHub from './components/messaging/MessagingHub.jsx';
 import AuthRequiredModal from './components/AuthRequiredModal.jsx';
 import ChatRoom from './components/messaging/ChatRoom.jsx';
+import { subscribeToMyDMRooms } from './services/directMessageService';
+import { subscribeToMyGroupChats } from './services/groupChatService';
+import { getUserDisplayName } from './services/nicknameService';
 import AppRouter from './components/AppRouter.jsx';
 import Toast from './components/Toast.jsx';
 import PhoneVerification from './components/PhoneVerification.jsx';
@@ -63,7 +66,7 @@ import LoginModal from './components/LoginModal.jsx';
 // ⚠️ 운세 기능 비활성화 (src/features/fortune으로 이동)
 // import FortuneFlow from './features/fortune/components/FortuneFlow.jsx';
 import ProfilePage from './components/ProfilePage.jsx';
-import Timer from './components/Timer.jsx';
+// Timer 기능 제거 (백그라운드 제한으로 인해 비활성화)
 import MacroModal from './components/MacroModal.jsx';
 import TrashPage from './components/TrashPage.jsx';
 import SecretPage from './components/secret/SecretPage.jsx';
@@ -72,7 +75,7 @@ import TermsAgreementModal, { TERMS_VERSION, PRIVACY_VERSION } from './component
 const getWidgetComponent = (widgetName, props) => {
     switch (widgetName) {
         case 'StatsGrid':
-            return <StatsGrid onSwitchTab={props.onSwitchTab} />;
+            return <StatsGrid onSwitchTab={props.onSwitchTab} latestMessage={props.latestMessage} memos={props.memos} calendarSchedules={props.calendarSchedules} />;
         case 'QuickActions':
             return <QuickActions onSwitchTab={props.onSwitchTab} addActivity={props.addActivity} />;
         case 'RecentActivity':
@@ -83,7 +86,7 @@ const getWidgetComponent = (widgetName, props) => {
     }
 };
 
-const DraggableWidget = ({ id, onSwitchTab, addActivity, recentActivities, displayCount, setDisplayCount, deleteActivity }) => {
+const DraggableWidget = ({ id, onSwitchTab, addActivity, recentActivities, displayCount, setDisplayCount, deleteActivity, latestMessage, memos, calendarSchedules }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
     const style = {
@@ -97,7 +100,10 @@ const DraggableWidget = ({ id, onSwitchTab, addActivity, recentActivities, displ
         recentActivities,
         displayCount,
         setDisplayCount,
-        deleteActivity
+        deleteActivity,
+        latestMessage,
+        memos,
+        calendarSchedules
     };
 
     return (
@@ -144,7 +150,8 @@ function App() {
     const [isMacroModalOpen, setIsMacroModalOpen] = useState(false);
     // ⚠️ 운세 기능 비활성화
     // const [isFortuneFlowOpen, setIsFortuneFlowOpen] = useState(false);
-    const [isTimerOpen, setIsTimerOpen] = useState(false);
+    // Timer 기능 제거 (백그라운드 제한으로 인해 비활성화)
+    // const [isTimerOpen, setIsTimerOpen] = useState(false);
     const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
     const [restoreType, setRestoreType] = useState('phone'); // 'phone' or 'google'
     const [pendingRestoreFile, setPendingRestoreFile] = useState(null);
@@ -156,6 +163,9 @@ function App() {
 
     // 🔒 로그아웃 진행 중 상태 (UI 차단용)
     const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+    // 💬 홈 화면 최신 메시지 상태
+    const [latestMessage, setLatestMessage] = useState(null);
 
     const [isUserIdle, setIsUserIdle] = useState(false);
     const idleTimerRef = useRef(null);
@@ -358,34 +368,94 @@ function App() {
         return () => unsubscribe();
     }, []);
 
-    // 🔔 로컬 알림 탭 리스너 (타이머 알림 처리)
+    // 💬 홈 화면용 최신 메시지 구독
     useEffect(() => {
-        const setupNotificationListener = async () => {
-            try {
-                // 알림 탭 이벤트 리스너
-                await LocalNotifications.addListener('localNotificationActionPerformed', (notification) => {
-                    console.log('🔔 로컬 알림 탭됨:', notification);
+        if (!firebaseUser) {
+            setLatestMessage(null);
+            return;
+        }
 
-                    // 타이머 알림인지 확인
-                    const extra = notification.notification.extra;
-                    if (extra?.type === 'timer' && extra?.action === 'open_timer') {
-                        console.log('⏰ 타이머 화면 열기');
-                        setIsTimerOpen(true);
-                    }
-                });
-                console.log('✅ 로컬 알림 리스너 등록 완료');
-            } catch (error) {
-                console.error('❌ 로컬 알림 리스너 등록 실패:', error);
+        let unsubscribeDM = () => {};
+        let unsubscribeGroup = () => {};
+        let allRooms = { dm: [], group: [] };
+
+        const updateLatestMessage = async () => {
+            const allChats = [...allRooms.dm, ...allRooms.group];
+            if (allChats.length === 0) {
+                setLatestMessage(null);
+                return;
             }
+
+            // 가장 최신 메시지가 있는 채팅방 찾기
+            const sortedChats = allChats.sort((a, b) => {
+                const aTime = a.lastMessageTime?.toMillis?.() || a.lastMessageTime || 0;
+                const bTime = b.lastMessageTime?.toMillis?.() || b.lastMessageTime || 0;
+                return bTime - aTime;
+            });
+
+            const latestChat = sortedChats[0];
+            if (!latestChat || !latestChat.lastMessage) {
+                setLatestMessage(null);
+                return;
+            }
+
+            // lastMessage가 객체인 경우 텍스트 추출
+            const messageContent = latestChat.lastMessage;
+            let messageText = '';
+            let messageSenderId = latestChat.lastMessageSenderId;
+
+            if (typeof messageContent === 'string') {
+                messageText = messageContent;
+            } else if (typeof messageContent === 'object' && messageContent !== null) {
+                messageText = messageContent.text || messageContent.content || messageContent.message || '';
+                if (messageContent.senderId) {
+                    messageSenderId = messageContent.senderId;
+                }
+            }
+
+            // 보낸 사람 이름 찾기 (닉네임 우선, 없으면 구글 이름)
+            let senderName = '알 수 없음';
+            if (messageSenderId) {
+                // participantsInfo에서 fallback용 구글 이름 가져오기
+                const fallbackName = latestChat.participantsInfo?.[messageSenderId]?.displayName || '알 수 없음';
+                // 닉네임 서비스에서 변경된 닉네임 우선 조회
+                senderName = await getUserDisplayName(messageSenderId, fallbackName);
+            } else if (latestChat.lastMessageSenderName) {
+                senderName = latestChat.lastMessageSenderName;
+            }
+
+            // 읽지 않은 메시지 여부 확인
+            const unreadCount = latestChat.unreadCount?.[firebaseUser.uid] || 0;
+
+            setLatestMessage({
+                text: messageText,
+                time: latestChat.lastMessageTime,
+                senderName: senderName,
+                roomId: latestChat.id,
+                hasUnread: unreadCount > 0
+            });
         };
 
-        setupNotificationListener();
+        // DM 구독
+        unsubscribeDM = subscribeToMyDMRooms((rooms) => {
+            allRooms.dm = rooms;
+            updateLatestMessage();
+        });
+
+        // 그룹 채팅 구독
+        unsubscribeGroup = subscribeToMyGroupChats((rooms) => {
+            allRooms.group = rooms;
+            updateLatestMessage();
+        });
 
         return () => {
-            // 리스너 제거
-            LocalNotifications.removeAllListeners();
+            unsubscribeDM();
+            unsubscribeGroup();
         };
-    }, []);
+    }, [firebaseUser]);
+
+    // Timer 기능 제거 (백그라운드 제한으로 인해 비활성화)
+    // 로컬 알림 탭 리스너도 제거됨
 
     // userId와 isAuthenticated 계산
     const phoneId = localStorage.getItem('mindflowUserId'); // 휴대폰 번호 (캐시)
@@ -1590,12 +1660,32 @@ function App() {
         return searchData;
     }, [memos, calendarSchedules, trash, folders]);
 
-    const handleSwitchTab = (tab) => {
+    const handleSwitchTab = (tab, options = {}) => {
         setActiveTab(tab);
         // 탭 전환 시 다중선택 모드 해제
         if (isSelectionMode) {
             setIsSelectionMode(false);
             setSelectedMemoIds(new Set());
+        }
+
+        // 추가 옵션 처리
+        if (options.roomId && tab === 'chat') {
+            // 채팅방으로 바로 이동
+            setTimeout(() => {
+                if (messagingHubRef.current?.openChatRoom) {
+                    messagingHubRef.current.openChatRoom(options.roomId);
+                }
+            }, 100);
+        }
+
+        if (options.folderId && tab === 'memo') {
+            // 특정 폴더로 이동
+            setCurrentActiveFolder(options.folderId);
+        }
+
+        if (options.date && tab === 'calendar') {
+            // 특정 날짜로 이동
+            setSelectedDate(new Date(options.date));
         }
     };
 
@@ -3440,6 +3530,9 @@ function App() {
                                             displayCount={displayCount}
                                             setDisplayCount={setDisplayCount}
                                             deleteActivity={deleteActivity}
+                                            latestMessage={latestMessage}
+                                            memos={memos}
+                                            calendarSchedules={calendarSchedules}
                                         />
                                     ))}
                                 </SortableContext>
@@ -3481,6 +3574,7 @@ function App() {
                                 onRequestUnshareSelectedMemos={requestUnshareSelectedMemos}
                                 onActiveFolderChange={handleActiveFolderChange}
                                 currentUserId={firebaseUser?.uid}
+                                initialActiveFolder={currentActiveFolder}
                             />
                         }
                         {activeTab === 'todo' && <div>할 일 페이지</div>}
@@ -3544,7 +3638,6 @@ function App() {
                         onProfileClick={handleProfileClick}
                         onLogout={handleLogout}
                         onLoginClick={() => setIsLoginModalOpen(true)}
-                        onOpenTimer={() => setIsTimerOpen(true)}
                         onOpenTrash={() => {
                             setIsMenuOpen(false);
                             setActiveTab('trash');
@@ -3749,10 +3842,7 @@ function App() {
                 />
             )} */}
 
-            {/* ⏱️ 타이머 모달 */}
-            {isTimerOpen && (
-                <Timer onClose={() => setIsTimerOpen(false)} />
-            )}
+            {/* Timer 기능 제거 (백그라운드 제한으로 인해 비활성화) */}
 
             {/* 👤 프로필 페이지 모달 - 상태 유지를 위해 항상 렌더링 */}
             {profile && (

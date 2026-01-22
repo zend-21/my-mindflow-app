@@ -39,7 +39,7 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
     const [imageError, setImageError] = useState(false);
 
     // 아바타 관련 상태 (계정별로 분리)
-    const [profileImageType, setProfileImageType] = useState(getProfileSetting('profileImageType') || 'avatar'); // 'avatar' | 'photo'
+    const [profileImageType, setProfileImageType] = useState(getProfileSetting('profileImageType') || 'photo'); // 'avatar' | 'photo' (기본: photo)
     const [selectedAvatarId, setSelectedAvatarId] = useState(getProfileSetting('selectedAvatarId') || null);
     const [isAvatarSelectorOpen, setIsAvatarSelectorOpen] = useState(false);
     const [avatarBgColor, setAvatarBgColor] = useState(getProfileSetting('avatarBgColor') || 'none');
@@ -64,6 +64,9 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
 
     // 보안 & 개인정보 모달
     const [isSecurityDocViewerOpen, setIsSecurityDocViewerOpen] = useState(false);
+
+    // 약관 동의 정보
+    const [termsAgreement, setTermsAgreement] = useState(null);
 
     // 사용자 이름 결정
     const userName = nickname || profile?.name || profile?.email?.split('@')[0] || '게스트';
@@ -396,7 +399,12 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
     // 배경색 변경 이벤트 리스너
     useEffect(() => {
         const handleBgColorChange = async (e) => {
-            const newColor = e.detail;
+            // 새 형식: { type: 'custom' | 'yellow' | ..., customColor: '#FFD700' | null }
+            // 기존 형식 호환: string (예: 'yellow')
+            const eventData = e.detail;
+            const newColor = typeof eventData === 'object' ? eventData.type : eventData;
+            const customColorValue = typeof eventData === 'object' ? eventData.customColor : null;
+
             setAvatarBgColor(newColor);
 
             // 🔥 Firestore users/{userId}/settings/profile에 동기화
@@ -407,12 +415,23 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
                     const { db } = await import('../firebase/config');
 
                     const settingsRef = doc(db, 'users', userId, 'settings', 'profile');
-                    await setDoc(settingsRef, {
+
+                    // 업데이트 데이터 구성
+                    const updateData = {
                         avatarBgColor: newColor,
                         updatedAt: serverTimestamp(),
-                    }, { merge: true });
+                    };
 
-                    console.log('✅ 아바타 배경색 Firestore 동기화 완료');
+                    // custom인 경우 avatarCustomColor도 함께 저장
+                    if (newColor === 'custom') {
+                        // 이벤트에서 직접 전달받은 값 우선, 없으면 localStorage에서
+                        const customColor = customColorValue || localStorage.getItem('avatarCustomColor') || '#FF1493';
+                        updateData.avatarCustomColor = customColor;
+                    }
+
+                    await setDoc(settingsRef, updateData, { merge: true });
+
+                    console.log('✅ 아바타 배경색 Firestore 동기화 완료:', updateData);
                 }
             } catch (error) {
                 console.error('아바타 배경색 동기화 실패:', error);
@@ -539,6 +558,30 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
         setHasMasterPasswordSet(hasMasterPassword());
     }, []);
 
+    // 약관 동의 정보 로드
+    useEffect(() => {
+        const loadTermsAgreement = async () => {
+            const userId = localStorage.getItem('firebaseUserId');
+            if (!userId) return;
+
+            try {
+                const { doc, getDoc } = await import('firebase/firestore');
+                const { db } = await import('../firebase/config');
+
+                const termsRef = doc(db, 'users', userId, 'agreements', 'terms');
+                const termsSnap = await getDoc(termsRef);
+
+                if (termsSnap.exists()) {
+                    setTermsAgreement(termsSnap.data());
+                }
+            } catch (error) {
+                console.error('약관 동의 정보 로드 오류:', error);
+            }
+        };
+
+        loadTermsAgreement();
+    }, []);
+
     // 생년월일 마스킹 함수
     const maskBirthDate = (year, month, day) => {
         if (isBirthDateRevealed) {
@@ -605,15 +648,9 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
         return hashHex;
     };
 
-    // 프로필 사진 변경
+    // 프로필 사진 변경 - 항상 파일 선택창 열기
     const handleProfileImageClick = () => {
-        if (profileImageType === 'avatar') {
-            // 아바타 모드일 때는 아바타 선택 모달 열기
-            setIsAvatarSelectorOpen(true);
-        } else {
-            // 사진 모드일 때는 파일 선택
-            fileInputRef.current?.click();
-        }
+        fileInputRef.current?.click();
     };
 
     // 프로필 사진/아바타 제거 (초기화)
@@ -908,27 +945,7 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
                             ) : null}
                         </S.ProfileImageWrapper>
 
-                        {/* 이미지 타입 선택 버튼 */}
-                        <S.ProfileImageTypeSelector>
-                            <S.ImageTypeButton
-                                $selected={profileImageType === 'avatar'}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleImageTypeChange('avatar');
-                                }}
-                            >
-                                🎨 아바타
-                            </S.ImageTypeButton>
-                            <S.ImageTypeButton
-                                $selected={profileImageType === 'photo'}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleImageTypeChange('photo');
-                                }}
-                            >
-                                📸 이미지
-                            </S.ImageTypeButton>
-                        </S.ProfileImageTypeSelector>
+                        {/* 이미지 타입 선택 버튼 - 숨김 처리 */}
 
                         {/* 숨겨진 파일 input (카메라/앨범 선택) */}
                         <input
@@ -1060,6 +1077,23 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
                         <span>이용약관 · 개인정보처리방침</span>
                         <span style={{ opacity: 0.5 }}>›</span>
                     </S.SecurityLinkButton>
+
+                    {/* 동의 완료 표시 박스 */}
+                    {termsAgreement && (
+                        <S.AgreementStatusBox>
+                            <S.AgreementCheckIcon>✓</S.AgreementCheckIcon>
+                            <S.AgreementText>
+                                <strong>{userName}</strong>님은 이상의 문서에 동의함.
+                                <S.AgreementDate>
+                                    {termsAgreement.termsAgreedAt && new Date(termsAgreement.termsAgreedAt).toLocaleDateString('ko-KR', {
+                                        year: 'numeric',
+                                        month: 'long',
+                                        day: 'numeric'
+                                    })}
+                                </S.AgreementDate>
+                            </S.AgreementText>
+                        </S.AgreementStatusBox>
+                    )}
                 </S.Section>
                         </S.Container>
                     </S.ScrollContent>
@@ -1073,9 +1107,6 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
                     onClose={() => setIsAvatarSelectorOpen(false)}
                     onSelect={handleAvatarSelect}
                     currentAvatarId={selectedAvatarId}
-                    birthYear={fortuneProfile?.birthYear}
-                    birthMonth={fortuneProfile?.birthMonth}
-                    birthDay={fortuneProfile?.birthDay}
                 />
             )}
 

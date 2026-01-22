@@ -36,7 +36,7 @@ const config: CapacitorConfig = {
   webDir: 'dist',
 
   android: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#1f2229',
     allowMixedContent: true,
     webContentsDebuggingEnabled: true  // Chrome inspect 디버깅 활성화
   },
@@ -58,10 +58,19 @@ const config: CapacitorConfig = {
      * StatusBar 플러그인 설정
      * - @capacitor/status-bar 패키지 필요
      * - main.tsx에서 런타임 설정도 함께 적용됨
+     *
+     * ============================================================
+     * 상태바 색상 설정
+     * ============================================================
+     * - 상태바 배경색: #2a2d34 (헤더 상단과 동일)
+     * - 아이콘/텍스트: #ffffff (흰색)
+     *
+     * ⚠️ 사용자의 지시를 받기 전 변경 불가
+     * ============================================================
      */
     StatusBar: {
       overlaysWebView: false,  // 상태바가 WebView 위에 겹치지 않도록
-      backgroundColor: '#1a1a2e',
+      backgroundColor: '#2a2d34',  // 헤더 상단과 동일한 색상
       style: 'DARK'  // 밝은 아이콘 (어두운 배경용)
     },
 

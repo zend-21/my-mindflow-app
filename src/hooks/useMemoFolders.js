@@ -19,11 +19,19 @@ const DEFAULT_FOLDERS = [
  * @param {Array} syncContext.folders - 실시간으로 동기화되는 폴더 배열
  * @param {Function} syncContext.syncFolder - 개별 폴더 저장 함수
  * @param {Function} syncContext.deleteFolder - 폴더 삭제 함수
+ * @param {string} initialActiveFolder - 외부에서 전달받은 초기 활성 폴더 ID
  */
-export const useMemoFolders = (syncContext = null) => {
+export const useMemoFolders = (syncContext = null, initialActiveFolder = 'all') => {
   const [folders, setFolders] = useState(DEFAULT_FOLDERS);
-  const [activeFolder, setActiveFolder] = useState('all');
+  const [activeFolder, setActiveFolder] = useState(initialActiveFolder);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // 외부에서 initialActiveFolder가 변경되면 activeFolder도 동기화
+  useEffect(() => {
+    if (initialActiveFolder && initialActiveFolder !== activeFolder) {
+      setActiveFolder(initialActiveFolder);
+    }
+  }, [initialActiveFolder]);
 
   // syncContext가 제공되면 실시간 폴더 데이터 사용
   useEffect(() => {

@@ -36,7 +36,7 @@ export const Overlay = styled.div`
 export const ModalContainer = styled.div`
     background: linear-gradient(180deg, #2a2d35 0%, #1a1d24 100%);
     border-radius: 20px;
-    width: 90vw;
+    width: calc(100% - 32px);
     max-width: 500px;
     max-height: 80vh;
     display: flex;
@@ -44,6 +44,7 @@ export const ModalContainer = styled.div`
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
     animation: ${slideUp} 0.3s ease-out;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    box-sizing: border-box;
 `;
 
 export const ModalHeader = styled.div`
@@ -84,6 +85,7 @@ export const CloseButton = styled.button`
 
 export const ModalBody = styled.div`
     padding: 20px;
+    padding-right: 12px; /* 스크롤바 영역 확보 */
     overflow-y: auto;
     flex: 1;
     scroll-behavior: smooth;
@@ -497,6 +499,7 @@ export const AvatarGrid = styled.div`
     grid-template-columns: repeat(4, 1fr);
     gap: 12px;
     margin-bottom: 24px;
+    justify-items: center;
 
     @media (max-width: 480px) {
         grid-template-columns: repeat(3, 1fr);

@@ -14,11 +14,11 @@ import {
 import { db } from '../firebase/config';
 
 // 최고 관리자 Firebase UID (직접 지정)
-export const SUPER_ADMIN_UID = 'YA8ZHGF13NOzLW9KIXC994Y8tyd2';
+export const SUPER_ADMIN_UID = 'PrFoplbIWVabgdfZdlN6ehmBcE73';
 
 // 최고 관리자 ShareNote 아이디 (ws- 접두사 없이 입력, 자동으로 추가됨)
-// 예: 'WSHGZ3' -> 내부적으로 'ws-WSHGZ3'로 변환
-export const SUPER_ADMIN_SHARENOTE_ID = 'WSHGZ3';
+// 예: 'WSAAZ3' -> 내부적으로 'ws-WSAAZ3'로 변환
+export const SUPER_ADMIN_SHARENOTE_ID = 'A9Z21L';
 
 // ShareNote 아이디로 Firebase UID 찾기 (캐싱)
 let sharenoteIdToUidCache = {};
@@ -131,6 +131,48 @@ const getAdminConfig = async () => {
       return { superAdmin: null, subAdmins: {} };
     }
     throw error;
+  }
+};
+
+/**
+ * 최고 관리자 변경 시 Firestore의 adminSettings 문서 동기화
+ * 코드의 SUPER_ADMIN_UID와 Firestore 문서가 다르면 자동 업데이트
+ */
+const syncAdminSettingsIfNeeded = async (currentSuperAdminUid) => {
+  try {
+    const configRef = doc(db, 'systemConfig', 'adminSettings');
+    const configDoc = await getDoc(configRef);
+
+    if (configDoc.exists()) {
+      const data = configDoc.data();
+      // Firestore의 superAdmin과 코드의 SUPER_ADMIN_UID가 다르면 업데이트
+      if (data.superAdmin !== currentSuperAdminUid) {
+        console.log('🔄 최고 관리자 변경 감지, Firestore 동기화 중...');
+        await setDoc(configRef, {
+          ...data,
+          superAdmin: currentSuperAdminUid,
+          superAdminShareNoteId: SUPER_ADMIN_SHARENOTE_ID,
+          updatedAt: serverTimestamp(),
+        });
+        console.log('✅ Firestore adminSettings 동기화 완료');
+      }
+    } else {
+      // 문서가 없으면 새로 생성
+      console.log('📝 adminSettings 문서 생성 중...');
+      await setDoc(configRef, {
+        superAdmin: currentSuperAdminUid,
+        superAdminShareNoteId: SUPER_ADMIN_SHARENOTE_ID,
+        subAdmins: {},
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      console.log('✅ adminSettings 문서 생성 완료');
+    }
+  } catch (error) {
+    // 권한 오류는 무시 (아직 관리자가 아닌 상태에서 접근 시)
+    if (error.code !== 'permission-denied') {
+      console.error('adminSettings 동기화 오류:', error);
+    }
   }
 };
 
@@ -324,6 +366,11 @@ export const checkAdminStatus = async (userId) => {
     // 최고 관리자 체크
     const superAdminUid = await getSuperAdminUid();
     const isSuperAdminUser = userId === superAdminUid;
+
+    // 최고 관리자인 경우, Firestore의 adminSettings 문서도 동기화
+    if (isSuperAdminUser) {
+      await syncAdminSettingsIfNeeded(superAdminUid);
+    }
 
     if (isSuperAdminUser) {
       return {

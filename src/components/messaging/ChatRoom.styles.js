@@ -1522,3 +1522,94 @@ export const SearchButton = styled.button`
     cursor: not-allowed;
   }
 `;
+
+// 매크로 버튼 (입력창 오른쪽 - placeholder와 동일한 고정 색상)
+export const MacroButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: transparent;
+  color: #999;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 10px;
+  font-weight: 500;
+  border: 1px solid rgba(153, 153, 153, 0.4);
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(153, 153, 153, 0.15);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+`;
+
+// 매크로 모달 오버레이 (RichTextEditor와 동일)
+export const MacroModalOverlay = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100001;
+`;
+
+export const MacroModalContent = styled.div`
+  background: #2a2d35;
+  border-radius: 12px;
+  padding: 20px;
+  width: 90%;
+  max-width: 500px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+`;
+
+export const MacroModalTitle = styled.h3`
+  margin: 0 0 16px 0;
+  color: #e0e0e0;
+  font-size: 18px;
+  text-align: center;
+`;
+
+export const MacroGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+`;
+
+export const MacroItem = styled.button`
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: #e0e0e0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  font-size: 14px;
+
+  &:hover {
+    background: rgba(139, 92, 246, 0.25);
+    border-color: rgba(139, 92, 246, 0.5);
+  }
+
+  &:active {
+    transform: scale(0.98);
+  }
+`;
+
+export const MacroEmptyMessage = styled.div`
+  padding: 16px;
+  text-align: center;
+  color: #888;
+  font-size: 14px;
+`;

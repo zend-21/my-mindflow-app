@@ -1,6 +1,6 @@
 // src/components/QuickActions.jsx
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import {
     DndContext,
@@ -157,13 +157,27 @@ const SortableItem = ({ item, onSwitchTab, isDragOverlay = false }) => {
     );
 };
 
+// 빠른 실행 카드 기본 데이터 (버전 관리)
+const QUICK_ACTIONS_VERSION = 3; // 텍스트 변경 시 버전 증가
+const DEFAULT_ITEMS = [
+    { id: 'memo', icon: '📝', title: '메모장', subtitle: '언제든 메모' },
+    { id: 'calendar', icon: '📅', title: '캘린더', subtitle: '일정 관리' },
+    { id: 'secret', icon: '🔒', title: '시크릿', subtitle: '비밀 노트' },
+    { id: 'chat', icon: '💬', title: '대화', subtitle: '공유로 협업' }
+];
+
 const QuickActions = ({ onSwitchTab }) => {
-    const [items, setItems] = useLocalStorage('quick-actions-order', [
-        { id: 'memo', icon: '📝', title: '메모', subtitle: '빠른 생각 정리' },
-        { id: 'calendar', icon: '📅', title: '캘린더', subtitle: '일정 관리' },
-        { id: 'secret', icon: '🔒', title: '시크릿', subtitle: '비밀 노트' },
-        { id: 'review', icon: '🌟', title: '리뷰', subtitle: '한 주 돌아보기' }
-    ]);
+    const [items, setItems] = useLocalStorage('quick-actions-order', DEFAULT_ITEMS);
+
+    // 버전 체크하여 강제 초기화 (기존 id가 다를 수 있으므로)
+    useEffect(() => {
+        const savedVersion = localStorage.getItem('quick-actions-version');
+        if (savedVersion !== String(QUICK_ACTIONS_VERSION)) {
+            // 완전히 기본값으로 초기화
+            setItems(DEFAULT_ITEMS);
+            localStorage.setItem('quick-actions-version', String(QUICK_ACTIONS_VERSION));
+        }
+    }, []);
 
     const [activeId, setActiveId] = useState(null);
     const hasDragged = useRef(false);

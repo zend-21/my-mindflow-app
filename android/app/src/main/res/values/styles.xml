@@ -13,11 +13,25 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
-        <!-- 상태바/네비게이션바 색상 (항상 어두운 색 고정) -->
-        <item name="android:statusBarColor">#1a1a2e</item>
-        <item name="android:navigationBarColor">#1a1a2e</item>
+        <!--
+            ============================================================
+            상태바/네비게이션바 색상 설정
+            ============================================================
+            - 상태바 배경색: #2a2d34 (헤더 상단과 동일)
+            - 네비게이션바 배경색: #202126 (푸터와 동일)
+            - 아이콘/텍스트: #ffffff (흰색)
+            - 네비게이션 버튼: #ffffff (흰색)
+
+            ⚠️ 사용자의 지시를 받기 전 변경 불가
+            ============================================================
+        -->
+        <item name="android:statusBarColor">#2a2d34</item>
+        <item name="android:navigationBarColor">#202126</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowTranslucentStatus">false</item>
+        <item name="android:windowTranslucentNavigation">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
         <item name="android:fitsSystemWindows">true</item>
         <!-- Android 15 edge-to-edge 강제 비활성화 -->
         <item name="android:windowOptOutEdgeToEdgeEnforcement">true</item>

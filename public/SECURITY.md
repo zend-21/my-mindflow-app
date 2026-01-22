@@ -1,13 +1,13 @@
 # 보안 정책
 
-**나의 비망록(MindFlow)**의 보안 정책입니다.
+**셰어노트(ShareNote)**의 보안 정책입니다.
 
 ## 보안 취약점 신고
 
 보안 취약점을 발견하신 경우 다음 방법으로 신고해 주세요:
 
 ### 신고 방법
-- **이메일**: security@mindflow.app (예시)
+- **이메일**: security@sharenote.app
 - **GitHub Private Security Advisory**: [보안 권고 생성](https://github.com/your-repo/security/advisories/new)
 
 ### 신고 시 포함할 정보
@@ -138,14 +138,14 @@
 ## 보안 연락처
 
 보안 관련 문의:
-- **Email**: security@mindflow.app
+- **Email**: security@sharenote.app
 - **Response Time**: 24시간 이내
 
 긴급 보안 사고:
-- **Email**: emergency@mindflow.app
+- **Email**: emergency@sharenote.app
 - **Response Time**: 즉시
 
 ---
 
-**최종 업데이트**: 2025년 12월 16일
+**최종 업데이트**: 2026년 2월 3일
 **버전**: 1.0.0

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../../firebase/config';
 import { subscribeToUnifiedMessages, markUnifiedAsRead, markAllUnifiedMessagesAsRead } from '../../../services/unifiedChatService';
@@ -13,12 +13,27 @@ export function useChatMessages(chat, currentUserId, isPageVisible, notification
   const [userDisplayNames, setUserDisplayNames] = useState({});
   const messagesEndRef = useRef(null);
 
+  // ref로 최신 값 유지 (의존성 배열에서 제외하기 위함)
+  const userNicknamesRef = useRef(userNicknames);
+  const userDisplayNamesRef = useRef(userDisplayNames);
+  const isPageVisibleRef = useRef(isPageVisible);
+  const notificationEnabledRef = useRef(notificationSettings.enabled);
+  const playSoundRef = useRef(playChatMessageSound);
+
+  // ref 동기화
+  useEffect(() => { userNicknamesRef.current = userNicknames; }, [userNicknames]);
+  useEffect(() => { userDisplayNamesRef.current = userDisplayNames; }, [userDisplayNames]);
+  useEffect(() => { isPageVisibleRef.current = isPageVisible; }, [isPageVisible]);
+  useEffect(() => { notificationEnabledRef.current = notificationSettings.enabled; }, [notificationSettings.enabled]);
+  useEffect(() => { playSoundRef.current = playChatMessageSound; }, [playChatMessageSound]);
+
   useEffect(() => {
     if (!chat.id) return;
 
     let isMounted = true;
     let prevMessageCount = 0;
     let unsubscribe = null;
+    const loadedSenders = new Set(); // 이미 로드 시도한 발신자 추적
 
     // 약간의 지연을 두고 구독 시작 (Firestore 내부 상태 안정화)
     const timeoutId = setTimeout(() => {
@@ -29,37 +44,42 @@ export function useChatMessages(chat, currentUserId, isPageVisible, notification
         if (!isMounted) return;
 
         // 새 메시지가 추가되었고, 내가 보낸 메시지가 아니면 효과음 재생
-        if (prevMessageCount > 0 && newMessages.length > prevMessageCount && notificationSettings.enabled) {
+        if (prevMessageCount > 0 && newMessages.length > prevMessageCount && notificationEnabledRef.current) {
           const latestMessage = newMessages[newMessages.length - 1];
           // 상대방이 보낸 메시지인 경우만 효과음 재생
           if (latestMessage?.senderId !== currentUserId) {
-            playChatMessageSound();
+            playSoundRef.current?.();
           }
         }
 
         // 새 메시지 도착 시 페이지가 보이는 경우에만 읽음 처리
         if (prevMessageCount > 0 && newMessages.length > prevMessageCount) {
-          markUnifiedAsRead(chat.id, chat.type, currentUserId, isPageVisible);
+          markUnifiedAsRead(chat.id, chat.type, currentUserId, isPageVisibleRef.current);
         }
 
         prevMessageCount = newMessages.length;
         setMessages(newMessages);
 
-        // 메시지 발신자들의 닉네임 동적 로드
+        // 메시지 발신자들의 닉네임 동적 로드 (ref 사용으로 리스너 재생성 방지)
         const senderIds = new Set(newMessages.map(msg => msg.senderId).filter(Boolean));
         for (const senderId of senderIds) {
-          // 이미 로드된 사용자는 스킵
-          if (userNicknames[senderId] !== undefined || userDisplayNames[senderId] !== undefined) continue;
+          // 이미 로드 시도한 발신자는 스킵 (Set으로 추적)
+          if (loadedSenders.has(senderId)) continue;
+          if (userNicknamesRef.current[senderId] !== undefined || userDisplayNamesRef.current[senderId] !== undefined) continue;
+
+          loadedSenders.add(senderId); // 로드 시도 표시
 
           try {
             // 1순위: nicknames 컬렉션에서 앱 닉네임
             const nickname = await getUserNickname(senderId);
-            setUserNicknames(prev => ({ ...prev, [senderId]: nickname }));
+            if (isMounted) {
+              setUserNicknames(prev => ({ ...prev, [senderId]: nickname }));
+            }
 
             // 2순위: settings에서 구글 displayName
             const settingsRef = doc(db, 'mindflowUsers', senderId, 'userData', 'settings');
             const settingsSnap = await getDoc(settingsRef);
-            if (settingsSnap.exists()) {
+            if (isMounted && settingsSnap.exists()) {
               setUserDisplayNames(prev => ({ ...prev, [senderId]: settingsSnap.data().displayName || null }));
             }
           } catch (error) {
@@ -76,8 +96,8 @@ export function useChatMessages(chat, currentUserId, isPageVisible, notification
       });
 
       // 읽음 표시 (통합 함수 사용 - 페이지 가시성 확인)
-      markUnifiedAsRead(chat.id, chat.type, currentUserId, isPageVisible);
-      markAllUnifiedMessagesAsRead(chat.id, chat.type, currentUserId, isPageVisible);
+      markUnifiedAsRead(chat.id, chat.type, currentUserId, isPageVisibleRef.current);
+      markAllUnifiedMessagesAsRead(chat.id, chat.type, currentUserId, isPageVisibleRef.current);
     }, 50);
 
     return () => {
@@ -92,7 +112,7 @@ export function useChatMessages(chat, currentUserId, isPageVisible, notification
         }
       }
     };
-  }, [chat.id, chat.type, currentUserId, isPageVisible, notificationSettings.enabled, userNicknames, userDisplayNames, playChatMessageSound]);
+  }, [chat.id, chat.type, currentUserId]); // 핵심 식별자만 의존성으로 유지
 
   return {
     messages,
