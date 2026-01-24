@@ -11,6 +11,14 @@ import { hasAlarm, hasActiveAlarm, isAutoDeleted, getRepeatedAnniversaries } fro
 import { saveCalendarDateToFirestore } from '../../services/userData';
 import * as S from './Calendar.styles';
 
+// HTML 태그 제거 함수
+const stripHtmlTags = (html) => {
+    if (!html || typeof html !== 'string') return '';
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return div.textContent || div.innerText || '';
+};
+
 // 개인 기념일
 const PERSONAL_EVENTS = {};
 
@@ -274,6 +282,7 @@ const today = new Date();
 const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 
 const Calendar = ({
+  selectedDate: initialSelectedDate,
   onSelectDate,
   addActivity,
   schedules,
@@ -290,7 +299,7 @@ const Calendar = ({
     const { moveToTrash } = useTrashContext();
 
     const [currentMonth, setCurrentMonth] = useState(new Date());
-    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [selectedDate, setSelectedDate] = useState(initialSelectedDate || new Date());
     const [isDateSelectorModalOpen, setIsDateSelectorModalOpen] = useState(false);
     const [scheduleText, setScheduleText] = useState('');
     const [isEditing, setIsEditing] = useState(false);
@@ -329,22 +338,20 @@ const Calendar = ({
         trackMouse: true,
     });
 
+    // 외부에서 전달된 selectedDate가 변경되면 내부 state 업데이트
+    useEffect(() => {
+        if (initialSelectedDate) {
+            setSelectedDate(initialSelectedDate);
+            setCurrentMonth(initialSelectedDate);
+        }
+    }, [initialSelectedDate]);
+
     // 월별 체크 시스템을 적용한 특일 데이터 로드 함수
     const loadSpecialDatesData = async (forceUpdate = false) => {
         const cachedData = getCachedData();
 
-        console.log('🔍 loadSpecialDatesData 호출');
-        console.log('  - forceUpdate:', forceUpdate);
-        console.log('  - cachedData 존재:', !!cachedData);
-        if (cachedData) {
-            console.log('  - cachedData.timestamp:', new Date(cachedData.timestamp));
-            console.log('  - lastCheckedMonth:', cachedData.lastCheckedMonth);
-            console.log('  - shouldRunMonthlyCheck:', shouldRunMonthlyCheck(cachedData));
-        }
-
         // 캐시가 없으면 전체 다운로드
         if (!cachedData) {
-            console.log('⚠️ 캐시 없음 - 전체 데이터 다운로드 시작');
             await downloadAllData();
             return;
         }
@@ -353,7 +360,6 @@ const Calendar = ({
         if (!forceUpdate && !shouldRunMonthlyCheck(cachedData)) {
             setSpecialDates(cachedData.data);
             setCacheStatus({ loading: false, error: null });
-            console.log('✅ 캐시된 특일 데이터 사용 (이번 달 이미 체크함)');
             return;
         }
 
@@ -694,10 +700,19 @@ const Calendar = ({
         const entry = schedules[key];
         const specialDate = specialDates[key];
 
-        if (entry && entry.text && entry.text.trim().length > 0) {
-            setScheduleText(entry.text);
-            setOriginalTextOnEdit(entry.text);
-            setIsHolidayText(false);
+        // HTML 태그 제거 후 텍스트가 있는지 확인
+        if (entry && entry.text) {
+            const plainText = stripHtmlTags(entry.text).trim();
+            if (plainText.length > 0) {
+                setScheduleText(entry.text);
+                setOriginalTextOnEdit(entry.text);
+                setIsHolidayText(false);
+            } else {
+                setScheduleText("");
+                setIsHolidayText(false);
+                setIsNationalDay(false);
+                setOriginalTextOnEdit("");
+            }
         } else {
             setScheduleText("");
             setIsHolidayText(false);
@@ -774,8 +789,10 @@ const Calendar = ({
     const hasSchedule = (date) => {
         const key = format(date, 'yyyy-MM-dd');
         const entry = schedules[key];
-        // 일정 텍스트가 있고 비어있지 않은 경우에만 true
-        return entry && entry.text && entry.text.trim().length > 0;
+        // HTML 태그 제거 후 텍스트가 있는지 확인
+        if (!entry || !entry.text) return false;
+        const plainText = stripHtmlTags(entry.text).trim();
+        return plainText.length > 0;
     };
 
     // hasAlarm, hasActiveAlarm 함수는 utils로 이동됨
@@ -962,6 +979,12 @@ const Calendar = ({
         );
 
         setSchedules((prevSchedules) => {
+            // ✅ prevSchedules가 undefined/null인 경우 방어
+            if (!prevSchedules || typeof prevSchedules !== 'object') {
+                console.error('❌ [executeDeleteScheduleOnly] prevSchedules가 유효하지 않습니다:', prevSchedules);
+                return prevSchedules || {};
+            }
+
             const updatedSchedules = { ...prevSchedules };
 
             if (updatedSchedules[key]) {
@@ -1317,16 +1340,6 @@ const Calendar = ({
                                 // ⚠️ CRITICAL FIX: localStorage 대신 React state schedules 사용
                                 const repeatedAnniversaries = getRepeatedAnniversaries(selectedDate, schedules);
 
-                                console.log('🔍 [Preview Header] 반복 기념일:', {
-                                    selectedDate: format(selectedDate, 'yyyy-MM-dd'),
-                                    repeatedCount: repeatedAnniversaries.length,
-                                    repeated: repeatedAnniversaries.map(a => ({
-                                        id: a.id,
-                                        title: a.title,
-                                        anniversaryName: a.anniversaryName
-                                    }))
-                                });
-
                                 if (repeatedAnniversaries.length === 0) return null;
 
                                 return (
@@ -1404,17 +1417,6 @@ const Calendar = ({
                                     try {
                                         // ⚠️ CRITICAL FIX: localStorage 대신 React state schedules 사용
                                         const repeated = getRepeatedAnniversaries(selectedDate, schedules);
-                                        console.log('🔍 [Calendar Content] 반복 기념일 로드:', {
-                                            selectedDate: format(selectedDate, 'yyyy-MM-dd'),
-                                            repeatedCount: repeated.length,
-                                            repeated: repeated.map(a => ({
-                                                id: a.id,
-                                                title: a.title,
-                                                isRepeated: a.isRepeated,
-                                                anniversaryRepeat: a.anniversaryRepeat
-                                            }))
-                                        });
-
                                         return repeated.filter(alarm => !isAutoDeleted(alarm));
                                     } catch (error) {
                                         console.error('반복 기념일 로드 오류:', error);

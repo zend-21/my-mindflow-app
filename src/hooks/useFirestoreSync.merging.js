@@ -42,11 +42,9 @@ export const mergeItem = (firestoreItem, localItem, itemType) => {
 
     if (firestoreTime > effectiveSyncedTime) {
       // Firestore가 더 최신 → 다른 기기에서 수정됨
-      console.log(`📥 ${itemType} ${firestoreItem.id}: Firestore 우선`);
       return firestoreItem;
     } else {
       // 로컬이 더 최신 또는 저장 실패 → 로컬 우선
-      console.log(`📝 ${itemType} ${firestoreItem.id}: 로컬 우선`);
       return localItem;
     }
   }
@@ -64,11 +62,9 @@ export const handleLocalOnlyItem = (localItem, itemType) => {
 
   if (!lastSaved) {
     // 한 번도 저장 안 됨 → 진짜 새 아이템
-    console.log(`🆕 새 ${itemType} 발견: ${localItem.id}`);
     return localItem;
   } else {
     // 저장 기록 있는데 Firestore에 없음 → 다른 기기에서 삭제됨
-    console.log(`🗑️ ${itemType} ${localItem.id}: 다른 기기에서 삭제됨`);
     localStorage.removeItem(lastSavedKey);
     return null;
   }
@@ -177,10 +173,8 @@ export const mergeCalendar = (firestoreCalendar, localCalendar) => {
         const localTime = getTimestamp(localSchedule);
 
         if (firestoreTime > localTime) {
-          console.log(`📥 캘린더 ${dateKey}: Firestore 우선`);
           mergedCalendar[dateKey] = firestoreSchedule;
         } else {
-          console.log(`📝 캘린더 ${dateKey}: 로컬 우선`);
           mergedCalendar[dateKey] = localSchedule;
         }
       }
@@ -249,10 +243,8 @@ export const mergeSettings = (firestoreSettings, localSettings, saveSettingsToFi
     const effectiveSyncedTime = lastSaved ? lastSyncedTime : localTime;
 
     if (firestoreTime > effectiveSyncedTime) {
-      console.log('📥 설정: Firestore 우선');
       return firestoreSettings;
     } else {
-      console.log('📝 설정: 로컬 우선, Firestore 저장 시도');
       saveSettingsToFirestore(userId, localSettings).catch(() => {});
       return localSettings;
     }

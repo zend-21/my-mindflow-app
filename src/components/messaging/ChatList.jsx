@@ -422,39 +422,15 @@ const ChatList = forwardRef(({ showToast, memos, requirePhoneAuth, onUpdateMemoP
       rooms.forEach(room => {
         const prevTime = prevLastMessageTimes.current[room.id];
 
-        // ⚠️ lastMessage 전체 구조 확인
-        console.log('🔍 [ChatList] lastMessage 전체 구조:', room.id, room.lastMessage);
-
         const currentTime = room.lastMessage?.createdAt?.toMillis?.() || 0;
 
         // 새 메시지가 도착했고, 내가 보낸 게 아니며, 현재 그 방에 없을 때
         // prevTime이 있고 시간이 증가한 경우만 (초기 로드 제외)
         const hasNewMessage = prevTime !== undefined && currentTime > prevTime;
 
-        console.log('🔍 [ChatList] DM 방 메시지 확인:', {
-          roomId: room.id,
-          prevTime,
-          prevTimeType: typeof prevTime,
-          currentTime,
-          currentTimeType: typeof currentTime,
-          'prevTime !== undefined': prevTime !== undefined,
-          'currentTime > prevTime': currentTime > prevTime,
-          hasNewMessage,
-          lastMessageSenderId: room.lastMessage?.senderId,
-          currentUserId,
-          currentChatRoom: getCurrentChatRoom()
-        });
-
         if (hasNewMessage) {
           const isMyMessage = room.lastMessage?.senderId === currentUserId;
           const isInThisRoom = getCurrentChatRoom() === room.id;
-
-          console.log('🔍 [ChatList] 새 메시지 조건 확인:', {
-            roomId: room.id,
-            isMyMessage,
-            isInThisRoom,
-            shouldPlaySound: !isMyMessage && !isInThisRoom
-          });
 
           if (!isMyMessage && !isInThisRoom) {
             // 🔔 알림음 재생 (playNewMessageNotification 내부에서 페이지 가시성 체크)
@@ -486,39 +462,15 @@ const ChatList = forwardRef(({ showToast, memos, requirePhoneAuth, onUpdateMemoP
       groups.forEach(group => {
         const prevTime = prevLastMessageTimes.current[group.id];
 
-        // ⚠️ lastMessage 전체 구조 확인
-        console.log('🔍 [ChatList] 그룹 lastMessage 전체 구조:', group.id, group.lastMessage);
-
         const currentTime = group.lastMessage?.createdAt?.toMillis?.() || 0;
 
         // 새 메시지가 도착했고, 내가 보낸 게 아니며, 현재 그 방에 없을 때
         // prevTime이 있고 시간이 증가한 경우만 (초기 로드 제외)
         const hasNewMessage = prevTime !== undefined && currentTime > prevTime;
 
-        console.log('🔍 [ChatList] 그룹방 메시지 확인:', {
-          groupId: group.id,
-          prevTime,
-          prevTimeType: typeof prevTime,
-          currentTime,
-          currentTimeType: typeof currentTime,
-          'prevTime !== undefined': prevTime !== undefined,
-          'currentTime > prevTime': currentTime > prevTime,
-          hasNewMessage,
-          lastMessageSenderId: group.lastMessage?.senderId,
-          currentUserId,
-          currentChatRoom: getCurrentChatRoom()
-        });
-
         if (hasNewMessage) {
           const isMyMessage = group.lastMessage?.senderId === currentUserId;
           const isInThisRoom = getCurrentChatRoom() === group.id;
-
-          console.log('🔍 [ChatList] 그룹방 새 메시지 조건 확인:', {
-            groupId: group.id,
-            isMyMessage,
-            isInThisRoom,
-            shouldPlaySound: !isMyMessage && !isInThisRoom
-          });
 
           if (!isMyMessage && !isInThisRoom) {
             // 그룹방 개별 음소거 설정 확인

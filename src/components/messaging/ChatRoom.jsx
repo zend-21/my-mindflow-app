@@ -29,6 +29,7 @@ import UserProfileModal from './UserProfileModal';
 import { db } from '../../firebase/config';
 import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 import { getCurrentUserId, getCurrentUserData, getRoomReceiveSoundMuted, setRoomReceiveSoundMuted } from '../../utils/userStorage';
+import { getAccountLocalStorageWithTTL } from '../../hooks/useFirestoreSync.utils';
 import { avatarList } from '../avatars/AvatarIcons';
 
 
@@ -616,9 +617,15 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   useEffect(() => {
     const loadMacros = () => {
       try {
-        const savedMacros = JSON.parse(localStorage.getItem('macroTexts') || '[]');
+        const userId = getCurrentUserId();
+        if (!userId) {
+          setMacros([]);
+          return;
+        }
+        // ✅ TTL 기반 localStorage 사용
+        const savedMacros = getAccountLocalStorageWithTTL(userId, 'macros') || [];
         // 빈 문자열 제외하고 내용이 있는 매크로만 필터링
-        setMacros(savedMacros.filter(m => m && m.trim()).slice(0, 7));
+        setMacros(Array.isArray(savedMacros) ? savedMacros.filter(m => m && m.trim()).slice(0, 7) : []);
       } catch (error) {
         console.error('매크로 로드 실패:', error);
         setMacros([]);
@@ -629,7 +636,11 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
 
     // localStorage 변경 감지 (다른 탭에서 매크로 수정 시)
     const handleStorageChange = (e) => {
-      if (e.key === 'macroTexts') {
+      const userId = getCurrentUserId();
+      if (!userId) return;
+
+      const macrosKey = `user_${userId}_macros`;
+      if (e.key === macrosKey) {
         loadMacros();
       }
     };

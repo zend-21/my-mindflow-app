@@ -337,11 +337,7 @@ export const fetchCalendarFromFirestore = async (userId) => {
       }
 
       calendar[docSnap.id] = data.schedule || {};
-
-      console.log('🔍 [fetchCalendarFromFirestore] 날짜:', docSnap.id, '알람 수:', data.schedule?.alarm?.registeredAlarms?.length);
     });
-
-    console.log('✅ [fetchCalendarFromFirestore] 총', Object.keys(calendar).length, '개 날짜 로드됨');
 
     return calendar;
   } catch (error) {

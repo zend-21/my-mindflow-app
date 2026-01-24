@@ -51,7 +51,7 @@ export const saveSettingsToFirestore = async (userId, settings) => {
       ...settings,
       deleted: false,
       updatedAt: serverTimestamp(),
-      createdAt: settings.createdAt || serverTimestamp()
+      createdAt: (settings && settings.createdAt) ? settings.createdAt : serverTimestamp()
     }, { merge: true });
   } catch (error) {
     console.error('설정 데이터 저장 실패:', error);
@@ -109,7 +109,7 @@ export const saveFortuneProfileToFirestore = async (userId, fortuneProfile) => {
       ...fortuneProfile,
       deleted: false,
       updatedAt: serverTimestamp(),
-      createdAt: fortuneProfile.createdAt || serverTimestamp()
+      createdAt: (fortuneProfile && fortuneProfile.createdAt) ? fortuneProfile.createdAt : serverTimestamp()
     };
 
     // undefined 값 제거 (중첩 객체 포함)

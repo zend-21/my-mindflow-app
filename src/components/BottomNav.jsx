@@ -107,47 +107,24 @@ const BottomNav = ({ activeTab, onSwitchTab }) => {
             const total = dmUnread + groupUnread;
             // ⚠️ 중요: 0 이하의 값은 모두 0으로 처리 (음수 방지 및 모두 읽었을 때 배지 제거)
             const finalCount = total > 0 ? total : 0;
-            console.log('📊 [BottomNav] 배지 업데이트:', { dmUnread, groupUnread, total, finalCount });
             setTotalUnreadCount(finalCount);
         };
 
         // 1:1 채팅 구독
         const unsubscribeDM = subscribeToMyDMRooms((rooms) => {
-            const dmRoomsDetail = rooms.map(r => ({
-                id: r.id,
-                myUnreadCount: r.unreadCount?.[currentUserId] || 0,
-                fullUnreadCountObject: r.unreadCount  // Firestore의 전체 unreadCount 객체 표시
-            }));
-            console.log('📊 [BottomNav] DM 방 목록 (상세):', dmRoomsDetail);
-
             dmUnread = rooms.reduce((sum, room) => {
                 const count = room.unreadCount?.[currentUserId] || 0;
-                if (count > 0) {
-                    console.log(`   🔴 방 ${room.id}: unreadCount = ${count}, 전체 객체:`, room.unreadCount);
-                }
                 return sum + count;
             }, 0);
-            console.log('📊 [BottomNav] DM 총 안 읽음:', dmUnread);
             updateTotal();
         });
 
         // 그룹 채팅 구독
         const unsubscribeGroup = subscribeToMyGroupChats((groups) => {
-            const groupRoomsDetail = groups.map(g => ({
-                id: g.id,
-                myUnreadCount: g.unreadCount?.[currentUserId] || 0,
-                fullUnreadCountObject: g.unreadCount  // Firestore의 전체 unreadCount 객체 표시
-            }));
-            console.log('📊 [BottomNav] 그룹 방 목록 (상세):', groupRoomsDetail);
-
             groupUnread = groups.reduce((sum, group) => {
                 const count = group.unreadCount?.[currentUserId] || 0;
-                if (count > 0) {
-                    console.log(`   🔴 방 ${group.id}: unreadCount = ${count}, 전체 객체:`, group.unreadCount);
-                }
                 return sum + count;
             }, 0);
-            console.log('📊 [BottomNav] 그룹 총 안 읽음:', groupUnread);
             updateTotal();
         });
 

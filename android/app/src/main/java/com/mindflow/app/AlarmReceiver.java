@@ -49,8 +49,8 @@ public class AlarmReceiver extends BroadcastReceiver {
                 return;
             }
 
-            // ✅ 소리 URI 강제 지정 (문자열로 직접 경로 지정)
-            Uri soundUri = Uri.parse("android.resource://" + context.getPackageName() + "/raw/schedule_alarm");
+            // ✅ 소리 URI 강제 지정 (리소스 ID 사용)
+            Uri soundUri = Uri.parse("android.resource://" + context.getPackageName() + "/" + R.raw.schedule_alarm);
             Log.d(TAG, "🔊 알림음 URI 생성: " + soundUri);
 
             // 앱 실행 Intent (일반 클릭)
@@ -116,17 +116,17 @@ public class AlarmReceiver extends BroadcastReceiver {
 
                     final MediaPlayer mediaPlayer = new MediaPlayer();
 
-                    // 알람 스트림 사용 (방해금지 모드 무시)
+                    // 알림 스트림 사용 (알림 볼륨 사용, 방해금지 모드 존중)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                         AudioAttributes audioAttributes = new AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                             .build();
                         mediaPlayer.setAudioAttributes(audioAttributes);
-                        Log.d(TAG, "✅ MediaPlayer AudioAttributes 설정: USAGE_ALARM");
+                        Log.d(TAG, "✅ MediaPlayer AudioAttributes 설정: USAGE_NOTIFICATION");
                     } else {
-                        mediaPlayer.setAudioStreamType(AudioManager.STREAM_ALARM);
-                        Log.d(TAG, "✅ MediaPlayer StreamType 설정: STREAM_ALARM");
+                        mediaPlayer.setAudioStreamType(AudioManager.STREAM_NOTIFICATION);
+                        Log.d(TAG, "✅ MediaPlayer StreamType 설정: STREAM_NOTIFICATION");
                     }
 
                     mediaPlayer.setDataSource(context, soundUri);

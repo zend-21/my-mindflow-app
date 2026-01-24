@@ -459,8 +459,6 @@ const Header = React.memo(({ profile, onMenuClick, onSearchClick, isHidden, onLo
         setImageError(true);
     };
 
-    console.log('🎯 Header 렌더링 - isHidden:', isHidden);
-    
     return (
         <HeaderWrapper $isHidden={isHidden}>
             <LeftContainer onClick={profile ? onProfileClick : onLoginClick}>

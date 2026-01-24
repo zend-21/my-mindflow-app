@@ -19,6 +19,8 @@ import {
 } from 'react-icons/fa';
 import * as S from './RichTextEditor.styles';
 import { toast } from '../utils/toast';
+import { getCurrentUserId } from '../utils/userStorage';
+import { getAccountLocalStorageWithTTL, setAccountLocalStorageWithTTL } from '../hooks/useFirestoreSync.utils';
 
 // 색상 프리셋
 const TEXT_COLOR_PRESETS = [
@@ -80,8 +82,24 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
   useEffect(() => {
     const loadMacros = () => {
       try {
-        const savedMacros = JSON.parse(localStorage.getItem('macroTexts') || '[]');
-        setMacros(savedMacros.slice(0, 7)); // 최대 7개만
+        const userId = getCurrentUserId();
+        if (!userId) {
+          setMacros([]);
+          return;
+        }
+        // ✅ TTL 기반 localStorage 사용
+        let savedMacros = getAccountLocalStorageWithTTL(userId, 'macros') || [];
+
+        // 마이그레이션: 기존 macroTexts 데이터 복구
+        if (!savedMacros || savedMacros.length === 0) {
+          const oldMacros = JSON.parse(localStorage.getItem('macroTexts') || '[]');
+          if (Array.isArray(oldMacros) && oldMacros.length > 0) {
+            savedMacros = oldMacros;
+            setAccountLocalStorageWithTTL(userId, 'macros', oldMacros, { synced: false });
+          }
+        }
+
+        setMacros(Array.isArray(savedMacros) ? savedMacros.slice(0, 7) : []); // 최대 7개만
       } catch (error) {
         console.error('매크로 로드 실패:', error);
         setMacros([]);
@@ -92,7 +110,11 @@ const RichTextEditor = ({ content, onChange, placeholder = '내용을 입력하�
 
     // localStorage 변경 감지
     const handleStorageChange = (e) => {
-      if (e.key === 'macroTexts') {
+      const userId = getCurrentUserId();
+      if (!userId) return;
+
+      const macrosKey = `user_${userId}_macros`;
+      if (e.key === macrosKey) {
         loadMacros();
       }
     };

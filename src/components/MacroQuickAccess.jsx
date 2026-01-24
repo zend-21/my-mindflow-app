@@ -4,6 +4,8 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import Portal from './Portal';
+import { getCurrentUserId } from '../utils/userStorage';
+import { getAccountLocalStorageWithTTL } from '../hooks/useFirestoreSync.utils';
 
 const MacroButton = styled.button`
     position: fixed;
@@ -153,7 +155,6 @@ const CloseButton = styled.button`
     }
 `;
 
-const STORAGE_KEY = 'macroTexts';
 const PREVIEW_LENGTH = 30; // 미리보기 표시 글자 수
 
 const MacroQuickAccess = () => {
@@ -166,16 +167,20 @@ const MacroQuickAccess = () => {
     useEffect(() => {
         // localStorage에서 매크로 불러오기
         const loadMacros = () => {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                try {
-                    const parsed = JSON.parse(saved);
-                    if (Array.isArray(parsed) && parsed.length === 7) {
-                        setMacros(parsed);
-                    }
-                } catch (error) {
-                    console.error('Failed to load macros:', error);
+            const userId = getCurrentUserId();
+            if (!userId) {
+                setMacros(Array(7).fill(''));
+                return;
+            }
+
+            try {
+                // ✅ TTL 기반 localStorage 사용
+                const saved = getAccountLocalStorageWithTTL(userId, 'macros') || [];
+                if (Array.isArray(saved) && saved.length === 7) {
+                    setMacros(saved);
                 }
+            } catch (error) {
+                console.error('Failed to load macros:', error);
             }
         };
 
@@ -183,6 +188,10 @@ const MacroQuickAccess = () => {
 
         // localStorage 변경 감지 (다른 탭이나 매크로 모달에서 변경 시)
         const handleStorageChange = (e) => {
+            const userId = getCurrentUserId();
+            if (!userId) return;
+
+            const STORAGE_KEY = `user_${userId}_macros`;
             if (e.key === STORAGE_KEY) {
                 loadMacros();
             }

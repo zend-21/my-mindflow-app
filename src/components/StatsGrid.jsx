@@ -1,6 +1,6 @@
 // src/components/StatsGrid.jsx
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import styled from 'styled-components';
 
 const GridWrapper = styled.div`
@@ -56,14 +56,30 @@ const CardContent = styled.p`
     align-items: center; /* 내용이 짧으면 수직 중앙 */
     justify-content: ${props => props.$largeNumber ? 'center' : 'flex-start'}; /* 큰 숫자는 가로 중앙 */
     word-break: break-word;
+    overflow: hidden; /* 애니메이션을 위한 오버플로우 숨김 */
+    position: relative;
 `;
 
-// 내용 텍스트 래퍼 (줄 수 제한용)
+// 내용 텍스트 래퍼 (줄 수 제한용 + 슬라이드 애니메이션)
 const CardContentText = styled.span`
     display: -webkit-box;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
+
+    /* 슬라이드 애니메이션 */
+    animation: slideInFromTop 0.5s ease-out;
+
+    @keyframes slideInFromTop {
+        from {
+            transform: translateY(-100%);
+            opacity: 0;
+        }
+        to {
+            transform: translateY(0);
+            opacity: 1;
+        }
+    }
 `;
 
 // 커뮤니티 카드용 제목 (1줄)
@@ -104,6 +120,18 @@ const CardMeta = styled.div`
     flex-direction: column;
     gap: 2px;
     margin-top: 8px;
+
+    /* 페이드 인 애니메이션 (페이드 아웃 없음) */
+    animation: fadeIn 0.5s ease-out;
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
 `;
 
 // 보조영역1 (11px, #888)
@@ -162,6 +190,15 @@ const getMessageText = (message) => {
     return '(내용 없음)';
 };
 
+// HTML 태그 제거 함수
+const stripHtmlTags = (html) => {
+    if (!html || typeof html !== 'string') return '';
+    // HTML 태그 제거
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    return div.textContent || div.innerText || '';
+};
+
 // 날짜 포맷 함수 (일정용)
 const formatScheduleDate = (timestamp) => {
     if (!timestamp) return '';
@@ -171,6 +208,17 @@ const formatScheduleDate = (timestamp) => {
         month: 'long',
         day: 'numeric'
     });
+};
+
+// 날짜 키 포맷 함수 (yyyy-MM-dd → "M월 D일 (요일)")
+const formatDateKey = (dateKey) => {
+    if (!dateKey) return '';
+    const date = new Date(dateKey);
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const weekday = weekdays[date.getDay()];
+    return `${month}월 ${day}일 (${weekday})`;
 };
 
 // 알람 시간 포맷 함수
@@ -208,71 +256,104 @@ const getRepeatLabel = (alarm) => {
     return repeatLabels[alarm.repeatType] || '1회 알람';
 };
 
-// 다가오는 일정/알람 찾기
-const getUpcomingSchedule = (calendarSchedules) => {
+// 다가오는 일정/알람 후보 목록 반환 (롤링용)
+const getUpcomingScheduleCandidates = (calendarSchedules) => {
     if (!calendarSchedules || Object.keys(calendarSchedules).length === 0) {
         return null;
     }
 
     const now = new Date();
     const nowTime = now.getTime();
-    let upcoming = null;
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+
+    // 날짜별로 그룹화된 후보들
+    const dateGroups = {};
 
     // 모든 스케줄 순회
     for (const dateKey in calendarSchedules) {
         const entry = calendarSchedules[dateKey];
         if (!entry) continue;
 
-        // 1. 일정 텍스트가 있는 경우 (사용자가 직접 작성한 일정)
-        if (entry.text && entry.text.trim()) {
-            const scheduleDate = new Date(dateKey);
-            scheduleDate.setHours(0, 0, 0, 0);
+        const scheduleDate = new Date(dateKey);
+        scheduleDate.setHours(0, 0, 0, 0);
 
-            // 오늘 이후의 일정만
-            if (scheduleDate.getTime() >= now.setHours(0, 0, 0, 0)) {
-                const scheduleTime = scheduleDate.getTime();
-                if (!upcoming || scheduleTime < upcoming.time) {
-                    upcoming = {
-                        type: 'schedule',
-                        content: entry.text,
-                        time: scheduleTime,
-                        createdAt: entry.createdAt,
-                        updatedAt: entry.updatedAt,
-                        dateKey: dateKey
-                    };
-                }
+        // 오늘 이전 날짜는 무시
+        if (scheduleDate < todayStart) continue;
+
+        // 날짜별 배열 초기화
+        if (!dateGroups[dateKey]) {
+            dateGroups[dateKey] = [];
+        }
+
+        // 1. 일정 텍스트 추가 (하루 종일 유효)
+        if (entry.text && entry.text.trim()) {
+            // HTML 태그 제거하여 순수 텍스트만 추출
+            const plainText = stripHtmlTags(entry.text).trim();
+
+            // 태그 제거 후에도 텍스트가 있는 경우만 추가
+            if (plainText) {
+                dateGroups[dateKey].push({
+                    type: 'schedule',
+                    content: plainText,
+                    time: scheduleDate.getTime(),
+                    createdAt: entry.createdAt,
+                    updatedAt: entry.updatedAt,
+                    dateKey: dateKey
+                });
             }
         }
 
-        // 2. 알람이 있는 경우
+        // 2. 알람 추가
         if (entry.alarm?.registeredAlarms?.length > 0) {
             for (const alarm of entry.alarm.registeredAlarms) {
-                // 비활성화된 알람 제외
-                if (alarm.isDisabled) continue;
+                // ⭐ 비활성화된 알람 제외
+                if (alarm.enabled === false) continue;
+
+                // ⭐ 반복 알람의 특정 날짜 비활성화 확인
+                if (alarm.isAnniversary && alarm.disabledDates && Array.isArray(alarm.disabledDates)) {
+                    const alarmDate = new Date(alarm.calculatedTime);
+                    const alarmDateStr = alarmDate.toISOString().split('T')[0];
+                    if (alarm.disabledDates.includes(alarmDateStr)) {
+                        continue;
+                    }
+                }
 
                 const alarmTime = new Date(alarm.calculatedTime).getTime();
 
-                // 현재 시간 이후의 알람만
-                if (alarmTime > nowTime) {
-                    if (!upcoming || alarmTime < upcoming.time) {
-                        upcoming = {
-                            type: 'alarm',
-                            content: alarm.title || '알람',
-                            time: alarmTime,
-                            alarmTime: alarm.calculatedTime,
-                            isAnniversary: alarm.isAnniversary || false,
-                            repeatType: alarm.repeatType,
-                            anniversaryRepeat: alarm.anniversaryRepeat,
-                            alarm: alarm,
-                            dateKey: dateKey
-                        };
-                    }
+                // ⭐ 기념일: 하루 종일 유효 (일정처럼 취급)
+                // ⭐ 일반 알람: 현재 시간 이후만 유효
+                const isValidAlarm = alarm.isAnniversary || alarmTime > nowTime;
+
+                if (isValidAlarm) {
+                    dateGroups[dateKey].push({
+                        type: 'alarm',
+                        content: alarm.title || '알람',
+                        time: alarmTime,
+                        alarmTime: alarm.calculatedTime,
+                        isAnniversary: alarm.isAnniversary || false,
+                        repeatType: alarm.repeatType,
+                        anniversaryRepeat: alarm.anniversaryRepeat,
+                        alarm: alarm,
+                        dateKey: dateKey
+                    });
                 }
             }
         }
     }
 
-    return upcoming;
+    // 가장 빠른 날짜 찾기
+    const sortedDates = Object.keys(dateGroups)
+        .filter(date => dateGroups[date].length > 0) // 유효한 항목이 있는 날짜만
+        .sort();
+
+    if (sortedDates.length === 0) return null;
+
+    // ⭐ 가장 빠른 날짜의 모든 후보 배열 반환 (롤링용)
+    const earliestDate = sortedDates[0];
+    const candidates = dateGroups[earliestDate];
+
+    return candidates.length > 0 ? candidates : null;
 };
 
 const StatsGrid = ({ onSwitchTab, latestMessage, memos = [], calendarSchedules = {} }) => {
@@ -293,10 +374,36 @@ const StatsGrid = ({ onSwitchTab, latestMessage, memos = [], calendarSchedules =
         ? getMessageText(latestMessage.text) || getMessageText(latestMessage.lastMessage)
         : null;
 
-    // 다가오는 일정/알람 찾기
-    const upcomingSchedule = useMemo(() => {
-        return getUpcomingSchedule(calendarSchedules);
+    // 다가오는 일정/알람 후보 목록 (롤링용)
+    const upcomingCandidates = useMemo(() => {
+        return getUpcomingScheduleCandidates(calendarSchedules);
     }, [calendarSchedules]);
+
+    // 롤링 인덱스 관리
+    const [currentIndex, setCurrentIndex] = useState(0);
+
+    // 후보 목록이 변경되면 인덱스 초기화
+    useEffect(() => {
+        setCurrentIndex(0);
+    }, [upcomingCandidates]);
+
+    // 자동 롤링 (5초마다)
+    useEffect(() => {
+        if (!upcomingCandidates || upcomingCandidates.length <= 1) {
+            return; // 항목이 1개 이하면 롤링 불필요
+        }
+
+        const interval = setInterval(() => {
+            setCurrentIndex(prev => (prev + 1) % upcomingCandidates.length);
+        }, 5000); // 5초마다 다음 항목으로
+
+        return () => clearInterval(interval);
+    }, [upcomingCandidates]);
+
+    // 현재 표시할 항목
+    const upcomingSchedule = upcomingCandidates && upcomingCandidates.length > 0
+        ? upcomingCandidates[currentIndex]
+        : null;
 
     return (
         <GridWrapper>
@@ -340,30 +447,28 @@ const StatsGrid = ({ onSwitchTab, latestMessage, memos = [], calendarSchedules =
                 {upcomingSchedule ? (
                     upcomingSchedule.type === 'schedule' ? (
                         <>
-                            <CardContent>
+                            <CardContent key={`schedule-${currentIndex}`}>
                                 <CardContentText>
                                     {upcomingSchedule.content}
                                 </CardContentText>
                             </CardContent>
-                            <CardMeta>
+                            <CardMeta key={`schedule-meta-${currentIndex}`}>
                                 <MetaPrimary>
-                                    등록: {formatScheduleDate(upcomingSchedule.createdAt)}
+                                    📅 {formatDateKey(upcomingSchedule.dateKey)}
                                 </MetaPrimary>
                                 <MetaSecondary>
-                                    {upcomingSchedule.updatedAt && upcomingSchedule.updatedAt !== upcomingSchedule.createdAt
-                                        ? `수정: ${formatScheduleDate(upcomingSchedule.updatedAt)}`
-                                        : '-'}
+                                    일정
                                 </MetaSecondary>
                             </CardMeta>
                         </>
                     ) : (
                         <>
-                            <CardContent $isAnniversary={upcomingSchedule.isAnniversary}>
+                            <CardContent key={`alarm-${currentIndex}`} $isAnniversary={upcomingSchedule.isAnniversary}>
                                 <CardContentText>
                                     {upcomingSchedule.isAnniversary ? `🎂 ${upcomingSchedule.content}` : upcomingSchedule.content}
                                 </CardContentText>
                             </CardContent>
-                            <CardMeta>
+                            <CardMeta key={`alarm-meta-${currentIndex}`}>
                                 <MetaPrimary>
                                     {formatAlarmTime(upcomingSchedule.alarmTime)}
                                 </MetaPrimary>

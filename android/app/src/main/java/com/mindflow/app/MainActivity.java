@@ -155,9 +155,9 @@ public class MainActivity extends BridgeActivity {
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                 .build();
 
-            // ✅ 알람 전용 AudioAttributes (백그라운드에서도 울림)
+            // ✅ 스케줄 알람용 AudioAttributes (알림 볼륨 사용)
             AudioAttributes alarmAudioAttributes = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)  // ← 알람용 (최우선)
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)  // ← 알림용 (방해금지 모드 존중)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)  // ← 알림음 타입
                 .build();
 

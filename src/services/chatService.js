@@ -10,6 +10,7 @@ import {
   messageLimiter,
   validateContentSize
 } from '../utils/securityUtils';
+import { getProfileSetting } from '../utils/userStorage';
 
 /**
  * 메시지 전송
@@ -63,12 +64,12 @@ export const sendMessage = async (roomId, message, type = 'text') => {
     const { getUserNickname } = await import('./nicknameService');
     userNickname = await getUserNickname(userId);
     if (!userNickname) {
-      // Firestore에 없으면 localStorage에서 가져오기
-      userNickname = localStorage.getItem('userNickname') || null;
+      // Firestore에 없으면 localStorage에서 가져오기 (사용자별)
+      userNickname = getProfileSetting('nickname') || null;
     }
   } catch (error) {
     console.error('닉네임 로드 실패:', error);
-    userNickname = localStorage.getItem('userNickname') || null;
+    userNickname = getProfileSetting('nickname') || null;
   }
 
   const messageData = {

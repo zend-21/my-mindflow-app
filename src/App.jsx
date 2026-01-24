@@ -466,10 +466,7 @@ function App() {
     // 🆔 WS 코드 로드 (헤더처럼 App에서 관리)
     useEffect(() => {
         const loadWsCode = async () => {
-            console.log('🔍 WS 코드 로드 시작 - userId:', userId, 'profile:', profile?.name);
-
             if (!userId || !profile) {
-                console.log('⚠️ WS 코드 로드 실패: userId 또는 profile 없음');
                 setWsCode(null);
                 return;
             }
@@ -477,7 +474,6 @@ function App() {
             // localStorage에서 먼저 확인
             const cachedWsCode = localStorage.getItem(`wsCode_${userId}`);
             if (cachedWsCode) {
-                console.log('✅ localStorage에서 WS 코드 로드:', cachedWsCode);
                 setWsCode(cachedWsCode);
                 return;
             }
@@ -485,13 +481,11 @@ function App() {
             // Firebase에서 가져오기
             try {
                 const workspaceId = `workspace_${userId}`;
-                console.log('🔍 Firestore에서 WS 코드 조회:', workspaceId);
                 const workspaceRef = doc(db, 'workspaces', workspaceId);
                 const workspaceDoc = await getDoc(workspaceRef);
 
                 if (workspaceDoc.exists()) {
                     const code = workspaceDoc.data().workspaceCode;
-                    console.log('✅ Firestore에서 WS 코드 로드:', code);
                     setWsCode(code);
                     if (code) {
                         localStorage.setItem(`wsCode_${userId}`, code);
@@ -1070,9 +1064,9 @@ function App() {
                 recentActivities,
                 widgets,
                 displayCount,
-                trashedItems: JSON.parse(localStorage.getItem('trashedItems_shared') || '[]'),
-                macroTexts: JSON.parse(localStorage.getItem('macroTexts') || '[]'),
-                memoFolders: JSON.parse(localStorage.getItem('memoFolders') || '[]')
+                trashedItems: trash || [],
+                macroTexts: macros || [],
+                memoFolders: folders || []
             }
         };
 
@@ -1130,13 +1124,13 @@ function App() {
                         });
                     }
                     if (data.trashedItems) {
-                        localStorage.setItem('trashedItems_shared', JSON.stringify(data.trashedItems));
+                        syncTrash(data.trashedItems);
                     }
                     if (data.macroTexts) {
-                        localStorage.setItem('macroTexts', JSON.stringify(data.macroTexts));
+                        syncMacros(data.macroTexts);
                     }
                     if (data.memoFolders) {
-                        localStorage.setItem('memoFolders', JSON.stringify(data.memoFolders));
+                        syncFolders(data.memoFolders);
                     }
                 } else if (Array.isArray(importedData)) {
                     // 구 형식 (메모만 있는 경우)
@@ -1715,9 +1709,14 @@ function App() {
             setCurrentActiveFolder(options.folderId);
         }
 
-        if (options.date && tab === 'calendar') {
-            // 특정 날짜로 이동
-            setSelectedDate(new Date(options.date));
+        if (tab === 'calendar') {
+            if (options.date) {
+                // 특정 날짜로 이동
+                setSelectedDate(new Date(options.date));
+            } else {
+                // 옵션 없이 이동하면 오늘로 리셋
+                setSelectedDate(new Date());
+            }
         }
     };
 
@@ -1854,7 +1853,6 @@ function App() {
                                 if (settings.customProfilePictureHash) {
                                     setProfileSetting('customProfilePictureHash', settings.customProfilePictureHash);
                                 }
-                                console.log('✅ 프로필 이미지 설정 복원 완료');
                             }
                         } catch (settingsError) {
                             console.error('프로필 이미지 설정 로드 실패:', settingsError);
@@ -2330,13 +2328,11 @@ function App() {
 
                     // localStorage에 캐시
                     localStorage.setItem(`wsCode_${firebaseUserId}`, wsCode);
-                    console.log('✅ Workspace 문서 생성 완료 - WS 코드:', wsCode);
                 } else {
                     // 기존 WS 코드 캐시
                     const existingWsCode = workspaceDoc.data().workspaceCode;
                     if (existingWsCode) {
                         localStorage.setItem(`wsCode_${firebaseUserId}`, existingWsCode);
-                        console.log('✅ 기존 Workspace 확인 - WS 코드:', existingWsCode);
                     }
                 }
             } catch (workspaceError) {
@@ -2485,13 +2481,11 @@ function App() {
 
                     // localStorage에 캐시
                     localStorage.setItem(`wsCode_${firebaseUserId}`, wsCode);
-                    console.log('✅ Workspace 문서 생성 완료 - WS 코드:', wsCode);
                 } else {
                     // 기존 WS 코드 캐시
                     const existingWsCode = workspaceDoc.data().workspaceCode;
                     if (existingWsCode) {
                         localStorage.setItem(`wsCode_${firebaseUserId}`, existingWsCode);
-                        console.log('✅ 기존 Workspace 확인 - WS 코드:', existingWsCode);
                     }
                 }
             } catch (workspaceError) {
@@ -2871,13 +2865,13 @@ function App() {
                     });
                 }
                 if (result.data.trashedItems) {
-                    localStorage.setItem('trashedItems_shared', JSON.stringify(result.data.trashedItems));
+                    syncTrash(result.data.trashedItems);
                 }
                 if (result.data.macroTexts) {
-                    localStorage.setItem('macroTexts', JSON.stringify(result.data.macroTexts));
+                    syncMacros(result.data.macroTexts);
                 }
                 if (result.data.memoFolders) {
-                    localStorage.setItem('memoFolders', JSON.stringify(result.data.memoFolders));
+                    syncFolders(result.data.memoFolders);
                 }
 
                 addActivity('복원', 'Google Drive에서 복원 완료');
@@ -3573,6 +3567,7 @@ function App() {
                         {activeTab === 'calendar' && (
                             <Calendar
                                 key="calendar"
+                                selectedDate={selectedDate}
                                 onSelectDate={handleSelectDate}
                                 addActivity={addActivity}
                                 schedules={calendarSchedules}
@@ -3853,6 +3848,8 @@ function App() {
                 scheduleData={scheduleForAlarm}
                 allSchedules={calendarSchedules}
                 userId={userId}
+                settings={settings}
+                syncSettings={syncSettings}
                 onSave={handleSaveAlarm}
                 onClose={() => setIsAlarmModalOpen(false)}
             />

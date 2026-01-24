@@ -37,10 +37,7 @@ export const createDebouncedSave = (userId, enabled) => {
   const pendingSaves = { current: [] }; // 대기 중인 저장 작업 추적
 
   const executeSave = async (saveFn, itemId, dataForComparison, dataType, ...saveArgs) => {
-    console.log(`🔍 [executeSave] 호출됨: itemId=${itemId}, dataType=${dataType}, userId=${userId}, enabled=${enabled}`);
-
     if (!userId || !enabled) {
-      console.warn(`⚠️ [executeSave] 저장 건너뜀: userId=${userId}, enabled=${enabled}`);
       return;
     }
 
@@ -51,19 +48,13 @@ export const createDebouncedSave = (userId, enabled) => {
       const currentData = JSON.stringify(dataForComparison);
 
       if (lastSaved === currentData) {
-        console.log(`⏭️ [변경 감지] 변경사항 없음 - 저장 생략: ${itemId}`);
         return;
       }
-
-      console.log(`💾 [변경 감지] 변경 감지됨 - Firestore 저장 시작: ${itemId}`);
-      console.log(`📊 [변경 감지] 데이터 크기: ${currentData.length} bytes`);
 
       // Firestore 저장 실행 (userId는 자동으로 첫 번째 인자로 전달)
       const saveStartTime = Date.now();
       await saveFn(userId, ...saveArgs);
       const saveDuration = Date.now() - saveStartTime;
-
-      console.log(`✅ [변경 감지] Firestore 저장 성공: ${itemId} (${saveDuration}ms)`);
 
       // 🔍 진단: 저장 성공 로그
       diagnosticLog('success', `저장 완료: ${dataType || itemId}`, {
@@ -99,22 +90,16 @@ export const createDebouncedSave = (userId, enabled) => {
   };
 
   const save = (saveFn, itemId, dataForComparison, dataType, ...saveArgs) => {
-    console.log(`📝 [디바운스 저장] 예약됨: itemId=${itemId}, dataType=${dataType}`);
-
     if (saveTimeout.current) {
-      console.log(`⏱️ [디바운스 저장] 기존 타이머 클리어: ${itemId}`);
       clearTimeout(saveTimeout.current);
     }
 
     // 대기 중인 작업 저장
     pendingSaves.current = [saveFn, itemId, dataForComparison, dataType, ...saveArgs];
-    console.log(`📦 [디바운스 저장] 대기 큐에 추가: ${itemId} (300ms 대기)`);
 
     saveTimeout.current = setTimeout(async () => {
-      console.log(`⏰ [디바운스 저장] 타이머 만료 - 실행 시작: ${itemId}`);
       await executeSave(saveFn, itemId, dataForComparison, dataType, ...saveArgs);
       pendingSaves.current = []; // 실행 후 클리어
-      console.log(`🏁 [디바운스 저장] 완료 및 큐 클리어: ${itemId}`);
     }, 300); // 300ms 디바운스 (데이터 손실 방지 + 할당량 절약)
   };
 
@@ -126,26 +111,15 @@ export const createDebouncedSave = (userId, enabled) => {
 
   // ✅ flush: 대기 중인 저장 즉시 실행 (beforeunload용)
   const flush = async () => {
-    console.log(`🚨 [flush] 호출됨 - 대기 큐 확인 중...`);
-    console.log(`🚨 [flush] saveTimeout 상태:`, saveTimeout.current ? '타이머 존재' : '타이머 없음');
-    console.log(`🚨 [flush] pendingSaves 길이:`, pendingSaves.current.length);
-
     if (saveTimeout.current) {
-      console.log(`🚨 [flush] 타이머 클리어`);
       clearTimeout(saveTimeout.current);
       saveTimeout.current = null;
     }
 
     if (pendingSaves.current.length > 0) {
       const [saveFn, itemId, dataForComparison, dataType, ...saveArgs] = pendingSaves.current;
-      console.log(`🚨 [긴급 플러시] 대기 중인 저장 즉시 실행: itemId=${itemId}, dataType=${dataType}`);
-      const flushStartTime = Date.now();
       await executeSave(saveFn, itemId, dataForComparison, dataType, ...saveArgs);
-      const flushDuration = Date.now() - flushStartTime;
       pendingSaves.current = [];
-      console.log(`✅ [긴급 플러시] 완료: ${itemId} (${flushDuration}ms)`);
-    } else {
-      console.log(`ℹ️ [flush] 대기 중인 저장 없음 - 건너뜀`);
     }
   };
 
@@ -407,16 +381,19 @@ export const createDeleteActivity = (userId, enabled, setActivities) => {
 /**
  * 설정 동기화
  */
-export const createSyncSettings = (setSettings, debouncedSave) => {
+export const createSyncSettings = (userId, setSettings, debouncedSave) => {
   return (newSettings) => {
     setSettings(newSettings);
 
-    if (newSettings.widgets) localStorage.setItem('widgets_shared', JSON.stringify(newSettings.widgets));
-    if (newSettings.displayCount) localStorage.setItem('displayCount_shared', JSON.stringify(newSettings.displayCount));
-    if (newSettings.nickname) localStorage.setItem('userNickname', newSettings.nickname);
-    if (newSettings.profileImageType) localStorage.setItem('profileImageType', newSettings.profileImageType);
-    if (newSettings.selectedAvatarId) localStorage.setItem('selectedAvatarId', newSettings.selectedAvatarId);
-    if (newSettings.avatarBgColor) localStorage.setItem('avatarBgColor', newSettings.avatarBgColor);
+    // ✅ 사용자별 localStorage 키 사용 (계정 분리)
+    if (userId) {
+      if (newSettings.widgets) localStorage.setItem(`user_${userId}_widgets`, JSON.stringify(newSettings.widgets));
+      if (newSettings.displayCount) localStorage.setItem(`user_${userId}_displayCount`, JSON.stringify(newSettings.displayCount));
+      if (newSettings.nickname) localStorage.setItem(`user_${userId}_nickname`, newSettings.nickname);
+      if (newSettings.profileImageType) localStorage.setItem(`user_${userId}_profileImageType`, newSettings.profileImageType);
+      if (newSettings.selectedAvatarId) localStorage.setItem(`user_${userId}_selectedAvatarId`, newSettings.selectedAvatarId);
+      if (newSettings.avatarBgColor) localStorage.setItem(`user_${userId}_avatarBgColor`, newSettings.avatarBgColor);
+    }
 
     // 🚀 변경 감지 후 서버에 저장
     debouncedSave.save(saveSettingsToFirestore, `settings_main`, newSettings, newSettings);
@@ -499,32 +476,17 @@ export const createSyncTrash = (userId, setTrash, debouncedSave) => {
 
 /**
  * 매크로 배열 동기화 (하위 호환)
+ * ⚡ 즉시 저장: 디바운스 없이 즉시 Firestore 저장 (오프라인 시 자동 재시도)
  */
 export const createSyncMacros = (userId, enabled, setMacros, debouncedSave) => {
-  return (newMacros) => {
-    // 방어: Firestore 데이터가 비어있거나 유효하지 않으면 기존 localStorage 유지
+  return async (newMacros) => {
+    // 방어: Firestore 데이터가 비어있거나 유효하지 않으면 기존 localStorage 유시
     if (!newMacros || !Array.isArray(newMacros)) {
       console.warn('⚠️ syncMacros: 유효하지 않은 데이터 무시', newMacros);
       return;
     }
 
-    // 빈 배열이거나 모두 빈 문자열인 경우, 기존 localStorage에 데이터가 있으면 유지
-    const hasValidMacro = newMacros.some(m => m && m.trim().length > 0);
-    if (!hasValidMacro) {
-      try {
-        const existingData = getAccountLocalStorageWithTTL(userId, 'macros', false);
-        const existing = Array.isArray(existingData) ? existingData : [];
-        const hasExistingData = existing.some(m => m && m.trim().length > 0);
-        if (hasExistingData) {
-          console.warn('⚠️ syncMacros: Firestore 데이터가 비어있어 기존 localStorage 유지');
-          return;
-        }
-      } catch (err) {
-        console.error('❌ localStorage 확인 실패:', err);
-      }
-    }
-
-    // 기존 데이터와 비교하여 변경된 경우에만 저장
+    // 기존 데이터와 비교하여 변경된 경우에만 저장 (Firestore 할당량 절약)
     try {
       const existingData = getAccountLocalStorageWithTTL(userId, 'macros', false);
       const existing = Array.isArray(existingData) ? existingData : [];
@@ -532,7 +494,7 @@ export const createSyncMacros = (userId, enabled, setMacros, debouncedSave) => {
                         newMacros.some((macro, index) => macro !== existing[index]);
 
       if (!hasChanged) {
-        // 변경사항이 없으면 조용히 리턴 (로그 없음)
+        console.log('📝 매크로 변경 없음 - Firestore 저장 건너뜀');
         return;
       }
     } catch (err) {
@@ -543,10 +505,17 @@ export const createSyncMacros = (userId, enabled, setMacros, debouncedSave) => {
     setMacros(newMacros);
     setAccountLocalStorageWithTTL(userId, 'macros', newMacros, { synced: false });
 
-    // 전체 배열을 한 번에 Firestore에 저장 (dataType='macros' 전달)
+    // ⚡ 즉시 저장: Firestore에 바로 저장 (디바운스 없음)
     if (userId && enabled) {
-      console.log('☁️ 매크로 Firestore 저장 시작:', userId, newMacros);
-      debouncedSave.save(saveMacroToFirestore, `macros_all`, newMacros, 'macros', newMacros);
+      console.log('☁️ 매크로 Firestore 즉시 저장 시작:', userId);
+      try {
+        await saveMacroToFirestore(userId, newMacros);
+        setAccountLocalStorageWithTTL(userId, 'macros', newMacros, { synced: true });
+        console.log('✅ 매크로 Firestore 즉시 저장 완료');
+      } catch (error) {
+        console.error('❌ 매크로 Firestore 저장 실패 (오프라인):', error);
+        // synced: false 유지 → 온라인 복귀 시 자동 업로드
+      }
     } else {
       console.warn('⚠️ Firestore 저장 건너뜀 - userId:', userId, 'enabled:', enabled);
     }
@@ -557,26 +526,16 @@ export const createSyncMacros = (userId, enabled, setMacros, debouncedSave) => {
  * 캘린더 객체 동기화 (하위 호환)
  */
 export const createSyncCalendar = (userId, setCalendar, debouncedSave) => {
-  return (newCalendarOrUpdater) => {
-    // ⚠️ [중요] 함수형 업데이트 지원
-    // Calendar 컴포넌트에서 setSchedules(prev => {...}) 형태로 호출할 수 있음
-    let resolvedCalendar;
+  // Firestore 동기화 로직을 별도 함수로 분리
+  const syncToFirestore = (calendarToSync) => {
+    if (!calendarToSync || typeof calendarToSync !== 'object') {
+      console.error('❌ [syncCalendar] Firestore 동기화 스킵 - calendarToSync가 유효하지 않음');
+      return;
+    }
 
-    setCalendar(prev => {
-      // 함수가 전달되면 이전 값으로 실행
-      resolvedCalendar = typeof newCalendarOrUpdater === 'function'
-        ? newCalendarOrUpdater(prev)
-        : newCalendarOrUpdater;
+    console.log('✅ [syncCalendar] Firestore 동기화 시작:', Object.keys(calendarToSync).length, '개 날짜');
 
-      console.log('🔍 [syncCalendar] 시작:', Object.keys(resolvedCalendar).length, '개 날짜');
-
-      // localStorage에 전체 캘린더 즉시 캐싱 (오프라인 지원, synced: false)
-      setAccountLocalStorageWithTTL(userId, 'calendar', resolvedCalendar, { synced: false });
-
-      return resolvedCalendar;
-    });
-
-    Object.entries(resolvedCalendar).forEach(([dateKey, schedule]) => {
+    Object.entries(calendarToSync).forEach(([dateKey, schedule]) => {
       // 의미 있는 데이터가 있는지 확인
       const hasText = schedule.text && schedule.text.trim() !== '' && schedule.text !== '<p></p>';
       const hasAlarms = schedule.alarm?.registeredAlarms && schedule.alarm.registeredAlarms.length > 0;
@@ -600,6 +559,40 @@ export const createSyncCalendar = (userId, setCalendar, debouncedSave) => {
             });
         }
       }
+    });
+  };
+
+  return (newCalendarOrUpdater) => {
+    // ⚠️ [중요] 함수형 업데이트 지원
+    // Calendar 컴포넌트에서 setSchedules(prev => {...}) 형태로 호출할 수 있음
+
+    setCalendar(prev => {
+      // ✅ prev가 undefined/null인 경우 빈 객체로 처리
+      const currentCalendar = (prev && typeof prev === 'object') ? prev : {};
+
+      // 함수가 전달되면 현재 값으로 실행
+      const newCalendar = typeof newCalendarOrUpdater === 'function'
+        ? newCalendarOrUpdater(currentCalendar)
+        : newCalendarOrUpdater;
+
+      // ✅ newCalendar가 undefined/null이거나 객체가 아니면 현재 상태 유지
+      if (!newCalendar || typeof newCalendar !== 'object') {
+        console.error('❌ [syncCalendar] 업데이트된 캘린더가 유효하지 않습니다:', newCalendar);
+        return currentCalendar;
+      }
+
+      console.log('✅ [syncCalendar] 상태 업데이트:', Object.keys(newCalendar).length, '개 날짜');
+
+      // localStorage에 전체 캘린더 즉시 캐싱 (오프라인 지원, synced: false)
+      setAccountLocalStorageWithTTL(userId, 'calendar', newCalendar, { synced: false });
+
+      // ✅ React batching 이후에 Firestore 동기화 실행
+      // queueMicrotask를 사용하여 현재 렌더링 사이클이 완료된 후 동기화
+      queueMicrotask(() => {
+        syncToFirestore(newCalendar);
+      });
+
+      return newCalendar;
     });
   };
 };

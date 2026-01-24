@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { cancelNativeScheduleAlarm } from '../../../../services/scheduleAlarmService';
+import { getCurrentUserId } from '../../../../utils/userStorage';
 
 export const useAlarmList = (scheduleData) => {
   // 알람 리스트 상태
@@ -16,7 +17,11 @@ export const useAlarmList = (scheduleData) => {
 
   // 저장된 정렬 설정 불러오기
   useEffect(() => {
-    const savedSettings = localStorage.getItem('alarmSettings');
+    const userId = getCurrentUserId();
+    if (!userId) return;
+
+    const alarmListSettingsKey = `user_${userId}_alarmListSettings`;
+    const savedSettings = localStorage.getItem(alarmListSettingsKey);
     if (savedSettings) {
       try {
         const settings = JSON.parse(savedSettings);
@@ -30,18 +35,15 @@ export const useAlarmList = (scheduleData) => {
 
   // 정렬 설정 자동 저장
   useEffect(() => {
-    const savedSettings = localStorage.getItem('alarmSettings');
-    let settings = {};
-    if (savedSettings) {
-      try {
-        settings = JSON.parse(savedSettings);
-      } catch (error) {
-        console.error('기존 설정 로드 실패:', error);
-      }
-    }
-    settings.sortBy = sortBy;
-    settings.sortDirection = sortDirection;
-    localStorage.setItem('alarmSettings', JSON.stringify(settings));
+    const userId = getCurrentUserId();
+    if (!userId) return;
+
+    const settings = {
+      sortBy,
+      sortDirection
+    };
+    const alarmListSettingsKey = `user_${userId}_alarmListSettings`;
+    localStorage.setItem(alarmListSettingsKey, JSON.stringify(settings));
   }, [sortBy, sortDirection]);
 
   // 알람 정렬 함수

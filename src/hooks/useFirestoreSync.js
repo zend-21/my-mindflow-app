@@ -333,8 +333,6 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
           setActivities(mergedActivities);
           setSettings(mergedSettings);
 
-          console.log('✅ Evernote 방식 다중 기기 동기화 완료');
-
           // ✅ FIX: State 타이밍 버그 수정 - 병합된 값을 직접 사용
           // setState는 비동기이므로 state 변수가 아닌 병합된 값을 localStorage에 저장
           setAccountLocalStorageWithTTL(userId, 'memos', mergedMemos, { synced: true });
@@ -365,12 +363,20 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
         setAccountLocalStorageWithTTL(userId, 'widgets', data.settings?.widgets || ['StatsGrid', 'QuickActions', 'RecentActivity'], { synced: true });
         setAccountLocalStorageWithTTL(userId, 'displayCount', data.settings?.displayCount || 5, { synced: true });
 
-        // 닉네임은 별도 nicknames 컬렉션에서 가져오기
+        // 알람 설정도 동기화 (사용자별 localStorage에 저장)
+        if (data.settings?.alarmSettings) {
+          const alarmSettingsKey = `user_${userId}_alarmSettings`;
+          localStorage.setItem(alarmSettingsKey, JSON.stringify(data.settings.alarmSettings));
+          console.log('✅ 알람 설정 Firestore에서 로드:', data.settings.alarmSettings);
+        }
+
+        // 닉네임은 별도 nicknames 컬렉션에서 가져오기 (사용자별 저장)
         try {
           const { getUserNickname } = await import('../services/nicknameService');
           const nickname = await getUserNickname(userId);
           if (nickname) {
-            localStorage.setItem('userNickname', nickname);
+            localStorage.setItem(`user_${userId}_nickname`, nickname);
+            console.log('✅ 닉네임 로드 (userId:', userId + '):', nickname);
           }
         } catch (error) {
           console.error('닉네임 동기화 실패:', error);
@@ -537,7 +543,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
   const deleteCalendarDate = useCallback(createDeleteCalendarDate(userId, enabled, setCalendar), [userId, enabled]);
   const syncActivity = useCallback(createSyncActivity(userId, setActivities, debouncedSave), [userId, debouncedSave]);
   const deleteActivity = useCallback(createDeleteActivity(userId, enabled, setActivities), [userId, enabled]);
-  const syncSettings = useCallback(createSyncSettings(setSettings, debouncedSave), [debouncedSave]);
+  const syncSettings = useCallback(createSyncSettings(userId, setSettings, debouncedSave), [userId, debouncedSave]);
 
   // 배열 기반 동기화 함수들 (하위 호환)
   // getMemosRef를 useMemo 대신 ref로 저장하여 안정성 확보

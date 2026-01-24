@@ -6,6 +6,8 @@ import styled from 'styled-components';
 import Portal from './Portal';
 import { FiCopy, FiCheck, FiEdit2 } from 'react-icons/fi';
 import { toast } from '../utils/toast';
+import { getCurrentUserId } from '../utils/userStorage';
+import { getAccountLocalStorageWithTTL, setAccountLocalStorageWithTTL } from '../hooks/useFirestoreSync.utils';
 
 const Overlay = styled.div`
     position: fixed;
@@ -337,7 +339,6 @@ const ToastMessage = styled.div`
     }
 `;
 
-const STORAGE_KEY = 'macroTexts';
 const MAX_LENGTH = 100;
 
 const MacroModal = ({ onClose, onSave }) => {
@@ -352,32 +353,34 @@ const MacroModal = ({ onClose, onSave }) => {
 
     useEffect(() => {
         // localStorage에서 매크로 불러오기
-        const saved = localStorage.getItem(STORAGE_KEY);
-        if (saved) {
-            try {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) {
-                    // 마이그레이션 처리
-                    if (parsed.length === 10) {
-                        // 10개에서 7개로: 앞의 7개만 유지
-                        const migrated = parsed.slice(0, 7);
-                        setMacros(migrated);
-                        setInitialMacros(migrated); // 초기값도 저장
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-                    } else if (parsed.length === 5) {
-                        // 5개에서 7개로: 2개 빈 슬롯 추가
-                        const migrated = [...parsed, '', ''];
-                        setMacros(migrated);
-                        setInitialMacros(migrated); // 초기값도 저장
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(migrated));
-                    } else if (parsed.length === 7) {
-                        setMacros(parsed);
-                        setInitialMacros(parsed); // 초기값도 저장
-                    }
+        const userId = getCurrentUserId();
+        if (!userId) return;
+
+        try {
+            // ✅ TTL 기반 localStorage 사용
+            const saved = getAccountLocalStorageWithTTL(userId, 'macros') || [];
+
+            if (Array.isArray(saved)) {
+                // 마이그레이션 처리
+                if (saved.length === 10) {
+                    // 10개에서 7개로: 앞의 7개만 유지
+                    const migrated = saved.slice(0, 7);
+                    setMacros(migrated);
+                    setInitialMacros(migrated);
+                    setAccountLocalStorageWithTTL(userId, 'macros', migrated, { synced: false });
+                } else if (saved.length === 5) {
+                    // 5개에서 7개로: 2개 빈 슬롯 추가
+                    const migrated = [...saved, '', ''];
+                    setMacros(migrated);
+                    setInitialMacros(migrated);
+                    setAccountLocalStorageWithTTL(userId, 'macros', migrated, { synced: false });
+                } else if (saved.length === 7) {
+                    setMacros(saved);
+                    setInitialMacros(saved);
                 }
-            } catch (error) {
-                console.error('Failed to load macros:', error);
             }
+        } catch (error) {
+            console.error('Failed to load macros:', error);
         }
     }, []);
 
@@ -392,9 +395,7 @@ const MacroModal = ({ onClose, onSave }) => {
         const newMacros = [...macros];
         newMacros[index] = value;
         setMacros(newMacros);
-
-        // localStorage에 저장
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newMacros));
+        // 💡 입력 중에는 메모리에만 저장, 모달 닫을 때 localStorage + Firestore 저장
     };
 
     const handleCopy = async (index) => {
@@ -440,7 +441,8 @@ const MacroModal = ({ onClose, onSave }) => {
         const newMacros = [...macros];
         newMacros[editingIndex] = editText;
         setMacros(newMacros);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(newMacros));
+        // 💡 편집 완료 시 메모리에만 저장, 모달 닫을 때 localStorage + Firestore 저장
+
         setEditingIndex(null);
         setEditText('');
     };

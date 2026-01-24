@@ -12,6 +12,7 @@ import DeletedFriendsModal from './DeletedFriendsModal';
 import BlockedUsersModal from './BlockedUsersModal';
 import HiddenRequestsModal from './HiddenRequestsModal';
 import { avatarList } from '../avatars/AvatarIcons';
+import { getProfileSetting } from '../../utils/userStorage';
 import * as S from './FriendList.styles';
 
 const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountChange }) => {
@@ -196,9 +197,9 @@ const FriendList = ({ showToast, memos, requirePhoneAuth, onFriendRequestCountCh
         }
       }
 
-      // 여전히 없으면 localStorage fallback
+      // 여전히 없으면 localStorage fallback (사용자별)
       if (!nickname) {
-        nickname = localStorage.getItem('userNickname') || localStorage.getItem('userName');
+        nickname = getProfileSetting('nickname') || getProfileSetting('userName');
         console.log('📝 localStorage fallback:', nickname);
       }
 

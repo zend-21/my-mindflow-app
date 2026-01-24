@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { saveAudioFile, loadAudioFile } from '../../../../utils/audioStorage';
+import { getCurrentUserId } from '../../../../utils/userStorage';
 
 export const useAlarmSound = () => {
   // 사운드 관련 상태
@@ -19,7 +20,11 @@ export const useAlarmSound = () => {
 
   // 저장된 설정 불러오기
   useEffect(() => {
-    const savedSettings = localStorage.getItem('alarmSettings');
+    const userId = getCurrentUserId();
+    if (!userId) return;
+
+    const alarmSoundSettingsKey = `user_${userId}_alarmSoundSettings`;
+    const savedSettings = localStorage.getItem(alarmSoundSettingsKey);
     if (savedSettings) {
       try {
         const settings = JSON.parse(savedSettings);
@@ -45,6 +50,9 @@ export const useAlarmSound = () => {
 
   // 설정 자동 저장
   useEffect(() => {
+    const userId = getCurrentUserId();
+    if (!userId) return;
+
     const alarmSettings = {
       soundFile: soundFile === 'default' ? 'default' : 'custom',
       customSoundName,
@@ -53,7 +61,8 @@ export const useAlarmSound = () => {
       snoozeEnabled,
       snoozeMinutes,
     };
-    localStorage.setItem('alarmSettings', JSON.stringify(alarmSettings));
+    const alarmSoundSettingsKey = `user_${userId}_alarmSoundSettings`;
+    localStorage.setItem(alarmSoundSettingsKey, JSON.stringify(alarmSettings));
   }, [soundFile, customSoundName, volume, notificationType, snoozeEnabled, snoozeMinutes]);
 
   // 사운드 파일 업로드 처리

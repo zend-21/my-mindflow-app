@@ -678,17 +678,13 @@ const SideMenu = ({
 
         const checkAdmin = async () => {
             try {
-                console.log('📡 [관리자 상태 확인] checkAdminStatus 호출 시작...');
                 const { checkAdminStatus } = await import('../services/adminManagementService');
 
                 const status = await checkAdminStatus(userId);
-                console.log('✅ [관리자 상태 확인] checkAdminStatus 결과:', status);
 
                 setIsAdmin(status.isAdmin);
                 setIsSuperAdmin(status.isSuperAdmin);
                 setAdminPermissions(status.permissions);
-
-                console.log('📝 [관리자 상태 확인] 상태 업데이트 완료 - isAdmin:', status.isAdmin, 'isSuperAdmin:', status.isSuperAdmin, 'permissions:', status.permissions);
 
                 // 최초 마운트 시 문의 상태 체크
                 await checkInquiryStatus(userId, status);

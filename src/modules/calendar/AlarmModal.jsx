@@ -43,7 +43,7 @@ import { getRepeatedAnniversaries } from './utils/anniversaryHelpers';
 import AlarmToast from './AlarmToast';
 
 // ==================== COMPONENT ====================
-const AlarmModal = ({ isOpen, scheduleData, allSchedules, userId, onSave, onClose }) => {
+const AlarmModal = ({ isOpen, scheduleData, allSchedules, userId, settings, syncSettings, onSave, onClose }) => {
   if (!isOpen) return null;
 
   const isPastDate = scheduleData?.isPastDate || false;
@@ -102,6 +102,62 @@ const AlarmModal = ({ isOpen, scheduleData, allSchedules, userId, onSave, onClos
   const optionsButtonRef = useRef(null);
   const soundFileInputRef = useRef(null);
   const audioRef = useRef(null);
+  const isInitialMount = useRef(true); // 초기 마운트 감지
+
+  // ==================== LOAD/SAVE ALARM SETTINGS ====================
+  // 알람 설정(알림 유형, 반복 횟수) localStorage에서 로드
+  useEffect(() => {
+    if (!userId) return; // userId가 없으면 로드하지 않음
+
+    try {
+      // 사용자별 localStorage 키 사용 (개별 계정 분리)
+      const alarmSettingsKey = `user_${userId}_alarmSettings`;
+      const savedSettings = localStorage.getItem(alarmSettingsKey);
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        if (settings.notificationType !== undefined) {
+          setNotificationType(settings.notificationType);
+        }
+        if (settings.repeatCount !== undefined) {
+          setRepeatCount(settings.repeatCount);
+        }
+        console.log('✅ 알람 설정 로드 (userId:', userId + '):', settings);
+      }
+    } catch (error) {
+      console.error('❌ 알람 설정 로드 오류:', error);
+    }
+  }, [userId]); // userId 변경 시 로드
+
+  // 알람 설정(알림 유형, 반복 횟수) 변경 시 localStorage + Firestore에 저장
+  useEffect(() => {
+    // 초기 마운트 시에는 저장하지 않음 (무한 루프 방지)
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    if (!userId || !settings || !syncSettings) return;
+
+    try {
+      const alarmSettings = {
+        notificationType,
+        repeatCount
+      };
+
+      // 1. 사용자별 localStorage에 저장 (개별 계정 분리)
+      const alarmSettingsKey = `user_${userId}_alarmSettings`;
+      localStorage.setItem(alarmSettingsKey, JSON.stringify(alarmSettings));
+
+      // 2. Firestore에도 저장 (클라우드 동기화)
+      const updatedSettings = {
+        ...settings,
+        alarmSettings
+      };
+      syncSettings(updatedSettings);
+    } catch (error) {
+      console.error('❌ 알람 설정 저장 오류:', error);
+    }
+  }, [notificationType, repeatCount, userId]); // settings, syncSettings 제거하여 무한 루프 방지
 
   // ==================== LOAD DATA ====================
   useEffect(() => {
@@ -1346,30 +1402,6 @@ const AlarmModal = ({ isOpen, scheduleData, allSchedules, userId, onSave, onClos
                             value={value}
                             checked={repeatCount === parseInt(value, 10)}
                             onChange={(e) => setRepeatCount(parseInt(e.target.value, 10))}
-                          />
-                          <span>{label}</span>
-                        </RadioOption>
-                      ))}
-                    </RadioGroup>
-                  </S.Section>
-                )}
-
-                {/* Repeat Interval - 반복 횟수가 3회일 때만 표시 */}
-                {showOptions && repeatCount === 3 && (
-                  <S.Section>
-                    <S.SectionTitle>
-                      <BellIcon />
-                      반복 간격
-                    </S.SectionTitle>
-                    <RadioGroup>
-                      {Object.entries(ALARM_REPEAT_CONFIG.intervals).map(([value, label]) => (
-                        <RadioOption key={value} $checked={repeatInterval === parseInt(value, 10)}>
-                          <input
-                            type="radio"
-                            name="repeatInterval"
-                            value={value}
-                            checked={repeatInterval === parseInt(value, 10)}
-                            onChange={(e) => setRepeatInterval(parseInt(e.target.value, 10))}
                           />
                           <span>{label}</span>
                         </RadioOption>

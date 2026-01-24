@@ -446,17 +446,14 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
         const loadWsCode = async () => {
             // localStorage에서 userId 가져오기
             const userId = localStorage.getItem('firebaseUserId');
-            console.log('🔍 [ProfilePage] WS 코드 로드 시작 - userId:', userId, 'profile:', profile?.name);
 
             if (!userId || !profile) {
-                console.log('⚠️ [ProfilePage] WS 코드 로드 실패: userId 또는 profile 없음');
                 return;
             }
 
             // localStorage에서 먼저 확인
             const cachedWsCode = localStorage.getItem(`wsCode_${userId}`);
             if (cachedWsCode) {
-                console.log('✅ [ProfilePage] localStorage에서 WS 코드 로드:', cachedWsCode);
                 setWsCode(cachedWsCode);
 
                 // QR 코드 생성
@@ -479,13 +476,11 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
             try {
                 // workspaces 컬렉션에서 WS 코드 가져오기
                 const workspaceId = `workspace_${userId}`;
-                console.log('🔍 [ProfilePage] Firestore에서 WS 코드 조회:', workspaceId);
                 const workspaceRef = doc(db, 'workspaces', workspaceId);
                 const workspaceDoc = await getDoc(workspaceRef);
 
                 if (workspaceDoc.exists()) {
                     const code = workspaceDoc.data().workspaceCode;
-                    console.log('✅ [ProfilePage] Firestore에서 WS 코드 로드:', code);
                     setWsCode(code);
 
                     // localStorage에 캐시
@@ -531,19 +526,19 @@ const ProfilePage = ({ profile, memos, folders, calendarSchedules, showToast, on
 
                 if (firestoreNickname) {
                     setNickname(firestoreNickname);
-                    // localStorage 동기화
-                    localStorage.setItem('userNickname', firestoreNickname);
+                    // localStorage 동기화 (사용자별)
+                    setProfileSetting('nickname', firestoreNickname);
                 } else {
-                    // Firestore에 없으면 localStorage 사용
-                    const savedNickname = localStorage.getItem('userNickname');
+                    // Firestore에 없으면 localStorage 사용 (사용자별)
+                    const savedNickname = getProfileSetting('nickname');
                     if (savedNickname) {
                         setNickname(savedNickname);
                     }
                 }
             } catch (error) {
                 console.error('닉네임 로드 실패:', error);
-                // 에러 시 localStorage 폴백
-                const savedNickname = localStorage.getItem('userNickname');
+                // 에러 시 localStorage 폴백 (사용자별)
+                const savedNickname = getProfileSetting('nickname');
                 if (savedNickname) {
                     setNickname(savedNickname);
                 }
