@@ -1,0 +1,125 @@
+package com.mindflow.app;
+
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.media.AudioAttributes;
+import android.net.Uri;
+import android.os.Build;
+import android.util.Log;
+import androidx.core.app.NotificationCompat;
+
+/**
+ * ✅ 알람 트리거 시 실행되는 BroadcastReceiver
+ * - 앱이 종료되어 있어도 작동
+ * - 알림 생성 및 소리/진동 처리
+ */
+public class AlarmReceiver extends BroadcastReceiver {
+
+    private static final String TAG = "AlarmReceiver";
+
+    @Override
+    public void onReceive(Context context, Intent intent) {
+        Log.d(TAG, "🔔 AlarmReceiver.onReceive() 호출됨");
+        Log.d(TAG, "📱 앱 상태: " + (isAppRunning(context) ? "실행 중" : "종료됨"));
+
+        try {
+            int notificationId = intent.getIntExtra("notificationId", -1);
+            String title = intent.getStringExtra("title");
+            String body = intent.getStringExtra("body");
+            String channelId = intent.getStringExtra("channelId");
+            String soundFileName = intent.getStringExtra("sound");
+            boolean enableVibration = intent.getBooleanExtra("enableVibration", true);
+
+            Log.d(TAG, "📋 알람 정보:");
+            Log.d(TAG, "  - ID: " + notificationId);
+            Log.d(TAG, "  - 제목: " + title);
+            Log.d(TAG, "  - 내용: " + body);
+            Log.d(TAG, "  - 채널: " + channelId);
+
+            if (notificationId == -1 || title == null) {
+                Log.e(TAG, "❌ 필수 데이터가 없습니다");
+                return;
+            }
+
+            // 알림음 URI 생성
+            Uri soundUri = null;
+            if (soundFileName != null && !soundFileName.isEmpty()) {
+                int soundResId = context.getResources().getIdentifier(
+                    soundFileName,
+                    "raw",
+                    context.getPackageName()
+                );
+                if (soundResId != 0) {
+                    soundUri = Uri.parse("android.resource://" + context.getPackageName() + "/" + soundResId);
+                    Log.d(TAG, "🔊 알림음 URI: " + soundUri);
+                }
+            }
+
+            // 앱 실행 Intent
+            Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
+            if (launchIntent == null) {
+                launchIntent = new Intent(context, MainActivity.class);
+            }
+            launchIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                flags |= PendingIntent.FLAG_IMMUTABLE;
+            }
+            PendingIntent pendingIntent = PendingIntent.getActivity(context, notificationId, launchIntent, flags);
+
+            // 알림 생성
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(context.getApplicationInfo().icon)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(NotificationCompat.PRIORITY_MAX)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setAutoCancel(true)
+                .setContentIntent(pendingIntent)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+
+            // 소리 설정 (채널에서 이미 설정되어 있지만, 명시적으로도 설정)
+            if (soundUri != null) {
+                builder.setSound(soundUri, AudioAttributes.USAGE_ALARM);
+            }
+
+            // 진동 설정
+            if (enableVibration) {
+                builder.setVibrate(new long[]{0, 500, 200, 500});
+            }
+
+            // 알림 표시
+            NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (notificationManager != null) {
+                notificationManager.notify(notificationId, builder.build());
+                Log.d(TAG, "✅ 알림 표시 완료");
+            } else {
+                Log.e(TAG, "❌ NotificationManager가 null입니다");
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "❌ 알림 생성 실패", e);
+        }
+    }
+
+    /**
+     * 앱이 실행 중인지 확인
+     */
+    private boolean isAppRunning(Context context) {
+        android.app.ActivityManager activityManager = (android.app.ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        if (activityManager != null) {
+            for (android.app.ActivityManager.RunningAppProcessInfo processInfo : activityManager.getRunningAppProcesses()) {
+                if (processInfo.processName.equals(context.getPackageName())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+}

@@ -23,6 +23,7 @@ import { ko } from 'date-fns/locale';
 import useAlarmManager from './hooks/useAlarmManager';
 import { getRandomStealthPhrase } from './utils/stealthPhrases';
 import { setCurrentUserId, setCurrentUserData, getCurrentUserId, checkSync, migrateUserData, logout as userStorageLogout, getProfileSetting, setProfileSetting, cleanupSharedKeys } from './utils/userStorage';
+import { diagnosticLog } from './utils/diagnosticLogger';
 import { deleteBase64ImagesFromCalendar } from './services/userDataService';
 import { findPhoneByFirebaseUID, isLegacyUser } from './services/authService';
 import './utils/cleanBase64'; // window.cleanInvalidMemos 등록용
@@ -714,6 +715,7 @@ function App() {
         syncActivities,
         syncSettings,
         saveImmediately,
+        flushPendingSaves,
         manualSync,
         // 개별 항목 동기화 함수
         syncMemo,
@@ -942,35 +944,51 @@ function App() {
         let updatedSchedules;
 
         if (actionType === 'delete' || actionType === 'edit') {
-            // localStorage에서 최신 데이터 읽기
-            const currentUserId = localStorage.getItem('currentUser');
-            const calendarKey = currentUserId ? `user_${currentUserId}_calendar` : 'calendarSchedules_shared';
+            // ✅ FIX: userId 사용 (currentUser 대신)
+            // AlarmModal의 getCalendarStorageKey()와 동일한 키 사용
+            const calendarKey = userId ? `user_${userId}_calendar` : 'calendarSchedules_shared';
             const storedData = localStorage.getItem(calendarKey);
             updatedSchedules = storedData ? JSON.parse(storedData) : { ...calendarSchedules };
-            console.log('🔍 [handleSaveAlarm] localStorage에서 최신 데이터 로드 (delete/edit)');
+            console.log('🔍 [handleSaveAlarm] localStorage에서 최신 데이터 로드 (delete/edit)', { userId, calendarKey });
         } else {
             // 그 외 액션은 기존 방식대로 React state 사용
             updatedSchedules = { ...calendarSchedules };
+        }
 
-            // 해당 날짜의 스케줄에 'alarm' 객체를 추가하거나 업데이트
-            const targetSchedule = updatedSchedules[key];
-            if (targetSchedule) {
-                updatedSchedules[key] = {
-                    ...targetSchedule,
-                    alarm: alarmSettings
-                };
-            } else {
-                updatedSchedules[key] = {
-                    text: '',
-                    alarm: alarmSettings
-                };
-            }
+        // ✅ FIX: 모든 액션에서 alarm 데이터를 스케줄에 설정
+        // delete/edit 액션에서도 alarm을 설정해야 undefined가 되지 않음
+        const targetSchedule = updatedSchedules[key];
+        if (targetSchedule) {
+            updatedSchedules[key] = {
+                ...targetSchedule,
+                alarm: alarmSettings
+            };
+        } else {
+            updatedSchedules[key] = {
+                text: '',
+                alarm: alarmSettings
+            };
         }
 
         console.log('🔍 [handleSaveAlarm] 현재 스케줄:', updatedSchedules[key]);
         console.log('🔍 [handleSaveAlarm] 전체 알람 수:', alarmSettings.registeredAlarms?.length);
 
+        // 🔍 진단: 알람 저장 전 상태
+        diagnosticLog('info', `알람 ${actionType} 시작`, {
+            date: key,
+            alarmsCount: alarmSettings.registeredAlarms?.length || 0,
+            userId: userId ? userId.substring(0, 8) + '...' : 'N/A'
+        });
+
         syncCalendar(updatedSchedules);
+
+        // ⚡ 알람 등록 시 즉시 Firestore 저장 (디바운스 없이)
+        if (actionType === 'register') {
+            console.log('⚡ [handleSaveAlarm] 알람 등록 - 즉시 저장 실행');
+            diagnosticLog('warning', '즉시 저장 실행 중...', { action: actionType });
+            flushPendingSaves();
+            diagnosticLog('success', '즉시 저장 완료', { action: actionType });
+        }
 
         // 4. 사용자에게 피드백을 줍니다 (모달은 닫지 않음)
         const hasAlarms = alarmSettings.registeredAlarms && alarmSettings.registeredAlarms.length > 0;
@@ -1164,13 +1182,27 @@ function App() {
             showToast("✓ 메모가 저장되었습니다");
         };
 
-    const handleEditMemo = (id, newContent, isImportant, folderId, previousFolderId) => {
+    const handleEditMemo = async (id, newContent, isImportant, folderId, previousFolderId) => {
             const now = Date.now();
             const targetMemo = memos.find(memo => memo.id === id);
             if (!targetMemo) return;
 
             // 내용이 변경되었는지 확인 (공백 포함)
             const contentChanged = targetMemo.content !== newContent;
+
+            // ⭐ 대화방에서 불러온 문서를 수정하면, 해당 대화방의 currentDoc 비우기
+            if (contentChanged && targetMemo.currentWorkingRoomId) {
+                try {
+                    const { doc, deleteDoc } = await import('firebase/firestore');
+                    const { db } = await import('./firebase/config');
+
+                    const currentDocRef = doc(db, 'chatRooms', targetMemo.currentWorkingRoomId, 'sharedDocument', 'currentDoc');
+                    await deleteDoc(currentDocRef);
+                    console.log('✅ 메모 수정: 대화방 currentDoc 자동 비우기 완료:', targetMemo.currentWorkingRoomId);
+                } catch (error) {
+                    console.error('❌ 메모 수정: 대화방 currentDoc 비우기 실패:', error);
+                }
+            }
 
             const updatedMemo = {
                 ...targetMemo,
@@ -3820,6 +3852,7 @@ function App() {
                 isOpen={isAlarmModalOpen}
                 scheduleData={scheduleForAlarm}
                 allSchedules={calendarSchedules}
+                userId={userId}
                 onSave={handleSaveAlarm}
                 onClose={() => setIsAlarmModalOpen(false)}
             />

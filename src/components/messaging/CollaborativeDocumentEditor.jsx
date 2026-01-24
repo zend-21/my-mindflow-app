@@ -735,27 +735,59 @@ const CollaborativeDocumentEditor = ({
       const currentDocRef = doc(db, 'chatRooms', chatRoomId, 'sharedDocument', 'currentDoc');
 
       // 0. ⭐ [중요] 기존 문서가 있었다면 currentWorkingRoomId 정리
-      // 주의: 기존 문서가 현재 방에서 마커가 있으면 현재 방 유지, 없으면 건드리지 않음
-      // (다른 방에서 마커가 있을 수 있으므로 null로 설정하지 않음)
+      // actualCount 기반으로 currentWorkingRoomId 설정
       if (currentDocId && currentDocId !== memo.id && !currentDocId.startsWith('temp_')) {
         try {
-          // 현재 방의 기존 문서 editHistory 검색하여 pending 마커가 있는지 확인
+          // 1. 현재 방의 기존 문서 editHistory 검색하여 pending 마커가 있는지 확인
           const oldEditsRef = collection(db, 'chatRooms', chatRoomId, 'documents', currentDocId, 'editHistory');
           const oldPendingQuery = query(oldEditsRef, where('status', '==', 'pending'));
           const oldPendingSnapshot = await getDocs(oldPendingQuery);
-          const hasOldMarkerInCurrentRoom = oldPendingSnapshot.size > 0;
+          const actualCountInCurrentRoom = oldPendingSnapshot.size;
 
-          if (hasOldMarkerInCurrentRoom) {
-            // 현재 방에 마커가 있으면 currentWorkingRoomId를 현재 방으로 유지
+          if (actualCountInCurrentRoom > 0) {
+            // 현재 방에 마커가 있으면 currentWorkingRoomId를 현재 방으로 설정
             const oldMemoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', currentDocId);
             await setDoc(oldMemoRef, {
               currentWorkingRoomId: chatRoomId,
               hasPendingEdits: true
             }, { merge: true });
-            console.log(`✅ 문서 교체 - 기존 문서에 마커 존재 (${oldPendingSnapshot.size}개), currentWorkingRoomId 유지:`, currentDocId);
+            console.log(`✅ 문서 교체 - 기존 문서에 마커 존재 (${actualCountInCurrentRoom}개), currentWorkingRoomId = ${chatRoomId}`);
           } else {
-            // 현재 방에 마커가 없으면 건드리지 않음 (다른 방에 마커가 있을 수 있음)
-            console.log('✅ 문서 교체 - 현재 방에 마커 없음, currentWorkingRoomId 변경 안 함:', currentDocId);
+            // 2. 현재 방에 마커가 없으면, 원본 메모의 currentWorkingRoomId 확인
+            const oldMemoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', currentDocId);
+            const oldMemoSnap = await getDoc(oldMemoRef);
+
+            if (oldMemoSnap.exists()) {
+              const oldMemoData = oldMemoSnap.data();
+              const otherRoomId = oldMemoData.currentWorkingRoomId;
+
+              // 다른 방에서 마커가 있는지 확인
+              if (otherRoomId && otherRoomId !== chatRoomId) {
+                const otherEditsRef = collection(db, 'chatRooms', otherRoomId, 'documents', currentDocId, 'editHistory');
+                const otherPendingQuery = query(otherEditsRef, where('status', '==', 'pending'));
+                const otherPendingSnapshot = await getDocs(otherPendingQuery);
+                const actualCountInOtherRoom = otherPendingSnapshot.size;
+
+                if (actualCountInOtherRoom > 0) {
+                  // 다른 방에 마커가 있으면 그대로 유지
+                  console.log(`✅ 문서 교체 - 다른 방(${otherRoomId})에 마커 존재 (${actualCountInOtherRoom}개), currentWorkingRoomId 유지`);
+                } else {
+                  // 다른 방에도 마커가 없으면 null로 설정
+                  await setDoc(oldMemoRef, {
+                    currentWorkingRoomId: null,
+                    hasPendingEdits: false
+                  }, { merge: true });
+                  console.log('✅ 문서 교체 - 모든 방에 마커 없음, currentWorkingRoomId = null');
+                }
+              } else {
+                // currentWorkingRoomId가 없거나 현재 방이면 null로 설정
+                await setDoc(oldMemoRef, {
+                  currentWorkingRoomId: null,
+                  hasPendingEdits: false
+                }, { merge: true });
+                console.log('✅ 문서 교체 - 현재 방에 마커 없음, currentWorkingRoomId = null');
+              }
+            }
           }
         } catch (error) {
           console.error('❌ 기존 문서 currentWorkingRoomId 정리 실패:', error);
@@ -3604,30 +3636,59 @@ const CollaborativeDocumentEditor = ({
       console.log('🗑️ 캐시에서 문서 삭제:', docIdToClose);
 
       // ⭐ [중요] 비우기 시 원본 메모 업데이트
-      // 비우기는 로컬 상태만 초기화하는 것이므로, editHistory는 그대로 유지됨
-      // → 현재 방에 마커가 있으면 현재 방 유지, 없으면 건드리지 않음
-      // (다른 방에서 마커가 있을 수 있으므로 null로 설정하지 않음)
+      // actualCount 기반으로 currentWorkingRoomId 설정
       try {
-        // 현재 방의 editHistory만 검색하여 pending 마커가 있는지 확인
+        // 1. 현재 방의 editHistory 검색하여 pending 마커가 있는지 확인
         const editsRef = collection(db, 'chatRooms', chatRoomId, 'documents', docIdToClose, 'editHistory');
         const pendingQuery = query(editsRef, where('status', '==', 'pending'));
         const pendingSnapshot = await getDocs(pendingQuery);
+        const actualCountInCurrentRoom = pendingSnapshot.size;
 
-        const hasMarkerInCurrentRoom = pendingSnapshot.size > 0;
-
-        if (hasMarkerInCurrentRoom) {
-          // 현재 방에 마커가 있으면 currentWorkingRoomId를 현재 방으로 유지
+        if (actualCountInCurrentRoom > 0) {
+          // 현재 방에 마커가 있으면 currentWorkingRoomId를 현재 방으로 설정
           const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', docIdToClose);
           await setDoc(memoRef, {
             currentWorkingRoomId: chatRoomId,
             hasPendingEdits: true
           }, { merge: true });
-          console.log(`✅ 비우기 - 현재 방에 마커 존재 (${pendingSnapshot.size}개), currentWorkingRoomId 유지:`, chatRoomId);
+          console.log(`✅ 비우기 - 현재 방에 마커 존재 (${actualCountInCurrentRoom}개), currentWorkingRoomId = ${chatRoomId}`);
         } else {
-          // 현재 방에 마커가 없으면 건드리지 않음 (다른 방에 마커가 있을 수 있음)
-          console.log('✅ 비우기 - 현재 방에 마커 없음, currentWorkingRoomId 변경 안 함:', docIdToClose);
+          // 2. 현재 방에 마커가 없으면, 원본 메모의 currentWorkingRoomId 확인
+          const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', docIdToClose);
+          const memoSnap = await getDoc(memoRef);
+
+          if (memoSnap.exists()) {
+            const memoData = memoSnap.data();
+            const otherRoomId = memoData.currentWorkingRoomId;
+
+            // 다른 방에서 마커가 있는지 확인
+            if (otherRoomId && otherRoomId !== chatRoomId) {
+              const otherEditsRef = collection(db, 'chatRooms', otherRoomId, 'documents', docIdToClose, 'editHistory');
+              const otherPendingQuery = query(otherEditsRef, where('status', '==', 'pending'));
+              const otherPendingSnapshot = await getDocs(otherPendingQuery);
+              const actualCountInOtherRoom = otherPendingSnapshot.size;
+
+              if (actualCountInOtherRoom > 0) {
+                // 다른 방에 마커가 있으면 그대로 유지
+                console.log(`✅ 비우기 - 다른 방(${otherRoomId})에 마커 존재 (${actualCountInOtherRoom}개), currentWorkingRoomId 유지`);
+              } else {
+                // 다른 방에도 마커가 없으면 null로 설정
+                await setDoc(memoRef, {
+                  currentWorkingRoomId: null,
+                  hasPendingEdits: false
+                }, { merge: true });
+                console.log('✅ 비우기 - 모든 방에 마커 없음, currentWorkingRoomId = null');
+              }
+            } else {
+              // currentWorkingRoomId가 없거나 현재 방이면 null로 설정
+              await setDoc(memoRef, {
+                currentWorkingRoomId: null,
+                hasPendingEdits: false
+              }, { merge: true });
+              console.log('✅ 비우기 - 현재 방에 마커 없음, currentWorkingRoomId = null');
+            }
+          }
         }
-        // 참고: SharedMemoSelectorModal의 실시간 리스너가 Firestore 변경을 감지하여 배지 업데이트
       } catch (error) {
         console.error('❌ 비우기 - 원본 메모 업데이트 실패:', error);
       }

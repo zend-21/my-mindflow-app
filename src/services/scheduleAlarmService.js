@@ -3,6 +3,10 @@
 
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
+import { registerPlugin } from '@capacitor/core';
+
+// ✅ 커스텀 AlarmManager 플러그인 (앱 종료 후에도 작동)
+const ScheduleAlarm = registerPlugin('ScheduleAlarm');
 
 /**
  * 스케줄 알람 네이티브 등록
@@ -25,6 +29,26 @@ export const registerNativeScheduleAlarm = async (alarm, scheduleDate) => {
             return false;
         }
 
+        // ✅ Android 12+ 정확한 알람 권한 체크
+        if (Capacitor.getPlatform() === 'android') {
+            try {
+                const permissions = await LocalNotifications.checkPermissions();
+                console.log('📋 알람 권한 상태:', JSON.stringify(permissions, null, 2));
+
+                if (permissions.canScheduleExactAlarms === false) {
+                    console.error('❌ [CRITICAL] 정확한 알람 권한이 없습니다!');
+                    console.error('❌ 설정 > 앱 > ShareNote > 알람 및 리마인더 에서 권한을 허용해주세요.');
+                    alert('⚠️ 백그라운드 알람을 사용하려면\n\n설정 > 앱 > ShareNote > 알람 및 리마인더\n\n에서 권한을 허용해주세요.');
+                    return false;
+                } else {
+                    console.log('✅ 정확한 알람 권한 확인 완료');
+                }
+            } catch (error) {
+                console.warn('⚠️ 정확한 알람 권한 체크 실패 (Android 12 미만일 수 있음):', error);
+                // Android 12 미만에서는 이 권한이 필요없으므로 계속 진행
+            }
+        }
+
         const alarmTime = new Date(alarm.calculatedTime);
         const now = new Date();
 
@@ -39,7 +63,7 @@ export const registerNativeScheduleAlarm = async (alarm, scheduleDate) => {
 
         // 알람 타입에 따라 채널 선택
         const notificationType = alarm.customNotificationType || alarm.notificationType || 'both';
-        let channelId = 'alarm_channel_v2'; // 기본: 소리+진동
+        let channelId = 'alarm_channel_v2'; // 기본: 소리+진동 (v4 = USAGE_ALARM + IMPORTANCE_MAX)
 
         if (notificationType === 'sound') {
             channelId = 'alarm_channel_sound_only_v2';
@@ -60,34 +84,32 @@ export const registerNativeScheduleAlarm = async (alarm, scheduleDate) => {
             repeatCount: repeatCount
         });
 
+        // ✅ AlarmManager 플러그인 사용 (백그라운드에서도 작동)
         // 반복 알람 생성 (1회 또는 3회)
-        const notifications = [];
+        const body = `${alarm.content || `일정: ${scheduleDate}`}\n\n- ShareNote -`;
+        const enableVibration = notificationType === 'both' || notificationType === 'vibrate';
+
         for (let i = 0; i < repeatCount; i++) {
             const repeatTime = new Date(alarmTime.getTime() + (i * 60 * 1000)); // i분 추가
-            notifications.push({
-                id: notificationId + i, // 각 반복마다 고유 ID
-                title: alarm.title,
-                body: `${alarm.content || `일정: ${scheduleDate}`}\n\n- ShareNote -`,
-                schedule: { at: repeatTime },
-                smallIcon: 'ic_stat_icon_config_sample',
-                iconColor: '#1a1a2e',
-                channelId: channelId,
-                sound: 'schedule_alarm.mp3',
-                extra: {
-                    type: 'schedule',
-                    alarmId: alarm.id,
-                    scheduleDate: scheduleDate,
-                    isAnniversary: alarm.isAnniversary || false,
-                    repeatIndex: i + 1,
-                    totalRepeats: repeatCount
-                }
-            });
+            const uniqueId = notificationId + i; // 각 반복마다 고유 ID
+
+            try {
+                await ScheduleAlarm.scheduleAlarm({
+                    notificationId: uniqueId,
+                    title: alarm.title,
+                    body: body,
+                    triggerTime: repeatTime.getTime(),
+                    channelId: channelId,
+                    sound: 'schedule_alarm', // 확장자 제외
+                    enableVibration: enableVibration
+                });
+                console.log(`✅ 알람 ${i + 1}/${repeatCount} 등록: ${repeatTime.toLocaleString('ko-KR')}`);
+            } catch (error) {
+                console.error(`❌ 알람 ${i + 1}/${repeatCount} 등록 실패:`, error);
+            }
         }
 
-        // LocalNotifications로 알람 예약
-        await LocalNotifications.schedule({ notifications });
-
-        console.log(`✅ 스케줄 알람 등록 완료: ${alarm.title} (${repeatCount}회 반복, ${alarmTime.toLocaleString('ko-KR')}부터)`);
+        console.log(`✅ 스케줄 알람 등록 완료: ${alarm.title} (${repeatCount}회 반복)`);
         return true;
     } catch (error) {
         console.error('❌ 스케줄 알람 등록 실패:', error);
@@ -109,17 +131,20 @@ export const cancelNativeScheduleAlarm = async (alarmId, repeatCount = 3) => {
     try {
         const notificationId = parseInt(`${alarmId}`.slice(-8), 10);
 
-        // 반복 알람을 모두 취소 (최대 3개)
-        const notificationsToCancel = [];
+        // ✅ AlarmManager 플러그인으로 취소
         for (let i = 0; i < repeatCount; i++) {
-            notificationsToCancel.push({ id: notificationId + i });
+            const uniqueId = notificationId + i;
+            try {
+                await ScheduleAlarm.cancelAlarm({
+                    notificationId: uniqueId
+                });
+                console.log(`✅ 알람 ${i + 1}/${repeatCount} 취소 완료`);
+            } catch (error) {
+                console.error(`❌ 알람 ${i + 1}/${repeatCount} 취소 실패:`, error);
+            }
         }
 
-        await LocalNotifications.cancel({
-            notifications: notificationsToCancel
-        });
-
-        console.log(`✅ 스케줄 알람 취소 완료: ID ${alarmId} (${repeatCount}회 반복 모두 취소)`);
+        console.log(`✅ 스케줄 알람 취소 완료: ID ${alarmId} (${repeatCount}회 반복)`);
         return true;
     } catch (error) {
         console.error('❌ 스케줄 알람 취소 실패:', error);

@@ -149,9 +149,9 @@ const AlarmToast = ({ isVisible, alarmData, onClose }) => {
 
       if (soundFile === 'custom') {
         const audioData = await loadAudioFile('alarm_sound_main');
-        audioSrc = audioData || '/sound/Schedule_alarm/default.mp3';
+        audioSrc = audioData || `/sound/Schedule_alarm/default.mp3?v=${Date.now()}`;
       } else {
-        audioSrc = '/sound/Schedule_alarm/default.mp3';
+        audioSrc = `/sound/Schedule_alarm/default.mp3?v=${Date.now()}`;
       }
 
       if (audioSrc) {

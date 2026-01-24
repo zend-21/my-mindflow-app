@@ -640,7 +640,9 @@ export const FullScreenHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 16px 20px;
+  padding-top: calc(env(safe-area-inset-top, 0px) + 50px); /* Safe Area + 기본 패딩 */
+  padding-bottom: 4px; /* 하단 여백 조정 */
   background: rgba(255, 255, 255, 0.03);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
@@ -708,6 +710,7 @@ export const FullScreenEditArea = styled.div`
   background: rgba(0, 0, 0, 0.2);
   color: #e0e0e0;
   padding: 24px;
+  padding-bottom: max(24px, env(safe-area-inset-bottom, 24px)); /* 하단 Safe Area 대응 */
   font-size: 16px;
   line-height: 1.8;
   overflow-y: auto;

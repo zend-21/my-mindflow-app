@@ -142,6 +142,14 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
     const handleNativeLogin = async () => {
         console.log('🔵 네이티브 Google 로그인 시작');
         try {
+            // ✅ 로그인 전 기존 세션 완전히 제거 (계정 선택 화면 강제)
+            try {
+                await GoogleAuth.signOut();
+                console.log('✅ 기존 Google 세션 정리 완료');
+            } catch (signOutError) {
+                console.warn('⚠️ Google 세션 정리 실패 (무시):', signOutError);
+            }
+
             const result = await GoogleAuth.signIn();
             console.log('✅ 네이티브 Google 로그인 성공');
             console.log('📦 전체 result 객체:', JSON.stringify(result, null, 2));
@@ -222,6 +230,8 @@ function LoginModal({ onSuccess, onError, onClose, setProfile }) {
             onError();
         },
         scope: 'https://www.googleapis.com/auth/drive.file',
+        // ✅ 계정 선택 화면 강제 표시 (One Tap 자동 선택 방지)
+        prompt: 'select_account',
     });
 
     // 플랫폼에 따라 적절한 로그인 함수 선택

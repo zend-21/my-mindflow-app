@@ -22,6 +22,7 @@
 //
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { diagnosticLog } from '../utils/diagnosticLogger';
 import {
   fetchAllUserData,
   migrateLocalStorageToFirestore,
@@ -103,21 +104,61 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
   const [error, setError] = useState(null);
   const [syncStatus, setSyncStatus] = useState('idle'); // 'idle', 'syncing', 'synced', 'offline'
 
-  // 데이터 상태
-  const [memos, setMemos] = useState([]);
+  // ✅ Hydration First: localStorage → State → Firestore 병합
+  // isReady 플래그: Firestore 초기 로드 완료 전까지 localStorage 쓰기 방지
+  const [isReady, setIsReady] = useState(false);
+
+  // ✅ HYDRATION FIRST: useState 초기값을 localStorage에서 로드
+  const [memos, setMemos] = useState(() => {
+    if (!userId) return [];
+    return getAccountLocalStorageWithTTL(userId, 'memos', false) || [];
+  });
   const memosRef = useRef([]); // 함수형 업데이트 지원을 위한 ref
-  const [folders, setFolders] = useState([]);
-  const [trash, setTrash] = useState([]);
-  const [macros, setMacros] = useState([]);
-  const [calendar, setCalendar] = useState({});
-  const [activities, setActivities] = useState([]);
-  const [settings, setSettings] = useState({
-    widgets: ['StatsGrid', 'QuickActions', 'RecentActivity'],
-    displayCount: 5,
-    nickname: null,
-    profileImageType: 'avatar',
-    selectedAvatarId: null,
-    avatarBgColor: 'none'
+
+  const [folders, setFolders] = useState(() => {
+    if (!userId) return [];
+    return getAccountLocalStorageWithTTL(userId, 'folders', false) || [];
+  });
+
+  const [trash, setTrash] = useState(() => {
+    if (!userId) return [];
+    return getAccountLocalStorageWithTTL(userId, 'trash', false) || [];
+  });
+
+  const [macros, setMacros] = useState(() => {
+    if (!userId) return [];
+    return getAccountLocalStorageWithTTL(userId, 'macros', false) || [];
+  });
+
+  const [calendar, setCalendar] = useState(() => {
+    if (!userId) return {};
+    return getAccountLocalStorageWithTTL(userId, 'calendar', false) || {};
+  });
+
+  const [activities, setActivities] = useState(() => {
+    if (!userId) return [];
+    return getAccountLocalStorageWithTTL(userId, 'activities', false) || [];
+  });
+
+  const [settings, setSettings] = useState(() => {
+    const defaultSettings = {
+      widgets: ['StatsGrid', 'QuickActions', 'RecentActivity'],
+      displayCount: 5,
+      nickname: null,
+      profileImageType: 'avatar',
+      selectedAvatarId: null,
+      avatarBgColor: 'none'
+    };
+    if (!userId) return defaultSettings;
+
+    const widgets = getAccountLocalStorageWithTTL(userId, 'widgets', false);
+    const displayCount = getAccountLocalStorageWithTTL(userId, 'displayCount', false);
+
+    return {
+      ...defaultSettings,
+      ...(widgets && { widgets }),
+      ...(displayCount && { displayCount })
+    };
   });
 
   // 마이그레이션 완료 여부
@@ -153,6 +194,13 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
       try {
         setLoading(true);
         setError(null);
+
+        // 🔍 진단: 데이터 로드 시작
+        diagnosticLog('info', '데이터 로드 시작', {
+          userId: userId ? userId.substring(0, 8) + '...' : 'N/A',
+          enabled,
+          migrated: migrationRef.current
+        });
 
         // 🧹 Step 0-1: 만료된 localStorage 데이터 정리
         const cleanedCount = cleanupExpiredLocalStorage(userId);
@@ -210,6 +258,14 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
         // 📦 Step 3: Firestore에서 데이터 로드
         const data = await fetchAllUserData(userId);
+
+        // 🔍 진단: Firestore 데이터 로드 완료
+        diagnosticLog('success', 'Firestore 로드 완료', {
+          memos: data.memos?.length || 0,
+          folders: data.folders?.length || 0,
+          calendar: Object.keys(data.calendar || {}).length,
+          macros: data.macros?.length || 0
+        });
 
         // Step 4: Firestore에 데이터가 없으면 localStorage에서 마이그레이션
         const hasFirestoreData = data.memos?.length > 0 ||
@@ -278,20 +334,32 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
           setSettings(mergedSettings);
 
           console.log('✅ Evernote 방식 다중 기기 동기화 완료');
+
+          // ✅ FIX: State 타이밍 버그 수정 - 병합된 값을 직접 사용
+          // setState는 비동기이므로 state 변수가 아닌 병합된 값을 localStorage에 저장
+          setAccountLocalStorageWithTTL(userId, 'memos', mergedMemos, { synced: true });
+          setAccountLocalStorageWithTTL(userId, 'folders', mergedFolders, { synced: true });
+          setAccountLocalStorageWithTTL(userId, 'trash', mergedTrash, { synced: true });
+          setAccountLocalStorageWithTTL(userId, 'macros', mergedMacros, { synced: true });
+          setAccountLocalStorageWithTTL(userId, 'calendar', mergedCalendar, { synced: true });
+          setAccountLocalStorageWithTTL(userId, 'activities', mergedActivities, { synced: true });
         }
 
-        // localStorage에 병합된 데이터 캐싱 (TTL 기반)
-        const currentMemos = memos.length > 0 ? memos : (data.memos || []);
-        const currentFolders = folders.length > 0 ? folders : (data.folders || []);
-        const currentCalendar = Object.keys(calendar).length > 0 ? calendar : (data.calendar || {});
+        // 신규 사용자의 경우에만 아래 로직 실행
+        if (!hasFirestoreData) {
+          // localStorage에 병합된 데이터 캐싱 (TTL 기반)
+          const currentMemos = memos.length > 0 ? memos : (data.memos || []);
+          const currentFolders = folders.length > 0 ? folders : (data.folders || []);
+          const currentCalendar = Object.keys(calendar).length > 0 ? calendar : (data.calendar || {});
 
-        // Firestore에서 로드한 데이터이므로 synced: true로 저장
-        setAccountLocalStorageWithTTL(userId, 'memos', currentMemos, { synced: true });
-        setAccountLocalStorageWithTTL(userId, 'folders', currentFolders, { synced: true });
-        setAccountLocalStorageWithTTL(userId, 'trash', data.trash || [], { synced: true });
-        setAccountLocalStorageWithTTL(userId, 'macros', data.macros || [], { synced: true });
-        setAccountLocalStorageWithTTL(userId, 'calendar', currentCalendar, { synced: true });
-        setAccountLocalStorageWithTTL(userId, 'activities', data.activities || [], { synced: true });
+          // Firestore에서 로드한 데이터이므로 synced: true로 저장
+          setAccountLocalStorageWithTTL(userId, 'memos', currentMemos, { synced: true });
+          setAccountLocalStorageWithTTL(userId, 'folders', currentFolders, { synced: true });
+          setAccountLocalStorageWithTTL(userId, 'trash', data.trash || [], { synced: true });
+          setAccountLocalStorageWithTTL(userId, 'macros', data.macros || [], { synced: true });
+          setAccountLocalStorageWithTTL(userId, 'calendar', currentCalendar, { synced: true });
+          setAccountLocalStorageWithTTL(userId, 'activities', data.activities || [], { synced: true });
+        }
 
         // 설정은 영구 보존 (TTL 정책에 따라)
         setAccountLocalStorageWithTTL(userId, 'widgets', data.settings?.widgets || ['StatsGrid', 'QuickActions', 'RecentActivity'], { synced: true });
@@ -314,15 +382,34 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
         setMigrated(true);
         migrationRef.current = true;
+
+        // ✅ Write Guard: Firestore 초기 로드 완료 후 localStorage 쓰기 허용
+        setIsReady(true);
+        console.log('✅ Firestore 초기 로드 완료 - localStorage 쓰기 활성화');
+
+        // 🔍 진단: 초기화 완료
+        diagnosticLog('success', '초기화 완료', {
+          ready: true,
+          userId: userId.substring(0, 8) + '...'
+        });
       } catch (err) {
         console.error('데이터 로드 실패:', err);
         setError(err);
+
+        // 🔍 진단: 로드 실패
+        diagnosticLog('error', 'Firestore 로드 실패', {
+          error: err.message,
+          code: err.code
+        });
 
         // 오류 시 localStorage 폴백
         const fallbackMemos = getLocalStorageWithFallback(userId, 'memos', 'memos_shared') || [];
         const fallbackFolders = getLocalStorageWithFallback(userId, 'folders', 'memoFolders') || [];
         setMemos(fallbackMemos);
         setFolders(fallbackFolders);
+
+        // ✅ 오류 시에도 isReady 활성화 (로컬 모드로 작동)
+        setIsReady(true);
       } finally {
         setLoading(false);
       }
@@ -351,7 +438,8 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
   // ⚠️ 캘린더는 제외 - Firestore가 단일 진실 공급원(Single Source of Truth)
   // ⚠️ TTL 정책: memos, folders는 synced 플래그로 관리, 나머지는 TTL 기반
   useEffect(() => {
-    if (!userId || !enabled || !migrated) return;
+    // ✅ Write Guard: Firestore 초기 로드 완료 전에는 localStorage 쓰기 금지
+    if (!userId || !enabled || !migrated || !isReady) return;
 
     try {
       // synced: false로 저장 (Firestore 저장 완료 후 true로 변경됨)
@@ -364,31 +452,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     } catch (error) {
       console.error('localStorage 동기화 실패:', error);
     }
-  }, [userId, enabled, migrated, memos, folders, trash, macros, calendar, activities]);
-
-  // 브라우저 종료 시 긴급 백업 (데이터 손실 최종 방어선)
-  // ⚠️ 캘린더는 제외 - Firestore가 단일 진실 공급원
-  useEffect(() => {
-    if (!userId || !enabled) return;
-
-    const handleBeforeUnload = () => {
-      // localStorage 긴급 저장 (동기) - synced: false로 저장
-      try {
-        setAccountLocalStorageWithTTL(userId, 'memos', memos, { synced: false });
-        setAccountLocalStorageWithTTL(userId, 'folders', folders, { synced: false });
-        setAccountLocalStorageWithTTL(userId, 'trash', trash, { synced: false });
-        setAccountLocalStorageWithTTL(userId, 'macros', macros, { synced: false });
-        // calendar는 Firestore에만 저장 (localStorage 긴급 백업 제외)
-        setAccountLocalStorageWithTTL(userId, 'activities', activities, { synced: false });
-        console.log('✅ 브라우저 종료 전 긴급 백업 완료');
-      } catch (error) {
-        console.error('❌ 긴급 백업 실패:', error);
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [userId, enabled, memos, folders, trash, macros, calendar, activities]);
+  }, [userId, enabled, migrated, isReady, memos, folders, trash, macros, calendar, activities]);
 
   // ⚡ 포그라운드 복귀 시 자동 동기화 체크 (최적화: localStorage 기반 증분 동기화)
   useEffect(() => {
@@ -425,6 +489,40 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     createDebouncedSave(userId, enabled),
     [userId, enabled]
   );
+
+  // 브라우저 종료 시 긴급 백업 (데이터 손실 최종 방어선)
+  // ⚠️ 캘린더는 제외 - Firestore가 단일 진실 공급원
+  useEffect(() => {
+    if (!userId || !enabled) return;
+
+    const handleBeforeUnload = async (e) => {
+      // ✅ CRITICAL FIX: 대기 중인 디바운스 타이머 즉시 실행
+      try {
+        if (debouncedSave && debouncedSave.flush) {
+          await debouncedSave.flush();
+          console.log('🚨 [긴급 플러시] 대기 중인 Firestore 저장 완료');
+        }
+      } catch (error) {
+        console.error('❌ 디바운스 플러시 실패:', error);
+      }
+
+      // localStorage 긴급 저장 (동기) - synced: false로 저장
+      try {
+        setAccountLocalStorageWithTTL(userId, 'memos', memos, { synced: false });
+        setAccountLocalStorageWithTTL(userId, 'folders', folders, { synced: false });
+        setAccountLocalStorageWithTTL(userId, 'trash', trash, { synced: false });
+        setAccountLocalStorageWithTTL(userId, 'macros', macros, { synced: false });
+        // calendar는 Firestore에만 저장 (localStorage 긴급 백업 제외)
+        setAccountLocalStorageWithTTL(userId, 'activities', activities, { synced: false });
+        console.log('✅ 브라우저 종료 전 긴급 백업 완료');
+      } catch (error) {
+        console.error('❌ 긴급 백업 실패:', error);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [userId, enabled, memos, folders, trash, macros, calendar, activities, debouncedSave]);
 
   // 개별 동기화 함수들
   const syncMemo = useCallback(createSyncMemo(userId, setMemos, debouncedSave), [userId, debouncedSave]);
@@ -463,6 +561,14 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
     // 아무 작업도 하지 않음 - 할당량 절약
     return Promise.resolve();
   }, []);
+
+  // ⚡ 대기 중인 저장 즉시 실행 (알람 등록 등 중요 작업용)
+  const flushPendingSaves = useCallback(async () => {
+    if (debouncedSave && debouncedSave.flush) {
+      console.log('⚡ [flushPendingSaves] 대기 중인 저장 즉시 실행');
+      await debouncedSave.flush();
+    }
+  }, [debouncedSave]);
 
   // 수동 동기화
   const manualSync = useCallback(
@@ -511,6 +617,7 @@ export const useFirestoreSync = (userId, enabled = true, firebaseUID = null) => 
 
     // 즉시 저장
     saveImmediately,
+    flushPendingSaves,
 
     // 수동 동기화
     manualSync,

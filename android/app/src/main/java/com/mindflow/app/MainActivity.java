@@ -3,6 +3,7 @@ package com.mindflow.app;
 import android.os.Bundle;
 import android.util.Log;
 import com.getcapacitor.BridgeActivity;
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.graphics.Color;
@@ -29,9 +30,17 @@ public class MainActivity extends BridgeActivity {
         Log.d("MainActivity", "✅ BadgePlugin 등록 완료");
         registerPlugin(NotificationSettingsPlugin.class);
         Log.d("MainActivity", "✅ NotificationSettingsPlugin 등록 완료");
+        registerPlugin(ScheduleAlarmPlugin.class);
+        Log.d("MainActivity", "✅ ScheduleAlarmPlugin 등록 완료");
 
         super.onCreate(savedInstanceState);
         Log.d("MainActivity", "✅ super.onCreate() 완료");
+
+        // WebView 디버깅 활성화 (Chrome/Edge DevTools에서 디버깅 가능)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            android.webkit.WebView.setWebContentsDebuggingEnabled(true);
+            Log.d("MainActivity", "✅ WebView 디버깅 활성화 완료");
+        }
 
         // FCM 알림 채널 생성 (Android 8.0+) - Context 초기화 후 실행
         createNotificationChannels();
@@ -135,10 +144,16 @@ public class MainActivity extends BridgeActivity {
             Uri alarmSoundUri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.schedule_alarm);
             Log.d("MainActivity", "🔊 스케줄 알람음 URI: " + alarmSoundUri);
 
-            // 알림음이 배경음악과 믹스되어 재생되도록 설정
-            AudioAttributes audioAttributes = new AudioAttributes.Builder()
+            // 일반 알림음 설정 (채팅, 타이머 등)
+            AudioAttributes notificationAudioAttributes = new AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .build();
+
+            // ✅ 알람 전용 AudioAttributes (백그라운드에서도 울림)
+            AudioAttributes alarmAudioAttributes = new AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_ALARM)  // ← 알람용으로 변경!
                 .build();
 
             // 1. 타이머 채널 - timer_alarm.mp3 사용
@@ -150,72 +165,75 @@ public class MainActivity extends BridgeActivity {
             timerChannel.setDescription("타이머 완료 알림");
             timerChannel.enableVibration(true);
             timerChannel.setShowBadge(false); // 타이머는 배지 표시 안 함
-            timerChannel.setSound(timerSoundUri, audioAttributes);
+            timerChannel.setSound(timerSoundUri, notificationAudioAttributes);
             Log.d("MainActivity", "✅ 타이머 채널 생성 완료 (timer_alarm.mp3)");
 
             // 2. 알람 채널 (소리 + 진동) - schedule_alarm.mp3 사용
             NotificationChannel alarmChannel = new NotificationChannel(
                 "alarm_channel_v2",
                 "캘린더 알람 (소리+진동)",
-                NotificationManager.IMPORTANCE_HIGH
+                NotificationManager.IMPORTANCE_MAX  // ✅ 백그라운드 알람을 위해 MAX 사용
             );
             alarmChannel.setDescription("캘린더 스케줄 알람 (소리+진동)");
             alarmChannel.enableVibration(true);
             alarmChannel.setShowBadge(true);
-            alarmChannel.setSound(alarmSoundUri, audioAttributes);
+            alarmChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);  // ✅ 잠금화면 표시
+            alarmChannel.setSound(alarmSoundUri, alarmAudioAttributes);  // ✅ 알람용 속성 사용
             Log.d("MainActivity", "✅ 알람 채널 생성 완료 (schedule_alarm.mp3)");
 
             // 2-1. 알람 소리만 채널 (진동 없음)
             NotificationChannel alarmSoundOnlyChannel = new NotificationChannel(
                 "alarm_channel_sound_only_v2",
                 "캘린더 알람 (소리만)",
-                NotificationManager.IMPORTANCE_HIGH
+                NotificationManager.IMPORTANCE_MAX  // ✅ 백그라운드 알람을 위해 MAX 사용
             );
             alarmSoundOnlyChannel.setDescription("캘린더 알람 (소리만, 진동 없음)");
             alarmSoundOnlyChannel.enableVibration(false);
             alarmSoundOnlyChannel.setShowBadge(true);
-            alarmSoundOnlyChannel.setSound(alarmSoundUri, audioAttributes);
+            alarmSoundOnlyChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);  // ✅ 잠금화면 표시
+            alarmSoundOnlyChannel.setSound(alarmSoundUri, alarmAudioAttributes);  // ✅ 알람용 속성 사용
             Log.d("MainActivity", "✅ 알람 소리만 채널 생성 완료");
 
             // 2-2. 알람 진동만 채널 (소리 없음)
             NotificationChannel alarmVibrationOnlyChannel = new NotificationChannel(
                 "alarm_channel_vibration_only_v2",
                 "캘린더 알람 (진동만)",
-                NotificationManager.IMPORTANCE_HIGH
+                NotificationManager.IMPORTANCE_MAX  // ✅ 백그라운드 알람을 위해 MAX 사용
             );
             alarmVibrationOnlyChannel.setDescription("캘린더 알람 (진동만, 소리 없음)");
             alarmVibrationOnlyChannel.enableVibration(true);
             alarmVibrationOnlyChannel.setShowBadge(true);
+            alarmVibrationOnlyChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);  // ✅ 잠금화면 표시
             alarmVibrationOnlyChannel.setSound(null, null);
             Log.d("MainActivity", "✅ 알람 진동만 채널 생성 완료");
 
             // 3. 채팅 채널 (채팅 메시지) - sharenote.mp3 사용
             NotificationChannel chatChannel = new NotificationChannel(
-                "chat_channel_v3",
+                "chat_channel_v4",
                 "채팅",
                 NotificationManager.IMPORTANCE_HIGH
             );
             chatChannel.setDescription("새 채팅 메시지 알림");
             chatChannel.enableVibration(true);
             chatChannel.setShowBadge(true);
-            chatChannel.setSound(chatSoundUri, audioAttributes);
+            chatChannel.setSound(chatSoundUri, notificationAudioAttributes);
             Log.d("MainActivity", "✅ 채팅 채널 생성 완료 (sharenote.mp3)");
 
             // 4. 채팅 소리만 채널 (진동 없음)
             NotificationChannel chatSoundOnlyChannel = new NotificationChannel(
-                "chat_channel_sound_only_v3",
+                "chat_channel_sound_only_v4",
                 "채팅 (소리만)",
                 NotificationManager.IMPORTANCE_HIGH
             );
             chatSoundOnlyChannel.setDescription("채팅 알림 (소리만, 진동 없음)");
             chatSoundOnlyChannel.enableVibration(false);
             chatSoundOnlyChannel.setShowBadge(true);
-            chatSoundOnlyChannel.setSound(chatSoundUri, audioAttributes);
+            chatSoundOnlyChannel.setSound(chatSoundUri, notificationAudioAttributes);
             Log.d("MainActivity", "✅ 채팅 소리만 채널 생성 완료");
 
             // 5. 채팅 진동만 채널 (소리 없음)
             NotificationChannel chatVibrationOnlyChannel = new NotificationChannel(
-                "chat_channel_vibration_only_v3",
+                "chat_channel_vibration_only_v4",
                 "채팅 (진동만)",
                 NotificationManager.IMPORTANCE_HIGH
             );
@@ -227,7 +245,7 @@ public class MainActivity extends BridgeActivity {
 
             // 6. 채팅 완전 무음 채널 (소리/진동 모두 없음)
             NotificationChannel chatAllSilentChannel = new NotificationChannel(
-                "chat_channel_all_silent_v3",
+                "chat_channel_all_silent_v4",
                 "채팅 (완전 무음)",
                 NotificationManager.IMPORTANCE_HIGH
             );

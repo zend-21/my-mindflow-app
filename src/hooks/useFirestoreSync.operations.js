@@ -18,6 +18,7 @@ import {
   deleteCalendarDateFromFirestore,
   deleteActivityFromFirestore,
 } from '../services/userDataService';
+import { diagnosticLog } from '../utils/diagnosticLogger';
 
 import {
   setAccountLocalStorage,
@@ -29,49 +30,126 @@ import {
 
 /**
  * 디바운스 저장 함수 생성 (TTL 및 synced 플래그 포함)
+ * 반환값: { save, flush } - flush는 대기 중인 저장을 즉시 실행
  */
 export const createDebouncedSave = (userId, enabled) => {
   const saveTimeout = { current: null };
+  const pendingSaves = { current: [] }; // 대기 중인 저장 작업 추적
 
-  return (saveFn, itemId, dataForComparison, dataType, ...saveArgs) => {
+  const executeSave = async (saveFn, itemId, dataForComparison, dataType, ...saveArgs) => {
+    console.log(`🔍 [executeSave] 호출됨: itemId=${itemId}, dataType=${dataType}, userId=${userId}, enabled=${enabled}`);
+
+    if (!userId || !enabled) {
+      console.warn(`⚠️ [executeSave] 저장 건너뜀: userId=${userId}, enabled=${enabled}`);
+      return;
+    }
+
+    try {
+      // 🚀 변경 감지: localStorage에서 마지막 저장 버전 확인
+      const lastSavedKey = `firestore_saved_${itemId}`;
+      const lastSaved = localStorage.getItem(lastSavedKey);
+      const currentData = JSON.stringify(dataForComparison);
+
+      if (lastSaved === currentData) {
+        console.log(`⏭️ [변경 감지] 변경사항 없음 - 저장 생략: ${itemId}`);
+        return;
+      }
+
+      console.log(`💾 [변경 감지] 변경 감지됨 - Firestore 저장 시작: ${itemId}`);
+      console.log(`📊 [변경 감지] 데이터 크기: ${currentData.length} bytes`);
+
+      // Firestore 저장 실행 (userId는 자동으로 첫 번째 인자로 전달)
+      const saveStartTime = Date.now();
+      await saveFn(userId, ...saveArgs);
+      const saveDuration = Date.now() - saveStartTime;
+
+      console.log(`✅ [변경 감지] Firestore 저장 성공: ${itemId} (${saveDuration}ms)`);
+
+      // 🔍 진단: 저장 성공 로그
+      diagnosticLog('success', `저장 완료: ${dataType || itemId}`, {
+        userId: userId.substring(0, 8) + '...',
+        itemId: itemId.substring(0, 20) + '...',
+        dataSize: currentData.length,
+        duration: saveDuration + 'ms'
+      });
+
+      // ✅ 성공 시에만 마지막 저장 버전 업데이트
+      localStorage.setItem(lastSavedKey, currentData);
+
+      // ✅ synced 플래그를 true로 업데이트
+      if (dataType) {
+        markLocalStorageSynced(userId, dataType, true);
+        console.log(`✅ [변경 감지] 저장 완료 및 synced=true: ${itemId}`);
+      } else {
+        console.log(`✅ [변경 감지] 저장 완료 및 버전 기록: ${itemId}`);
+      }
+    } catch (err) {
+      console.error(`❌ [변경 감지] Firestore 저장 실패 (${itemId}):`, err);
+      console.error(`❌ [변경 감지] 에러 스택:`, err.stack);
+
+      // 🔍 진단: 저장 실패 로그
+      diagnosticLog('error', `저장 실패: ${dataType || itemId}`, {
+        userId: userId ? userId.substring(0, 8) + '...' : 'N/A',
+        error: err.message,
+        code: err.code
+      });
+
+      // 실패 시 lastSaved 업데이트 안 함 → 다음 저장 시도 시 재시도
+    }
+  };
+
+  const save = (saveFn, itemId, dataForComparison, dataType, ...saveArgs) => {
+    console.log(`📝 [디바운스 저장] 예약됨: itemId=${itemId}, dataType=${dataType}`);
+
     if (saveTimeout.current) {
+      console.log(`⏱️ [디바운스 저장] 기존 타이머 클리어: ${itemId}`);
       clearTimeout(saveTimeout.current);
     }
+
+    // 대기 중인 작업 저장
+    pendingSaves.current = [saveFn, itemId, dataForComparison, dataType, ...saveArgs];
+    console.log(`📦 [디바운스 저장] 대기 큐에 추가: ${itemId} (300ms 대기)`);
+
     saveTimeout.current = setTimeout(async () => {
-      if (!userId || !enabled) return;
-
-      try {
-        // 🚀 변경 감지: localStorage에서 마지막 저장 버전 확인
-        const lastSavedKey = `firestore_saved_${itemId}`;
-        const lastSaved = localStorage.getItem(lastSavedKey);
-        const currentData = JSON.stringify(dataForComparison);
-
-        if (lastSaved === currentData) {
-          console.log(`⏭️ [변경 감지] 변경사항 없음 - 저장 생략: ${itemId}`);
-          return;
-        }
-
-        console.log(`💾 [변경 감지] 변경 감지됨 - Firestore 저장: ${itemId}`);
-
-        // Firestore 저장 실행 (userId는 자동으로 첫 번째 인자로 전달)
-        await saveFn(userId, ...saveArgs);
-
-        // ✅ 성공 시에만 마지막 저장 버전 업데이트
-        localStorage.setItem(lastSavedKey, currentData);
-
-        // ✅ synced 플래그를 true로 업데이트
-        if (dataType) {
-          markLocalStorageSynced(userId, dataType, true);
-          console.log(`✅ [변경 감지] 저장 완료 및 synced=true: ${itemId}`);
-        } else {
-          console.log(`✅ [변경 감지] 저장 완료 및 버전 기록: ${itemId}`);
-        }
-      } catch (err) {
-        console.error(`❌ [변경 감지] Firestore 저장 실패 (${itemId}):`, err);
-        // 실패 시 lastSaved 업데이트 안 함 → 다음 저장 시도 시 재시도
-      }
-    }, 1500); // 1500ms 디바운스 (할당량 절약 - 타이핑 중 과도한 저장 방지)
+      console.log(`⏰ [디바운스 저장] 타이머 만료 - 실행 시작: ${itemId}`);
+      await executeSave(saveFn, itemId, dataForComparison, dataType, ...saveArgs);
+      pendingSaves.current = []; // 실행 후 클리어
+      console.log(`🏁 [디바운스 저장] 완료 및 큐 클리어: ${itemId}`);
+    }, 300); // 300ms 디바운스 (데이터 손실 방지 + 할당량 절약)
   };
+
+  // ⚡ saveImmediate: 디바운스 없이 즉시 저장 (알람 등록 등 중요 작업용)
+  const saveImmediate = async (saveFn, itemId, dataForComparison, dataType, ...saveArgs) => {
+    console.log('⚡ [즉시 저장] 디바운스 건너뜀:', itemId);
+    await executeSave(saveFn, itemId, dataForComparison, dataType, ...saveArgs);
+  };
+
+  // ✅ flush: 대기 중인 저장 즉시 실행 (beforeunload용)
+  const flush = async () => {
+    console.log(`🚨 [flush] 호출됨 - 대기 큐 확인 중...`);
+    console.log(`🚨 [flush] saveTimeout 상태:`, saveTimeout.current ? '타이머 존재' : '타이머 없음');
+    console.log(`🚨 [flush] pendingSaves 길이:`, pendingSaves.current.length);
+
+    if (saveTimeout.current) {
+      console.log(`🚨 [flush] 타이머 클리어`);
+      clearTimeout(saveTimeout.current);
+      saveTimeout.current = null;
+    }
+
+    if (pendingSaves.current.length > 0) {
+      const [saveFn, itemId, dataForComparison, dataType, ...saveArgs] = pendingSaves.current;
+      console.log(`🚨 [긴급 플러시] 대기 중인 저장 즉시 실행: itemId=${itemId}, dataType=${dataType}`);
+      const flushStartTime = Date.now();
+      await executeSave(saveFn, itemId, dataForComparison, dataType, ...saveArgs);
+      const flushDuration = Date.now() - flushStartTime;
+      pendingSaves.current = [];
+      console.log(`✅ [긴급 플러시] 완료: ${itemId} (${flushDuration}ms)`);
+    } else {
+      console.log(`ℹ️ [flush] 대기 중인 저장 없음 - 건너뜀`);
+    }
+  };
+
+  return { save, saveImmediate, flush };
 };
 
 /**
@@ -88,7 +166,7 @@ export const createSyncMemo = (userId, setMemos, debouncedSave) => {
     });
 
     // 🚀 변경 감지 후 서버에 저장 (dataType='memos' 전달)
-    debouncedSave(saveMemoToFirestore, `memo_${memo.id}`, memo, 'memos', memo);
+    debouncedSave.save(saveMemoToFirestore, `memo_${memo.id}`, memo, 'memos', memo);
   };
 };
 
@@ -129,7 +207,7 @@ export const createSyncFolder = (userId, setFolders, debouncedSave) => {
     });
 
     // 🚀 변경 감지 후 서버에 저장 (dataType='folders' 전달)
-    debouncedSave(saveFolderToFirestore, `folder_${folder.id}`, folder, 'folders', folder);
+    debouncedSave.save(saveFolderToFirestore, `folder_${folder.id}`, folder, 'folders', folder);
   };
 };
 
@@ -169,7 +247,7 @@ export const createSyncTrashItem = (userId, setTrash, debouncedSave) => {
     });
 
     // 🚀 변경 감지 후 서버에 저장 (dataType='trash' 전달)
-    debouncedSave(saveTrashItemToFirestore, `trash_${item.id}`, item, 'trash', item);
+    debouncedSave.save(saveTrashItemToFirestore, `trash_${item.id}`, item, 'trash', item);
   };
 };
 
@@ -208,7 +286,7 @@ export const createSyncMacro = (userId, enabled, setMacros, debouncedSave) => {
 
       // 🚀 변경 감지 후 전체 배열을 Firestore에 저장
       if (userId && enabled) {
-        debouncedSave(saveMacroToFirestore, `macros_all`, updated, 'macros', updated);
+        debouncedSave.save(saveMacroToFirestore, `macros_all`, updated, 'macros', updated);
       }
 
       return updated;
@@ -255,7 +333,7 @@ export const createSyncCalendarDate = (userId, setCalendar, debouncedSave) => {
     });
 
     // 🚀 변경 감지 후 서버에 저장 (dataType='calendar' 전달)
-    debouncedSave(saveCalendarDateToFirestore, `calendar_${dateKey}`, schedule, 'calendar', dateKey, schedule);
+    debouncedSave.save(saveCalendarDateToFirestore, `calendar_${dateKey}`, schedule, 'calendar', dateKey, schedule);
   };
 };
 
@@ -299,7 +377,7 @@ export const createSyncActivity = (userId, setActivities, debouncedSave) => {
     });
 
     // 🚀 변경 감지 후 서버에 저장 (dataType='activities' 전달)
-    debouncedSave(saveActivityToFirestore, `activity_${activity.id}`, activity, 'activities', activity);
+    debouncedSave.save(saveActivityToFirestore, `activity_${activity.id}`, activity, 'activities', activity);
   };
 };
 
@@ -341,7 +419,7 @@ export const createSyncSettings = (setSettings, debouncedSave) => {
     if (newSettings.avatarBgColor) localStorage.setItem('avatarBgColor', newSettings.avatarBgColor);
 
     // 🚀 변경 감지 후 서버에 저장
-    debouncedSave(saveSettingsToFirestore, `settings_main`, newSettings, newSettings);
+    debouncedSave.save(saveSettingsToFirestore, `settings_main`, newSettings, newSettings);
   };
 };
 
@@ -383,7 +461,7 @@ export const createSyncMemos = (userId, setMemos, debouncedSave, getMemosRef) =>
 
     // 🚀 변경 감지 후 각 메모를 개별 저장 (dataType='memos' 전달)
     validMemos.forEach(memo => {
-      debouncedSave(saveMemoToFirestore, `memo_${memo.id}`, memo, 'memos', memo);
+      debouncedSave.save(saveMemoToFirestore, `memo_${memo.id}`, memo, 'memos', memo);
     });
   };
 };
@@ -398,7 +476,7 @@ export const createSyncFolders = (userId, setFolders, debouncedSave) => {
 
     // 🚀 변경 감지 후 각 폴더를 개별 저장 (dataType='folders' 전달)
     newFolders.forEach(folder => {
-      debouncedSave(saveFolderToFirestore, `folder_${folder.id}`, folder, 'folders', folder);
+      debouncedSave.save(saveFolderToFirestore, `folder_${folder.id}`, folder, 'folders', folder);
     });
   };
 };
@@ -413,7 +491,7 @@ export const createSyncTrash = (userId, setTrash, debouncedSave) => {
 
     newTrash.forEach(item => {
       if (item && item.id) {
-        debouncedSave(saveTrashItemToFirestore, `trash_${item.id}`, item, 'trash', item);
+        debouncedSave.save(saveTrashItemToFirestore, `trash_${item.id}`, item, 'trash', item);
       }
     });
   };
@@ -468,7 +546,7 @@ export const createSyncMacros = (userId, enabled, setMacros, debouncedSave) => {
     // 전체 배열을 한 번에 Firestore에 저장 (dataType='macros' 전달)
     if (userId && enabled) {
       console.log('☁️ 매크로 Firestore 저장 시작:', userId, newMacros);
-      debouncedSave(saveMacroToFirestore, `macros_all`, newMacros, 'macros', newMacros);
+      debouncedSave.save(saveMacroToFirestore, `macros_all`, newMacros, 'macros', newMacros);
     } else {
       console.warn('⚠️ Firestore 저장 건너뜀 - userId:', userId, 'enabled:', enabled);
     }
@@ -496,7 +574,7 @@ export const createSyncCalendar = (userId, setCalendar, debouncedSave) => {
       if (hasText || hasAlarms) {
         console.log('🔍 [syncCalendar] 저장 대기열:', dateKey, '알람 수:', schedule.alarm?.registeredAlarms?.length);
         // ✅ 마커는 debouncedSave 내부에서 Firestore 저장 성공 후에만 업데이트됨
-        debouncedSave(saveCalendarDateToFirestore, `calendar_${dateKey}`, schedule, 'calendar', dateKey, schedule);
+        debouncedSave.save(saveCalendarDateToFirestore, `calendar_${dateKey}`, schedule, 'calendar', dateKey, schedule);
       } else {
         // 빈 스케줄인 경우 Firestore에서 삭제
         console.log('🗑️ [syncCalendar] 빈 스케줄 삭제:', dateKey);
@@ -525,7 +603,7 @@ export const createSyncActivities = (userId, setActivities, debouncedSave) => {
 
     newActivities.forEach(activity => {
       if (activity && activity.id) {
-        debouncedSave(saveActivityToFirestore, `activity_${activity.id}`, activity, 'activities', activity);
+        debouncedSave.save(saveActivityToFirestore, `activity_${activity.id}`, activity, 'activities', activity);
       }
     });
   };

@@ -28,7 +28,7 @@
 // https://console.firebase.google.com/
 
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
 import { getAnalytics } from 'firebase/analytics';
@@ -54,7 +54,13 @@ let analytics = null;
 if (firebaseConfig.apiKey && firebaseConfig.projectId) {
   try {
     app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
+
+    // Firestore 초기화 - QUIC 프로토콜 오류 방지
+    db = initializeFirestore(app, {
+      experimentalForceLongPolling: false, // QUIC 오류 시 자동 HTTP/2 폴백
+      experimentalAutoDetectLongPolling: true // 네트워크 상태에 따라 자동 선택
+    });
+
     storage = getStorage(app);
     auth = getAuth(app);
 

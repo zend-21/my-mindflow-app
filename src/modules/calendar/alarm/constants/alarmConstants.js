@@ -87,7 +87,11 @@ export const ALARM_REPEAT_CONFIG = {
     1: '1회 (반복 없음)',
     3: '3회 (1분 간격으로 3회 알림)'
   },
+  intervals: {
+    60: '1분 간격',
+  },
   fixedInterval: 60,                    // 고정: 1분 간격 (60초)
+  defaultInterval: 60,                  // 기본: 1분 간격 (60초)
   defaultCount: 1,                      // 기본: 1회
   toastDuration: 3000,                  // 토스트 표시 시간: 3초
 };

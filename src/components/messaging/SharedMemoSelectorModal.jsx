@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import styled from 'styled-components';
 import { X, Search, FileText, Calendar, Folder, Lock } from 'lucide-react';
 import { checkFrozenDocuments } from '../../utils/frozenDocumentUtils';
-import { collection, collectionGroup, query, where, getDocs, onSnapshot, doc } from 'firebase/firestore';
+import { collection, collectionGroup, query, where, getDocs, onSnapshot, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 
 const ModalOverlay = styled.div`
@@ -377,10 +377,6 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
     const checkFrozenStatus = async () => {
       if (sharedMemos.length === 0 || !currentUserId) return;
 
-      // ⚠️ [중요] 실시간 리스너가 초기 데이터를 받을 때까지 약간 대기
-      // 그렇지 않으면 allMemos의 오래된 currentWorkingRoomId를 사용함
-      await new Promise(resolve => setTimeout(resolve, 100));
-
       const frozenSet = new Set();
       const pendingInfo = {};
 
@@ -388,18 +384,23 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
 
       // 각 메모의 실제 editHistory 개수 조회
       for (const memo of sharedMemos) {
-        // ⚠️ [중요] 실시간 데이터를 우선 사용 (realtimeMemoData가 가장 최신 상태)
-        // null도 유효한 값이므로 undefined와 구분해야 함 (null은 "협업 안 함" 상태)
-        const realtimeData = realtimeMemoData[memo.id];
-        // realtimeData가 존재하고, currentWorkingRoomId 키가 명시적으로 있을 때만 실시간 값 사용
-        const workingRoomId = (realtimeData && 'currentWorkingRoomId' in realtimeData)
-          ? realtimeData.currentWorkingRoomId
-          : memo.currentWorkingRoomId;
+        // ⚠️ [중요] 항상 Firestore에서 최신 currentWorkingRoomId 조회
+        // 다른 방에서 비우기를 했을 수 있으므로 캐시된 값을 믿으면 안 됨
+        let workingRoomId = null;
+        try {
+          const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', memo.id);
+          const memoSnap = await getDoc(memoRef);
+          if (memoSnap.exists()) {
+            workingRoomId = memoSnap.data().currentWorkingRoomId || null;
+          }
+        } catch (error) {
+          console.error(`메모 ${memo.id} currentWorkingRoomId 조회 실패:`, error);
+          continue;
+        }
 
         console.log('🔍 [Frozen 체크] 메모:', memo.id, {
           memoWorkingRoomId: memo.currentWorkingRoomId,
-          realtimeWorkingRoomId: realtimeMemoData[memo.id]?.currentWorkingRoomId,
-          finalWorkingRoomId: workingRoomId,
+          firestoreWorkingRoomId: workingRoomId,
           currentChatRoomId: chatRoomId
         });
 
@@ -470,10 +471,64 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
     }
   }, [searchQuery, sharedMemos]);
 
-  const handleSelectMemo = (memo) => {
+  const handleSelectMemo = async (memo) => {
     // 다른 대화방에서 편집 중인 문서는 불러올 수 없음
     if (frozenMemoIds.has(memo.id)) {
-      showToast?.('이 문서는 다른방에서 협업중인 문서로 불러올 수 없습니다.');
+      const frozenInfo = frozenMemoInfo[memo.id];
+      if (frozenInfo && frozenInfo.chatRoomId) {
+        try {
+          // 채팅방 정보 조회 (dm_로 시작하면 1:1 대화방)
+          const isDirect = frozenInfo.chatRoomId.startsWith('dm_');
+          const collectionName = isDirect ? 'directMessages' : 'chatRooms';
+
+          const chatRoomRef = doc(db, collectionName, frozenInfo.chatRoomId);
+          const chatRoomSnap = await getDoc(chatRoomRef);
+
+          let chatRoomName = '알 수 없는 대화방';
+          if (chatRoomSnap.exists()) {
+            const chatRoomData = chatRoomSnap.data();
+            const chatType = isDirect ? 'direct' : (chatRoomData.type || 'direct');
+
+            if (chatType === 'direct') {
+              // 1:1 대화방: 상대방 이름 찾기
+              const participants = chatRoomData.participants || [];
+              const partnerId = participants.find(id => id !== currentUserId);
+
+              if (partnerId) {
+                // getUserDisplayName 서비스로 정확한 이름 가져오기
+                const { getUserDisplayName } = await import('../../services/nicknameService');
+
+                // users 컬렉션에서 Google displayName 가져오기
+                const userRef = doc(db, 'users', partnerId);
+                const userSnap = await getDoc(userRef);
+                const googleDisplayName = userSnap.exists() ? userSnap.data().displayName : null;
+
+                const partnerDisplayName = await getUserDisplayName(partnerId, googleDisplayName);
+                chatRoomName = `${partnerDisplayName}님과의 대화방`;
+              } else {
+                chatRoomName = '1:1 대화방';
+              }
+            } else {
+              // 단체 대화방
+              chatRoomName = chatRoomData.name || chatRoomData.title || '단체 대화방';
+            }
+          }
+
+          // 배지 타입에 따라 다른 메시지 표시
+          if (frozenInfo.pendingCount > 0) {
+            // 1번 문서 (x개 대기)
+            showToast?.(`"${chatRoomName}"에서 협업중인 문서로 불러올 수 없습니다`);
+          } else {
+            // 2번 문서 (협업 대기중)
+            showToast?.(`"${chatRoomName}"에서 열어놓은 문서이기에 불러올 수 없습니다`);
+          }
+        } catch (error) {
+          console.error('채팅방 정보 조회 실패:', error);
+          showToast?.('이 문서는 다른 방에서 협업중인 문서로 불러올 수 없습니다');
+        }
+      } else {
+        showToast?.('이 문서는 다른 방에서 협업중인 문서로 불러올 수 없습니다');
+      }
       return;
     }
 

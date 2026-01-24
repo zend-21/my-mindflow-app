@@ -33,6 +33,13 @@
             </intent-filter>
         </service>
 
+        <!-- ✅ 알람 BroadcastReceiver (앱 종료 시에도 작동) -->
+        <receiver
+            android:name=".AlarmReceiver"
+            android:enabled="true"
+            android:exported="false">
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -65,4 +72,6 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 정확한 알람 권한 (Android 12+) -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- Android 14+ 정확한 알람 권한 (더 강력한 권한) -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 </manifest>
