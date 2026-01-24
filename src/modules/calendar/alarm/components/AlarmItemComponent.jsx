@@ -345,7 +345,12 @@ const AlarmItemComponent = ({ alarm, scheduleData, onToggle, onDelete, onEdit, i
                       alarm.anniversaryRepeat === 'yearly' ? '매년' : ''})
                   </RepeatLabel>
                 ) : hasRepeat && isRegisteredToday ? (
-                  <RepeatLabel> (직접등록)</RepeatLabel>
+                  <RepeatLabel>
+                    {' '}(등록일) ({alarm.anniversaryRepeat === 'daily' ? '매일' :
+                      alarm.anniversaryRepeat === 'weekly' ? '매주' :
+                      alarm.anniversaryRepeat === 'monthly' ? '매달' :
+                      alarm.anniversaryRepeat === 'yearly' ? '매년' : ''})
+                  </RepeatLabel>
                 ) : null}
               </div>
             </div>

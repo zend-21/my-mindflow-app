@@ -911,6 +911,9 @@ const Calendar = ({
                 return copy;
             });
             showToast("스케줄이 삭제되었습니다.");
+            if (typeof addActivity === 'function') {
+                addActivity('스케줄 삭제', `${key}`);
+            }
             return;
         }
 
@@ -923,6 +926,9 @@ const Calendar = ({
             },
         }));
         showToast("스케줄이 수정되었습니다.");
+        if (typeof addActivity === 'function') {
+            addActivity('스케줄 수정', `${key} - ${scheduleText}`);
+        }
     };
 
     const handleDeleteRequest = () => {
@@ -1006,6 +1012,10 @@ const Calendar = ({
         setScheduleText('');
         setIsEditing(false);
         showToast('일정이 휴지통으로 이동되었습니다.');
+        if (typeof addActivity === 'function') {
+            const scheduleTitle = currentEntry.text ? stripHtmlTags(currentEntry.text).substring(0, 20) : '내용 없음';
+            addActivity('스케줄 삭제', `${key} - ${scheduleTitle}`);
+        }
     };
 
     // 일정 삭제 버튼 클릭 핸들러 (확인 모달 표시)
@@ -1637,11 +1647,7 @@ const Calendar = ({
                                             }
                                             // 다른 요소 노드인 경우 자식 노드들을 재귀적으로 처리
                                             else if (node.nodeType === Node.ELEMENT_NODE) {
-                                                // 블록 레벨 요소는 앞에 줄바꿈 추가 (첫 번째 자식 제외)
                                                 const blockElements = ['P', 'DIV', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'UL', 'OL', 'LI', 'BLOCKQUOTE'];
-                                                if (blockElements.includes(node.nodeName) && !isFirstChild && currentTextChunks.length > 0) {
-                                                    currentTextChunks.push('\n');
-                                                }
 
                                                 // <br> 태그는 줄바꿈으로 처리
                                                 if (node.nodeName === 'BR') {
@@ -1650,7 +1656,7 @@ const Calendar = ({
                                                     // 자식 노드들을 순서대로 처리
                                                     node.childNodes.forEach((child, index) => processNode(child, index === 0));
 
-                                                    // 블록 레벨 요소는 뒤에도 줄바꿈 추가
+                                                    // 블록 레벨 요소는 뒤에만 줄바꿈 추가
                                                     if (blockElements.includes(node.nodeName)) {
                                                         currentTextChunks.push('\n');
                                                     }
@@ -1671,11 +1677,14 @@ const Calendar = ({
 
                                         // 렌더링
                                         return (
-                                            <div style={{
-                                                display: 'flex',
-                                                flexDirection: 'column',
-                                                gap: '8px'
-                                            }}>
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '8px'
+                                                }}
+                                                onDoubleClick={() => onOpenEditor?.(selectedDate, scheduleText)}
+                                            >
                                                 {orderedContent.map((item, index) => {
                                                     if (item.type === 'text') {
                                                         return (
@@ -1707,6 +1716,10 @@ const Calendar = ({
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     window.open(item.src, '_blank');
+                                                                }}
+                                                                onDoubleClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    onOpenEditor?.(selectedDate, scheduleText);
                                                                 }}
                                                             />
                                                         );
