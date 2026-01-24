@@ -467,7 +467,7 @@ const AlarmModal = ({ isOpen, scheduleData, allSchedules, userId, onSave, onClos
   const isDisabled = isPastDate && !isAnniversary;
 
   // 알람 등록 핸들러
-  const handleRegisterAlarm = () => {
+  const handleRegisterAlarm = async () => {
     console.log('알람 등록 버튼 클릭');
 
     // 유효성 검사 (순서: 타이틀 → 알림주기 → 알림시기 → 알람 시간)
@@ -540,6 +540,11 @@ const AlarmModal = ({ isOpen, scheduleData, allSchedules, userId, onSave, onClos
         const alarmType = isAnniversary ? 'anniversary' : 'normal';
         onSave({ registeredAlarms: updatedAlarms, alarmType }, 'register');
       }
+
+      // 🔔 네이티브 알람 등록 (백그라운드에서도 작동)
+      const { registerNativeScheduleAlarm } = await import('../../services/scheduleAlarmService');
+      const dateKey = format(new Date(scheduleData.date), 'yyyy-MM-dd');
+      await registerNativeScheduleAlarm(newAlarm, dateKey);
 
       // 입력 필드 초기화
       setAlarmTitle('');

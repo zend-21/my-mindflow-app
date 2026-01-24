@@ -38,6 +38,9 @@
             android:name=".AlarmReceiver"
             android:enabled="true"
             android:exported="false">
+            <intent-filter>
+                <action android:name="com.mindflow.app.SCHEDULE_ALARM" />
+            </intent-filter>
         </receiver>
 
         <provider
@@ -74,4 +77,6 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <!-- Android 14+ 정확한 알람 권한 (더 강력한 권한) -->
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- ✅ Full Screen Intent 권한 (Android 10+, 백그라운드 알람에 필수!) -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 </manifest>

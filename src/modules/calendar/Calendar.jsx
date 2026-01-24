@@ -1044,54 +1044,52 @@ const Calendar = ({
         }
     };
 
-    // 비활성화된 알람만 삭제 (과거 날짜용) - AlarmModal의 confirmDelete와 동일한 방식
+    // 비활성화된 알람만 삭제 (과거 날짜용)
     const executeDeleteDisabledAlarmsOnly = () => {
-        const dateKey = format(selectedDate, 'yyyy-MM-dd');
-        const currentSchedule = schedules[dateKey];
+        // 일반 알람 중 시간이 지난 알람만 삭제, 기념일 알람과 일정 텍스트는 보존
+        if (!currentEntry || !currentEntry.alarm) return;
 
-        if (!currentSchedule || !currentSchedule.alarm) return;
+        const dateKey = format(selectedDate, 'yyyy-MM-dd');
+        const now = new Date();
 
         try {
-            // ⚠️ CRITICAL FIX: 올바른 localStorage 키 사용 (AlarmModal과 동일)
-            const userId = localStorage.getItem('currentUser');
-            const calendarKey = userId ? `user_${userId}_calendar` : 'calendarSchedules_shared';
+            // 현재 React state에서 알람 가져오기
+            const currentAlarms = currentEntry.alarm.registeredAlarms || [];
+            console.log('🔍 삭제 전 전체 알람:', currentAlarms);
 
-            const allSchedulesStr = localStorage.getItem(calendarKey);
-            const allSchedules = allSchedulesStr ? JSON.parse(allSchedulesStr) : {};
+            // 기념일 알람이거나, 아직 시간이 안 지난 알람만 남기기
+            const alarmsToSave = currentAlarms.filter(alarm => {
+                const isAnniv = alarm.isAnniversary || alarm.isRepeated || alarm.anniversaryRepeat;
+                const alarmTime = new Date(alarm.calculatedTime);
+                const isNotExpired = alarmTime >= now;
+                const shouldKeep = isAnniv || isNotExpired;
 
-            if (!allSchedules[dateKey] || !allSchedules[dateKey].alarm) return;
-
-            // 기념일 알람과 활성화된 알람만 유지 (종료된 알람 삭제)
-            const currentAlarms = allSchedules[dateKey].alarm.registeredAlarms || [];
-            const alarmsToSave = currentAlarms.filter(alarm =>
-                alarm.isAnniversary || alarm.enabled !== false
-            );
+                console.log(`🔍 알람 "${alarm.title}": 기념일=${isAnniv}, 시간=${alarmTime.toLocaleString('ko-KR')}, 만료=${!isNotExpired} => 보존=${shouldKeep}`);
+                return shouldKeep;
+            });
 
             if (alarmsToSave.length === currentAlarms.length) {
                 showToast('삭제할 종료된 알람이 없습니다.');
                 return;
             }
 
-            console.log('localStorage에 저장할 알람들 (종료되지 않은 알람):', alarmsToSave);
-            allSchedules[dateKey].alarm.registeredAlarms = alarmsToSave;
-            localStorage.setItem(calendarKey, JSON.stringify(allSchedules));
+            console.log('✅ 저장할 알람들 (종료되지 않은 알람):', alarmsToSave);
 
-            // ✅ 동기화 마커 업데이트 (AlarmModal과 동일)
-            if (allSchedules[dateKey] && (allSchedules[dateKey].text || alarmsToSave.length > 0)) {
-                // 텍스트나 남은 알람이 있으면 최신 상태를 마커에 기록
-                localStorage.setItem(`firestore_saved_calendar_${dateKey}`, JSON.stringify(allSchedules[dateKey]));
-                console.log('✅ 동기화 마커 업데이트 완료');
-            } else {
-                // 텍스트도 알람도 없으면 DELETED 마커
-                localStorage.setItem(`firestore_saved_calendar_${dateKey}`, 'DELETED');
-                console.log('✅ DELETED 마커 설정 완료');
-            }
+            // 새로운 스케줄 객체 생성
+            const updatedSchedule = {
+                ...currentEntry,
+                alarm: {
+                    ...currentEntry.alarm,
+                    registeredAlarms: alarmsToSave
+                }
+            };
 
-            // localStorage 업데이트 후 schedules 상태를 다시 로드 (AlarmModal과 동일한 방식)
-            const reloadedSchedules = JSON.parse(localStorage.getItem(calendarKey));
+            // React state 업데이트 (이것만으로 useFirestoreSync가 자동으로 Firestore 동기화 처리)
+            const updatedSchedules = { ...schedules, [dateKey]: updatedSchedule };
+            setSchedules(updatedSchedules);
 
-            // onSave 호출하여 부모 컴포넌트가 Firestore 동기화 처리하도록 함 (AlarmModal과 동일)
-            setSchedules(reloadedSchedules);
+            // ⚠️ localStorage와 동기화 마커는 useFirestoreSync가 자동으로 처리하므로
+            // 수동으로 업데이트하지 않음 (수동 업데이트 시 변경 감지 실패로 Firestore 동기화 안 됨)
 
             showToast('종료된 알람이 삭제되었습니다.');
         } catch (error) {

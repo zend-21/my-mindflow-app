@@ -557,15 +557,26 @@ export const createSyncMacros = (userId, enabled, setMacros, debouncedSave) => {
  * 캘린더 객체 동기화 (하위 호환)
  */
 export const createSyncCalendar = (userId, setCalendar, debouncedSave) => {
-  return (newCalendar) => {
-    console.log('🔍 [syncCalendar] 시작:', Object.keys(newCalendar).length, '개 날짜');
+  return (newCalendarOrUpdater) => {
+    // ⚠️ [중요] 함수형 업데이트 지원
+    // Calendar 컴포넌트에서 setSchedules(prev => {...}) 형태로 호출할 수 있음
+    let resolvedCalendar;
 
-    setCalendar(newCalendar);
+    setCalendar(prev => {
+      // 함수가 전달되면 이전 값으로 실행
+      resolvedCalendar = typeof newCalendarOrUpdater === 'function'
+        ? newCalendarOrUpdater(prev)
+        : newCalendarOrUpdater;
 
-    // localStorage에 전체 캘린더 즉시 캐싱 (오프라인 지원, synced: false)
-    setAccountLocalStorageWithTTL(userId, 'calendar', newCalendar, { synced: false });
+      console.log('🔍 [syncCalendar] 시작:', Object.keys(resolvedCalendar).length, '개 날짜');
 
-    Object.entries(newCalendar).forEach(([dateKey, schedule]) => {
+      // localStorage에 전체 캘린더 즉시 캐싱 (오프라인 지원, synced: false)
+      setAccountLocalStorageWithTTL(userId, 'calendar', resolvedCalendar, { synced: false });
+
+      return resolvedCalendar;
+    });
+
+    Object.entries(resolvedCalendar).forEach(([dateKey, schedule]) => {
       // 의미 있는 데이터가 있는지 확인
       const hasText = schedule.text && schedule.text.trim() !== '' && schedule.text !== '<p></p>';
       const hasAlarms = schedule.alarm?.registeredAlarms && schedule.alarm.registeredAlarms.length > 0;

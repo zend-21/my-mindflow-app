@@ -61,15 +61,8 @@ export const registerNativeScheduleAlarm = async (alarm, scheduleDate) => {
         // 알람 ID 생성 (충돌 방지를 위해 고유 ID 사용)
         const notificationId = parseInt(`${alarm.id}`.slice(-8), 10);
 
-        // 알람 타입에 따라 채널 선택
-        const notificationType = alarm.customNotificationType || alarm.notificationType || 'both';
-        let channelId = 'alarm_channel_v2'; // 기본: 소리+진동 (v4 = USAGE_ALARM + IMPORTANCE_MAX)
-
-        if (notificationType === 'sound') {
-            channelId = 'alarm_channel_sound_only_v2';
-        } else if (notificationType === 'vibrate') {
-            channelId = 'alarm_channel_vibration_only_v2';
-        }
+        // 알람 채널 ID (v10으로 완전히 새로 시작)
+        const channelId = 'alarm_channel_v10';
 
         // 반복 횟수 확인 (기본값: 1)
         const repeatCount = alarm.repeatCount || 1;
@@ -79,15 +72,13 @@ export const registerNativeScheduleAlarm = async (alarm, scheduleDate) => {
             title: alarm.title,
             scheduledTime: alarmTime.toISOString(),
             isAnniversary: alarm.isAnniversary,
-            notificationType: notificationType,
             channelId: channelId,
             repeatCount: repeatCount
         });
 
         // ✅ AlarmManager 플러그인 사용 (백그라운드에서도 작동)
-        // 반복 알람 생성 (1회 또는 3회)
         const body = `${alarm.content || `일정: ${scheduleDate}`}\n\n- ShareNote -`;
-        const enableVibration = notificationType === 'both' || notificationType === 'vibrate';
+        const enableVibration = true;  // v10: 진동 항상 활성화
 
         for (let i = 0; i < repeatCount; i++) {
             const repeatTime = new Date(alarmTime.getTime() + (i * 60 * 1000)); // i분 추가

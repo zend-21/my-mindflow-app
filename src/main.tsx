@@ -4,10 +4,25 @@ import { BrowserRouter } from 'react-router-dom';
 import App from './App.jsx';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import ErrorBoundary from './components/ErrorBoundary';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { NavigationBar } from '@capgo/capacitor-navigation-bar';
 import { initializeAudioContext } from './utils/notificationSounds';
+
+// 커스텀 플러그인 초기화 (앱 시작 시)
+if (Capacitor.isNativePlatform()) {
+  const BadgePlugin = registerPlugin('Badge');
+  const ScheduleAlarmPlugin = registerPlugin('ScheduleAlarm');
+
+  // 개발자 콘솔에서 테스트할 수 있도록 window에 노출
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as Record<string, any>).Badge = BadgePlugin;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as Record<string, any>).ScheduleAlarm = ScheduleAlarmPlugin;
+
+  console.log('✅ 커스텀 플러그인 등록 완료: Badge, ScheduleAlarm');
+  console.log('🔍 테스트용: window.Badge, window.ScheduleAlarm 사용 가능');
+}
 
 /**
  * ============================================================

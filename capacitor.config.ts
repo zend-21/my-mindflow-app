@@ -97,6 +97,16 @@ const config: CapacitorConfig = {
     },
 
     /**
+     * ScheduleAlarm 플러그인 설정 (커스텀 플러그인)
+     * - android/app/src/main/java/com/mindflow/app/ScheduleAlarmPlugin.java
+     * - Android AlarmManager 직접 사용
+     * - 앱 종료 후에도 백그라운드 알람 작동
+     */
+    ScheduleAlarm: {
+      // 커스텀 플러그인이므로 별도 설정 없음
+    },
+
+    /**
      * Google Auth 플러그인 설정
      * - @codetrix-studio/capacitor-google-auth 패키지 필요
      * - Android: strings.xml에 server_client_id 설정 필요

@@ -356,13 +356,17 @@ export const fetchCalendarFromFirestore = async (userId) => {
 export const saveCalendarDateToFirestore = async (userId, dateKey, schedule) => {
   try {
     console.log('🔍 [saveCalendarDateToFirestore] 저장 시작:', dateKey);
-    console.log('📦 원본 schedule:', JSON.stringify(schedule, null, 2));
+
+    // 알람 개수만 표시 (전체 데이터 출력 방지)
+    const alarmCount = schedule?.alarm?.registeredAlarms?.length || 0;
+    const hasText = schedule?.text ? `텍스트 ${schedule.text.length}자` : '텍스트 없음';
+    console.log(`📦 원본 schedule: 알람 ${alarmCount}개, ${hasText}`);
 
     // undefined 값 제거 (재귀적으로 중첩된 객체도 처리)
     const cleanSchedule = removeUndefinedValues(schedule);
 
-    console.log('🧹 cleanSchedule:', JSON.stringify(cleanSchedule, null, 2));
-    console.log('📏 cleanSchedule keys:', cleanSchedule ? Object.keys(cleanSchedule) : 'null');
+    const cleanAlarmCount = cleanSchedule?.alarm?.registeredAlarms?.length || 0;
+    console.log(`🧹 cleanSchedule: 알람 ${cleanAlarmCount}개, keys: [${cleanSchedule ? Object.keys(cleanSchedule).join(', ') : 'null'}]`);
 
     const docRef = doc(db, 'mindflowUsers', userId, 'calendar', dateKey);
 

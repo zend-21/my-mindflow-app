@@ -28,14 +28,20 @@ public class ScheduleAlarmPlugin extends Plugin {
      */
     @PluginMethod
     public void scheduleAlarm(PluginCall call) {
-        Log.d(TAG, "📅 scheduleAlarm 호출됨");
+        Log.e(TAG, "================================================");
+        Log.e(TAG, "🚨🚨🚨 [v14-REBUILD] scheduleAlarm 호출됨 🚨🚨🚨");
+        Log.e(TAG, "📅 빌드: 2026-01-24 18:00 KST");
+        Log.e(TAG, "🔧 Intent.setAction 적용됨");
+        Log.e(TAG, "================================================");
+        Log.d(TAG, "📅 scheduleAlarm 실행 시작");
 
         try {
             int notificationId = call.getInt("notificationId", -1);
             String title = call.getString("title", "알람");
             String body = call.getString("body", "");
             long triggerTime = call.getLong("triggerTime", 0L);
-            String channelId = call.getString("channelId", "alarm_channel_v2");
+            // ✅ JavaScript 값을 무시하고 무조건 v10 사용!
+            String channelId = "alarm_channel_v10";
             String soundFileName = call.getString("sound", "schedule_alarm");
             boolean enableVibration = call.getBoolean("enableVibration", true);
 
@@ -49,19 +55,22 @@ public class ScheduleAlarmPlugin extends Plugin {
             Log.d(TAG, "  - 제목: " + title);
             Log.d(TAG, "  - 내용: " + body);
             Log.d(TAG, "  - 시간: " + triggerTime);
-            Log.d(TAG, "  - 채널: " + channelId);
+            Log.d(TAG, "  - 채널: " + channelId + " (강제 v10)");
 
             Context context = getContext();
             AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
 
-            // BroadcastReceiver로 전달할 Intent
+            // BroadcastReceiver로 전달할 Intent (명시적 action 설정)
             Intent intent = new Intent(context, AlarmReceiver.class);
+            intent.setAction("com.mindflow.app.SCHEDULE_ALARM");  // ✅ 명시적 action
             intent.putExtra("notificationId", notificationId);
             intent.putExtra("title", title);
             intent.putExtra("body", body);
             intent.putExtra("channelId", channelId);
             intent.putExtra("sound", soundFileName);
             intent.putExtra("enableVibration", enableVibration);
+
+            Log.d(TAG, "🎯 Intent Action 설정: com.mindflow.app.SCHEDULE_ALARM");
 
             // PendingIntent 생성 (Android 12+ FLAG_IMMUTABLE 필수)
             int flags = PendingIntent.FLAG_UPDATE_CURRENT;
@@ -77,11 +86,20 @@ public class ScheduleAlarmPlugin extends Plugin {
 
             // ✅ Android 12+ 정확한 알람 권한 체크
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                if (!alarmManager.canScheduleExactAlarms()) {
-                    Log.e(TAG, "❌ 정확한 알람 권한이 없습니다!");
+                boolean canSchedule = alarmManager.canScheduleExactAlarms();
+                Log.d(TAG, "📱 Android 버전: " + Build.VERSION.SDK_INT + " (API 31+ = Android 12+)");
+                Log.d(TAG, "🔍 canScheduleExactAlarms: " + canSchedule);
+
+                if (!canSchedule) {
+                    Log.e(TAG, "❌ [CRITICAL] 정확한 알람 권한이 없습니다!");
+                    Log.e(TAG, "❌ 설정 > 앱 > ShareNote > 알람 및 리마인더 권한을 허용하세요");
                     call.reject("정확한 알람 권한이 필요합니다. 설정에서 허용해주세요.");
                     return;
+                } else {
+                    Log.d(TAG, "✅ 정확한 알람 권한 확인됨");
                 }
+            } else {
+                Log.d(TAG, "✅ Android 11 이하 - 정확한 알람 권한 불필요");
             }
 
             // ✅ setExactAndAllowWhileIdle 사용 (배터리 절약 모드에서도 작동)
@@ -130,6 +148,7 @@ public class ScheduleAlarmPlugin extends Plugin {
             AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
 
             Intent intent = new Intent(context, AlarmReceiver.class);
+            intent.setAction("com.mindflow.app.SCHEDULE_ALARM");  // ✅ action 추가
             int flags = PendingIntent.FLAG_UPDATE_CURRENT;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 flags |= PendingIntent.FLAG_IMMUTABLE;

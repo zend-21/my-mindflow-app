@@ -23,6 +23,11 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Log.e("MainActivity", "================================================");
+        Log.e("MainActivity", "🚨🚨🚨 ShareNote v14-REBUILD 🚨🚨🚨");
+        Log.e("MainActivity", "📅 빌드 시간: 2026-01-24 18:00 KST");
+        Log.e("MainActivity", "🔧 AlarmReceiver Intent-Filter 적용됨");
+        Log.e("MainActivity", "================================================");
         Log.d("MainActivity", "🚀 onCreate 시작");
 
         // ⚠️ CRITICAL: registerPlugin()은 super.onCreate() 이전에 호출되어야 함 (Capacitor 4+)
@@ -152,8 +157,8 @@ public class MainActivity extends BridgeActivity {
 
             // ✅ 알람 전용 AudioAttributes (백그라운드에서도 울림)
             AudioAttributes alarmAudioAttributes = new AudioAttributes.Builder()
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                .setUsage(AudioAttributes.USAGE_ALARM)  // ← 알람용으로 변경!
+                .setUsage(AudioAttributes.USAGE_ALARM)  // ← 알람용 (최우선)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)  // ← 알림음 타입
                 .build();
 
             // 1. 타이머 채널 - timer_alarm.mp3 사용
@@ -170,42 +175,49 @@ public class MainActivity extends BridgeActivity {
 
             // 2. 알람 채널 (소리 + 진동) - schedule_alarm.mp3 사용
             NotificationChannel alarmChannel = new NotificationChannel(
-                "alarm_channel_v2",
-                "캘린더 알람 (소리+진동)",
-                NotificationManager.IMPORTANCE_MAX  // ✅ 백그라운드 알람을 위해 MAX 사용
+                "alarm_channel_v10",  // ✅ v10으로 완전 새로 시작
+                "캘린더 알람",
+                NotificationManager.IMPORTANCE_HIGH
             );
-            alarmChannel.setDescription("캘린더 스케줄 알람 (소리+진동)");
+            alarmChannel.setDescription("스케줄 알람을 위한 채널입니다.");
+            alarmChannel.enableLights(true);
+            alarmChannel.setLightColor(Color.RED);
             alarmChannel.enableVibration(true);
-            alarmChannel.setShowBadge(true);
-            alarmChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);  // ✅ 잠금화면 표시
-            alarmChannel.setSound(alarmSoundUri, alarmAudioAttributes);  // ✅ 알람용 속성 사용
-            Log.d("MainActivity", "✅ 알람 채널 생성 완료 (schedule_alarm.mp3)");
+            alarmChannel.setSound(alarmSoundUri, alarmAudioAttributes);
+            Log.d("MainActivity", "✅ alarm_channel_v10 생성 완료");
 
             // 2-1. 알람 소리만 채널 (진동 없음)
             NotificationChannel alarmSoundOnlyChannel = new NotificationChannel(
-                "alarm_channel_sound_only_v2",
+                "alarm_channel_sound_only_v6",  // ✅ v6로 업데이트
                 "캘린더 알람 (소리만)",
-                NotificationManager.IMPORTANCE_MAX  // ✅ 백그라운드 알람을 위해 MAX 사용
+                NotificationManager.IMPORTANCE_HIGH
             );
             alarmSoundOnlyChannel.setDescription("캘린더 알람 (소리만, 진동 없음)");
             alarmSoundOnlyChannel.enableVibration(false);
+            alarmSoundOnlyChannel.enableLights(true);
+            alarmSoundOnlyChannel.setLightColor(Color.RED);
             alarmSoundOnlyChannel.setShowBadge(true);
-            alarmSoundOnlyChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);  // ✅ 잠금화면 표시
-            alarmSoundOnlyChannel.setSound(alarmSoundUri, alarmAudioAttributes);  // ✅ 알람용 속성 사용
-            Log.d("MainActivity", "✅ 알람 소리만 채널 생성 완료");
+            alarmSoundOnlyChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            alarmSoundOnlyChannel.setBypassDnd(true);
+            alarmSoundOnlyChannel.setSound(alarmSoundUri, alarmAudioAttributes);
+            Log.d("MainActivity", "✅ 알람 소리만 채널 v6 생성 완료");
 
             // 2-2. 알람 진동만 채널 (소리 없음)
             NotificationChannel alarmVibrationOnlyChannel = new NotificationChannel(
-                "alarm_channel_vibration_only_v2",
+                "alarm_channel_vibration_only_v6",  // ✅ v6로 업데이트
                 "캘린더 알람 (진동만)",
-                NotificationManager.IMPORTANCE_MAX  // ✅ 백그라운드 알람을 위해 MAX 사용
+                NotificationManager.IMPORTANCE_HIGH
             );
             alarmVibrationOnlyChannel.setDescription("캘린더 알람 (진동만, 소리 없음)");
             alarmVibrationOnlyChannel.enableVibration(true);
+            alarmVibrationOnlyChannel.setVibrationPattern(new long[]{0, 500, 200, 500});
+            alarmVibrationOnlyChannel.enableLights(true);
+            alarmVibrationOnlyChannel.setLightColor(Color.RED);
             alarmVibrationOnlyChannel.setShowBadge(true);
-            alarmVibrationOnlyChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);  // ✅ 잠금화면 표시
+            alarmVibrationOnlyChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
+            alarmVibrationOnlyChannel.setBypassDnd(true);
             alarmVibrationOnlyChannel.setSound(null, null);
-            Log.d("MainActivity", "✅ 알람 진동만 채널 생성 완료");
+            Log.d("MainActivity", "✅ 알람 진동만 채널 v6 생성 완료");
 
             // 3. 채팅 채널 (채팅 메시지) - sharenote.mp3 사용
             NotificationChannel chatChannel = new NotificationChannel(
