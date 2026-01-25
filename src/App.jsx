@@ -193,6 +193,72 @@ function App() {
         };
     }, []);
 
+    // 📱 앱 시작 시 알림 권한 요청 (네이티브 플랫폼에서만)
+    useEffect(() => {
+        const requestInitialPermissions = async () => {
+            try {
+                const { Capacitor } = await import('@capacitor/core');
+
+                // 네이티브 플랫폼이 아니면 실행하지 않음
+                if (!Capacitor.isNativePlatform()) {
+                    return;
+                }
+
+                // 이미 권한 요청을 했는지 확인
+                const hasRequestedPermissions = localStorage.getItem('has_requested_permissions');
+                if (hasRequestedPermissions) {
+                    console.log('✅ 이미 권한 요청을 완료했습니다');
+                    return;
+                }
+
+                console.log('📱 앱 시작 - 알림 권한 요청 시작');
+
+                // 1. LocalNotifications 권한 요청 (스케줄 알람용)
+                const localPermission = await LocalNotifications.requestPermissions();
+                console.log('📱 LocalNotifications 권한:', localPermission.display);
+
+                // 2. PushNotifications 권한 요청 (FCM용)
+                const { PushNotifications } = await import('@capacitor/push-notifications');
+                const pushPermission = await PushNotifications.requestPermissions();
+                console.log('📱 PushNotifications 권한:', pushPermission.receive);
+
+                // 3. Android 12+ 정확한 알람 권한 안내
+                if (Capacitor.getPlatform() === 'android') {
+                    const permissions = await LocalNotifications.checkPermissions();
+
+                    if (permissions.canScheduleExactAlarms === false) {
+                        const confirmSettings = window.confirm(
+                            '⏰ 정확한 알람 권한 필요\n\n' +
+                            '캘린더 알람이 정확한 시간에 울리려면\n' +
+                            '"정확한 알람" 권한이 필요합니다.\n\n' +
+                            '설정으로 이동하시겠습니까?'
+                        );
+
+                        if (confirmSettings) {
+                            const { registerPlugin } = await import('@capacitor/core');
+                            const NotificationSettings = registerPlugin('NotificationSettings');
+                            await NotificationSettings.openAlarmSettings();
+                        }
+                    }
+                }
+
+                // 권한 요청 완료 표시
+                localStorage.setItem('has_requested_permissions', 'true');
+                console.log('✅ 앱 시작 권한 요청 완료');
+
+            } catch (error) {
+                console.error('❌ 권한 요청 실패:', error);
+            }
+        };
+
+        // 스플래시 화면이 끝난 후 권한 요청 (1.5초 후)
+        const timer = setTimeout(() => {
+            requestInitialPermissions();
+        }, 1500);
+
+        return () => clearTimeout(timer);
+    }, []);
+
     // 🔔 백그라운드 알림 탭 → 채팅방 이동 이벤트 리스너
     useEffect(() => {
         const handleOpenChatRoom = (event) => {

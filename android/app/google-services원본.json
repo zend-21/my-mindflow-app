@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "983598708482",
+    "project_id": "share-note-app",
+    "storage_bucket": "share-note-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:983598708482:android:469f3fded78f16e0a2741b",
+        "android_client_info": {
+          "package_name": "com.mindflow.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "983598708482-8kackp0e1ti8nq3r67tpjj64slc3rf3p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAACF3K0ta3PtADJZcQ9nX98IWvo38sNXg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "983598708482-8kackp0e1ti8nq3r67tpjj64slc3rf3p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
