@@ -426,7 +426,7 @@ const CollapsibleDocumentEditor = ({
           </PermissionBadge>
 
           {onClose && (
-            <IconButton onClick={onClose} title="닫기">
+            <IconButton onClick={onClose} title="닫기" style={{ marginLeft: '20px' }}>
               <X size={18} />
             </IconButton>
           )}

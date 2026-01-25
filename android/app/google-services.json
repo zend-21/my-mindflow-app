@@ -14,6 +14,22 @@
       },
       "oauth_client": [
         {
+          "client_id": "983598708482-2a3mdviv5r6tjhta7v8dbndth37t3hje.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mindflow.app",
+            "certificate_hash": "5823e22369a70cf9e7c2f46cb30add1ab56b7ad9"
+          }
+        },
+        {
+          "client_id": "983598708482-hlsok3s423fvjin2jlkpmjdlnj5npdrd.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mindflow.app",
+            "certificate_hash": "930284cf21b62ab41c370e50ae60f37bbacb51d8"
+          }
+        },
+        {
           "client_id": "983598708482-8kackp0e1ti8nq3r67tpjj64slc3rf3p.apps.googleusercontent.com",
           "client_type": 3
         }

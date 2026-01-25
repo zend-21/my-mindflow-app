@@ -308,8 +308,8 @@ const AlarmModal = ({ isOpen, scheduleData, allSchedules, userId, settings, sync
 
     // 미리보기 알람 데이터
     const previewData = {
-      title: alarmTitle || '알람 미리보기',
-      content: '설정된 알람이 이렇게 울립니다',
+      title: `'알람 타이틀'`,
+      content: '- ShareNote -',
       soundFile,
       volume,
       notificationType,
@@ -348,7 +348,7 @@ const AlarmModal = ({ isOpen, scheduleData, allSchedules, userId, settings, sync
         const advanceToastId = `preview_advance_${Date.now()}`;
         setPreviewToasts(prev => [...prev, {
           id: advanceToastId,
-          title: `[미리 알림] ${alarmTitle || '알람 미리보기'}`,
+          title: `[미리 알림] '알람 타이틀'`,
           content: `${ADVANCE_NOTICE_CONFIG.options[advanceNotice]} 알림입니다`,
           soundFile,
           volume,
@@ -364,7 +364,7 @@ const AlarmModal = ({ isOpen, scheduleData, allSchedules, userId, settings, sync
               const toastId = `preview_advance_${Date.now()}_${i}`;
               setPreviewToasts(prev => [...prev, {
                 id: toastId,
-                title: `[미리 알림] ${alarmTitle || '알람 미리보기'}`,
+                title: `[미리 알림] '알람 타이틀'`,
                 content: `${ADVANCE_NOTICE_CONFIG.options[advanceNotice]} 알림입니다`,
                 soundFile,
                 volume,

@@ -35,11 +35,11 @@ const ToastContainer = styled.div`
   position: fixed;
   top: 20px;
   left: 50%;
-  background: rgba(50, 50, 50, 0.95);
-  color: white;
-  padding: 16px 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  background: white;
+  color: #333;
+  padding: 8px 16px;
+  border-radius: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   z-index: 13000;
   animation: ${props => props.$isClosing ? slideUp : slideDown} 0.3s ease-out forwards;
   cursor: pointer;
@@ -48,16 +48,26 @@ const ToastContainer = styled.div`
   min-width: 250px;
 `;
 
+const AppIcon = styled.img`
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+`;
+
 const ToastTitle = styled.div`
   font-size: 16px;
-  font-weight: 500;
+  font-weight: normal;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  white-space: normal;
-  word-break: break-word;
+  white-space: nowrap;
+  word-break: keep-all;
   text-align: center;
+`;
+
+const BoldText = styled.span`
+  font-weight: bold;
 `;
 
 /**
@@ -204,7 +214,8 @@ const AlarmToast = ({ isVisible, alarmData, onClose }) => {
     <Portal>
       <ToastContainer $isClosing={isClosing} onClick={handleClick}>
         <ToastTitle>
-          🔔 {alarmData.title || '알람'}
+          <AppIcon src="/icons/icon-48.png" alt="ShareNote" />
+          <BoldText>{alarmData.title || '알람'}</BoldText> {alarmData.content || ''}
         </ToastTitle>
       </ToastContainer>
     </Portal>

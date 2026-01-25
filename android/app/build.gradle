@@ -20,8 +20,17 @@ android {
         abortOnError false
         checkReleaseBuilds false
     }
+    signingConfigs {
+        release {
+            storeFile file('snote-test-release.keystore')
+            storePassword 'snote2026test'
+            keyAlias 'snote-test'
+            keyPassword 'snote2026test'
+        }
+    }
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

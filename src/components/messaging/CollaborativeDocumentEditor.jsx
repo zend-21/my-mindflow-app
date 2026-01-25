@@ -25,6 +25,7 @@ import CollaborationMemoModal from './CollaborationMemoModal';
 import PinchZoomImageViewer from '../PinchZoomImageViewer';
 import * as S from './CollaborativeDocumentEditor.styles';
 import { sanitizeHtml } from '../../utils/sanitizeHtml';
+import { getAccountLocalStorageWithTTL } from '../../hooks/useFirestoreSync.utils';
 
 // ===== 전역 문서 캐시 (컴포넌트 인스턴스 간 공유) =====
 // 컴포넌트가 언마운트되어도 캐시가 유지되도록 전역으로 관리
@@ -754,11 +755,20 @@ const CollaborativeDocumentEditor = ({
             console.log(`✅ 문서 교체 - 기존 문서에 마커 존재 (${actualCountInCurrentRoom}개), currentWorkingRoomId = ${chatRoomId}`);
           } else {
             // 2. 현재 방에 마커가 없으면, 원본 메모의 currentWorkingRoomId 확인
-            const oldMemoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', currentDocId);
-            const oldMemoSnap = await getDoc(oldMemoRef);
+            // ✅ TTL 캐시 우선 확인
+            const cachedMemos = getAccountLocalStorageWithTTL(currentUserId, 'memos', false);
+            let oldMemoData = cachedMemos?.find(m => m.id === currentDocId);
 
-            if (oldMemoSnap.exists()) {
-              const oldMemoData = oldMemoSnap.data();
+            if (!oldMemoData) {
+              // 캐시에 없으면 Firestore에서 가져오기
+              const oldMemoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', currentDocId);
+              const oldMemoSnap = await getDoc(oldMemoRef);
+              if (oldMemoSnap.exists()) {
+                oldMemoData = oldMemoSnap.data();
+              }
+            }
+
+            if (oldMemoData) {
               const otherRoomId = oldMemoData.currentWorkingRoomId;
 
               // 다른 방에서 마커가 있는지 확인
@@ -809,18 +819,28 @@ const CollaborativeDocumentEditor = ({
       // 원본 메모의 최신 데이터 가져오기 (승인된 내용 반영)
       let memoData = memo;
       try {
-        const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', memo.id);
-        const memoSnap = await getDoc(memoRef);
-        if (memoSnap.exists()) {
-          memoData = { id: memo.id, ...memoSnap.data() };
-          console.log('📄 Firestore에서 최신 메모 데이터 로드:', memo.id);
+        // ✅ TTL 캐시 우선 확인 (데이터 사용량 절약)
+        const cachedMemos = getAccountLocalStorageWithTTL(currentUserId, 'memos', false);
+        const cachedMemo = cachedMemos?.find(m => m.id === memo.id);
 
-          // ⭐ 다른 방에서 협업 중인지 확인
-          if (memoData.currentWorkingRoomId && memoData.currentWorkingRoomId !== chatRoomId) {
-            showToast?.('이 문서는 다른 대화방에서 협업 중입니다. 먼저 해당 대화방에서 문서를 비우거나 승인해주세요.');
-            console.warn('❌ 다른 방에서 협업 중:', memoData.currentWorkingRoomId);
-            return;
+        if (cachedMemo) {
+          memoData = cachedMemo;
+          console.log('📄 localStorage TTL 캐시에서 메모 데이터 로드:', memo.id);
+        } else {
+          // 캐시에 없으면 Firestore에서 가져오기
+          const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', memo.id);
+          const memoSnap = await getDoc(memoRef);
+          if (memoSnap.exists()) {
+            memoData = { id: memo.id, ...memoSnap.data() };
+            console.log('📄 Firestore에서 최신 메모 데이터 로드:', memo.id);
           }
+        }
+
+        // ⭐ 다른 방에서 협업 중인지 확인
+        if (memoData.currentWorkingRoomId && memoData.currentWorkingRoomId !== chatRoomId) {
+          showToast?.('이 문서는 다른 대화방에서 협업 중입니다. 먼저 해당 대화방에서 문서를 비우거나 승인해주세요.');
+          console.warn('❌ 다른 방에서 협업 중:', memoData.currentWorkingRoomId);
+          return;
         }
       } catch (error) {
         console.error('원본 메모 로드 실패, 전달된 memo 사용:', error);
@@ -1072,11 +1092,45 @@ const CollaborativeDocumentEditor = ({
   // 외부에서 메모를 선택했을 때 처리
   const lastSelectedMemoIdRef = useRef(null);
 
+  // ✅ pendingEdits를 문서 위치 순서대로 정렬 (시간 순서가 아님)
+  const sortedPendingEdits = useMemo(() => {
+    if (pendingEdits.length === 0) return [];
+
+    const activeRef = showFullScreenEdit ? fullScreenContentRef : contentRef;
+    if (!activeRef.current) return pendingEdits;
+
+    // 각 편집의 문서 내 위치 계산
+    const editsWithPosition = pendingEdits.map(edit => {
+      const marker = activeRef.current.querySelector(`[data-edit-id="${edit.id}"]`);
+      if (marker) {
+        // 마커의 offsetTop과 offsetLeft를 사용해서 위치 계산
+        let element = marker;
+        let offsetTop = 0;
+        while (element && element !== activeRef.current) {
+          offsetTop += element.offsetTop;
+          element = element.offsetParent;
+        }
+        return {
+          ...edit,
+          position: offsetTop
+        };
+      }
+      // 마커를 찾지 못한 경우 맨 뒤로
+      return {
+        ...edit,
+        position: Infinity
+      };
+    });
+
+    // 위치 순서대로 정렬 (위에서 아래로)
+    return editsWithPosition.sort((a, b) => a.position - b.position);
+  }, [pendingEdits, showFullScreenEdit, content]); // content가 변경되면 마커 위치도 변경될 수 있음
+
   // 수정 영역으로 이동하는 함수
   const scrollToEdit = useCallback((index) => {
-    if (pendingEdits.length === 0) return;
+    if (sortedPendingEdits.length === 0) return;
 
-    const editId = pendingEdits[index]?.id;
+    const editId = sortedPendingEdits[index]?.id;
     if (!editId) return;
 
     // 편집 마커 찾기
@@ -1098,34 +1152,34 @@ const CollaborativeDocumentEditor = ({
         marker.style.boxShadow = 'none';
       }, 500);
     }
-  }, [pendingEdits, showFullScreenEdit]);
+  }, [sortedPendingEdits, showFullScreenEdit]);
 
   // 다음 수정 영역으로 이동
   const handleNextEdit = useCallback(() => {
-    if (pendingEdits.length === 0) return;
+    if (sortedPendingEdits.length === 0) return;
 
-    const nextIndex = (currentEditIndex + 1) % pendingEdits.length;
+    const nextIndex = (currentEditIndex + 1) % sortedPendingEdits.length;
     setCurrentEditIndex(nextIndex);
     scrollToEdit(nextIndex);
-  }, [currentEditIndex, pendingEdits.length, scrollToEdit]);
+  }, [currentEditIndex, sortedPendingEdits.length, scrollToEdit]);
 
   // 이전 수정 영역으로 이동
   const handlePrevEdit = useCallback(() => {
-    if (pendingEdits.length === 0) return;
+    if (sortedPendingEdits.length === 0) return;
 
-    const prevIndex = currentEditIndex === 0 ? pendingEdits.length - 1 : currentEditIndex - 1;
+    const prevIndex = currentEditIndex === 0 ? sortedPendingEdits.length - 1 : currentEditIndex - 1;
     setCurrentEditIndex(prevIndex);
     scrollToEdit(prevIndex);
-  }, [currentEditIndex, pendingEdits.length, scrollToEdit]);
+  }, [currentEditIndex, sortedPendingEdits.length, scrollToEdit]);
 
-  // pendingEdits 변경 시 인덱스 초기화
+  // sortedPendingEdits 변경 시 인덱스 초기화
   useEffect(() => {
-    if (pendingEdits.length === 0) {
+    if (sortedPendingEdits.length === 0) {
       setCurrentEditIndex(0);
-    } else if (currentEditIndex >= pendingEdits.length) {
-      setCurrentEditIndex(pendingEdits.length - 1);
+    } else if (currentEditIndex >= sortedPendingEdits.length) {
+      setCurrentEditIndex(sortedPendingEdits.length - 1);
     }
-  }, [pendingEdits.length, currentEditIndex]);
+  }, [sortedPendingEdits.length, currentEditIndex]);
 
   useEffect(() => {
     if (selectedMemo && selectedMemo.id !== lastSelectedMemoIdRef.current) {
@@ -1431,7 +1485,7 @@ const CollaborativeDocumentEditor = ({
       return '제목 없음';
     }
 
-    // 첫 줄을 제목으로 사용 (최대 16자)
+    // 첫 줄을 제목으로 사용 (최대 16자로 축소)
     return firstLine.length > 16 ? firstLine.substring(0, 16) : firstLine;
   }, []);
 
@@ -1599,7 +1653,7 @@ const CollaborativeDocumentEditor = ({
     const newContent = activeRef.current.innerHTML;
     setContent(newContent);
 
-    // 첫 번째 줄을 제목으로 자동 설정 (16자 제한)
+    // 첫 번째 줄을 제목으로 자동 설정 (8자 제한)
     const textContent = activeRef.current.textContent || '';
     const firstLine = textContent.split('\n')[0].trim();
     if (firstLine) {
@@ -3654,11 +3708,20 @@ const CollaborativeDocumentEditor = ({
           console.log(`✅ 비우기 - 현재 방에 마커 존재 (${actualCountInCurrentRoom}개), currentWorkingRoomId = ${chatRoomId}`);
         } else {
           // 2. 현재 방에 마커가 없으면, 원본 메모의 currentWorkingRoomId 확인
-          const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', docIdToClose);
-          const memoSnap = await getDoc(memoRef);
+          // ✅ TTL 캐시 우선 확인
+          const cachedMemos = getAccountLocalStorageWithTTL(currentUserId, 'memos', false);
+          let memoData = cachedMemos?.find(m => m.id === docIdToClose);
 
-          if (memoSnap.exists()) {
-            const memoData = memoSnap.data();
+          if (!memoData) {
+            // 캐시에 없으면 Firestore에서 가져오기
+            const memoRef = doc(db, 'mindflowUsers', currentUserId, 'memos', docIdToClose);
+            const memoSnap = await getDoc(memoRef);
+            if (memoSnap.exists()) {
+              memoData = memoSnap.data();
+            }
+          }
+
+          if (memoData) {
             const otherRoomId = memoData.currentWorkingRoomId;
 
             // 다른 방에서 마커가 있는지 확인
@@ -5529,7 +5592,7 @@ const CollaborativeDocumentEditor = ({
                 />
               </S.FullScreenTitle>
 
-              <S.IconButton onClick={handleCloseFullScreenEdit} title="닫기" style={{ position: 'relative', right: '-15px' }}>
+              <S.IconButton onClick={handleCloseFullScreenEdit} title="닫기" style={{ position: 'relative', right: '-5px' }}>
                 <X size={24} />
               </S.IconButton>
             </S.FullScreenHeader>

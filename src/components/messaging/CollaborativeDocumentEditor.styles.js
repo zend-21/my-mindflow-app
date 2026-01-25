@@ -63,7 +63,7 @@ export const DocumentIcon = styled.div`
 
 export const TitleInput = styled.input`
   flex: 1;
-  max-width: 300px;
+  max-width: 250px;
   background: transparent; /* 배경 제거 */
   border: none;
   color: #ffffff;
@@ -143,6 +143,8 @@ export const IconButton = styled.button`
   /* z-index로 확실히 위에 표시 */
   position: relative;
   z-index: 100;
+  /* X 버튼만 오른쪽으로 10px 이동 */
+  margin-right: -10px;
 
   &:hover {
     background: rgba(255, 255, 255, 0.1);
@@ -641,7 +643,7 @@ export const FullScreenHeader = styled.div`
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  padding-top: calc(env(safe-area-inset-top, 0px) + 50px); /* Safe Area + 기본 패딩 */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 60px); /* Safe Area + 기본 패딩 (56px → 60px) */
   padding-bottom: 4px; /* 하단 여백 조정 */
   background: rgba(255, 255, 255, 0.03);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -658,9 +660,9 @@ export const FullScreenTitle = styled.div`
 
 export const FullScreenTitleInput = styled.input`
   flex: 1;
-  max-width: 400px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  max-width: 300px;
+  background: transparent;
+  border: none;
   color: #ffffff;
   font-size: 18px;
   font-weight: 600;
@@ -672,18 +674,18 @@ export const FullScreenTitleInput = styled.input`
   white-space: nowrap;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: transparent;
   }
 
   &:focus {
     outline: none;
-    background: rgba(255, 255, 255, 0.1);
-    border-color: #4a90e2;
+    background: transparent;
+    border-color: transparent;
   }
 
   &:disabled {
-    cursor: not-allowed;
-    opacity: 0.6;
+    cursor: default;
+    opacity: 1;
   }
 `;
 

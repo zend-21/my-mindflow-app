@@ -233,12 +233,24 @@ const FrozenBadge = styled.div`
   display: flex;
   align-items: center;
   gap: 4px;
-  background: ${props => props.$active ? 'rgba(74, 144, 226, 0.15)' : 'rgba(255, 68, 68, 0.15)'};
-  border: 1px solid ${props => props.$active ? 'rgba(74, 144, 226, 0.3)' : 'rgba(255, 68, 68, 0.3)'};
+  background: ${props =>
+    props.$waiting ? 'rgba(255, 105, 180, 0.15)' :
+    props.$active ? 'rgba(74, 144, 226, 0.15)' :
+    'rgba(255, 68, 68, 0.15)'
+  };
+  border: 1px solid ${props =>
+    props.$waiting ? 'rgba(255, 105, 180, 0.3)' :
+    props.$active ? 'rgba(74, 144, 226, 0.3)' :
+    'rgba(255, 68, 68, 0.3)'
+  };
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 11px;
-  color: ${props => props.$active ? '#4a90e2' : '#ff6b6b'};
+  color: ${props =>
+    props.$waiting ? '#ff69b4' :
+    props.$active ? '#4a90e2' :
+    '#ff6b6b'
+  };
   white-space: nowrap;
   flex-shrink: 0;
   position: relative;
@@ -639,7 +651,10 @@ const SharedMemoSelectorModal = ({ onClose, onSelectMemo, showToast, allMemos, c
                       <DownloadedBadge>다운로드</DownloadedBadge>
                     )}
                     {showBadge && (
-                      <FrozenBadge $active={isActiveInThisRoom}>
+                      <FrozenBadge
+                        $active={isActiveInThisRoom}
+                        $waiting={pendingCount === 0 && isFrozen}
+                      >
                         {isFrozen && <Lock size={12} />}
                         {getBadgeText()}
                       </FrozenBadge>

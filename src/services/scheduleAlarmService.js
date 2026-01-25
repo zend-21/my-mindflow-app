@@ -9,6 +9,69 @@ import { registerPlugin } from '@capacitor/core';
 const ScheduleAlarm = registerPlugin('ScheduleAlarm');
 
 /**
+ * 경과된 알람 자동 정리
+ * - 이미 시간이 지난 알람들을 취소하여 중복 트리거 방지
+ */
+const cleanupExpiredAlarms = async () => {
+    if (!Capacitor.isNativePlatform()) {
+        return;
+    }
+
+    try {
+        const now = Date.now();
+
+        // localStorage에서 모든 알람 정보 가져오기
+        const keys = Object.keys(localStorage);
+        const calendarKeys = keys.filter(key =>
+            key.includes('calendar') && !key.includes('Settings') && !key.includes('alarm')
+        );
+
+        const expiredAlarms = [];
+
+        for (const key of calendarKeys) {
+            try {
+                const schedules = JSON.parse(localStorage.getItem(key) || '{}');
+
+                for (const dayData of Object.values(schedules)) {
+                    const registeredAlarms = dayData?.alarm?.registeredAlarms || [];
+
+                    for (const alarm of registeredAlarms) {
+                        const alarmTime = new Date(alarm.calculatedTime).getTime();
+                        const repeatCount = alarm.repeatCount || 1;
+
+                        // 반복 알람의 마지막 시간 계산
+                        const lastRepeatTime = alarmTime + ((repeatCount - 1) * 60 * 1000);
+
+                        // 마지막 반복도 경과된 경우 취소 대상
+                        if (lastRepeatTime < now && !alarm.isAnniversary) {
+                            expiredAlarms.push({
+                                id: alarm.id,
+                                repeatCount: repeatCount,
+                                title: alarm.title
+                            });
+                        }
+                    }
+                }
+            } catch (error) {
+                console.warn('알람 데이터 파싱 오류:', error);
+            }
+        }
+
+        // 경과된 알람들 취소
+        if (expiredAlarms.length > 0) {
+            console.log(`🧹 경과된 알람 ${expiredAlarms.length}개 정리 중...`);
+
+            for (const alarm of expiredAlarms) {
+                await cancelNativeScheduleAlarm(alarm.id, alarm.repeatCount);
+                console.log(`✅ 경과된 알람 취소: ${alarm.title}`);
+            }
+        }
+    } catch (error) {
+        console.error('❌ 경과된 알람 정리 실패:', error);
+    }
+};
+
+/**
  * 스케줄 알람 네이티브 등록
  * @param {Object} alarm - 알람 데이터
  * @param {string} scheduleDate - 스케줄 날짜 (yyyy-MM-dd)
@@ -22,6 +85,9 @@ export const registerNativeScheduleAlarm = async (alarm, scheduleDate) => {
     }
 
     try {
+        // ✅ [FIX] 알람 등록 전 경과된 알람 자동 정리 (이전 알람이 울리는 문제 방지)
+        await cleanupExpiredAlarms();
+
         // 알림 권한 확인
         const permission = await LocalNotifications.requestPermissions();
         if (permission.display !== 'granted') {
@@ -77,7 +143,8 @@ export const registerNativeScheduleAlarm = async (alarm, scheduleDate) => {
         });
 
         // ✅ AlarmManager 플러그인 사용 (백그라운드에서도 작동)
-        const body = `${alarm.content || `일정: ${scheduleDate}`}\n\n- ShareNote -`;
+        const title = `'${alarm.title}'`;
+        const body = `- ShareNote -`;
         const enableVibration = true;  // v10: 진동 항상 활성화
 
         for (let i = 0; i < repeatCount; i++) {
@@ -87,7 +154,7 @@ export const registerNativeScheduleAlarm = async (alarm, scheduleDate) => {
             try {
                 await ScheduleAlarm.scheduleAlarm({
                     notificationId: uniqueId,
-                    title: alarm.title,
+                    title: title,
                     body: body,
                     triggerTime: repeatTime.getTime(),
                     channelId: channelId,
