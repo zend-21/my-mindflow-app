@@ -24,7 +24,8 @@ export const getUserStats = async () => {
     const usersSnapshot = await getDocs(usersRef);
 
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // 오늘 날짜를 YYYY-MM-DD 형식으로 (로컬 시간대 기준)
+    const todayDateKey = now.toLocaleDateString('en-CA'); // 'en-CA'는 YYYY-MM-DD 형식
 
     let totalUsers = 0;
     let todaySignups = 0;
@@ -45,13 +46,17 @@ export const getUserStats = async () => {
           deletedDate = data.deletedAt.toDate();
         } else if (data.deletedAt instanceof Date) {
           deletedDate = data.deletedAt;
+        } else if (typeof data.deletedAt === 'number') {
+          // Unix timestamp (밀리초)를 Date로 변환
+          deletedDate = new Date(data.deletedAt);
         } else if (typeof data.deletedAt === 'string') {
           deletedDate = new Date(data.deletedAt);
         } else {
           return; // 유효하지 않은 날짜는 건너뜀
         }
 
-        const dateKey = deletedDate.toISOString().split('T')[0];
+        // 로컬 시간대 기준 날짜 키
+        const dateKey = deletedDate.toLocaleDateString('en-CA');
         deletionsByDate[dateKey] = (deletionsByDate[dateKey] || 0) + 1;
       } else {
         // 활성 회원
@@ -64,29 +69,33 @@ export const getUserStats = async () => {
             createdDate = data.createdAt.toDate();
           } else if (data.createdAt instanceof Date) {
             createdDate = data.createdAt;
+          } else if (typeof data.createdAt === 'number') {
+            // Unix timestamp (밀리초)를 Date로 변환
+            createdDate = new Date(data.createdAt);
           } else if (typeof data.createdAt === 'string') {
             createdDate = new Date(data.createdAt);
           } else {
             return; // 유효하지 않은 날짜는 건너뜀
           }
 
-          const dateKey = createdDate.toISOString().split('T')[0];
+          // 로컬 시간대 기준 날짜 키 (UTC 대신 로컬 시간대 사용)
+          const dateKey = createdDate.toLocaleDateString('en-CA');
           signupsByDate[dateKey] = (signupsByDate[dateKey] || 0) + 1;
 
-          // 오늘 가입자
-          if (createdDate >= todayStart) {
+          // 오늘 가입자 (날짜 문자열 비교로 변경 - 더 정확함)
+          if (dateKey === todayDateKey) {
             todaySignups++;
           }
         }
       }
     });
 
-    // 날짜별 데이터를 배열로 변환 (최근 30일)
+    // 날짜별 데이터를 배열로 변환 (최근 30일, 로컬 시간대 기준)
     const last30Days = [];
     for (let i = 29; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
-      const dateKey = date.toISOString().split('T')[0];
+      const dateKey = date.toLocaleDateString('en-CA'); // 로컬 시간대 기준
       last30Days.push({
         date: dateKey,
         signups: signupsByDate[dateKey] || 0,

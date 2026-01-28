@@ -199,7 +199,7 @@ export const cancelNativeScheduleAlarm = async (alarmId, repeatCount = 3) => {
                 console.log(`✅ 알람 ${i + 1}/${repeatCount} 취소 완료`);
             } catch (error) {
                 console.error(`❌ 알람 ${i + 1}/${repeatCount} 취소 실패:`, error);
-            }
+ㅅㅓㅅㅁㅗ          }
         }
 
         console.log(`✅ 스케줄 알람 취소 완료: ID ${alarmId} (${repeatCount}회 반복)`);

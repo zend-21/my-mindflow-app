@@ -2162,9 +2162,12 @@ function App() {
                 firebaseUserId = userInfo.sub || userInfo.id || btoa(userInfo.email).replace(/[^a-zA-Z0-9]/g, '').substring(0, 28);
             }
 
-            // 📜 약관 동의 확인
-            console.log('📜 약관 동의 여부 확인 중...');
-            const { needsAgreement, isReConsent, changedTerms } = await checkTermsAgreement(firebaseUserId);
+            // 📜 약관 동의 확인 (임시로 스킵)
+            console.log('📜 약관 체크 스킵됨');
+            const needsAgreement = false;
+            const isReConsent = false;
+            const changedTerms = [];
+            // const { needsAgreement, isReConsent, changedTerms } = await checkTermsAgreement(firebaseUserId);
 
             // 🔐 휴대폰 인증 플로우 시작
             console.log('🔐 휴대폰 번호 확인 중...');

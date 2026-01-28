@@ -103,42 +103,50 @@ const ChartTitle = styled.h3`
 `;
 
 const Chart = styled.div`
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  height: 150px;
-  padding: 8px 0;
-`;
-
-const ChartBar = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-`;
-
-const Bar = styled.div`
-  width: 100%;
-  background: ${props => props.$color};
-  border-radius: 4px 4px 0 0;
-  height: ${props => props.$height}%;
-  min-height: ${props => props.$height > 0 ? '2px' : '0'};
-  transition: height 0.3s;
   position: relative;
+  width: 100%;
+  height: 200px;
+  padding: 10px 10px 0px 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
 
-  &:hover {
-    opacity: 0.8;
+  /* 스크롤바 스타일 */
+  &::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.3);
+    }
   }
 `;
 
-const BarLabel = styled.div`
+const ChartSvg = styled.svg`
+  display: block;
+  min-width: 200px;
+  width: 100%;
+  height: 100%;
+`;
+
+const DateLabel = styled.text`
   font-size: 10px;
-  color: #666;
-  writing-mode: horizontal-tb;
-  transform: rotate(-45deg);
-  transform-origin: center;
-  white-space: nowrap;
+  fill: #888;
+  text-anchor: middle;
+`;
+
+const YAxisLabel = styled.text`
+  font-size: 10px;
+  fill: #888;
+  text-anchor: end;
 `;
 
 const SearchSection = styled.div`
@@ -722,6 +730,21 @@ const AdminUserManagementTab = () => {
     return Math.max(...data.map(d => Math.max(d.signups, d.deletions)), 1);
   };
 
+  // 선형 스케일로 Y 좌표 계산 (Y축과 그래프 동일)
+  const calculateYPosition = (value, maxValue, height) => {
+    if (maxValue === 0) return height;
+
+    // 선형 스케일 계산
+    const percentage = (value / maxValue) * 100;
+
+    // 작은 값도 보이도록 최소 3% 높이 보장 (0은 제외)
+    const minHeight = value > 0 ? 3 : 0;
+    const adjustedPercentage = Math.max(percentage, minHeight);
+
+    // Y축은 위에서 아래로 증가하므로 반전
+    return height - (height * adjustedPercentage / 100);
+  };
+
   if (loading) {
     return (
       <Container>
@@ -774,21 +797,156 @@ const AdminUserManagementTab = () => {
               최근 30일 가입/탈퇴 현황
             </ChartTitle>
             <Chart>
-              {stats?.chartData?.map((data, index) => {
-                const maxValue = getMaxValue(stats.chartData);
-                const signupHeight = (data.signups / maxValue) * 100;
-                const deletionHeight = (data.deletions / maxValue) * 100;
+              {stats?.chartData && stats.chartData.length > 0 && (
+                <ChartSvg viewBox="0 0 240 170" preserveAspectRatio="xMidYMid meet">
+                  {(() => {
+                    const leftPadding = 25;
+                    const topPadding = 10;
+                    const chartWidth = 210;
+                    const chartHeight = 135;
+                    const maxValue = getMaxValue(stats.chartData);
+                    const pointSpacing = chartWidth / (stats.chartData.length - 1);
 
-                return (
-                  <ChartBar key={index}>
-                    <Bar $color="rgba(39, 174, 96, 0.6)" $height={signupHeight} title={`가입: ${data.signups}`} />
-                    <Bar $color="rgba(231, 76, 60, 0.6)" $height={deletionHeight} title={`탈퇴: ${data.deletions}`} />
-                    {index % 5 === 0 && (
-                      <BarLabel>{data.date.slice(5)}</BarLabel>
-                    )}
-                  </ChartBar>
-                );
-              })}
+                    // Y축 눈금 개수 (자동 조절, 중복 제거)
+                    const getYAxisTicks = (max) => {
+                      const ticks = [];
+
+                      // maxValue에 따라 적절한 간격 계산
+                      let interval;
+                      if (max <= 5) {
+                        interval = 1;
+                      } else if (max <= 10) {
+                        interval = 2;
+                      } else if (max <= 20) {
+                        interval = 5;
+                      } else if (max <= 50) {
+                        interval = 10;
+                      } else if (max <= 100) {
+                        interval = 20;
+                      } else {
+                        interval = Math.ceil(max / 5 / 10) * 10; // 큰 수는 10단위로
+                      }
+
+                      for (let i = 0; i <= max; i += interval) {
+                        ticks.push(i);
+                      }
+
+                      // 마지막 눈금이 maxValue가 아니면 추가
+                      if (ticks[ticks.length - 1] < max) {
+                        ticks.push(max);
+                      }
+
+                      return ticks;
+                    };
+
+                    const yTickValues = getYAxisTicks(maxValue);
+
+                    // 가입자 데이터 (왼쪽/위 패딩 추가)
+                    const signupData = stats.chartData.map(d => d.signups);
+                    const signupPath = signupData.map((point, index) => {
+                      const x = leftPadding + (index * pointSpacing);
+                      const y = topPadding + calculateYPosition(point, maxValue, chartHeight);
+                      return index === 0 ? `M ${x} ${y}` : `L ${x} ${y}`;
+                    }).join(' ');
+
+                    // 탈퇴자 데이터 (왼쪽/위 패딩 추가)
+                    const deletionData = stats.chartData.map(d => d.deletions);
+                    const deletionPath = deletionData.map((point, index) => {
+                      const x = leftPadding + (index * pointSpacing);
+                      const y = topPadding + calculateYPosition(point, maxValue, chartHeight);
+                      return index === 0 ? `M ${x} ${y}` : `L ${x} ${y}`;
+                    }).join(' ');
+
+                    return (
+                      <>
+                        {/* Y축 */}
+                        <line
+                          x1={leftPadding}
+                          y1={topPadding}
+                          x2={leftPadding}
+                          y2={topPadding + chartHeight}
+                          stroke="rgba(255, 255, 255, 0.2)"
+                          strokeWidth="1"
+                        />
+
+                        {/* Y축 눈금 및 레이블 */}
+                        {yTickValues.map((value) => {
+                          // Y축 눈금은 최소 높이 보장 없이 정확한 위치 표시
+                          const percentage = maxValue > 0 ? (value / maxValue) * 100 : 0;
+                          const y = topPadding + chartHeight - (chartHeight * percentage / 100);
+                          return (
+                            <g key={`ytick-${value}`}>
+                              <line
+                                x1={leftPadding - 5}
+                                y1={y}
+                                x2={leftPadding}
+                                y2={y}
+                                stroke="rgba(255, 255, 255, 0.2)"
+                                strokeWidth="1"
+                              />
+                              <YAxisLabel x={leftPadding - 8} y={y + 3}>
+                                {value}
+                              </YAxisLabel>
+                            </g>
+                          );
+                        })}
+
+                        {/* X축 */}
+                        <line
+                          x1={leftPadding}
+                          y1={topPadding + chartHeight}
+                          x2={leftPadding + chartWidth}
+                          y2={topPadding + chartHeight}
+                          stroke="rgba(255, 255, 255, 0.2)"
+                          strokeWidth="1"
+                        />
+
+                        {/* 가입자 라인 (녹색) */}
+                        <path
+                          d={signupPath}
+                          fill="none"
+                          stroke="rgba(39, 174, 96, 0.8)"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+
+                        {/* 탈퇴자 라인 (빨간색) */}
+                        <path
+                          d={deletionPath}
+                          fill="none"
+                          stroke="rgba(231, 76, 60, 0.8)"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+
+                        {/* 날짜 라벨 (첫 날짜와 마지막 날짜만) */}
+                        {stats.chartData.map((data, index) => {
+                          if (index === 0 || index === stats.chartData.length - 1) {
+                            const x = leftPadding + (index * pointSpacing);
+                            // 첫 날짜는 왼쪽 정렬, 마지막 날짜는 오른쪽 정렬
+                            const textAnchor = index === 0 ? 'start' : 'end';
+                            return (
+                              <text
+                                key={`label-${index}`}
+                                x={x}
+                                y={topPadding + chartHeight + 12}
+                                fontSize="10px"
+                                fill="#888"
+                                textAnchor={textAnchor}
+                              >
+                                {data.date.slice(5)}
+                              </text>
+                            );
+                          }
+                          return null;
+                        })}
+                      </>
+                    );
+                  })()}
+                </ChartSvg>
+              )}
             </Chart>
           </ChartContainer>
 

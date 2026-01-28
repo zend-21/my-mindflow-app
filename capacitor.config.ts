@@ -31,7 +31,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
  */
 
 const config: CapacitorConfig = {
-  appId: 'com.mindflow.app',
+  appId: 'com.testsnote.app',
   appName: 'ShareNote',
   webDir: 'dist',
 

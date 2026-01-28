@@ -28,7 +28,7 @@
 // https://console.firebase.google.com/
 
 import { initializeApp } from 'firebase/app';
-import { initializeFirestore } from 'firebase/firestore';
+import { getFirestore, enableNetwork, onSnapshot, collection } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getAuth } from 'firebase/auth';
 import { getAnalytics } from 'firebase/analytics';
@@ -54,15 +54,36 @@ let analytics = null;
 if (firebaseConfig.apiKey && firebaseConfig.projectId) {
   try {
     app = initializeApp(firebaseConfig);
-
-    // Firestore 초기화 - QUIC 프로토콜 오류 방지
-    db = initializeFirestore(app, {
-      experimentalForceLongPolling: false, // QUIC 오류 시 자동 HTTP/2 폴백
-      experimentalAutoDetectLongPolling: true // 네트워크 상태에 따라 자동 선택
-    });
-
+    db = getFirestore(app);
     storage = getStorage(app);
     auth = getAuth(app);
+
+    // Firestore 네트워크 명시적 활성화 및 연결 테스트
+    if (db) {
+      enableNetwork(db)
+        .then(() => {
+          console.log('✅ Firestore 네트워크 활성화 완료');
+
+          // 연결 테스트: users 컬렉션 실시간 리스너 (연결 확인용)
+          try {
+            const unsubscribe = onSnapshot(
+              collection(db, 'users'),
+              (snapshot) => {
+                console.log('✅ Firestore 연결 성공 - users 컬렉션 크기:', snapshot.size);
+                unsubscribe(); // 테스트 완료 후 리스너 해제
+              },
+              (error) => {
+                console.error('❌ Firestore 연결 테스트 실패:', error);
+              }
+            );
+          } catch (testError) {
+            console.warn('⚠️ Firestore 연결 테스트 중 에러:', testError);
+          }
+        })
+        .catch((error) => {
+          console.error('❌ Firestore 네트워크 활성화 실패:', error);
+        });
+    }
 
     // Analytics 초기화 (브라우저 환경에서만)
     // ⚠️ 임시로 비활성화 - API 키 검증 후 재활성화 필요

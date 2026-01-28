@@ -98,6 +98,7 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   const [hasLoadedOlderMessages, setHasLoadedOlderMessages] = useState(false); // 이전 메시지를 추가로 로드했는지 여부
   const [dividerMessageIds, setDividerMessageIds] = useState([]); // 구분선을 표시할 메시지 ID 배열
   const [avatarContextMenu, setAvatarContextMenu] = useState({ show: false, x: 0, y: 0, messageId: null, senderId: null, senderName: '', isDeleted: false }); // 프사 컨텍스트 메뉴
+  const [messageContextMenu, setMessageContextMenu] = useState({ show: false, x: 0, y: 0, messageText: '', isDeleted: false, isBlocked: false, isMuted: false }); // 메시지 복사 컨텍스트 메뉴
   const [userProfileModal, setUserProfileModal] = useState({ show: false, userId: null, userName: '', profilePicture: null }); // 프로필 모달
   const [mutedUsers, setMutedUsers] = useState([]); // 이 채팅방에서 내가 차단한 사용자 목록 (단체방 메시지 차단)
   const [blockedUserIds, setBlockedUserIds] = useState([]); // 전체 앱에서 차단한 사용자 ID 목록
@@ -1758,6 +1759,10 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
   // 아바타 터치 정보
   const avatarTouchInfoRef = useRef({ userId: null, userName: null, profilePicture: null });
 
+  // 메시지 터치 정보
+  const messageTouchInfoRef = useRef({ messageText: '', isDeleted: false, isBlocked: false, isMuted: false });
+  const messageLongPressTimerRef = useRef(null);
+
   // 아바타 탭 - 프로필 모달 (PC용)
   const handleAvatarClick = (userId, userName, profilePicture) => {
     setUserProfileModal({ show: true, userId, userName, profilePicture });
@@ -1816,6 +1821,69 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
       longPressTimerRef.current = null;
     }
     avatarTouchInfoRef.current = { userId: null, userName: null, profilePicture: null };
+  };
+
+  // 메시지 터치 시작 (복사 기능)
+  const handleMessageTouchStart = (e, messageText, isDeleted, isBlocked, isMuted) => {
+    // 삭제/차단/음소거된 메시지는 복사 불가
+    if (isDeleted || isBlocked || isMuted) return;
+
+    messageTouchInfoRef.current = { messageText, isDeleted, isBlocked, isMuted };
+
+    const target = e.currentTarget || e.target;
+    const rect = target?.getBoundingClientRect();
+    if (rect) {
+      messageLongPressTimerRef.current = setTimeout(() => {
+        messageTouchInfoRef.current = { messageText: '', isDeleted: false, isBlocked: false, isMuted: false };
+        messageLongPressTimerRef.current = null;
+        setMessageContextMenu({
+          show: true,
+          x: rect.left,
+          y: rect.bottom + 8,
+          messageText,
+          isDeleted,
+          isBlocked,
+          isMuted
+        });
+      }, 500);
+    }
+  };
+
+  // 메시지 터치 종료
+  const handleMessageTouchEnd = (e) => {
+    if (messageLongPressTimerRef.current) {
+      clearTimeout(messageLongPressTimerRef.current);
+      messageLongPressTimerRef.current = null;
+    }
+    messageTouchInfoRef.current = { messageText: '', isDeleted: false, isBlocked: false, isMuted: false };
+  };
+
+  // 메시지 터치 취소
+  const handleMessageTouchCancel = () => {
+    if (messageLongPressTimerRef.current) {
+      clearTimeout(messageLongPressTimerRef.current);
+      messageLongPressTimerRef.current = null;
+    }
+    messageTouchInfoRef.current = { messageText: '', isDeleted: false, isBlocked: false, isMuted: false };
+  };
+
+  // 메시지 컨텍스트 메뉴 닫기
+  const closeMessageContextMenu = () => {
+    setMessageContextMenu({ show: false, x: 0, y: 0, messageText: '', isDeleted: false, isBlocked: false, isMuted: false });
+  };
+
+  // 메시지 복사 처리
+  const handleCopyMessage = async () => {
+    if (!messageContextMenu.messageText) return;
+
+    try {
+      await navigator.clipboard.writeText(messageContextMenu.messageText);
+      showToast?.('메시지가 복사되었습니다');
+      closeMessageContextMenu();
+    } catch (error) {
+      console.error('메시지 복사 실패:', error);
+      showToast?.('메시지 복사에 실패했습니다');
+    }
   };
 
   // 컨텍스트 메뉴 닫기
@@ -2829,6 +2897,10 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                             $collapsed={isCollapsible}
                             data-message-id={message.id}
                             style={isDeleted ? { background: 'rgba(180, 60, 60, 0.25)', border: '1px dashed rgba(255, 100, 100, 0.3)' } : isBlockedUser ? { background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)' } : isMutedUser ? { background: 'rgba(100, 100, 100, 0.3)', border: '1px dashed rgba(255, 255, 255, 0.2)' } : {}}
+                            onTouchStart={(e) => handleMessageTouchStart(e, messageText, isDeleted, isBlockedUser, isMutedUser)}
+                            onTouchEnd={handleMessageTouchEnd}
+                            onTouchCancel={handleMessageTouchCancel}
+                            onContextMenu={(e) => e.preventDefault()}
                           >
                             <S.MessageTextContent
                               ref={(isDeleted || isMutedUser || isBlockedUser) ? undefined : handleTextContentRef}
@@ -2923,6 +2995,43 @@ const ChatRoom = ({ chat, onClose, showToast, memos, onUpdateMemoPendingFlag, sy
                   </S.DropdownItem>
                 )
               )}
+            </div>
+          </>
+        )}
+
+        {/* 메시지 복사 컨텍스트 메뉴 */}
+        {messageContextMenu.show && (
+          <>
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 99998,
+                background: 'rgba(0, 0, 0, 0.3)'
+              }}
+              onClick={closeMessageContextMenu}
+            />
+            <div
+              style={{
+                position: 'fixed',
+                top: Math.min(messageContextMenu.y, window.innerHeight - 80),
+                left: messageContextMenu.x,
+                zIndex: 99999,
+                background: 'linear-gradient(180deg, #2a2a2a 0%, #1f1f1f 100%)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                borderRadius: '12px',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+                minWidth: '140px',
+                overflow: 'hidden'
+              }}
+            >
+              <S.DropdownItem onClick={handleCopyMessage}>
+                <Copy size={16} />
+                복사
+              </S.DropdownItem>
             </div>
           </>
         )}

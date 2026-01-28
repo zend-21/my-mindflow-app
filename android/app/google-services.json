@@ -49,6 +49,43 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:983598708482:android:426b34efcf0028e1a2741b",
+        "android_client_info": {
+          "package_name": "com.testsnote.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "983598708482-s1bp24napcatvmh3qbpc3qbcvvu5jube.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.testsnote.app",
+            "certificate_hash": "930284cf21b62ab41c370e50ae60f37bbacb51d8"
+          }
+        },
+        {
+          "client_id": "983598708482-8kackp0e1ti8nq3r67tpjj64slc3rf3p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAACF3K0ta3PtADJZcQ9nX98IWvo38sNXg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "983598708482-8kackp0e1ti8nq3r67tpjj64slc3rf3p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"
